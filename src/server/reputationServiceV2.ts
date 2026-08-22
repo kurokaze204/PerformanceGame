@@ -66,12 +66,29 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
   }
   event.turnoverChangeApplied = turnoverChange;
   event.netFinancialImpact = turnoverChange;
+
+  // Keep the same result shape as a normally resolved knowledge domain so the
+  // AAR/analytics pipeline can compare events consistently. The zero values are
+  // intentional: reputation bypassed the knowledge calculation rather than
+  // contributing knowledge to it.
   event.domainResults = event.card.domains.map((r) => ({
     domain: r.domain,
+    baseKnowledge: 0,
+    usableIntranet: 0,
+    team: 0,
+    localCodified: 0,
+    expertBonus: 0,
+    copBonus: 0,
+    automationBonus: 0,
+    consultantBonus: 0,
+    totalKnowledge: 0,
     difficulty: r.difficulty,
+    dieRoll: 0,
+    requiredTotal: r.difficulty,
+    achievedTotal: r.difficulty,
     domainSuccess: true,
     reputationOverride: true,
-    explanation: 'Resolved by spending one Reputation point; no knowledge capability was created.',
+    explanation: 'Resolved by spending one Reputation point; the knowledge challenge was bypassed and no knowledge capability was created.',
   }));
 
   await saveSessionV2(session);
