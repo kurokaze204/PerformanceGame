@@ -44,9 +44,7 @@ function combinedProbability(session: GameSessionV2, company: CompanyV2, event: 
 
 export async function captureSessionStart(session: GameSessionV2): Promise<void> {
   await initialiseAnalyticsRun(session);
-  for (const company of session.companies) {
-    await captureRoundReveals(session, company);
-  }
+  for (const company of session.companies) await captureRoundReveals(session, company);
 }
 
 export async function captureRoundReveals(session: GameSessionV2, company: CompanyV2): Promise<void> {
@@ -97,7 +95,7 @@ export async function setStrategyResponse(
     company.businessStrategyInitial = businessStrategy;
     company.knowledgeStrategyInitial = knowledgeStrategy;
   } else {
-    company.businessStrategyFinal = businessStrategy;
+    company.businessStrategyFinal = company.businessStrategyInitial || businessStrategy;
     company.knowledgeStrategyFinal = knowledgeStrategy;
   }
   await saveSessionV2(session);
