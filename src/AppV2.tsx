@@ -6,6 +6,7 @@ import { DOMAIN_INFO } from './types/game.ts';
 import type { ActiveEventV2, BusinessStrategy, CompanyV2, GameSessionV2, KnowledgeStrategy } from './types/gameV2.ts';
 import { calculateUsableIntranetV2 } from './engine/coreV2.ts';
 import { AustraliaMap } from './components/AustraliaMap.tsx';
+import type { SiteImpactEffect } from './components/AustraliaMap.tsx';
 import { EventDecisionCardV2 } from './components/EventDecisionCardV2.tsx';
 import { ActionTokens } from './components/ActionTokens.tsx';
 import { SharedGameTimer } from './components/SharedGameTimer.tsx';
@@ -38,10 +39,29 @@ export function AppV2() {
   const [selectedSiteId, setSelectedSiteId] = useState('melbourne');
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
   const [notification, setNotification] = useState<string | null>(null);
+  const [impactEffect, setImpactEffect] = useState<SiteImpactEffect | null>(null);
 
   const toast = (message: string) => {
     setNotification(message);
     window.setTimeout(() => setNotification((v) => v === message ? null : v), 4000);
+  };
+
+  const showFinancialImpact = (nextSession: GameSessionV2, extraData: any) => {
+    const companyId = participant?.companyId || localStorage.getItem('tpg_company_id');
+    if (!companyId || extraData?.companyId !== companyId) return;
+    const amount = Number(extraData?.result?.turnoverChange || 0);
+    if (!amount) return;
+    const companyNow = nextSession.companies.find((c) => c.id === companyId);
+    if (!companyNow) return;
+    const enterprise = extraData?.scope === 'enterprise';
+    const siteIds = enterprise
+      ? companyNow.sites.filter((s) => !s.isClosed).map((s) => s.id)
+      : extraData?.targetSiteId ? [String(extraData.targetSiteId)] : [];
+    if (!siteIds.length) return;
+    if (!enterprise) setSelectedSiteId(siteIds[0]);
+    const effect: SiteImpactEffect = { id: `${extraData.eventInstanceId}-${Date.now()}`, siteIds, amount, enterprise };
+    setImpactEffect(effect);
+    window.setTimeout(() => setImpactEffect((current) => current?.id === effect.id ? null : current), 1900);
   };
 
   useEffect(() => {
@@ -64,11 +84,14 @@ export function AppV2() {
     stream.onmessage = (message) => {
       try {
         const data = JSON.parse(message.data);
-        if (data.session) setSession(data.session);
+        if (data.session) {
+          if (data.type === 'EVENT_RESOLVED') showFinancialImpact(data.session, data.extraData);
+          setSession(data.session);
+        }
       } catch { /* ignore keepalive */ }
     };
     return () => stream.close();
-  }, [session?.id]);
+  }, [session?.id, participant?.companyId]);
 
   const company: CompanyV2 | undefined = useMemo(() => {
     if (!session) return undefined;
@@ -230,12 +253,12 @@ export function AppV2() {
           <div className="flex items-center gap-2 flex-wrap">
             {playPhases.map((phase, idx) => <React.Fragment key={phase}><div className={`rounded-full px-4 py-2 text-sm font-black ${phase === session.phase ? 'bg-indigo-500 text-white' : idx < currentPhaseIndex ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-950 text-slate-600 border border-slate-800'}`}>{PHASE_LABELS[phase]}</div>{idx < playPhases.length - 1 && <ArrowRight className="w-4 h-4 text-slate-700"/>}</React.Fragment>)}
           </div>
-          <div className="flex items-center gap-3"><span className="font-bold text-white">Round {Math.min(session.round, session.config.rounds)} of {session.config.rounds}</span>{isFacilitator && session.round <= session.config.rounds && <button onClick={advancePhase} className="rounded-xl bg-white text-slate-950 px-4 py-2 font-black">Next stage</button>}</div>
+          <div className="flex items-center gap-3"><span className="font-bold text-white">Round {Math.min(session.round, session.config.rounds)} of {session.config.rounds}</span>{isFacilitator && session.phase !== 'respond' && session.round <= session.config.rounds && <button onClick={advancePhase} className="rounded-xl bg-white text-slate-950 px-4 py-2 font-black">Next stage</button>}</div>
         </section>
 
         <section className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-4">
           <div className="rounded-3xl border border-slate-800 bg-slate-900/50 p-3 overflow-hidden">
-            <AustraliaMap company={company} selectedSiteId={selectedSiteId} onSelectSite={setSelectedSiteId} onSelectHQ={() => undefined} isHQSelected={false} onSelectExpert={() => undefined}/>
+            <AustraliaMap company={company} selectedSiteId={selectedSiteId} onSelectSite={setSelectedSiteId} onSelectHQ={() => undefined} isHQSelected={false} onSelectExpert={() => undefined} impactEffect={impactEffect}/>
           </div>
           <aside className="rounded-3xl border border-slate-800 bg-slate-900/70 p-4">
             <div className="flex items-center justify-between"><div><div className="text-xs uppercase tracking-widest text-slate-500 font-bold">Selected site</div><div className="text-xl font-black text-white mt-1 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-400"/>{selectedSite.name}</div></div><div className="text-right"><div className="text-xs text-slate-500">Turnover</div><div className="font-black text-white">{formatCurrency(selectedSite.turnover)}</div></div></div>
@@ -252,18 +275,14 @@ export function AppV2() {
         )}
 
         {session.phase === 'consequences' && <ConsequencesModal session={session} company={company} onApplyLearning={applyLearning} onNextPhase={advancePhase}/>} 
-
         {session.phase === 'investment' && <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 space-y-6"><div className="text-center"><h2 className="text-2xl font-black text-white">Invest in next round's capability</h2><p className="text-slate-400 mt-1">Every action you spend is one less action available this round.</p></div><ActionTokens remaining={company.actionsRemaining} total={session.config.actions_per_round}/><ActionsPanel session={session} company={company} onPerformAction={performAction} onNextPhase={advancePhase}/></section>}
-
         {session.phase === 'risk' && <AttritionModal session={session} company={company} phaseResult={{attritionSummaries:session.riskResults || {}}} onAdvanceToNextRound={advancePhase}/>} 
-
         {session.isFinalDisruptionActive && <FinalDisruptionModal session={session} company={company} onResolveFinalDisruption={async()=>{const res=await fetch(`/api/sessions/${session.id}/resolve-final-disruption`,{method:'POST'});const data=await res.json(); if(data.session)setSession(data.session);}} onOpenAAR={()=>toast('AAR evidence is now being captured; chart presentation is the next UI pass.')}/>} 
       </main>
 
       {showJoin && <SessionJoinModal currentSession={session} onJoinSession={join} onCreateNewSession={create} onSoloStart={solo}/>} 
       {needsInitialStrategy && <StrategyPromptV2 stage="initial" onSubmit={(business, knowledge) => submitStrategy('initial', business, knowledge)}/>} 
       {needsFinalStrategy && <StrategyPromptV2 stage="final" originalBusinessStrategy={company.businessStrategyInitial} originalKnowledgeStrategy={company.knowledgeStrategyInitial} onSubmit={(business, knowledge) => submitStrategy('final', business, knowledge)}/>} 
-
       {notification && <div className="fixed bottom-5 right-5 z-[100] rounded-2xl bg-white text-slate-950 px-5 py-3 shadow-2xl font-bold max-w-md flex items-start gap-2"><AlertTriangle className="w-5 h-5 text-amber-600 shrink-0"/>{notification}</div>}
     </div>
   );
