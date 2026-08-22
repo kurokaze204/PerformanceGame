@@ -180,11 +180,12 @@ export async function saveSessionV2(sessionInput: GameSession): Promise<void> {
 
 export async function initialiseAnalyticsRun(session: GameSessionV2): Promise<void> {
   if (!pool) return;
-  await pool.query(`
+  const inserted = await pool.query(`
     INSERT INTO performance_gap.game_runs_v2
       (session_id,title,rules_version,deck_version,balance_version,companies_count,started_at)
     VALUES ($1,$2,$3,$4,$5,$6,$7)
     ON CONFLICT (session_id) DO NOTHING
+    RETURNING session_id
   `, [session.id, session.title, session.rulesVersion, session.deckVersion, session.balanceVersion, session.companies.length, session.createdAt]);
 
   for (const company of session.companies) {
@@ -195,7 +196,7 @@ export async function initialiseAnalyticsRun(session: GameSessionV2): Promise<vo
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       ON CONFLICT (session_id,company_id) DO NOTHING
     `, [session.id, company.id, company.name, company.startingTurnover, m.avgTeamCapability, m.avgCodifiedKnowledge, m.avgCorporateIntranet, m.avgUsableIntranet]);
-    await recordCompanyMetric(session, company, 'GAME_START');
+    if (inserted.rowCount) await recordCompanyMetric(session, company, 'GAME_START');
   }
 }
 
