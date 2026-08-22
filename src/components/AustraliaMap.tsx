@@ -35,23 +35,37 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
   const expertsAtHQ = company.experts.filter((e) => !e.isVacant && e.location === 'HQ');
   const getExpertsAtSite = (siteId: string) => company.experts.filter((e) => !e.isVacant && e.location === siteId);
   const [displayedImpactEffect, setDisplayedImpactEffect] = useState<SiteImpactEffect | null>(null);
+  const [impactProgress, setImpactProgress] = useState(0);
   const impactStartTimer = useRef<number | null>(null);
   const impactEndTimer = useRef<number | null>(null);
+  const impactFrame = useRef<number | null>(null);
 
   // A challenge can be resolved while the player is scrolled down at the card.
-  // Bring the map back into view first, then hold the financial impact on screen
-  // long enough for the player to register what happened.
+  // Bring the map back into view first, then animate both the financial impact
+  // and the affected turnover over four seconds.
   useEffect(() => {
     if (!impactEffect) return;
 
     if (impactStartTimer.current) window.clearTimeout(impactStartTimer.current);
     if (impactEndTimer.current) window.clearTimeout(impactEndTimer.current);
+    if (impactFrame.current) window.cancelAnimationFrame(impactFrame.current);
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
     impactStartTimer.current = window.setTimeout(() => {
       setDisplayedImpactEffect(impactEffect);
+      setImpactProgress(0);
+
+      const startedAt = performance.now();
+      const animate = (now: number) => {
+        const progress = Math.min(1, (now - startedAt) / 4000);
+        setImpactProgress(progress);
+        if (progress < 1) impactFrame.current = window.requestAnimationFrame(animate);
+      };
+      impactFrame.current = window.requestAnimationFrame(animate);
+
       impactEndTimer.current = window.setTimeout(() => {
         setDisplayedImpactEffect((current) => current?.id === impactEffect.id ? null : current);
+        setImpactProgress(0);
       }, 4200);
     }, 500);
   }, [impactEffect?.id]);
@@ -59,9 +73,15 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
   useEffect(() => () => {
     if (impactStartTimer.current) window.clearTimeout(impactStartTimer.current);
     if (impactEndTimer.current) window.clearTimeout(impactEndTimer.current);
+    if (impactFrame.current) window.cancelAnimationFrame(impactFrame.current);
   }, []);
 
   const activeImpact = displayedImpactEffect;
+  const animatedImpactAmount = activeImpact ? Math.round(activeImpact.amount * impactProgress) : 0;
+  const enterpriseStartTurnover = activeImpact?.enterprise ? company.turnover - activeImpact.amount : company.turnover;
+  const animatedEnterpriseTurnover = activeImpact?.enterprise
+    ? Math.round(enterpriseStartTurnover + activeImpact.amount * impactProgress)
+    : company.turnover;
 
   const { coastSquares, ocean1Squares, ocean2Squares, ocean3Squares, ocean4Squares, interiorSquares } = useMemo(() => {
     const coast: typeof AUSTRALIA_GRID.squares = [];
@@ -91,9 +111,10 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
           initial={{ opacity: 0, scale: 0.75, y: 10 }}
           animate={{ opacity: [0, 1, 1, 1, 0], scale: [0.75, 1.18, 1.08, 1, 1], y: [10, -6, -10, -16, -24] }}
           transition={{ duration: 4, times: [0, 0.12, 0.3, 0.82, 1] }}
-          className={`absolute left-1/2 top-[42%] -translate-x-1/2 z-40 rounded-2xl border-2 px-7 py-4 text-4xl font-black shadow-2xl pointer-events-none ${activeImpact.amount > 0 ? 'bg-emerald-950/95 border-emerald-400 text-emerald-200' : 'bg-rose-950/95 border-rose-400 text-rose-200'}`}
+          className={`absolute left-1/2 top-[42%] -translate-x-1/2 z-40 rounded-2xl border-2 px-7 py-4 text-center shadow-2xl pointer-events-none ${activeImpact.amount > 0 ? 'bg-emerald-950/95 border-emerald-400 text-emerald-200' : 'bg-rose-950/95 border-rose-400 text-rose-200'}`}
         >
-          COMPANY {activeImpact.amount > 0 ? '+' : '−'}{formatCurrency(Math.abs(activeImpact.amount))}
+          <div className="text-4xl font-black tabular-nums">COMPANY {activeImpact.amount > 0 ? '+' : '−'}{formatCurrency(Math.abs(animatedImpactAmount))}</div>
+          <div className="mt-1 text-sm font-bold text-white/80 tabular-nums">Turnover {formatCurrency(enterpriseStartTurnover)} → {formatCurrency(animatedEnterpriseTurnover)}</div>
         </motion.div>
       )}
 
@@ -162,6 +183,9 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
         const residentExperts = getExpertsAtSite(site.id);
         const hasSPOF = residentExperts.some((e) => e.isSPOF);
         const isImpacting = !!activeImpact?.siteIds.includes(site.id);
+        const localImpact = isImpacting && !activeImpact?.enterprise && activeImpact ? activeImpact.amount : 0;
+        const startingTurnover = localImpact ? site.turnover - localImpact : site.turnover;
+        const displayedTurnover = localImpact ? Math.round(startingTurnover + localImpact * impactProgress) : site.turnover;
 
         let transformClass = 'translate(-50%, -50%)';
         if (site.id === 'adelaide') transformClass = 'translate(-100%, -50%)';
@@ -194,15 +218,16 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
                 initial={{ opacity: 0, scale: 0.7, y: 8 }}
                 animate={{ opacity: [0, 1, 1, 1, 0], scale: [0.7, 1.2, 1.08, 1, 1], y: [8, -8, -12, -18, -28] }}
                 transition={{ duration: 4, times: [0, 0.12, 0.3, 0.82, 1] }}
-                className={`absolute -top-10 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-xl border-2 px-4 py-2 text-2xl font-black shadow-2xl pointer-events-none ${activeImpact.amount > 0 ? 'bg-emerald-950 border-emerald-300 text-emerald-200' : 'bg-rose-950 border-rose-300 text-rose-200'}`}
+                className={`absolute -top-14 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-xl border-2 px-4 py-2 text-center shadow-2xl pointer-events-none ${activeImpact.amount > 0 ? 'bg-emerald-950 border-emerald-300 text-emerald-200' : 'bg-rose-950 border-rose-300 text-rose-200'}`}
               >
-                {activeImpact.amount > 0 ? '+' : '−'}{formatCurrency(Math.abs(activeImpact.amount))}
+                <div className="text-2xl font-black tabular-nums">{activeImpact.amount > 0 ? '+' : '−'}{formatCurrency(Math.abs(animatedImpactAmount))}</div>
+                <div className="mt-0.5 text-[10px] font-bold text-white/80 tabular-nums">Turnover {formatCurrency(startingTurnover)} → {formatCurrency(displayedTurnover)}</div>
               </motion.div>
             )}
 
             <div className="flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5 truncate"><span className={`w-1.5 h-1.5 rounded-full shrink-0 ${site.isClosed ? 'bg-rose-500' : 'bg-emerald-400 shadow-xs shadow-emerald-400'}`} /><span className="text-xs font-semibold text-white tracking-tight truncate">{site.name}</span></div>
-              <span className={`text-xs font-mono font-bold shrink-0 ${site.isClosed ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(site.turnover)}</span>
+              <span className={`text-xs font-mono font-bold shrink-0 tabular-nums ${site.isClosed ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(displayedTurnover)}</span>
             </div>
 
             <div className="flex items-center gap-1 mt-1 flex-wrap">
