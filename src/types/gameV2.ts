@@ -39,6 +39,7 @@ export interface ActiveEventV2 extends ActiveEvent {
   turnoverBefore?: number;
   siteTurnoverBefore?: number | null;
   netFinancialImpact?: number;
+  reputationUsed?: boolean;
 }
 
 export interface ExpertV2 extends Expert {
@@ -53,6 +54,8 @@ export interface CompanyV2 extends Company {
   problemEventsDrawn: number;
   opportunityEventsDrawn: number;
   horizonScanAvailableRound: number | null;
+  reputationPoints: number;
+  reputationPointsStarted: number;
 
   // AAR / benchmarking state
   businessStrategyInitial: BusinessStrategy | null;
@@ -102,6 +105,7 @@ export interface V2BalanceConfig {
   lateBalanceElapsedMinutes: number;
   lateBalanceMaxTypeGap: number;
   timerDurationSeconds: number;
+  startingReputationPoints: number;
 }
 
 export const V2_BALANCE: V2BalanceConfig = {
@@ -112,12 +116,13 @@ export const V2_BALANCE: V2BalanceConfig = {
   lateBalanceElapsedMinutes: 40,
   lateBalanceMaxTypeGap: 2,
   timerDurationSeconds: 50 * 60,
+  startingReputationPoints: 3,
 };
 
 export const V2_VERSION = {
-  rules: '2.0.0-alpha.2',
-  deck: '1.0.0',
-  balance: '2.0.0-alpha.2',
+  rules: '2.1.0-alpha.1',
+  deck: '1.1.0',
+  balance: '2.1.0-alpha.1',
 };
 
 export function asCompanyV2(company: Company): CompanyV2 {
@@ -128,6 +133,8 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.problemEventsDrawn ??= 0;
   c.opportunityEventsDrawn ??= 0;
   c.horizonScanAvailableRound ??= null;
+  c.reputationPointsStarted ??= V2_BALANCE.startingReputationPoints;
+  c.reputationPoints ??= c.reputationPointsStarted;
   c.businessStrategyInitial ??= null;
   c.knowledgeStrategyInitial ??= null;
   c.businessStrategyFinal ??= null;
