@@ -18,8 +18,8 @@ import { StrategyPromptV2 } from './components/StrategyPromptV2.tsx';
 import { formatCurrency } from './utils/format.ts';
 
 const PHASE_LABELS: Record<GameSessionV2['phase'], string> = {
-  events: 'Events',
-  respond: 'Respond',
+  events: 'Challenges',
+  respond: 'Challenges',
   consequences: 'Results',
   investment: 'Invest',
   risk: 'Knowledge Risk',
@@ -204,7 +204,8 @@ export function AppV2() {
   const selectedEvent = events[Math.min(selectedEventIndex, Math.max(0, events.length - 1))];
   const selectedSite = company.sites.find((s) => s.id === selectedSiteId) || company.sites[0];
   const isFacilitator = participant?.role === 'facilitator';
-  const currentPhaseIndex = ['events', 'respond', 'consequences', 'investment', 'risk'].indexOf(session.phase);
+  const playPhases = ['respond', 'consequences', 'investment', 'risk'] as const;
+  const currentPhaseIndex = playPhases.indexOf(session.phase as typeof playPhases[number]);
   const horizonCanRedraw = selectedEvent && company.horizonScanAvailableRound === session.round && !company.horizonScanUsedThisRound && !!company.horizonScanDomain && selectedEvent.card.domains.some((r) => r.domain === company.horizonScanDomain);
   const needsInitialStrategy = !!participant && !isFacilitator && !company.knowledgeStrategyInitial;
   const needsFinalStrategy = !!participant && !isFacilitator && !!session.finalDisruptionResolved && !company.knowledgeStrategyFinal;
@@ -227,7 +228,7 @@ export function AppV2() {
       <main className="max-w-[1500px] mx-auto px-4 py-5 space-y-5">
         <section className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-wrap">
-            {(['events','respond','consequences','investment','risk'] as const).map((phase, idx) => <React.Fragment key={phase}><div className={`rounded-full px-4 py-2 text-sm font-black ${phase === session.phase ? 'bg-indigo-500 text-white' : idx < currentPhaseIndex ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-950 text-slate-600 border border-slate-800'}`}>{PHASE_LABELS[phase]}</div>{idx < 4 && <ArrowRight className="w-4 h-4 text-slate-700"/>}</React.Fragment>)}
+            {playPhases.map((phase, idx) => <React.Fragment key={phase}><div className={`rounded-full px-4 py-2 text-sm font-black ${phase === session.phase ? 'bg-indigo-500 text-white' : idx < currentPhaseIndex ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-950 text-slate-600 border border-slate-800'}`}>{PHASE_LABELS[phase]}</div>{idx < playPhases.length - 1 && <ArrowRight className="w-4 h-4 text-slate-700"/>}</React.Fragment>)}
           </div>
           <div className="flex items-center gap-3"><span className="font-bold text-white">Round {Math.min(session.round, session.config.rounds)} of {session.config.rounds}</span>{isFacilitator && session.round <= session.config.rounds && <button onClick={advancePhase} className="rounded-xl bg-white text-slate-950 px-4 py-2 font-black">Next stage</button>}</div>
         </section>
@@ -242,9 +243,9 @@ export function AppV2() {
           </aside>
         </section>
 
-        {(session.phase === 'events' || session.phase === 'respond') && !session.isFinalDisruptionActive && (
+        {session.phase === 'respond' && !session.isFinalDisruptionActive && (
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-4"><div><h2 className="text-2xl font-black text-white">{session.phase === 'events' ? 'Two things have happened.' : 'How will you respond?'}</h2><p className="text-slate-400 text-sm mt-1">Review both cards before committing. You can switch between them while planning.</p></div>{session.phase === 'events' && isFacilitator && <button onClick={advancePhase} className="rounded-2xl bg-indigo-500 text-white px-5 py-3 font-black">Start responding <ArrowRight className="inline w-4 h-4 ml-1"/></button>}</div>
+            <div><h2 className="text-2xl font-black text-white">How will you respond?</h2><p className="text-slate-300 text-sm mt-1">Each turn you will be presented with two challenge cards they might be good or bad, either way you need to find the particular expertise to solve them.</p><p className="text-slate-500 text-sm mt-1">Review both cards before committing. You can switch between them while planning.</p></div>
             <div className="grid sm:grid-cols-2 gap-3">{events.map((evt, idx) => <motion.button initial={{opacity:0,y:18,rotate:idx===0?-1.5:1.5}} animate={{opacity:1,y:0,rotate:0}} transition={{delay:idx*0.12}} key={evt.instanceId} onClick={() => {setSelectedEventIndex(idx); if(evt.targetSiteId) setSelectedSiteId(evt.targetSiteId);}} className={`rounded-2xl p-4 border-2 text-left ${selectedEventIndex===idx?'border-white bg-slate-800':'border-slate-700 bg-slate-900 opacity-70 hover:opacity-100'}`}><div className="flex justify-between gap-3"><div><div className={`text-xs uppercase font-black tracking-widest ${evt.card.type==='problem'?'text-rose-400':'text-emerald-400'}`}>{evt.card.type}</div><div className="font-black text-white mt-1">{evt.card.title}</div></div>{evt.isResolved && <span className={`self-start rounded-full px-2 py-1 text-xs font-black ${evt.success?'bg-emerald-950 text-emerald-300':'bg-rose-950 text-rose-300'}`}>{evt.success?'DONE':'FAILED'}</span>}</div></motion.button>)}</div>
             {selectedEvent && <EventDecisionCardV2 session={session} company={company} event={selectedEvent} cardNumber={selectedEventIndex+1} onSetAllocation={setAllocation} onResolveEvent={resolveEvent} onRedrawEvent={redrawEvent} canHorizonRedraw={!!horizonCanRedraw}/>} 
           </section>
