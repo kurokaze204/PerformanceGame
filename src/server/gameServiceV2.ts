@@ -68,7 +68,7 @@ export async function createNewSessionV2(sessionId: string, title: string, compa
     id,
     title,
     round: 1,
-    phase: 'events',
+    phase: 'respond',
     isPaused: false,
     isFinalDisruptionActive: false,
     companies,
@@ -145,7 +145,7 @@ export async function redrawEventV2(sessionId: string, companyId: string, eventI
 
 export async function resolveEventV2(sessionId: string, companyId: string, eventInstanceId?: string) {
   const session = await getSessionOrThrow(sessionId);
-  if (session.phase !== 'respond') return { success: false, message: 'Move to Respond before resolving events.', session };
+  if (session.phase !== 'respond') return { success: false, message: 'Challenges can only be resolved during the challenge phase.', session };
   const company = session.companies.find((c) => c.id === companyId); if (!company) throw new Error('Company not found.');
   const events = session.activeEvents[company.id] || [];
   const event = eventInstanceId ? events.find((e) => e.instanceId === eventInstanceId) : events.find((e) => !e.isResolved);
@@ -192,11 +192,11 @@ export async function advancePhaseV2(sessionId: string, requested?: GamePhase) {
     else if (session.phase === 'respond') next = 'consequences';
     else if (session.phase === 'consequences') next = 'investment';
     else if (session.phase === 'investment') next = 'risk';
-    else next = 'events';
+    else next = 'respond';
   }
 
   if (session.phase === 'respond' && next === 'consequences' && !allCompanyEventsResolved(session)) {
-    return { success: false, message: 'Every company must resolve both events before Consequences.', session };
+    return { success: false, message: 'Every company must resolve both challenges before Results.', session };
   }
 
   if (next === 'risk' && session.phase === 'investment') {
@@ -211,7 +211,7 @@ export async function advancePhaseV2(sessionId: string, requested?: GamePhase) {
     return { success: true, session, phaseResult: { attritionSummaries: summaries } };
   }
 
-  if (session.phase === 'risk' && next === 'events') {
+  if (session.phase === 'risk' && next === 'respond') {
     session.round += 1;
     session.riskResults = null;
     if (session.round > session.config.rounds) {
@@ -224,7 +224,7 @@ export async function advancePhaseV2(sessionId: string, requested?: GamePhase) {
     }
     prepareNextRoundV2(session);
     for (const company of session.companies) session.activeEvents[company.id] = drawRoundEventsV2(session, company);
-    session.phase = 'events';
+    session.phase = 'respond';
     await saveAndBroadcast(session, 'ROUND_STARTED', { round: session.round });
     return { success: true, session };
   }
