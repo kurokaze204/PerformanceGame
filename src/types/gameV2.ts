@@ -8,6 +8,22 @@ import {
   KnowledgeDomain,
 } from './game.ts';
 
+export type BusinessStrategy =
+  | 'short_term_profit'
+  | 'growth'
+  | 'downside_protection'
+  | 'balanced'
+  | 'adaptive';
+
+export type KnowledgeStrategy =
+  | 'rely_on_people'
+  | 'build_team_capability'
+  | 'capture_knowledge'
+  | 'build_networks'
+  | 'automate_critical_knowledge'
+  | 'buy_expertise'
+  | 'no_particular_strategy';
+
 export interface ActiveEventAllocationV2 extends ActiveEventAllocation {
   consultantPoints?: number;
   consultantCost?: number;
@@ -18,6 +34,11 @@ export interface ActiveEventV2 extends ActiveEvent {
   allocations: Record<KnowledgeDomain, ActiveEventAllocationV2>;
   resolvedAt?: string;
   consultantSpend?: number;
+  revealProbabilityPercent?: number;
+  committedProbabilityPercent?: number;
+  turnoverBefore?: number;
+  siteTurnoverBefore?: number | null;
+  netFinancialImpact?: number;
 }
 
 export interface ExpertV2 extends Expert {
@@ -32,6 +53,16 @@ export interface CompanyV2 extends Company {
   problemEventsDrawn: number;
   opportunityEventsDrawn: number;
   horizonScanAvailableRound: number | null;
+
+  // AAR / benchmarking state
+  businessStrategyInitial: BusinessStrategy | null;
+  knowledgeStrategyInitial: KnowledgeStrategy | null;
+  businessStrategyFinal: BusinessStrategy | null;
+  knowledgeStrategyFinal: KnowledgeStrategy | null;
+  expectedSuccesses: number;
+  actualSuccesses: number;
+  cumulativeKnowledgeSpend: number;
+  cumulativeConsultantSpend: number;
 }
 
 export interface RiskSummaryV2 {
@@ -58,6 +89,9 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   timerEndsAt: string | null;
   timerPausedSecondsRemaining: number | null;
   riskResults: Record<string, RiskSummaryV2> | null;
+  rulesVersion: string;
+  deckVersion: string;
+  balanceVersion: string;
 }
 
 export interface V2BalanceConfig {
@@ -80,6 +114,12 @@ export const V2_BALANCE: V2BalanceConfig = {
   timerDurationSeconds: 50 * 60,
 };
 
+export const V2_VERSION = {
+  rules: '2.0.0-alpha.2',
+  deck: '1.0.0',
+  balance: '2.0.0-alpha.2',
+};
+
 export function asCompanyV2(company: Company): CompanyV2 {
   const c = company as CompanyV2;
   c.consultantEngagements ??= 0;
@@ -88,6 +128,14 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.problemEventsDrawn ??= 0;
   c.opportunityEventsDrawn ??= 0;
   c.horizonScanAvailableRound ??= null;
+  c.businessStrategyInitial ??= null;
+  c.knowledgeStrategyInitial ??= null;
+  c.businessStrategyFinal ??= null;
+  c.knowledgeStrategyFinal ??= null;
+  c.expectedSuccesses ??= 0;
+  c.actualSuccesses ??= 0;
+  c.cumulativeKnowledgeSpend ??= 0;
+  c.cumulativeConsultantSpend ??= 0;
   return c;
 }
 
@@ -98,5 +146,8 @@ export function asSessionV2(session: GameSession): GameSessionV2 {
   s.timerEndsAt ??= null;
   s.timerPausedSecondsRemaining ??= null;
   s.riskResults ??= null;
+  s.rulesVersion ??= V2_VERSION.rules;
+  s.deckVersion ??= V2_VERSION.deck;
+  s.balanceVersion ??= V2_VERSION.balance;
   return s;
 }
