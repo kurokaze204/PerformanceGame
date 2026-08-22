@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Company, Expert, DOMAIN_INFO } from '../types/game.ts';
 import { HQ_COORDINATES } from '../engine/config.ts';
@@ -34,6 +34,34 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
 }) => {
   const expertsAtHQ = company.experts.filter((e) => !e.isVacant && e.location === 'HQ');
   const getExpertsAtSite = (siteId: string) => company.experts.filter((e) => !e.isVacant && e.location === siteId);
+  const [displayedImpactEffect, setDisplayedImpactEffect] = useState<SiteImpactEffect | null>(null);
+  const impactStartTimer = useRef<number | null>(null);
+  const impactEndTimer = useRef<number | null>(null);
+
+  // A challenge can be resolved while the player is scrolled down at the card.
+  // Bring the map back into view first, then hold the financial impact on screen
+  // long enough for the player to register what happened.
+  useEffect(() => {
+    if (!impactEffect) return;
+
+    if (impactStartTimer.current) window.clearTimeout(impactStartTimer.current);
+    if (impactEndTimer.current) window.clearTimeout(impactEndTimer.current);
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    impactStartTimer.current = window.setTimeout(() => {
+      setDisplayedImpactEffect(impactEffect);
+      impactEndTimer.current = window.setTimeout(() => {
+        setDisplayedImpactEffect((current) => current?.id === impactEffect.id ? null : current);
+      }, 4200);
+    }, 500);
+  }, [impactEffect?.id]);
+
+  useEffect(() => () => {
+    if (impactStartTimer.current) window.clearTimeout(impactStartTimer.current);
+    if (impactEndTimer.current) window.clearTimeout(impactEndTimer.current);
+  }, []);
+
+  const activeImpact = displayedImpactEffect;
 
   const { coastSquares, ocean1Squares, ocean2Squares, ocean3Squares, ocean4Squares, interiorSquares } = useMemo(() => {
     const coast: typeof AUSTRALIA_GRID.squares = [];
@@ -57,15 +85,15 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
     <div className="relative w-full aspect-[4/3] sm:aspect-[16/11] min-h-[560px] lg:min-h-[620px] bg-[#060a0f] rounded-xl border border-[#30363d] shadow-2xl overflow-hidden p-2 sm:p-4 select-none flex flex-col justify-between">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#0d1620]/60 via-[#060a0f] to-[#030609] pointer-events-none" />
 
-      {impactEffect?.enterprise && impactEffect.amount !== 0 && (
+      {activeImpact?.enterprise && activeImpact.amount !== 0 && (
         <motion.div
-          key={`enterprise-impact-${impactEffect.id}`}
+          key={`enterprise-impact-${activeImpact.id}`}
           initial={{ opacity: 0, scale: 0.75, y: 10 }}
-          animate={{ opacity: [0, 1, 1, 0], scale: [0.75, 1.1, 1, 1], y: [10, -8, -18, -28] }}
-          transition={{ duration: 1.8, times: [0, 0.18, 0.72, 1] }}
-          className={`absolute left-1/2 top-[42%] -translate-x-1/2 z-40 rounded-2xl border-2 px-5 py-3 text-2xl font-black shadow-2xl pointer-events-none ${impactEffect.amount > 0 ? 'bg-emerald-950/95 border-emerald-400 text-emerald-200' : 'bg-rose-950/95 border-rose-400 text-rose-200'}`}
+          animate={{ opacity: [0, 1, 1, 1, 0], scale: [0.75, 1.18, 1.08, 1, 1], y: [10, -6, -10, -16, -24] }}
+          transition={{ duration: 4, times: [0, 0.12, 0.3, 0.82, 1] }}
+          className={`absolute left-1/2 top-[42%] -translate-x-1/2 z-40 rounded-2xl border-2 px-7 py-4 text-4xl font-black shadow-2xl pointer-events-none ${activeImpact.amount > 0 ? 'bg-emerald-950/95 border-emerald-400 text-emerald-200' : 'bg-rose-950/95 border-rose-400 text-rose-200'}`}
         >
-          COMPANY {impactEffect.amount > 0 ? '+' : '−'}{formatCurrency(Math.abs(impactEffect.amount))}
+          COMPANY {activeImpact.amount > 0 ? '+' : '−'}{formatCurrency(Math.abs(activeImpact.amount))}
         </motion.div>
       )}
 
@@ -116,7 +144,7 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
       <div
         style={{ left: `${HQ_COORDINATES.x}%`, top: `${HQ_COORDINATES.y}%`, transform: 'translate(-50%, -50%)' }}
         onClick={onSelectHQ}
-        className={`absolute z-20 cursor-pointer p-2.5 rounded-lg border transition-all duration-150 shadow-xl ${isHQSelected ? 'bg-[#161b22] border-indigo-500 ring-2 ring-indigo-500/50 scale-105 shadow-indigo-500/20' : 'bg-[#12161f]/95 border-[#30363d] hover:border-indigo-400 hover:scale-[1.075]'}`}
+        className={`absolute z-20 cursor-pointer p-2.5 rounded-lg border transition-all duration-200 shadow-xl ${isHQSelected ? 'bg-[#161b22] border-indigo-500 ring-2 ring-indigo-500/50 scale-110 shadow-indigo-500/20' : 'bg-[#12161f]/95 border-[#30363d] hover:border-indigo-400 hover:scale-150 hover:z-30'}`}
       >
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded bg-indigo-600/25 border border-indigo-500/50 flex items-center justify-center text-indigo-400 shadow-inner"><Building2 className="w-4 h-4" /></div>
@@ -133,7 +161,7 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
         const isSelected = selectedSiteId === site.id;
         const residentExperts = getExpertsAtSite(site.id);
         const hasSPOF = residentExperts.some((e) => e.isSPOF);
-        const isImpacting = !!impactEffect?.siteIds.includes(site.id);
+        const isImpacting = !!activeImpact?.siteIds.includes(site.id);
 
         let transformClass = 'translate(-50%, -50%)';
         if (site.id === 'adelaide') transformClass = 'translate(-100%, -50%)';
@@ -148,27 +176,27 @@ export const AustraliaMap: React.FC<AustraliaMapProps> = ({
             key={site.id}
             style={{ left: `${site.coordinates.x}%`, top: `${site.coordinates.y}%`, transform: transformClass }}
             onClick={() => onSelectSite(site.id)}
-            className={`absolute z-20 cursor-pointer p-2 rounded-lg border transition-all duration-200 min-w-[120px] max-w-[140px] shadow-lg backdrop-blur-xs ${
+            className={`absolute z-20 cursor-pointer p-2 rounded-lg border transition-all duration-300 min-w-[120px] max-w-[140px] shadow-lg backdrop-blur-xs ${
               site.isClosed
                 ? 'bg-[#161b22]/75 border-rose-900/60 opacity-60'
                 : isImpacting
-                ? impactEffect && impactEffect.amount >= 0
-                  ? 'bg-emerald-950/95 border-emerald-300 ring-4 ring-emerald-400/50 scale-[1.075] shadow-emerald-400/40'
-                  : 'bg-rose-950/95 border-rose-300 ring-4 ring-rose-400/50 scale-[1.075] shadow-rose-400/40'
+                ? activeImpact && activeImpact.amount >= 0
+                  ? 'bg-emerald-950/95 border-emerald-300 ring-4 ring-emerald-400/50 scale-150 z-30 shadow-emerald-400/40'
+                  : 'bg-rose-950/95 border-rose-300 ring-4 ring-rose-400/50 scale-150 z-30 shadow-rose-400/40'
                 : isSelected
-                ? 'bg-[#161b22] border-emerald-400 ring-2 ring-emerald-400/50 scale-105 shadow-emerald-500/20 hover:scale-[1.075]'
-                : 'bg-[#12161f]/95 border-[#30363d] hover:border-emerald-500/70 hover:scale-[1.075]'
+                ? 'bg-[#161b22] border-emerald-400 ring-2 ring-emerald-400/50 scale-110 shadow-emerald-500/20 hover:scale-150 hover:z-30'
+                : 'bg-[#12161f]/95 border-[#30363d] hover:border-emerald-500/70 hover:scale-150 hover:z-30'
             }`}
           >
-            {isImpacting && !impactEffect?.enterprise && impactEffect && impactEffect.amount !== 0 && (
+            {isImpacting && !activeImpact?.enterprise && activeImpact && activeImpact.amount !== 0 && (
               <motion.div
-                key={`${site.id}-${impactEffect.id}`}
+                key={`${site.id}-${activeImpact.id}`}
                 initial={{ opacity: 0, scale: 0.7, y: 8 }}
-                animate={{ opacity: [0, 1, 1, 0], scale: [0.7, 1.15, 1, 1], y: [8, -8, -18, -28] }}
-                transition={{ duration: 1.8, times: [0, 0.18, 0.72, 1] }}
-                className={`absolute -top-7 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-xl border-2 px-3 py-1.5 text-lg font-black shadow-2xl pointer-events-none ${impactEffect.amount > 0 ? 'bg-emerald-950 border-emerald-300 text-emerald-200' : 'bg-rose-950 border-rose-300 text-rose-200'}`}
+                animate={{ opacity: [0, 1, 1, 1, 0], scale: [0.7, 1.2, 1.08, 1, 1], y: [8, -8, -12, -18, -28] }}
+                transition={{ duration: 4, times: [0, 0.12, 0.3, 0.82, 1] }}
+                className={`absolute -top-10 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-xl border-2 px-4 py-2 text-2xl font-black shadow-2xl pointer-events-none ${activeImpact.amount > 0 ? 'bg-emerald-950 border-emerald-300 text-emerald-200' : 'bg-rose-950 border-rose-300 text-rose-200'}`}
               >
-                {impactEffect.amount > 0 ? '+' : '−'}{formatCurrency(Math.abs(impactEffect.amount))}
+                {activeImpact.amount > 0 ? '+' : '−'}{formatCurrency(Math.abs(activeImpact.amount))}
               </motion.div>
             )}
 
