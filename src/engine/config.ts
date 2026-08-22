@@ -18,7 +18,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
 
   event_die: 12,
   cost_die: 6,
-  resolution_offset: 5,
+  // Original rule: succeed when d12 roll is higher than the remaining
+  // knowledge gap. In integer form this is roll + knowledge >= difficulty + 1.
+  resolution_offset: 1,
 
   absorptive_capacity_bonus: 2,
   expert_support_bonus: 2,
