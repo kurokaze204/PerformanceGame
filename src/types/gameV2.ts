@@ -121,8 +121,8 @@ export const V2_BALANCE: V2BalanceConfig = {
 
 export const V2_VERSION = {
   rules: '2.1.0-alpha.1',
-  deck: '1.1.0',
-  balance: '2.1.0-alpha.1',
+  deck: '1.2.0',
+  balance: '2.1.0-alpha.2',
 };
 
 export function asCompanyV2(company: Company): CompanyV2 {
