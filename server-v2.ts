@@ -34,18 +34,21 @@ import {
   setStrategyResponse,
 } from './src/server/analyticsHooksV2.ts';
 import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary, saveSessionV2 } from './src/server/dbV2.ts';
+import { resolveWithReputationV2 } from './src/server/reputationServiceV2.ts';
+import { applyCardDifficultyBumpV2 } from './src/engine/cardBalanceV2.ts';
 import type { BusinessStrategy, KnowledgeStrategy } from './src/types/gameV2.ts';
 
 dotenv.config();
 
 async function startServer() {
+  applyCardDifficultyBumpV2();
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
   app.use(express.json());
   const defaultSession = await initializeDefaultSessionV2();
   await captureSessionStart(defaultSession);
 
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok', engine: 'core-v2', time: new Date().toISOString() }));
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', engine: 'core-v2.1', time: new Date().toISOString() }));
   app.get('/api/sessions', async (_req, res) => res.json(await listSessionsV2()));
   app.get('/api/sessions/default', async (_req, res) => res.json(await initializeDefaultSessionV2()));
 
@@ -115,6 +118,13 @@ async function startServer() {
   };
   app.post('/api/sessions/:id/events/allocate', allocationHandler);
   app.post('/api/sessions/:id/allocate-resources', allocationHandler);
+
+  app.post('/api/sessions/:id/events/reputation', async (req, res) => {
+    try {
+      const result = await resolveWithReputationV2(req.params.id, req.body?.companyId, req.body?.eventInstanceId);
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
 
   const redrawHandler = async (req: express.Request, res: express.Response) => {
     try {
@@ -226,17 +236,11 @@ async function startServer() {
     res.json({ success: true, defaultSession: await resetAllV2() });
   });
 
-  // Runtime AI is deliberately optional. AAR evidence is deterministic and stored in Neon.
   app.post('/api/ai/debrief', async (req, res) => {
     const logs = await getGameEventLogs(String(req.body?.sessionId || 'KM2026').toUpperCase());
     res.json({
       summary: 'Use the evidence to ask what was planned, what happened, why it differed, and what the team would do better.',
-      facilitatorQuestions: [
-        'What was planned?',
-        'What actually happened?',
-        'Why was there a difference?',
-        'What would you do better next time?'
-      ],
+      facilitatorQuestions: ['What was planned?', 'What actually happened?', 'Why was there a difference?', 'What would you do better next time?'],
       recordedEvents: logs.length,
     });
   });
