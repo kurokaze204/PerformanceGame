@@ -46,7 +46,7 @@ export const KnowledgeHubPanel: React.FC<KnowledgeHubPanelProps> = ({ company })
   const domains = Object.keys(DOMAIN_INFO) as KnowledgeDomain[];
 
   return (
-    <aside className="overflow-hidden rounded-2xl border border-slate-300 bg-[#f3f5f2] text-slate-700 shadow-xl">
+    <aside className="h-[586px] lg:h-[646px] overflow-hidden rounded-2xl border border-slate-300 bg-[#f3f5f2] text-slate-700 shadow-xl">
       <div className="flex items-center justify-between gap-3 bg-white px-4 py-3 border-b border-slate-200">
         <div className="text-[17px] font-black leading-tight text-[#1f6f43] truncate">{company.name}</div>
         <div className="text-[13px] font-bold uppercase tracking-[0.16em] text-slate-500">Intranet</div>
