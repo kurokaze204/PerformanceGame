@@ -1,19 +1,13 @@
 import { EVENT_CARDS_DECK } from './cards.ts';
 
-let applied = false;
-
 /**
- * V2.1 balance adjustment: all normal event-card domain difficulties are one
- * point higher than the original deck. This makes the opening rounds harder
- * while allowing persistent capability investments to make later events
- * progressively cheaper and more reliable.
+ * Compatibility shim retained temporarily because server-v2 still imports this
+ * function. Card difficulties are now stored at their final values in cards.ts,
+ * so NO runtime difficulty adjustment is performed here.
  *
- * The deck is a shared in-memory array, so this is intentionally idempotent.
+ * This function can be deleted with its server import during the next cleanup.
  */
 export function applyCardDifficultyBumpV2(): void {
-  if (applied) return;
-  for (const card of EVENT_CARDS_DECK) {
-    for (const requirement of card.domains) requirement.difficulty += 1;
-  }
-  applied = true;
+  // Touch the import so TypeScript makes it obvious this shim belongs to the deck.
+  void EVENT_CARDS_DECK;
 }
