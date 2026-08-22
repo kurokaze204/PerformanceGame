@@ -143,6 +143,10 @@ export async function redrawEventV2(sessionId: string, companyId: string, eventI
   return { success: true, message: `Replaced “${previous}” with “${list[idx].card.title}”.`, session };
 }
 
+function allCompanyEventsResolved(session: GameSessionV2): boolean {
+  return session.companies.every((company) => (session.activeEvents[company.id] || []).every((e) => e.isResolved));
+}
+
 export async function resolveEventV2(sessionId: string, companyId: string, eventInstanceId?: string) {
   const session = await getSessionOrThrow(sessionId);
   if (session.phase !== 'respond') return { success: false, message: 'Challenges can only be resolved during the challenge phase.', session };
@@ -151,9 +155,15 @@ export async function resolveEventV2(sessionId: string, companyId: string, event
   const event = eventInstanceId ? events.find((e) => e.instanceId === eventInstanceId) : events.find((e) => !e.isResolved);
   if (!event) return { success: false, message: 'No unresolved event found.', session };
   const result = resolveSingleEventV2(session, company, event);
-  await saveAndBroadcast(session, 'EVENT_RESOLVED', { eventInstanceId: event.instanceId, result });
+  await saveAndBroadcast(session, 'EVENT_RESOLVED', { companyId, eventInstanceId: event.instanceId, targetSiteId: event.targetSiteId, scope: event.card.scope, result });
   await log(session, result.success ? 'EVENT_SUCCESS' : 'EVENT_FAILURE', `${event.card.title}: ${result.success ? 'Success' : 'Failure'}`, `Business impact ${result.turnoverChange >= 0 ? '+' : ''}$${result.turnoverChange}k; intervention cost $${result.interventionCost}k.`, company.id, { ...result, eventTitle: event.card.title });
   for (const c of result.consultantDetails) await log(session, 'CONSULTANT_ENGAGED', `External expertise: ${c.domain}`, `${c.points} consultant point(s) at $${c.rate}k/point cost $${c.cost}k.`, company.id, c);
+
+  if (allCompanyEventsResolved(session)) {
+    session.phase = 'consequences';
+    await saveAndBroadcast(session, 'CHALLENGES_COMPLETE', { round: session.round });
+  }
+
   return { success: true, eventSuccess: result.success, result, session };
 }
 
@@ -178,10 +188,6 @@ export async function knowledgeActionV2(sessionId: string, companyId: string, pa
   await saveAndBroadcast(session, 'ACTION_EXECUTED', { actionType: payload.type, message: result.message });
   await log(session, payload.type, payload.type.replaceAll('_', ' '), result.message, company.id, { ...payload, costTurnover: result.costTurnover });
   return { ...result, session };
-}
-
-function allCompanyEventsResolved(session: GameSessionV2): boolean {
-  return session.companies.every((company) => (session.activeEvents[company.id] || []).every((e) => e.isResolved));
 }
 
 export async function advancePhaseV2(sessionId: string, requested?: GamePhase) {
@@ -241,7 +247,6 @@ export async function resolveFinalDisruptionV2(sessionId: string) {
   for (const company of session.companies) {
     const allocations: any = {}; card.domains.forEach((r) => { allocations[r.domain] = {}; });
     const active: ActiveEvent = { instanceId: `final-${company.id}`, card, allocations, isResolved: false };
-    // Temporarily allow core resolver by presenting final disruption as Respond phase.
     const priorPhase = session.phase; session.phase = 'respond';
     const result = resolveSingleEventV2(session, company, active); session.phase = priorPhase;
     results.push({ companyId: company.id, companyName: company.name, finalTurnover: company.turnover, ...result });
