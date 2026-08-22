@@ -191,7 +191,9 @@ async function startServer() {
     try {
       const result = await advancePhaseV2(req.params.id, req.body?.targetPhase);
       if (result.success) {
-        if (result.session.phase === 'events') for (const company of result.session.companies) await captureRoundReveals(result.session, company);
+        if (result.session.phase === 'respond' && !result.session.isFinalDisruptionActive) {
+          for (const company of result.session.companies) await captureRoundReveals(result.session, company);
+        }
         await captureStateMetric(result.session, `PHASE_${result.session.phase.toUpperCase()}`);
       }
       res.status(result.success ? 200 : 400).json(result);
