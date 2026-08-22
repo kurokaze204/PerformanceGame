@@ -1,0 +1,100 @@
+import { captureResolvedEvent } from './analyticsHooksV2.ts';
+import { getSessionV2, logGameEvent, saveSessionV2 } from './dbV2.ts';
+
+function recalcCompanyTurnover(company: any): void {
+  company.turnover = Math.round(company.sites.reduce((sum: number, s: any) => sum + (s.isClosed ? 0 : s.turnover), 0));
+}
+
+function applySiteDelta(company: any, site: any, delta: number): void {
+  site.turnover = Math.max(0, Math.round(site.turnover + delta));
+  recalcCompanyTurnover(company);
+}
+
+function applyCompanyDelta(company: any, delta: number): void {
+  const active = company.sites.filter((s: any) => !s.isClosed);
+  if (!active.length || delta === 0) return;
+  const total = active.reduce((sum: number, s: any) => sum + s.turnover, 0);
+  let remaining = Math.round(delta);
+  active.forEach((site: any, idx: number) => {
+    const share = idx === active.length - 1
+      ? remaining
+      : Math.round(delta * (total > 0 ? site.turnover / total : 1 / active.length));
+    site.turnover = Math.max(0, site.turnover + share);
+    remaining -= share;
+  });
+  recalcCompanyTurnover(company);
+}
+
+/**
+ * Spend one point of finite social capital to make the entire current event
+ * successful. Reputation solves the immediate business problem/opportunity;
+ * it does not add Team Capability, codification, Intranet knowledge or any
+ * other persistent knowledge asset.
+ */
+export async function resolveWithReputationV2(sessionId: string, companyId: string, eventInstanceId: string) {
+  const session = await getSessionV2(sessionId.toUpperCase());
+  if (!session) return { success: false, message: 'Session not found.' };
+  if (session.phase !== 'respond') return { success: false, message: 'Reputation can only be used while responding to an event.', session };
+
+  const company = session.companies.find((c) => c.id === companyId);
+  if (!company) return { success: false, message: 'Company not found.', session };
+  if (company.reputationPoints <= 0) return { success: false, message: 'No reputation points remain.', session };
+
+  const event = (session.activeEvents[company.id] || []).find((e) => e.instanceId === eventInstanceId);
+  if (!event) return { success: false, message: 'Event not found.', session };
+  if (event.isResolved) return { success: false, message: 'This event is already resolved.', session };
+
+  company.reputationPoints -= 1;
+  event.reputationUsed = true;
+  event.isResolved = true;
+  event.success = true;
+  event.committedProbabilityPercent = 100;
+  event.resolvedAt = new Date().toISOString();
+  // A favour gets the outcome, but deliberately does not create experiential
+  // learning: the organisation bypassed the knowledge challenge.
+  event.experientialLearningAwarded = true;
+
+  let turnoverChange = 0;
+  if (event.card.type === 'opportunity') turnoverChange = event.card.impact;
+  if (turnoverChange !== 0) {
+    if (event.card.scope === 'local' && event.targetSiteId) {
+      const target = company.sites.find((s) => s.id === event.targetSiteId);
+      if (target) applySiteDelta(company, target, turnoverChange);
+    } else {
+      applyCompanyDelta(company, turnoverChange);
+    }
+  }
+  event.turnoverChangeApplied = turnoverChange;
+  event.netFinancialImpact = turnoverChange;
+  event.domainResults = event.card.domains.map((r) => ({
+    domain: r.domain,
+    difficulty: r.difficulty,
+    domainSuccess: true,
+    reputationOverride: true,
+    explanation: 'Resolved by spending one Reputation point; no knowledge capability was created.',
+  }));
+
+  await saveSessionV2(session);
+  const result = {
+    success: true,
+    turnoverChange,
+    interventionCost: 0,
+    consultantDetails: [],
+    domainResults: event.domainResults,
+    reputationUsed: true,
+    reputationRemaining: company.reputationPoints,
+  };
+  await captureResolvedEvent(session, company, event, 100, result);
+  await logGameEvent({
+    sessionId: session.id,
+    companyId: company.id,
+    eventType: 'REPUTATION_USED',
+    round: session.round,
+    phase: session.phase,
+    title: 'Called in a favour',
+    description: `${company.name} spent one Reputation point to guarantee “${event.card.title}”. ${company.reputationPoints} point(s) remain.`,
+    payload: { eventInstanceId, cardId: event.card.id, reputationRemaining: company.reputationPoints },
+  });
+
+  return { success: true, session, result };
+}
