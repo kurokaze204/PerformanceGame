@@ -1,5 +1,6 @@
 import { captureResolvedEvent } from './analyticsHooksV2.ts';
 import { getSessionV2, logGameEvent, saveSessionV2 } from './dbV2.ts';
+import { advancePhaseV2, broadcastV2 } from './gameServiceV2.ts';
 
 function recalcCompanyTurnover(company: any): void {
   company.turnover = Math.round(company.sites.reduce((sum: number, s: any) => sum + (s.isClosed ? 0 : s.turnover), 0));
@@ -25,12 +26,6 @@ function applyCompanyDelta(company: any, delta: number): void {
   recalcCompanyTurnover(company);
 }
 
-/**
- * Spend one point of finite social capital to make the entire current event
- * successful. Reputation solves the immediate business problem/opportunity;
- * it does not add Team Capability, codification, Intranet knowledge or any
- * other persistent knowledge asset.
- */
 export async function resolveWithReputationV2(sessionId: string, companyId: string, eventInstanceId: string) {
   const session = await getSessionV2(sessionId.toUpperCase());
   if (!session) return { success: false, message: 'Session not found.' };
@@ -50,8 +45,6 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
   event.success = true;
   event.committedProbabilityPercent = 100;
   event.resolvedAt = new Date().toISOString();
-  // A favour gets the outcome, but deliberately does not create experiential
-  // learning: the organisation bypassed the knowledge challenge.
   event.experientialLearningAwarded = true;
 
   let turnoverChange = 0;
@@ -67,10 +60,6 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
   event.turnoverChangeApplied = turnoverChange;
   event.netFinancialImpact = turnoverChange;
 
-  // Keep the same result shape as a normally resolved knowledge domain so the
-  // AAR/analytics pipeline can compare events consistently. The zero values are
-  // intentional: reputation bypassed the knowledge calculation rather than
-  // contributing knowledge to it.
   event.domainResults = event.card.domains.map((r) => ({
     domain: r.domain,
     baseKnowledge: 0,
@@ -113,5 +102,15 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
     payload: { eventInstanceId, cardId: event.card.id, reputationRemaining: company.reputationPoints },
   });
 
-  return { success: true, session, result };
+  broadcastV2(session, 'EVENT_RESOLVED', {
+    companyId: company.id,
+    eventInstanceId: event.instanceId,
+    targetSiteId: event.targetSiteId,
+    scope: event.card.scope,
+    result,
+  });
+
+  const allResolved = session.companies.every((c) => (session.activeEvents[c.id] || []).every((e) => e.isResolved));
+  const finalSession = allResolved ? (await advancePhaseV2(session.id)).session : session;
+  return { success: true, session: finalSession, result };
 }
