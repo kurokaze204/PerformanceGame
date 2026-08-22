@@ -16,6 +16,7 @@ import { AttritionModal } from './components/AttritionModal.tsx';
 import { FinalDisruptionModal } from './components/FinalDisruptionModal.tsx';
 import { SessionJoinModal } from './components/SessionJoinModal.tsx';
 import { StrategyPromptV2 } from './components/StrategyPromptV2.tsx';
+import { KnowledgeHubPanel } from './components/KnowledgeHubPanel.tsx';
 import { formatCurrency } from './utils/format.ts';
 
 const PHASE_LABELS: Record<GameSessionV2['phase'], string> = {
@@ -37,6 +38,7 @@ export function AppV2() {
   const [participant, setParticipant] = useState<Participant | null>(() => participantFromStorage());
   const [showJoin, setShowJoin] = useState(() => !participantFromStorage());
   const [selectedSiteId, setSelectedSiteId] = useState('melbourne');
+  const [isHQSelected, setIsHQSelected] = useState(false);
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
   const [notification, setNotification] = useState<string | null>(null);
   const [impactEffect, setImpactEffect] = useState<SiteImpactEffect | null>(null);
@@ -44,6 +46,11 @@ export function AppV2() {
   const toast = (message: string) => {
     setNotification(message);
     window.setTimeout(() => setNotification((v) => v === message ? null : v), 4000);
+  };
+
+  const selectSite = (siteId: string) => {
+    setSelectedSiteId(siteId);
+    setIsHQSelected(false);
   };
 
   const showFinancialImpact = (nextSession: GameSessionV2, extraData: any) => {
@@ -58,7 +65,7 @@ export function AppV2() {
       ? companyNow.sites.filter((s) => !s.isClosed).map((s) => s.id)
       : extraData?.targetSiteId ? [String(extraData.targetSiteId)] : [];
     if (!siteIds.length) return;
-    if (!enterprise) setSelectedSiteId(siteIds[0]);
+    if (!enterprise) selectSite(siteIds[0]);
     const effect: SiteImpactEffect = { id: `${extraData.eventInstanceId}-${Date.now()}`, siteIds, amount, enterprise };
     setImpactEffect(effect);
     window.setTimeout(() => setImpactEffect((current) => current?.id === effect.id ? null : current), 1900);
@@ -115,7 +122,7 @@ export function AppV2() {
     });
     if (!res.ok) { toast('Could not join this game.'); return; }
     const data = await res.json();
-    setSession(data.session); setParticipant(data.participant); setShowJoin(false);
+    setSession(data.session); setParticipant(data.participant); setShowJoin(false); setIsHQSelected(false);
     localStorage.setItem('tpg_session_id', data.session.id);
     localStorage.setItem('tpg_company_id', data.participant.companyId);
     localStorage.setItem('tpg_participant_id', data.participant.id);
@@ -134,7 +141,7 @@ export function AppV2() {
       body: JSON.stringify({ name: 'Facilitator', companyId: created.companies[0]?.id, role: 'facilitator' }),
     });
     const data = await joinRes.json();
-    setSession(data.session); setParticipant(data.participant); setShowJoin(false);
+    setSession(data.session); setParticipant(data.participant); setShowJoin(false); setIsHQSelected(false);
     localStorage.setItem('tpg_session_id', data.session.id);
     localStorage.setItem('tpg_company_id', data.participant.companyId);
     localStorage.setItem('tpg_participant_id', data.participant.id);
@@ -258,18 +265,30 @@ export function AppV2() {
 
         <section className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-4">
           <div className="rounded-3xl border border-slate-800 bg-slate-900/50 p-3 overflow-hidden">
-            <AustraliaMap company={company} selectedSiteId={selectedSiteId} onSelectSite={setSelectedSiteId} onSelectHQ={() => undefined} isHQSelected={false} onSelectExpert={() => undefined} impactEffect={impactEffect}/>
+            <AustraliaMap
+              company={company}
+              selectedSiteId={isHQSelected ? null : selectedSiteId}
+              onSelectSite={selectSite}
+              onSelectHQ={() => setIsHQSelected(true)}
+              isHQSelected={isHQSelected}
+              onSelectExpert={() => undefined}
+              impactEffect={impactEffect}
+            />
           </div>
-          <aside className="rounded-3xl border border-slate-800 bg-slate-900/70 p-4">
-            <div className="flex items-center justify-between"><div><div className="text-xs uppercase tracking-widest text-slate-500 font-bold">Selected site</div><div className="text-xl font-black text-white mt-1 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-400"/>{selectedSite.name}</div></div><div className="text-right"><div className="text-xs text-slate-500">Turnover</div><div className="font-black text-white">{formatCurrency(selectedSite.turnover)}</div></div></div>
-            <div className="mt-4 space-y-2">{(Object.keys(DOMAIN_INFO) as KnowledgeDomain[]).map((domain) => { const info = DOMAIN_INFO[domain]; const usable = calculateUsableIntranetV2(company, selectedSite, domain, session.config); return <div key={domain} className="rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2"><div className="flex justify-between items-center"><span className="font-bold text-sm text-white flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:info.color}}/>{info.label}</span><span className="text-xs text-slate-500">usable {Math.max(selectedSite.teamCapability[domain], selectedSite.codifiedKnowledge[domain], usable)}</span></div><div className="grid grid-cols-3 gap-2 mt-1 text-xs text-slate-400"><span>Team <b className="text-white">{selectedSite.teamCapability[domain]}</b></span><span>Docs <b className="text-white">{selectedSite.codifiedKnowledge[domain]}</b></span><span>Corp <b className="text-white">{company.intranet[domain]}</b></span></div></div>; })}</div>
-          </aside>
+          {isHQSelected ? (
+            <KnowledgeHubPanel company={company} />
+          ) : (
+            <aside className="rounded-3xl border border-slate-800 bg-slate-900/70 p-4">
+              <div className="flex items-center justify-between"><div><div className="text-xs uppercase tracking-widest text-slate-500 font-bold">Selected site</div><div className="text-xl font-black text-white mt-1 flex items-center gap-2"><MapPin className="w-5 h-5 text-indigo-400"/>{selectedSite.name}</div></div><div className="text-right"><div className="text-xs text-slate-500">Turnover</div><div className="font-black text-white">{formatCurrency(selectedSite.turnover)}</div></div></div>
+              <div className="mt-4 space-y-2">{(Object.keys(DOMAIN_INFO) as KnowledgeDomain[]).map((domain) => { const info = DOMAIN_INFO[domain]; const usable = calculateUsableIntranetV2(company, selectedSite, domain, session.config); return <div key={domain} className="rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2"><div className="flex justify-between items-center"><span className="font-bold text-sm text-white flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:info.color}}/>{info.label}</span><span className="text-xs text-slate-500">usable {Math.max(selectedSite.teamCapability[domain], selectedSite.codifiedKnowledge[domain], usable)}</span></div><div className="grid grid-cols-3 gap-2 mt-1 text-xs text-slate-400"><span>Team <b className="text-white">{selectedSite.teamCapability[domain]}</b></span><span>Docs <b className="text-white">{selectedSite.codifiedKnowledge[domain]}</b></span><span>Corp <b className="text-white">{company.intranet[domain]}</b></span></div></div>; })}</div>
+            </aside>
+          )}
         </section>
 
         {session.phase === 'respond' && !session.isFinalDisruptionActive && (
           <section className="space-y-4">
             <div><h2 className="text-2xl font-black text-white">How will you respond?</h2><p className="text-slate-300 text-sm mt-1">Each turn you will be presented with two challenge cards they might be good or bad, either way you need to find the particular expertise to solve them.</p><p className="text-slate-500 text-sm mt-1">Review both cards before committing. You can switch between them while planning.</p></div>
-            <div className="grid sm:grid-cols-2 gap-3">{events.map((evt, idx) => <motion.button initial={{opacity:0,y:18,rotate:idx===0?-1.5:1.5}} animate={{opacity:1,y:0,rotate:0}} transition={{delay:idx*0.12}} key={evt.instanceId} onClick={() => {setSelectedEventIndex(idx); if(evt.targetSiteId) setSelectedSiteId(evt.targetSiteId);}} className={`rounded-2xl p-4 border-2 text-left ${selectedEventIndex===idx?'border-white bg-slate-800':'border-slate-700 bg-slate-900 opacity-70 hover:opacity-100'}`}><div className="flex justify-between gap-3"><div><div className={`text-xs uppercase font-black tracking-widest ${evt.card.type==='problem'?'text-rose-400':'text-emerald-400'}`}>{evt.card.type}</div><div className="font-black text-white mt-1">{evt.card.title}</div></div>{evt.isResolved && <span className={`self-start rounded-full px-2 py-1 text-xs font-black ${evt.success?'bg-emerald-950 text-emerald-300':'bg-rose-950 text-rose-300'}`}>{evt.success?'DONE':'FAILED'}</span>}</div></motion.button>)}</div>
+            <div className="grid sm:grid-cols-2 gap-3">{events.map((evt, idx) => <motion.button initial={{opacity:0,y:18,rotate:idx===0?-1.5:1.5}} animate={{opacity:1,y:0,rotate:0}} transition={{delay:idx*0.12}} key={evt.instanceId} onClick={() => {setSelectedEventIndex(idx); if(evt.targetSiteId) selectSite(evt.targetSiteId);}} className={`rounded-2xl p-4 border-2 text-left ${selectedEventIndex===idx?'border-white bg-slate-800':'border-slate-700 bg-slate-900 opacity-70 hover:opacity-100'}`}><div className="flex justify-between gap-3"><div><div className={`text-xs uppercase font-black tracking-widest ${evt.card.type==='problem'?'text-rose-400':'text-emerald-400'}`}>{evt.card.type}</div><div className="font-black text-white mt-1">{evt.card.title}</div></div>{evt.isResolved && <span className={`self-start rounded-full px-2 py-1 text-xs font-black ${evt.success?'bg-emerald-950 text-emerald-300':'bg-rose-950 text-rose-300'}`}>{evt.success?'DONE':'FAILED'}</span>}</div></motion.button>)}</div>
             {selectedEvent && <EventDecisionCardV2 session={session} company={company} event={selectedEvent} cardNumber={selectedEventIndex+1} onSetAllocation={setAllocation} onResolveEvent={resolveEvent} onRedrawEvent={redrawEvent} canHorizonRedraw={!!horizonCanRedraw}/>} 
           </section>
         )}
