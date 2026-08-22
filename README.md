@@ -25,7 +25,8 @@ V2 keeps the live game snapshot but also writes structured longitudinal evidence
 
 The analytics model records:
 
-- initial and final business/knowledge strategy choices;
+- initial business and knowledge strategy choices;
+- post-game knowledge strategy choice, shown alongside the original choice;
 - turnover through the game;
 - average Team Capability;
 - average Local Codified Knowledge;
@@ -56,6 +57,10 @@ The AAR presentation should support the standard questions rather than prescribe
 2. What actually happened?
 3. Why was there a difference?
 4. What would you do better?
+
+### Final disruption and luck variance
+
+Expected-versus-actual success is now captured explicitly. A small hidden final-disruption variance correction is intentionally **not activated yet**. Its threshold and cap should be calibrated from early playtests so it reduces extreme bad-luck noise without rescuing poor strategy. Persistent Team Capability, Codification, Usable Intranet, Automation, expert depth and reduced SPOF exposure remain the primary resilience mechanisms.
 
 ## Development
 
