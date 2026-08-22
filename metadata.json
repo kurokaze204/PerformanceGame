@@ -1,0 +1,6 @@
+{
+  "name": "The Performance Gap - Knowledge Game",
+  "description": "Multiplayer business game making organisational knowledge, expertise, absorptive capacity, and resilience visible and manageable.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
