@@ -1,72 +1,81 @@
-# The Performance Gap — Simulation Platform
+# The Performance Gap
 
-**The Performance Gap** is an interactive, multiplayer strategic simulation platform exploring organizational knowledge, deep expertise, absorptive capacity, single points of failure (SPOF), relational knowledge networks (Communities of Practice), and enterprise resilience.
+**The Performance Gap** is a facilitated multiplayer business simulation about the gap between what an organisation knows and what it can actually do under pressure.
 
----
+Players balance short-term turnover against investment in organisational capability, expertise, knowledge transfer, codification, relationships, automation and resilience.
 
-## 🌟 Core Simulation Concepts & Mechanics
+## Core model
 
-1. **6 Operating Sites & Geographic Map**:
-   - Melbourne, Sydney, Brisbane, Perth, Adelaide, and Darwin.
-   - Each site maintains localized **Team Capability** (determines operational absorptive capacity) and **Local Codified Knowledge** (survives employee turnover).
-2. **Deep Experts & Single Point of Failure (SPOF)**:
-   - Deep Experts possess high individual expertise (score 4–6).
-   - If an expert's score exceeds site capability by $\ge 3$, they become a **SPOF** with heightened attrition vulnerability ($d12 \le 2$).
-3. **Corporate Headquarters & Intranet**:
-   - Enterprise knowledge repository accessible by all sites up to their local absorptive capacity limit ($\text{Team Capability} + 2$).
-   - Experts stationed at HQ boost corporate codification up to $+2$ per round.
-4. **Relational Knowledge & Communities of Practice (CoP)**:
-   - Inter-organizational knowledge exchange across the 5 domains (Engineering, HR, Marketing, Operations, Finance).
-   - Becomes active when $\ge 2$ companies maintain participating experts.
-5. **Dynamic 5-Phase Round Engine**:
-   - **Phase 1 (Draw)**: Receive local operational problems and market opportunities.
-   - **Phase 2 (Respond & Resolve)**: Allocate deep experts, CoP assistance, and evaluate success probabilities with 2d6 event dice rolls.
-   - **Phase 3 (Consequences & Learning)**: Apply financial turnover impact and convert successful opportunities into experiential learning.
-   - **Phase 4 (Knowledge Investment)**: Spend 4 strategic actions across *Develop*, *Capture*, *Connect*, *Embed*, and *Diagnose*.
-   - **Phase 5 (Attrition & Solvency)**: d12 expert resignation checks, workforce turnover, and site solvency evaluations.
-6. **Round 6 Final Disruption**:
-   - Macro shock testing accumulated corporate capability, automation, and organizational resilience.
-7. **Facilitator Command & AI Executive Debrief**:
-   - Comprehensive dashboard with full session overrides, event logs, 17 facilitation questions, and AI-powered AAR executive summaries via the Gemini API.
+- Six Australian operating sites plus Corporate Headquarters.
+- Five knowledge domains: Engineering, Human Resources, Marketing, Operations and Finance.
+- Local **Team Capability**, **Local Codified Knowledge** and enterprise **Corporate Intranet** knowledge.
+- Local absorptive capacity: `Usable Intranet = MIN(Intranet, Team Capability + 2)`.
+- Base organisational knowledge: `MAX(Team Capability, Local Codified, Usable Intranet)`.
+- Deep Experts are powerful, mobile and vulnerable Single Points of Failure (SPOFs).
+- Communities of Practice provide temporary relational access to expertise only while companies continue participating.
+- Horizon Scanning creates early warning: it can replace one matching event in the following round, not increase a knowledge score.
+- Automation embeds persistent company-wide capability at a significant financial cost.
+- External consultants rent temporary knowledge. Their price rises 35% after each engagement, making repeated dependence progressively expensive.
+- Event uncertainty uses a **d12**. Knowledge decisions change the probability of success rather than guarantee it.
 
----
+## Turn structure
 
-## 🚀 Quick Start Guide
+1. **Events** — two business cards are dealt.
+2. **Respond** — decide how to handle each card and resolve them one at a time.
+3. **Consequences** — see financial outcomes and capture eligible experiential learning.
+4. **Invest** — spend up to four Knowledge Actions to build future capability.
+5. **Risk** — expert and workforce knowledge loss is resolved and shown before the next round.
 
-### Prerequisites
-- Node.js 18+ or 20+
-- npm or yarn
+Five ordinary rounds are followed by a common Final Disruption.
 
-### Installation
+## Executive event choices
+
+For each knowledge gap the intended player-facing choices are:
+
+1. **Use what we already know**
+2. **Deploy one of our experts**
+3. **Ask our network for help**
+4. **Buy external expertise**
+5. **Accept the risk**
+
+The interface should show the financial amount at stake and, for local events, that amount as a percentage of the affected site's current turnover.
+
+## Event balance
+
+A normal five-round game contains ten events per company: five Problems and five Opportunities in a shuffled hidden schedule. A late-session balancing rule is designed to correct a strong skew once approximately 40 minutes have elapsed, so shorter sessions do not accidentally expose one team mainly to Problems or mainly to Opportunities.
+
+## Architecture
+
+- **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS
+- **Backend:** Express / Node.js
+- **Rules:** server-authoritative TypeScript game engine
+- **Realtime:** lightweight Server-Sent Events (SSE)
+- **Persistence:** existing Neon PostgreSQL account
+- **Source control:** GitHub
+- **Runtime AI:** not required for V1
+
+The recovery branch `fix/core-game-loop-v1` introduces a V2 state engine and server entrypoint while the original generated UI remains available for comparison. See `docs/core-v2-recovery.md`.
+
+## Development
+
 ```bash
-npm install
+bun install
+bun run lint
+bun run test:core
+bun run dev
 ```
 
-### Environment Configuration
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-Fill in your `GEMINI_API_KEY` (for AI debriefs) and optional `DATABASE_URL` for PostgreSQL persistence (defaults to fast in-memory storage if omitted).
+Production build:
 
-### Development Server
 ```bash
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Production Build
-```bash
-npm run build
-npm start
+bun run build
+bun start
 ```
 
----
+Copy `.env.example` to `.env` and provide `DATABASE_URL` for Neon persistence. A `FACILITATOR_SECRET` is required before facilitator/destructive controls can be used.
 
-## 🏛️ Architecture
+## Current recovery status
 
-- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + Lucide Icons + Canvas Confetti
-- **Backend Server**: Express custom server running on Node.js / `dist/server.cjs`
-- **Real-Time Concurrency**: Server-Sent Events (SSE) streaming state updates across all connected cohort participants
-- **AI Integration**: Google Gemini API (`@google/genai`) for real-time strategic debrief generation
-- **Persistence Layer**: Dual-mode PostgreSQL with atomic transactions and seamless In-Memory fallback
+The core V2 work focuses on reliable play before visual polish: authoritative phases, one-card-at-a-time resolution, correct local/enterprise turnover effects, expert travel/scarcity, current-round CoPs, one-round Horizon Scanning, consultant escalation, correct Risk timing, shared timer state and safer facilitator controls.
+
+The target visual experience is a simple digital board game rather than an analytics dashboard: persistent company board, dealt event cards, obvious executive choices, strong action tokens, short animations and clear cause-and-effect.
