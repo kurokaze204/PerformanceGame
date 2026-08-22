@@ -24,6 +24,17 @@ import {
   timerResetV2,
   timerStartV2,
 } from './src/server/gameServiceV2.ts';
+import {
+  captureKnowledgeAction,
+  captureResolvedEvent,
+  captureRoundReveals,
+  captureSessionStart,
+  captureStateMetric,
+  committedProbability,
+  setStrategyResponse,
+} from './src/server/analyticsHooksV2.ts';
+import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary, saveSessionV2 } from './src/server/dbV2.ts';
+import type { BusinessStrategy, KnowledgeStrategy } from './src/types/gameV2.ts';
 
 dotenv.config();
 
@@ -31,7 +42,8 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
   app.use(express.json());
-  await initializeDefaultSessionV2();
+  const defaultSession = await initializeDefaultSessionV2();
+  await captureSessionStart(defaultSession);
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', engine: 'core-v2', time: new Date().toISOString() }));
   app.get('/api/sessions', async (_req, res) => res.json(await listSessionsV2()));
@@ -47,7 +59,9 @@ async function startServer() {
         const count = Math.max(1, Math.min(8, Number(companyCount || 1)));
         names = defaults.slice(0, count);
       }
-      res.json(await createNewSessionV2(code, title || name || `The Performance Gap ${code}`, names));
+      const session = await createNewSessionV2(code, title || name || `The Performance Gap ${code}`, names);
+      await captureSessionStart(session);
+      res.json(session);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -61,6 +75,24 @@ async function startServer() {
     try { res.json(await joinSessionV2(req.params.id, req.body?.name, req.body?.companyId, req.body?.role)); }
     catch (e: any) { res.status(400).json({ error: e.message }); }
   });
+
+  app.post('/api/sessions/:id/strategy', async (req, res) => {
+    try {
+      const session = await getSessionV2(req.params.id.toUpperCase());
+      if (!session) return res.status(404).json({ error: 'Session not found' });
+      const company = session.companies.find((c) => c.id === req.body?.companyId);
+      if (!company) return res.status(404).json({ error: 'Company not found' });
+      const stage = req.body?.stage === 'final' ? 'final' : 'initial';
+      const businessStrategy = req.body?.businessStrategy as BusinessStrategy;
+      const knowledgeStrategy = req.body?.knowledgeStrategy as KnowledgeStrategy;
+      if (!businessStrategy || !knowledgeStrategy) return res.status(400).json({ error: 'Both strategy selections are required.' });
+      await setStrategyResponse(session, company, stage, businessStrategy, knowledgeStrategy);
+      res.json({ success: true, session });
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.get('/api/sessions/:id/aar', async (req, res) => res.json(await getAARData(req.params.id)));
+  app.get('/api/sessions/:id/benchmark/:companyId', async (req, res) => res.json(await getBenchmarkSummary(req.params.id, req.params.companyId)));
 
   app.get('/api/sessions/:id/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -87,6 +119,10 @@ async function startServer() {
   const redrawHandler = async (req: express.Request, res: express.Response) => {
     try {
       const result = await redrawEventV2(req.params.id, req.body?.companyId, req.body?.eventInstanceId);
+      if (result.success) {
+        const company = result.session.companies.find((c) => c.id === req.body?.companyId);
+        if (company) await captureRoundReveals(result.session, company);
+      }
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   };
@@ -95,18 +131,30 @@ async function startServer() {
 
   const resolveHandler = async (req: express.Request, res: express.Response) => {
     try {
+      const before = await getSessionV2(req.params.id.toUpperCase());
+      if (!before) return res.status(404).json({ error: 'Session not found' });
+      const companyBefore = before.companies.find((c) => c.id === req.body?.companyId);
+      const eventBefore = companyBefore ? (before.activeEvents[companyBefore.id] || []).find((e) => e.instanceId === req.body?.eventInstanceId) : undefined;
+      const probability = companyBefore && eventBefore ? committedProbability(before, companyBefore, eventBefore) : 0;
+
       const result = await resolveEventV2(req.params.id, req.body?.companyId, req.body?.eventInstanceId);
+      if (result.success) {
+        const company = result.session.companies.find((c) => c.id === req.body?.companyId);
+        const event = company ? (result.session.activeEvents[company.id] || []).find((e) => e.instanceId === req.body?.eventInstanceId) : undefined;
+        if (company && event) await captureResolvedEvent(result.session, company, event, probability, result.result);
+      }
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   };
   app.post('/api/sessions/:id/events/resolve', resolveHandler);
   app.post('/api/sessions/:id/resolve-event', resolveHandler);
-  app.post('/api/sessions/:id/resolve-events', resolveHandler); // Legacy UI: resolves the next unresolved card only.
+  app.post('/api/sessions/:id/resolve-events', resolveHandler);
 
   const learningHandler = async (req: express.Request, res: express.Response) => {
     try {
       const { companyId, eventInstanceId, domain, target, targetId } = req.body || {};
       const result = await applyLearningV2(req.params.id, companyId, eventInstanceId, domain, target, targetId);
+      if (result.success) await captureStateMetric(result.session, 'EXPERIENTIAL_LEARNING');
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   };
@@ -119,6 +167,10 @@ async function startServer() {
       const normalized = payload || { type: actionType || type, siteId: params?.siteId || siteId, expertId: params?.expertId || expertId, domain: params?.domain || domain, targetLocation: params?.targetLocation || targetLocation, learningTarget: params?.learningTarget || learningTarget, ...(params || {}) };
       if (!normalized.type) return res.status(400).json({ error: 'Action type is required.' });
       const result = await knowledgeActionV2(req.params.id, companyId, normalized);
+      if (result.success) {
+        const company = result.session.companies.find((c) => c.id === companyId);
+        if (company) await captureKnowledgeAction(result.session, company, result, normalized.type);
+      }
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   };
@@ -128,14 +180,25 @@ async function startServer() {
   const advanceHandler = async (req: express.Request, res: express.Response) => {
     try {
       const result = await advancePhaseV2(req.params.id, req.body?.targetPhase);
+      if (result.success) {
+        if (result.session.phase === 'events') for (const company of result.session.companies) await captureRoundReveals(result.session, company);
+        await captureStateMetric(result.session, `PHASE_${result.session.phase.toUpperCase()}`);
+      }
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   };
   app.post('/api/sessions/:id/advance', advanceHandler);
   app.post('/api/sessions/:id/advance-phase', advanceHandler);
 
-  app.post('/api/sessions/:id/final-disruption', async (req, res) => res.json(await resolveFinalDisruptionV2(req.params.id)));
-  app.post('/api/sessions/:id/resolve-final-disruption', async (req, res) => res.json(await resolveFinalDisruptionV2(req.params.id)));
+  const finalHandler = async (req: express.Request, res: express.Response) => {
+    try {
+      const result = await resolveFinalDisruptionV2(req.params.id);
+      await finaliseAnalyticsRun(result.session, result.results || []);
+      res.json(result);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  };
+  app.post('/api/sessions/:id/final-disruption', finalHandler);
+  app.post('/api/sessions/:id/resolve-final-disruption', finalHandler);
 
   app.post('/api/sessions/:id/timer/start', async (req, res) => res.json(await timerStartV2(req.params.id)));
   app.post('/api/sessions/:id/timer/pause', async (req, res) => res.json(await timerPauseV2(req.params.id)));
@@ -163,21 +226,18 @@ async function startServer() {
     res.json({ success: true, defaultSession: await resetAllV2() });
   });
 
-  // Runtime AI is deliberately optional. V1 debrief remains deterministic from event logs.
+  // Runtime AI is deliberately optional. AAR evidence is deterministic and stored in Neon.
   app.post('/api/ai/debrief', async (req, res) => {
     const logs = await getGameEventLogs(String(req.body?.sessionId || 'KM2026').toUpperCase());
     res.json({
-      summary: 'Review the decisions that traded short-term turnover against organisational capability and knowledge risk.',
-      keyLearnings: [
-        'External expertise solved immediate gaps but did not build internal capability.',
-        'Expert concentration increased SPOF risk and the cost of inaction.',
-        'Codified knowledge only delivered its full value where local teams could absorb and apply it.'
-      ],
+      summary: 'Use the evidence to ask what was planned, what happened, why it differed, and what the team would do better.',
       facilitatorQuestions: [
-        'Where did you repeatedly rent capability instead of building it?',
-        'Which known knowledge risk did you choose to carry, and what did that decision cost?',
-        `What changed in your strategy after the first ${Math.min(logs.length, 10)} recorded decisions?`
-      ]
+        'What was planned?',
+        'What actually happened?',
+        'Why was there a difference?',
+        'What would you do better next time?'
+      ],
+      recordedEvents: logs.length,
     });
   });
 
