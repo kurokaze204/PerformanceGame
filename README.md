@@ -94,6 +94,16 @@ npm run build
 
 ## Google AI Studio
 
-Google AI Studio Build mode supports importing a GitHub repository and two-way GitHub sync. The V2 recovery branch should be tested before merging to `main`. If the linked AI Studio project only follows its currently linked/default branch and does not offer branch selection, do not merge merely to make it visible: import the recovery branch as a separate test project if the importer accepts the branch, or wait until the branch has been validated and then merge the draft PR.
+Google AI Studio Build mode supports importing a GitHub repository and two-way GitHub sync. For this recovery work, keep the draft branch separate from `main` while testing.
+
+Preferred test path:
+
+1. In AI Studio Build mode, use **Add files (+) → Import from GitHub**.
+2. Import `kurokaze204/PerformanceGame` as a separate test app.
+3. If AI Studio offers a branch/ref choice, select `fix/core-game-loop-v1`.
+4. If the existing linked project can explicitly pull that branch, that is also fine.
+5. If AI Studio only follows `main`, do **not** merge the draft PR just to make the code visible; use a separate import/workspace where possible, or validate the branch elsewhere first.
+6. Add `DATABASE_URL` and `FACILITATOR_SECRET` to the AI Studio app's secrets/environment configuration before starting a test game.
+7. Start with a new one-company solo session so the analytics tables are created automatically and the strategy prompts/event flow can be checked end-to-end.
 
 The runtime does not require Gemini. AI features are optional; game rules, persistence and AAR evidence are deterministic application code.
