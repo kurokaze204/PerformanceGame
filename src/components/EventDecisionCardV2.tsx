@@ -46,8 +46,6 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
   const [isResolving, setIsResolving] = useState(false);
   const card = event.card;
 
-  // Event cards share the component instance. Reset domain/mode whenever the
-  // player switches cards so a Marketing card cannot retain Operations state.
   useEffect(() => {
     setDomain(event.card.domains[0].domain);
     setMode('existing');
@@ -115,6 +113,10 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
     { id: 'risk', label: 'Accept the risk', sub: 'Proceed without adding temporary knowledge', icon: ShieldQuestion },
   ];
 
+  const problemSuccessMessage = card.scope === 'local' && targetSite
+    ? `${targetSite.name} avoided a real hit to their bottom line. Well done!`
+    : `${company.name} avoided a real hit to their bottom line. Well done!`;
+
   return (
     <motion.section
       layout
@@ -124,10 +126,7 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-white/60">
-              <span>Card {cardNumber}</span>
-              <span>•</span>
-              <span>{card.type === 'problem' ? 'Problem' : 'Opportunity'}</span>
-              <span>•</span>
+              <span>Card {cardNumber}</span><span>•</span><span>{card.type === 'problem' ? 'Problem' : 'Opportunity'}</span><span>•</span>
               <span className="flex items-center gap-1">{card.scope === 'local' ? <MapPin className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}{card.scope === 'local' ? targetSite?.name : 'Whole company'}</span>
             </div>
             <h2 className="text-2xl font-black text-white mt-2 leading-tight">{card.title}</h2>
@@ -172,7 +171,7 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
         {!event.isResolved && (
           <>
             <div>
-              <div className="flex items-baseline justify-between gap-3 mb-3"><div><div className="text-lg font-black text-white">How will you handle {DOMAIN_INFO[domain].label}?</div><div className="text-sm text-slate-400">Choose an executive response. The detail appears underneath.</div></div><div className="text-right"><div className="text-xs text-slate-500 uppercase font-bold">Current chance</div><div className="text-3xl font-black text-white">{evaluation.winChancePercent}%</div></div></div>
+              <div className="flex items-baseline justify-between gap-3 mb-3"><div><div className="text-lg font-black text-white">How will you handle {DOMAIN_INFO[domain].label}?</div><div className="text-sm text-slate-400">Build a response by turning options on and off until the risk feels acceptable.</div></div><div className="text-right"><div className="text-xs text-slate-500 uppercase font-bold">Current chance</div><div className="text-3xl font-black text-white">{evaluation.winChancePercent}%</div></div></div>
               <div className="grid md:grid-cols-3 xl:grid-cols-6 gap-2">
                 {decisions.map((choice) => {
                   const Icon = choice.icon;
@@ -183,9 +182,9 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
 
             <motion.div layout className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4 min-h-24">
               {mode === 'existing' && <div><div className="font-bold text-white">Use existing organisational capability</div><div className="text-sm text-slate-400 mt-1">Team, local documents, usable corporate knowledge and any automation already in place are included automatically. No extra cost.</div></div>}
-              {mode === 'expert' && <div><div className="font-bold text-white mb-2">Who could help?</div>{eligibleExperts.length ? <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">{eligibleExperts.map((expert) => { const skill = expert.domains.find((d) => d.domain === domain)!; const atTarget = card.scope === 'enterprise' || expert.location === event.targetSiteId; return <button key={expert.id} onClick={() => onSetAllocation(event.instanceId, domain, { expertId: expert.id })} className={`rounded-xl border p-3 text-left ${allocation.expertId === expert.id ? 'border-indigo-400 bg-indigo-950/60' : 'border-slate-700 bg-slate-950'}`}><div className="flex justify-between gap-2"><span className="font-bold text-white">{expert.name}</span>{allocation.expertId === expert.id && <Check className="w-4 h-4 text-emerald-400"/>}</div><div className="text-sm text-slate-400">{DOMAIN_INFO[domain].label} {skill.score} · {expert.location === 'HQ' ? 'HQ' : company.sites.find((s) => s.id === expert.location)?.name || expert.location}</div><div className={`text-xs font-bold mt-1 ${atTarget ? 'text-emerald-400' : 'text-amber-400'}`}>{atTarget ? '+2 · already at the location' : '+2 · travel cost applies'}</div></button>; })}</div> : <div className="text-sm text-rose-300">No Deep Expert in this domain is currently available within your company.</div>}</div>}
-              {mode === 'network' && <div><div className="font-bold text-white">Community of Practice</div>{networkAvailable ? <button onClick={() => onSetAllocation(event.instanceId, domain, { useCoPSupport: true })} className={`mt-3 rounded-xl px-4 py-3 font-bold border ${allocation.useCoPSupport ? 'bg-amber-500 text-slate-950 border-amber-300' : 'bg-slate-950 text-amber-200 border-amber-600'}`}>{allocation.useCoPSupport ? 'Network help selected (+2)' : 'Ask the network for +2 support'}</button> : <div className="text-sm text-slate-400 mt-1">No active multi-company {DOMAIN_INFO[domain].label} CoP this round. The team may need to ask another company whether one of their experts can contribute.</div>}</div>}
-              {mode === 'consultant' && <div><div className="flex items-center gap-2 font-bold text-white"><CircleDollarSign className="w-5 h-5 text-amber-400"/>External expertise: ${consultantRate}k per knowledge point</div><div className="text-sm text-slate-400 mt-1">Temporary capability for this event only. Your rate rises 35% after each consultant engagement. Current engagements: {company.consultantEngagements}.</div><div className="flex gap-2 mt-3">{[1,2,3].map((points) => { const enabled = points <= evaluation.usefulConsultantGap; return <button key={points} disabled={!enabled} onClick={() => onSetAllocation(event.instanceId, domain, { consultantPoints: points })} className={`rounded-xl px-4 py-3 font-black border ${allocation.consultantPoints === points ? 'bg-amber-500 text-slate-950 border-amber-300' : enabled ? 'bg-slate-950 text-white border-slate-600 hover:border-amber-500' : 'bg-slate-900 text-slate-700 border-slate-800 cursor-not-allowed'}`}>+{points}<span className="block text-xs font-medium">${consultantRate * points}k</span></button>; })}{evaluation.usefulConsultantGap === 0 && <span className="text-sm text-emerald-400 self-center">No consultant points are needed to close the knowledge gap.</span>}</div></div>}
+              {mode === 'expert' && <div><div className="font-bold text-white mb-2">Who could help?</div>{eligibleExperts.length ? <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">{eligibleExperts.map((expert) => { const skill = expert.domains.find((d) => d.domain === domain)!; const atTarget = card.scope === 'enterprise' || expert.location === event.targetSiteId; const selected = allocation.expertId === expert.id; return <button key={expert.id} onClick={() => onSetAllocation(event.instanceId, domain, { expertId: selected ? '' : expert.id })} className={`rounded-xl border p-3 text-left ${selected ? 'border-indigo-400 bg-indigo-950/60' : 'border-slate-700 bg-slate-950'}`}><div className="flex justify-between gap-2"><span className="font-bold text-white">{expert.name}</span>{selected && <Check className="w-4 h-4 text-emerald-400"/>}</div><div className="text-sm text-slate-400">{DOMAIN_INFO[domain].label} {skill.score} · {expert.location === 'HQ' ? 'HQ' : company.sites.find((s) => s.id === expert.location)?.name || expert.location}</div><div className={`text-xs font-bold mt-1 ${atTarget ? 'text-emerald-400' : 'text-amber-400'}`}>{atTarget ? '+2 · already at the location' : '+2 · travel cost applies'}</div><div className="text-[10px] text-slate-500 mt-1">{selected ? 'Click again to remove' : 'Click to add to the response'}</div></button>; })}</div> : <div className="text-sm text-rose-300">No Deep Expert in this domain is currently available within your company.</div>}</div>}
+              {mode === 'network' && <div><div className="font-bold text-white">Community of Practice</div>{networkAvailable ? <button onClick={() => onSetAllocation(event.instanceId, domain, { useCoPSupport: !allocation.useCoPSupport })} className={`mt-3 rounded-xl px-4 py-3 font-bold border ${allocation.useCoPSupport ? 'bg-amber-500 text-slate-950 border-amber-300' : 'bg-slate-950 text-amber-200 border-amber-600'}`}>{allocation.useCoPSupport ? 'Network help selected (+2) · click to remove' : 'Ask the network for +2 support'}</button> : <div className="text-sm text-slate-400 mt-1">No active multi-company {DOMAIN_INFO[domain].label} CoP this round. The team may need to ask another company whether one of their experts can contribute.</div>}</div>}
+              {mode === 'consultant' && <div><div className="flex items-center gap-2 font-bold text-white"><CircleDollarSign className="w-5 h-5 text-amber-400"/>External expertise: ${consultantRate}k per knowledge point</div><div className="text-sm text-slate-400 mt-1">Temporary capability for this event only. Your rate rises 35% after each consultant engagement. Click a selected amount again to remove it.</div><div className="flex gap-2 mt-3">{[1,2,3].map((points) => { const selected = allocation.consultantPoints === points; const enabled = selected || points <= evaluation.usefulConsultantGap; return <button key={points} disabled={!enabled} onClick={() => onSetAllocation(event.instanceId, domain, { consultantPoints: selected ? 0 : points })} className={`rounded-xl px-4 py-3 font-black border ${selected ? 'bg-amber-500 text-slate-950 border-amber-300' : enabled ? 'bg-slate-950 text-white border-slate-600 hover:border-amber-500' : 'bg-slate-900 text-slate-700 border-slate-800 cursor-not-allowed'}`}>+{points}<span className="block text-xs font-medium">${consultantRate * points}k</span>{selected && <span className="block text-[9px] mt-0.5">click to remove</span>}</button>; })}{evaluation.usefulConsultantGap === 0 && !allocation.consultantPoints && <span className="text-sm text-emerald-400 self-center">No consultant points are needed to close the knowledge gap.</span>}</div></div>}
               {mode === 'reputation' && <div><div className="font-black text-white flex items-center gap-2"><Sparkles className="w-5 h-5 text-fuchsia-300"/>Call in a favour</div><div className="text-sm text-slate-400 mt-1">Spend one of your three finite Reputation points to guarantee this whole card. The favour fixes the immediate business outcome but creates no Team Capability, codification or corporate knowledge.</div><div className="flex items-center gap-3 mt-3"><div className="flex gap-2">{Array.from({length: company.reputationPointsStarted}, (_, i) => <span key={i} className={`w-10 h-10 rounded-full border-2 grid place-items-center font-black ${i < company.reputationPoints ? 'border-fuchsia-400 bg-fuchsia-950 text-fuchsia-200' : 'border-slate-700 bg-slate-950 text-slate-700'}`}>{i < company.reputationPoints ? '★' : '×'}</span>)}</div><button disabled={company.reputationPoints <= 0 || isResolving} onClick={useReputation} className="rounded-xl px-5 py-3 font-black bg-fuchsia-600 text-white disabled:bg-slate-800 disabled:text-slate-600">{company.reputationPoints > 0 ? 'Spend 1 Reputation → guarantee success' : 'No Reputation remaining'}</button></div></div>}
               {mode === 'risk' && <div><div className="font-black text-white flex items-center gap-2"><Dice5 className="w-5 h-5 text-rose-300"/>Proceed without intervention</div><div className="grid sm:grid-cols-3 gap-3 mt-3"><div className="rounded-xl bg-slate-950 p-3"><div className="text-xs uppercase text-slate-500 font-bold">Chance of success</div><div className="text-2xl font-black text-white">{evaluation.winChancePercent}%</div></div><div className="rounded-xl bg-slate-950 p-3"><div className="text-xs uppercase text-slate-500 font-bold">At stake</div><div className={`text-2xl font-black ${card.type === 'problem' ? 'text-rose-300' : 'text-emerald-300'}`}>{card.type === 'problem' ? '−' : '+'}{formatCurrency(card.impact)}</div></div><div className="rounded-xl bg-slate-950 p-3"><div className="text-xs uppercase text-slate-500 font-bold">Relative impact</div><div className="text-2xl font-black text-white">{riskPercent}%</div><div className="text-xs text-slate-500">of {card.scope === 'local' ? 'site' : 'company'} turnover</div></div></div></div>}
             </motion.div>
@@ -197,7 +196,20 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
           </>
         )}
 
-        {event.isResolved && <div className={`rounded-2xl p-5 border ${event.success ? 'bg-emerald-950/50 border-emerald-600' : 'bg-rose-950/50 border-rose-600'}`}><div className="text-2xl font-black text-white">{event.success ? 'Success' : 'Not resolved successfully'}</div><div className="text-sm text-slate-300 mt-1">{event.reputationUsed ? `Resolved by calling in a favour. Reputation remaining: ${company.reputationPoints}.` : event.turnoverChangeApplied ? `Business impact: ${event.turnoverChangeApplied > 0 ? '+' : '−'}${formatCurrency(Math.abs(event.turnoverChangeApplied))}` : 'No direct turnover change from the event outcome.'}</div></div>}
+        {event.isResolved && (
+          <div className={`rounded-2xl p-5 border ${event.success ? 'bg-emerald-950/50 border-emerald-600' : 'bg-rose-950/50 border-rose-600'}`}>
+            <div className="text-2xl font-black text-white">{event.success ? 'Success' : 'Not resolved successfully'}</div>
+            <div className="text-sm text-slate-300 mt-1">
+              {event.success && card.type === 'problem'
+                ? problemSuccessMessage
+                : event.reputationUsed
+                  ? `Resolved by calling in a favour. Reputation remaining: ${company.reputationPoints}.`
+                  : event.turnoverChangeApplied
+                    ? `Business impact: ${event.turnoverChangeApplied > 0 ? '+' : '−'}${formatCurrency(Math.abs(event.turnoverChangeApplied))}`
+                    : 'No direct turnover change from the event outcome.'}
+            </div>
+          </div>
+        )}
       </div>
     </motion.section>
   );
