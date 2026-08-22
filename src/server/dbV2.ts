@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { GameSession, KnowledgeDomain } from '../types/game.ts';
 import { CompanyV2, GameSessionV2, asSessionV2 } from '../types/gameV2.ts';
-import { initDatabase, logGameEvent, getGameEventLogs, saveParticipant } from './db.ts';
+import { deleteGameSession, getGameEventLogs, initDatabase, logGameEvent, resetAllDatabaseData, saveParticipant } from './db.ts';
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({
@@ -335,10 +335,52 @@ export async function listSessionsV2() {
 export async function deleteSessionV2(id: string): Promise<void> {
   const key = id.toUpperCase();
   memory.delete(key);
-  if (pool) await pool.query('DELETE FROM performance_gap.session_snapshots_v2 WHERE id = $1', [key]);
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM performance_gap.company_metrics_v2 WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.event_decisions_v2 WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.company_runs_v2 WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.game_runs_v2 WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.game_events WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.active_events WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.experts WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.sites WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.companies WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.participants WHERE session_id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.game_sessions WHERE id = $1', [key]);
+      await client.query('DELETE FROM performance_gap.session_snapshots_v2 WHERE id = $1', [key]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  await deleteGameSession(key);
 }
 
 export async function resetSessionsV2(): Promise<void> {
   memory.clear();
-  if (pool) await pool.query('TRUNCATE TABLE performance_gap.session_snapshots_v2');
+  if (pool) {
+    await pool.query(`
+      TRUNCATE TABLE
+        performance_gap.company_metrics_v2,
+        performance_gap.event_decisions_v2,
+        performance_gap.company_runs_v2,
+        performance_gap.game_runs_v2,
+        performance_gap.session_snapshots_v2,
+        performance_gap.game_events,
+        performance_gap.active_events,
+        performance_gap.experts,
+        performance_gap.sites,
+        performance_gap.companies,
+        performance_gap.participants,
+        performance_gap.game_sessions
+      RESTART IDENTITY CASCADE
+    `);
+  }
+  await resetAllDatabaseData();
 }
