@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, ArrowRight, Building2, MapPin, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Building2, MapPin } from 'lucide-react';
 import type { KnowledgeDomain, Participant } from './types/game.ts';
 import { DOMAIN_INFO } from './types/game.ts';
-import type { ActiveEventV2, CompanyV2, GameSessionV2 } from './types/gameV2.ts';
+import type { ActiveEventV2, BusinessStrategy, CompanyV2, GameSessionV2, KnowledgeStrategy } from './types/gameV2.ts';
 import { calculateUsableIntranetV2 } from './engine/coreV2.ts';
 import { AustraliaMap } from './components/AustraliaMap.tsx';
 import { EventDecisionCardV2 } from './components/EventDecisionCardV2.tsx';
@@ -14,6 +14,7 @@ import { ConsequencesModal } from './components/ConsequencesModal.tsx';
 import { AttritionModal } from './components/AttritionModal.tsx';
 import { FinalDisruptionModal } from './components/FinalDisruptionModal.tsx';
 import { SessionJoinModal } from './components/SessionJoinModal.tsx';
+import { StrategyPromptV2 } from './components/StrategyPromptV2.tsx';
 import { formatCurrency } from './utils/format.ts';
 
 const PHASE_LABELS: Record<GameSessionV2['phase'], string> = {
@@ -119,6 +120,17 @@ export function AppV2() {
 
   const solo = () => create('Solo Performance Gap', 1);
 
+  const submitStrategy = async (stage: 'initial' | 'final', business: BusinessStrategy, knowledge: KnowledgeStrategy) => {
+    if (!session || !company) return;
+    const res = await fetch(`/api/sessions/${session.id}/strategy`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId: company.id, stage, businessStrategy: business, knowledgeStrategy: knowledge }),
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || 'Could not record strategy.'); return; }
+    setSession(data.session);
+  };
+
   const advancePhase = async () => {
     if (!session) return;
     const res = await fetch(`/api/sessions/${session.id}/advance-phase`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
@@ -194,6 +206,8 @@ export function AppV2() {
   const isFacilitator = participant?.role === 'facilitator';
   const currentPhaseIndex = ['events', 'respond', 'consequences', 'investment', 'risk'].indexOf(session.phase);
   const horizonCanRedraw = selectedEvent && company.horizonScanAvailableRound === session.round && !company.horizonScanUsedThisRound && !!company.horizonScanDomain && selectedEvent.card.domains.some((r) => r.domain === company.horizonScanDomain);
+  const needsInitialStrategy = !!participant && !isFacilitator && !company.knowledgeStrategyInitial;
+  const needsFinalStrategy = !!participant && !isFacilitator && !!session.finalDisruptionResolved && !company.knowledgeStrategyFinal;
 
   return (
     <div className="min-h-screen bg-[#080b12] text-slate-200">
@@ -242,10 +256,12 @@ export function AppV2() {
 
         {session.phase === 'risk' && <AttritionModal session={session} company={company} phaseResult={{attritionSummaries:session.riskResults || {}}} onAdvanceToNextRound={advancePhase}/>} 
 
-        {session.isFinalDisruptionActive && <FinalDisruptionModal session={session} company={company} onResolveFinalDisruption={async()=>{const res=await fetch(`/api/sessions/${session.id}/resolve-final-disruption`,{method:'POST'});const data=await res.json(); if(data.session)setSession(data.session);}} onOpenAAR={()=>toast('After Action Review screen will be polished after the core playtest passes.')}/>} 
+        {session.isFinalDisruptionActive && <FinalDisruptionModal session={session} company={company} onResolveFinalDisruption={async()=>{const res=await fetch(`/api/sessions/${session.id}/resolve-final-disruption`,{method:'POST'});const data=await res.json(); if(data.session)setSession(data.session);}} onOpenAAR={()=>toast('AAR evidence is now being captured; chart presentation is the next UI pass.')}/>} 
       </main>
 
       {showJoin && <SessionJoinModal currentSession={session} onJoinSession={join} onCreateNewSession={create} onSoloStart={solo}/>} 
+      {needsInitialStrategy && <StrategyPromptV2 stage="initial" onSubmit={(business, knowledge) => submitStrategy('initial', business, knowledge)}/>} 
+      {needsFinalStrategy && <StrategyPromptV2 stage="final" originalBusinessStrategy={company.businessStrategyInitial} originalKnowledgeStrategy={company.knowledgeStrategyInitial} onSubmit={(business, knowledge) => submitStrategy('final', business, knowledge)}/>} 
 
       {notification && <div className="fixed bottom-5 right-5 z-[100] rounded-2xl bg-white text-slate-950 px-5 py-3 shadow-2xl font-bold max-w-md flex items-start gap-2"><AlertTriangle className="w-5 h-5 text-amber-600 shrink-0"/>{notification}</div>}
     </div>
