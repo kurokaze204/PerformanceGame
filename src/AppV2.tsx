@@ -66,9 +66,11 @@ export function AppV2() {
       : extraData?.targetSiteId ? [String(extraData.targetSiteId)] : [];
     if (!siteIds.length) return;
     if (!enterprise) selectSite(siteIds[0]);
+
     const effect: SiteImpactEffect = { id: `${extraData.eventInstanceId}-${Date.now()}`, siteIds, amount, enterprise };
-    setImpactEffect(effect);
-    window.setTimeout(() => setImpactEffect((current) => current?.id === effect.id ? null : current), 1900);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.setTimeout(() => setImpactEffect(effect), 650);
+    window.setTimeout(() => setImpactEffect((current) => current?.id === effect.id ? null : current), 4850);
   };
 
   useEffect(() => {
@@ -192,7 +194,21 @@ export function AppV2() {
     setSession(data.session);
     const refreshed = data.session.activeEvents[company.id] || [];
     const next = refreshed.findIndex((e: ActiveEventV2) => !e.isResolved);
-    if (next >= 0) setSelectedEventIndex(next);
+    if (next >= 0) {
+      setSelectedEventIndex(next);
+      return;
+    }
+
+    if (data.session.phase === 'respond') {
+      const phaseRes = await fetch(`/api/sessions/${session.id}/advance-phase`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const phaseData = await phaseRes.json();
+      if (phaseRes.ok && phaseData.success !== false) {
+        setSession(phaseData.session);
+        setSelectedEventIndex(0);
+      } else if (phaseData.message) {
+        toast(phaseData.message);
+      }
+    }
   };
 
   const redrawEvent = async (eventId: string) => {
