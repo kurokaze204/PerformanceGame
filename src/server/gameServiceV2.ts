@@ -91,8 +91,21 @@ export async function createNewSessionV2(sessionId: string, title: string, compa
 export async function initializeDefaultSessionV2(): Promise<GameSessionV2> {
   await initDatabaseV2();
   const existing = await getSessionV2('KM2026');
-  if (existing) return existing;
-  return createNewSessionV2('KM2026', 'The Performance Gap', ['Apex Technologies', 'Vanguard Systems']);
+  if (existing) {
+    const legacyPlaceholderSession =
+      existing.companies.length === 2 &&
+      existing.companies.some((c) => c.name === 'Apex Technologies') &&
+      existing.companies.some((c) => c.name === 'Vanguard Systems');
+
+    // KM2026 is the built-in local/test session. Older builds created a second
+    // placeholder company (Vanguard Systems), which meant Apex could finish both
+    // challenge cards and still be blocked waiting for a company nobody was
+    // actually controlling. Migrate that legacy test session to a true one-team
+    // session. Explicitly created multiplayer sessions are not affected.
+    if (!legacyPlaceholderSession) return existing;
+    return createNewSessionV2('KM2026', 'The Performance Gap', ['Apex Technologies']);
+  }
+  return createNewSessionV2('KM2026', 'The Performance Gap', ['Apex Technologies']);
 }
 
 export async function getSessionOrThrow(id: string): Promise<GameSessionV2> {
