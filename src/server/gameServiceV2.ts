@@ -17,12 +17,12 @@ import {
   createInitialCompanyV2,
   drawRoundEventsV2,
   executeKnowledgeActionV2,
-  executeRiskPhaseV2,
   prepareNextRoundV2,
   recalculateCompanySPOFV2,
   redrawEventSameTypeV2,
   resolveSingleEventV2,
 } from '../engine/coreV2.ts';
+import { executeRiskPhaseV4 } from '../engine/riskPhaseV4.ts';
 import { executeInvestmentActionV4, isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import {
   resolveSingleEventExplicitV2,
@@ -222,7 +222,7 @@ export async function advancePhaseV2(sessionId: string, requested?: GamePhase) {
   if (next === 'risk' && session.phase === 'investment') {
     const summaries: any = {};
     for (const company of session.companies) {
-      summaries[company.id] = executeRiskPhaseV2(session, company);
+      summaries[company.id] = executeRiskPhaseV4(session, company);
       await log(session, 'KNOWLEDGE_RISK', 'Knowledge risk resolved', `${summaries[company.id].departedExperts.length} expert departure(s), ${summaries[company.id].workforceAttrition.length} workforce knowledge loss(es).`, company.id, summaries[company.id]);
     }
     session.riskResults = summaries;
