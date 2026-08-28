@@ -1,6 +1,6 @@
 import { ActiveEventV2, BusinessStrategy, CompanyV2, GameSessionV2, KnowledgeStrategy } from '../types/gameV2.ts';
 import { KnowledgeDomain } from '../types/game.ts';
-import { evaluateEventDomainKnowledgeV2 } from '../engine/coreV2.ts';
+import { evaluateEventDomainKnowledgeExplicitV2 } from '../engine/challengeResponseV2.ts';
 import {
   initialiseAnalyticsRun,
   recordCompanyMetric,
@@ -19,7 +19,7 @@ function combinedProbability(session: GameSessionV2, company: CompanyV2, event: 
   }
   try {
     const domains = event.card.domains.map((r) => {
-      const e = evaluateEventDomainKnowledgeV2(session, company, event, r.domain as KnowledgeDomain, session.config);
+      const e = evaluateEventDomainKnowledgeExplicitV2(session, company, event, r.domain as KnowledgeDomain, session.config);
       return {
         domain: r.domain,
         difficulty: r.difficulty,
