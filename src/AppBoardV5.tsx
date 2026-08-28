@@ -58,23 +58,32 @@ export function AppBoardV5(){
  const acknowledgeResolution=async(data:any)=>{
   if(!session||!company)throw new Error('Game unavailable');
   deferUpdates.current=false;
-  let next=(data?.session||pendingSession.current) as GameSessionV2|undefined;
+  const next=(data?.session||pendingSession.current||session) as GameSessionV2;
   pendingSession.current=null;
-  if(!next){const fresh=await fetch(`/api/sessions/${session.id}`);if(!fresh.ok)throw new Error('Could not refresh the game state.');next=await fresh.json()}
   const nextEvents:ActiveEventV2[]=next.activeEvents[company.id]||[];
   const unresolved=nextEvents.findIndex(e=>!e.isResolved);
   if(unresolved>=0){setSession(next);setSelectedEventIndex(unresolved);const target=nextEvents[unresolved].targetSiteId;if(target)selectSite(target);return}
-  if(next.phase==='respond'){
-   const r=await fetch(`/api/sessions/${next.id}/advance-phase`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const d=await r.json();
-   if(!r.ok||d.success===false)throw new Error(d.message||d.error||'Could not finish the Challenge stage.');
-   next=d.session;
-  }
-  if(next.phase==='consequences'){
-   const r=await fetch(`/api/sessions/${next.id}/advance-phase`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const d=await r.json();
-   if(!r.ok||d.success===false)throw new Error(d.message||d.error||'Could not move to Invest.');
-   next=d.session;
-  }
-  setSession(next);setSelectedEventIndex(0);
+
+  // The acknowledgement itself must never be held hostage by a phase-change request.
+  // Move the player to Invest immediately, then reconcile the server state in the background.
+  const optimistic={...next,phase:'investment' as const};
+  setSession(optimistic);setSelectedEventIndex(0);
+  void (async()=>{
+   try{
+    let fresh=next;
+    const latestRes=await fetch(`/api/sessions/${session.id}`);
+    if(latestRes.ok)fresh=await latestRes.json();
+    if(fresh.phase==='respond'){
+     const r=await fetch(`/api/sessions/${fresh.id}/advance-phase`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetPhase:'consequences'})});
+     const d=await r.json();if(!r.ok||d.success===false)throw new Error(d.message||d.error||'Could not finish the Challenge stage.');fresh=d.session;
+    }
+    if(fresh.phase==='consequences'){
+     const r=await fetch(`/api/sessions/${fresh.id}/advance-phase`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetPhase:'investment'})});
+     const d=await r.json();if(!r.ok||d.success===false)throw new Error(d.message||d.error||'Could not move to Invest.');fresh=d.session;
+    }
+    if(fresh.phase==='investment')setSession(fresh);
+   }catch(error:any){toast(error.message||'The server did not confirm the phase change. Refreshing game state may be required.')}
+  })();
  };
  const redrawEvent=async(eventId:string)=>{if(!session||!company)return;const res=await fetch(`/api/sessions/${session.id}/redraw-event`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,eventInstanceId:eventId})});const data=await res.json();if(!res.ok){toast(data.message||data.error||'Redraw not available.');return}setSession(data.session)};
  const performAction=async(actionType:string,params:any={})=>{if(!session||!company)return;const res=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,actionType,params})});const data=await res.json();if(!res.ok){toast(data.message||data.error||'Action unavailable.');return}setSession(data.session);toast(data.message||'Action completed.')};
