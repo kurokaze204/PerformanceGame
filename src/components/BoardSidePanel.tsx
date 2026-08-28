@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Building2, MapPin, Users, X } from 'lucide-react';
 import type { KnowledgeDomain } from '../types/game.ts';
 import { DOMAIN_INFO } from '../types/game.ts';
@@ -17,6 +17,8 @@ interface BoardSidePanelProps {
   onSelectHQ: () => void;
 }
 
+type TeamMember = { id: string; name: string };
+
 export const BoardSidePanel: React.FC<BoardSidePanelProps> = ({
   session,
   company,
@@ -27,6 +29,8 @@ export const BoardSidePanel: React.FC<BoardSidePanelProps> = ({
   onSelectHQ,
 }) => {
   const [showSpofHelp, setShowSpofHelp] = useState(false);
+  const [showTeamMembers, setShowTeamMembers] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const selectedSite = company.sites.find((site) => site.id === selectedSiteId) || company.sites[0];
   const committedExpertIds = new Set(
     currentEvent
@@ -36,6 +40,43 @@ export const BoardSidePanel: React.FC<BoardSidePanelProps> = ({
       : [],
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadMembers = async () => {
+      const members = new Map<string, TeamMember>();
+      try {
+        const raw = localStorage.getItem('tpg_participant');
+        if (raw) {
+          const current = JSON.parse(raw);
+          if (current?.companyId === company.id && current?.id && current?.name) members.set(current.id, { id: current.id, name: current.name });
+        }
+      } catch { /* ignore malformed local storage */ }
+      try {
+        const response = await fetch(`/api/sessions/${session.id}/logs`);
+        if (response.ok) {
+          const logs = await response.json();
+          for (const entry of Array.isArray(logs) ? logs : []) {
+            if (entry?.eventType !== 'PARTICIPANT_JOINED' || entry?.companyId !== company.id) continue;
+            const id = String(entry?.payload?.participantId || `${entry?.title || 'member'}`);
+            const name = String(entry?.title || 'Team member').replace(/ joined$/i, '').trim();
+            members.set(id, { id, name });
+          }
+        }
+      } catch { /* keep the locally known participant */ }
+      if (!cancelled) setTeamMembers([...members.values()]);
+    };
+    void loadMembers();
+    const interval = window.setInterval(loadMembers, 3000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [session.id, company.id]);
+
+  useEffect(() => {
+    if (!showTeamMembers) return;
+    const close = () => setShowTeamMembers(false);
+    document.addEventListener('click', close, { once: true });
+    return () => document.removeEventListener('click', close);
+  }, [showTeamMembers]);
+
   const changeContext = (value: string) => {
     if (value === 'HQ') onSelectHQ();
     else onSelectSite(value);
@@ -44,6 +85,23 @@ export const BoardSidePanel: React.FC<BoardSidePanelProps> = ({
   return (
     <>
       <aside className="rounded-3xl border border-slate-800 bg-slate-900/75 p-4 min-h-[620px] overflow-hidden">
+        <div className="relative mb-3">
+          <button
+            onClick={(event) => { event.stopPropagation(); setShowTeamMembers((value) => !value); }}
+            className="w-full rounded-xl border border-indigo-700 bg-indigo-950/55 px-3 py-2 text-left font-black text-indigo-100 hover:bg-indigo-950/80 flex items-center justify-between gap-3"
+          >
+            <span className="flex items-center gap-2"><Users className="w-4 h-4 text-indigo-300" />Team Members ({teamMembers.length})</span>
+            <span className="text-[10px] text-indigo-300 uppercase tracking-wider">{showTeamMembers ? 'Hide' : 'Show'}</span>
+          </button>
+          {showTeamMembers && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-40 rounded-xl border border-indigo-600 bg-slate-950 shadow-2xl overflow-hidden">
+              {teamMembers.length ? teamMembers.map((member) => (
+                <div key={member.id} className="px-3 py-2 text-sm font-bold text-white border-b border-slate-800 last:border-b-0">{member.name}</div>
+              )) : <div className="px-3 py-2 text-sm text-slate-400">No team members found.</div>}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-xs uppercase tracking-widest text-indigo-300 font-black">Selected site</div>
