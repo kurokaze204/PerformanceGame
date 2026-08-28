@@ -155,8 +155,8 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.problemEventsDrawn ??= 0;
   c.opportunityEventsDrawn ??= 0;
   c.horizonScanAvailableRound ??= null;
-  c.reputationPointsStarted ??= V2_BALANCE.startingReputationPoints;
-  c.reputationPoints ??= c.reputationPointsStarted;
+  c.reputationPointsStarted = Math.min(c.reputationPointsStarted ?? V2_BALANCE.startingReputationPoints, V2_BALANCE.startingReputationPoints);
+  c.reputationPoints = Math.min(c.reputationPoints ?? c.reputationPointsStarted, V2_BALANCE.startingReputationPoints);
   c.businessStrategyInitial ??= null;
   c.knowledgeStrategyInitial ??= null;
   c.businessStrategyFinal ??= null;
