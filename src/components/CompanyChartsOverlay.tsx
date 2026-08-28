@@ -73,9 +73,9 @@ const TrendChart: React.FC<{ title: string; rounds: number[]; series: Series[]; 
     }).join(' ');
   };
   return <section className="rounded-xl border border-slate-700 bg-slate-950/85 p-2 min-w-0">
-    <div className="font-black text-white text-xs mb-1">{title}</div>
+    <div className="font-black text-white text-base leading-tight mb-1.5">{title}</div>
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[82px] bg-slate-900/55 rounded-lg">
-      {rounds.map((r,i)=>{const x=left+(rounds.length<=1?innerW/2:i*innerW/(rounds.length-1));return <g key={r}><line x1={x} y1={top} x2={x} y2={top+innerH} stroke="#334155" strokeWidth="1"/><text x={x} y={height-5} textAnchor="middle" fill="#94a3b8" fontSize="9">R{r}</text></g>})}
+      {rounds.map((r,i)=>{const x=left+(rounds.length<=1?innerW/2:i*innerW/(rounds.length-1));return <g key={r}><line x1={x} y1={top} x2={x} y2={top+innerH} stroke="#334155" strokeWidth="1"/><text x={x} y={height-4} textAnchor="middle" fill="#cbd5e1" fontSize="12" fontWeight="700">R{r}</text></g>})}
       {shown.map((s)=><polyline key={s.id} points={pointsFor(s.values)} fill="none" stroke={LINE_COLORS[series.findIndex(x=>x.id===s.id)%LINE_COLORS.length]} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>)}
     </svg>
   </section>;
