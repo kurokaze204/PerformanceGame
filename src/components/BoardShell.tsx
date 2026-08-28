@@ -12,7 +12,9 @@ export const BoardShell: React.FC<BoardShellProps> = ({ board, sidePanel, overla
       <div className="h-full">{board}</div>
       {overlay && (
         <div className="absolute inset-3 z-20 pointer-events-none overflow-auto rounded-2xl">
-          <div className="pointer-events-auto min-h-full flex items-start">{overlay}</div>
+          <div className="min-h-full flex items-start pointer-events-none">
+            <div className="pointer-events-auto w-full">{overlay}</div>
+          </div>
         </div>
       )}
     </div>
