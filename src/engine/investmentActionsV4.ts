@@ -150,11 +150,13 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (!domain) return { success: false, message: 'Choose a domain.' };
     const remaining = session.config.max_intranet_domain_growth_per_round - company.intranetRoundGrowth[domain];
     if (remaining <= 0) return { success: false, message: 'This Intranet domain has reached its growth limit for the round.' };
-    const hqSkills = company.experts.flatMap((e) => !e.isVacant && e.location === 'HQ' ? e.domains.filter((x) => x.domain === domain).map((x) => x.score) : []);
+    const expertSkills = company.experts.flatMap((e) => !e.isVacant ? e.domains.filter((x) => x.domain === domain).map((x) => ({ score: x.score, atHQ: e.location === 'HQ' })) : []);
     const highestSite = Math.max(...company.sites.filter((s) => !s.isClosed).map((s) => Math.max(s.teamCapability[domain], s.codifiedKnowledge[domain])), 0);
-    const sourceCeiling = Math.max(highestSite, ...hqSkills, 0);
+    const highestExpert = Math.max(0, ...expertSkills.map((x) => x.score));
+    const sourceCeiling = Math.max(highestSite, highestExpert, 0);
     if (company.intranet[domain] >= sourceCeiling) return { success: false, message: 'No deeper organisational knowledge is currently available to publish.' };
-    const increment = hqSkills.length ? session.config.hq_expert_intranet_increment : session.config.normal_intranet_increment;
+    const bestSourceIsHQExpert = expertSkills.some((x) => x.atHQ && x.score === sourceCeiling);
+    const increment = bestSourceIsHQExpert ? session.config.hq_expert_intranet_increment : session.config.normal_intranet_increment;
     const growth = Math.min(increment, remaining, sourceCeiling - company.intranet[domain]);
     company.intranet[domain] += growth; company.intranetRoundGrowth[domain] += growth;
     const investmentAttribution = finish(baseCost);
