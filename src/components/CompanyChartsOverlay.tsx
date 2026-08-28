@@ -62,10 +62,14 @@ export function captureRoundSnapshot(company: CompanyV2, round: number): RoundSn
 
 const TrendChart: React.FC<{ title: string; rounds: number[]; series: Series[]; enabled: Record<string, boolean> }> = ({ title, rounds, series, enabled }) => {
   const shown = series.filter((s) => enabled[s.id]);
-  const width = 760, height = 92, left = 20, right = 12, top = 8, bottom = 20;
+  const width = 760, height = 112, left = 20, right = 12, top = 8, bottom = 22;
   const innerW = width - left - right, innerH = height - top - bottom;
   const pointsFor = (values: number[]) => {
-    const min = Math.min(...values), max = Math.max(...values), span = Math.max(1, max - min);
+    // Zero is the normal baseline. If a series falls below zero, extend the
+    // scale downward rather than clipping the negative value.
+    const min = Math.min(0, ...values);
+    const max = Math.max(0, ...values);
+    const span = Math.max(1, max - min);
     return values.map((v, i) => {
       const x = left + (values.length <= 1 ? innerW / 2 : i * innerW / (values.length - 1));
       const y = top + innerH - ((v - min) / span) * innerH;
@@ -74,7 +78,7 @@ const TrendChart: React.FC<{ title: string; rounds: number[]; series: Series[]; 
   };
   return <section className="rounded-xl border border-slate-700 bg-slate-950/85 p-2 min-w-0">
     <div className="font-black text-white text-base leading-tight mb-1.5">{title}</div>
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[82px] bg-slate-900/55 rounded-lg">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[102px] bg-slate-900/55 rounded-lg">
       {rounds.map((r,i)=>{const x=left+(rounds.length<=1?innerW/2:i*innerW/(rounds.length-1));return <g key={r}><line x1={x} y1={top} x2={x} y2={top+innerH} stroke="#334155" strokeWidth="1"/><text x={x} y={height-4} textAnchor="middle" fill="#cbd5e1" fontSize="12" fontWeight="700">R{r}</text></g>})}
       {shown.map((s)=><polyline key={s.id} points={pointsFor(s.values)} fill="none" stroke={LINE_COLORS[series.findIndex(x=>x.id===s.id)%LINE_COLORS.length]} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>)}
     </svg>
@@ -115,7 +119,7 @@ export const CompanyChartsOverlay: React.FC<Props> = ({ company, snapshots, onCl
   return <div className="fixed inset-0 z-[160] bg-[#080b12]/98 backdrop-blur-sm p-3 md:p-5 overflow-hidden">
     <div className="h-full max-w-[1600px] mx-auto rounded-3xl border border-indigo-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-700 flex items-start justify-between gap-4 shrink-0">
-        <div><div className="text-xs uppercase tracking-[0.18em] text-indigo-300 font-black">Company Trends</div><h2 className="text-xl font-black text-white">How your capability is changing round by round</h2><p className="text-xs text-slate-400 mt-1">Trend view only: there is deliberately no Y-axis scale. The shared legend controls every chart. Site investment includes direct spend at that office plus its allocated share of corporate investment; Corporate HQ shows corporate investment only.</p></div>
+        <div><div className="text-xs uppercase tracking-[0.18em] text-indigo-300 font-black">Company Trends</div><h2 className="text-xl font-black text-white">How your capability is changing round by round</h2><p className="text-xs text-slate-400 mt-1">Trend view only: there is deliberately no Y-axis scale. Each series starts from a zero baseline unless it falls negative, in which case the chart extends below zero. The shared legend controls every chart. Site investment includes direct spend at that office plus its allocated share of corporate investment; Corporate HQ shows corporate investment only.</p></div>
         <button onClick={onClose} className="rounded-xl border border-slate-600 bg-slate-950 p-2 text-white hover:bg-slate-800"><X className="w-5 h-5"/></button>
       </div>
       <div className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_230px] gap-3 p-3">
