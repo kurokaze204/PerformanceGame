@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, ArrowRight, Building2, MapPin, Shield } from 'lucide-react';
 import type { KnowledgeDomain, Participant } from './types/game.ts';
@@ -11,7 +11,6 @@ import { EventDecisionCardV2 } from './components/EventDecisionCardV2.tsx';
 import { ActionTokens } from './components/ActionTokens.tsx';
 import { SharedGameTimer } from './components/SharedGameTimer.tsx';
 import { ActionsPanel } from './components/ActionsPanel.tsx';
-import { ConsequencesModal } from './components/ConsequencesModal.tsx';
 import { AttritionModal } from './components/AttritionModal.tsx';
 import { FinalDisruptionModal } from './components/FinalDisruptionModal.tsx';
 import { SessionJoinModal } from './components/SessionJoinModal.tsx';
@@ -44,6 +43,7 @@ export function AppV2() {
   const [notification, setNotification] = useState<string | null>(null);
   const [impactEffect, setImpactEffect] = useState<SiteImpactEffect | null>(null);
   const [showFacilitatorRoom, setShowFacilitatorRoom] = useState(false);
+  const deferSessionUpdates = useRef(false);
 
   const toast = (message: string) => {
     setNotification(message);
@@ -96,6 +96,7 @@ export function AppV2() {
       try {
         const data = JSON.parse(message.data);
         if (data.session) {
+          if (deferSessionUpdates.current && (data.type === 'EVENT_RESOLVED' || data.type === 'CHALLENGES_COMPLETE')) return;
           if (data.type === 'EVENT_RESOLVED') showFinancialImpact(data.session, data.extraData);
           setSession(data.session);
         }
@@ -114,6 +115,16 @@ export function AppV2() {
     if (!company) return;
     if (!company.sites.some((s) => s.id === selectedSiteId && !s.isClosed)) setSelectedSiteId(company.sites.find((s) => !s.isClosed)?.id || 'melbourne');
   }, [company, selectedSiteId]);
+
+  useEffect(() => {
+    if (!session || session.phase !== 'consequences' || deferSessionUpdates.current) return;
+    const skipLegacyResultsPhase = async () => {
+      const res = await fetch(`/api/sessions/${session.id}/advance-phase`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const data = await res.json();
+      if (res.ok && data.success !== false) setSession(data.session);
+    };
+    skipLegacyResultsPhase().catch(() => undefined);
+  }, [session?.id, session?.phase]);
 
   const join = async (sessionId: string, requestedCompanyId: string, playerName: string) => {
     const getRes = await fetch(`/api/sessions/${sessionId.toUpperCase()}`);
@@ -216,31 +227,53 @@ export function AppV2() {
   };
 
   const resolveEvent = async (eventId: string) => {
-    if (!session || !company) return;
+    if (!session || !company) return null;
+    deferSessionUpdates.current = true;
     const res = await fetch(`/api/sessions/${session.id}/resolve-event`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ companyId: company.id, eventInstanceId: eventId }),
     });
     const data = await res.json();
-    if (!res.ok) { toast(data.message || data.error || 'Event could not be resolved.'); return; }
-    setSession(data.session);
-    const refreshed = data.session.activeEvents[company.id] || [];
-    const next = refreshed.findIndex((e: ActiveEventV2) => !e.isResolved);
-    if (next >= 0) {
-      setSelectedEventIndex(next);
-      return;
+    if (!res.ok) {
+      deferSessionUpdates.current = false;
+      toast(data.message || data.error || 'Event could not be resolved.');
+      throw new Error(data.message || data.error || 'Event could not be resolved.');
     }
 
-    if (data.session.phase === 'respond') {
-      const phaseRes = await fetch(`/api/sessions/${session.id}/advance-phase`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-      const phaseData = await phaseRes.json();
-      if (phaseRes.ok && phaseData.success !== false) {
-        setSession(phaseData.session);
-        setSelectedEventIndex(0);
-      } else if (phaseData.message) {
-        toast(phaseData.message);
-      }
+    const resolvedEvent = (data.session.activeEvents[company.id] || []).find((entry: ActiveEventV2) => entry.instanceId === eventId);
+    if (resolvedEvent) {
+      showFinancialImpact(data.session, {
+        companyId: company.id,
+        eventInstanceId: eventId,
+        targetSiteId: resolvedEvent.targetSiteId,
+        scope: resolvedEvent.card.scope,
+        result: data.result,
+      });
     }
+
+    window.setTimeout(async () => {
+      deferSessionUpdates.current = false;
+      const refreshed = data.session.activeEvents[company.id] || [];
+      const next = refreshed.findIndex((entry: ActiveEventV2) => !entry.isResolved);
+
+      if (data.session.phase === 'consequences') {
+        const phaseRes = await fetch(`/api/sessions/${session.id}/advance-phase`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const phaseData = await phaseRes.json();
+        if (phaseRes.ok && phaseData.success !== false) {
+          setSession(phaseData.session);
+          setSelectedEventIndex(0);
+        } else {
+          setSession(data.session);
+          if (phaseData.message) toast(phaseData.message);
+        }
+        return;
+      }
+
+      setSession(data.session);
+      if (next >= 0) setSelectedEventIndex(next);
+    }, 2800);
+
+    return data;
   };
 
   const redrawEvent = async (eventId: string) => {
@@ -265,24 +298,13 @@ export function AppV2() {
     setSession(data.session); toast(data.message || 'Action completed.');
   };
 
-  const applyLearning = async (eventId: string, domain: KnowledgeDomain, target: 'team' | 'expert', targetId?: string) => {
-    if (!session || !company) return;
-    const res = await fetch(`/api/sessions/${session.id}/apply-learning`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyId: company.id, eventInstanceId: eventId, domain, target, targetId }),
-    });
-    const data = await res.json();
-    if (!res.ok) { toast(data.message || data.error || 'Learning could not be captured.'); return; }
-    setSession(data.session); toast(data.message);
-  };
-
   if (!session || !company) return <div className="min-h-screen bg-slate-950 text-white grid place-items-center">Loading The Performance Gap…</div>;
 
   const events = session.activeEvents[company.id] || [];
   const selectedEvent = events[Math.min(selectedEventIndex, Math.max(0, events.length - 1))];
   const selectedSite = company.sites.find((s) => s.id === selectedSiteId) || company.sites[0];
   const isFacilitator = participant?.role === 'facilitator';
-  const playPhases = ['respond', 'consequences', 'investment', 'risk'] as const;
+  const playPhases = ['respond', 'investment', 'risk'] as const;
   const currentPhaseIndex = playPhases.indexOf(session.phase as typeof playPhases[number]);
   const horizonCanRedraw = selectedEvent && company.horizonScanAvailableRound === session.round && !company.horizonScanUsedThisRound && !!company.horizonScanDomain && selectedEvent.card.domains.some((r) => r.domain === company.horizonScanDomain);
   const needsInitialStrategy = !!participant && !isFacilitator && !company.knowledgeStrategyInitial;
@@ -370,7 +392,6 @@ export function AppV2() {
               </section>
             )}
 
-            {session.phase === 'consequences' && <ConsequencesModal session={session} company={company} onApplyLearning={applyLearning} onNextPhase={advancePhase}/>} 
             {session.phase === 'investment' && <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 space-y-6"><div className="text-center"><h2 className="text-2xl font-black text-white">Invest in next round's capability</h2><p className="text-slate-400 mt-1">Every action you spend is one less action available this round.</p></div><ActionTokens remaining={company.actionsRemaining} total={session.config.actions_per_round}/><ActionsPanel session={session} company={company} onPerformAction={performAction} onNextPhase={advancePhase}/></section>}
             {session.phase === 'risk' && <AttritionModal session={session} company={company} phaseResult={{attritionSummaries:session.riskResults || {}}} onAdvanceToNextRound={advancePhase}/>} 
             {session.isFinalDisruptionActive && <FinalDisruptionModal session={session} company={company} onResolveFinalDisruption={async()=>{const res=await fetch(`/api/sessions/${session.id}/resolve-final-disruption`,{method:'POST'});const data=await res.json(); if(data.session)setSession(data.session);}} onOpenAAR={()=>toast('AAR evidence is now being captured; chart presentation is the next UI pass.')}/>} 
