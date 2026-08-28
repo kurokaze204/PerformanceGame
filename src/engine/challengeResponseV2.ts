@@ -91,13 +91,13 @@ export function evaluateEventDomainKnowledgeExplicitV2(
   const sources = explicitSourceValuesV2(company, event, domain, config);
   const difficulty = event.card.domains.find((requirement) => requirement.domain === domain)?.difficulty ?? base.difficulty;
   const withoutConsultant = sources.selectedBaseKnowledge + base.expertBonus + base.copBonus + base.automationBonus;
-  const usefulGap = Math.max(0, difficulty - withoutConsultant);
   const requestedConsultant = ignoreConsultant ? 0 : Math.max(0, Math.min(V2_BALANCE.consultantMaxPointsPerDomain, event.allocations[domain]?.consultantPoints || 0));
-  const consultantPoints = Math.min(requestedConsultant, usefulGap);
+  const consultantPoints = requestedConsultant;
   const totalKnowledge = withoutConsultant + consultantPoints;
   const targetThreshold = difficulty + config.resolution_offset;
   const winChancePercent = winChance(config.event_die, targetThreshold, totalKnowledge);
   const likelihood = winChancePercent >= 90 ? 'Very High' : winChancePercent >= 70 ? 'High' : winChancePercent >= 40 ? 'Moderate' : winChancePercent >= 20 ? 'Low' : 'Very Low';
+  const usefulGap = Math.max(0, targetThreshold - withoutConsultant);
 
   return {
     ...base,
@@ -135,13 +135,6 @@ export function validateEventAllocationExplicitV2(
     const points = Math.floor(allocation.consultantPoints);
     if (points < 0 || points > V2_BALANCE.consultantMaxPointsPerDomain) {
       return { ok: false, message: 'Consultant support is limited to 3 knowledge points per domain.' };
-    }
-    const prior = event.allocations[domain];
-    event.allocations[domain] = { ...allocation, consultantPoints: 0 };
-    const evaluation = evaluateEventDomainKnowledgeExplicitV2(sessionInput, companyInput, event, domain, sessionInput.config, true);
-    event.allocations[domain] = prior;
-    if (points > evaluation.usefulConsultantGap) {
-      return { ok: false, message: `Only ${evaluation.usefulConsultantGap} consultant point(s) can usefully close this knowledge gap.` };
     }
   }
 
