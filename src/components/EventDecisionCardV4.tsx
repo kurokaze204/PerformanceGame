@@ -98,16 +98,13 @@ export const EventDecisionCardV4:React.FC<Props>=({session,company,event,cardNum
    setBusy(false);
   }catch(error:any){setBusy(false);window.alert(error.message||'Could not use Reputation.');}
  };
- const continueResolution=async()=>{
+ const continueResolution=()=>{
   if(!resolution?.complete||busy)return;
   setBusy(true);
-  try{
-   await onAcknowledgeResolution(resolution.data);
-   setBusy(false);
-  }catch(error:any){
+  Promise.resolve(onAcknowledgeResolution(resolution.data)).catch((error:any)=>{
    setBusy(false);
    window.alert(error.message||'Could not continue to the next step.');
-  }
+  });
  };
  const resolve=async()=>{if(busy)return;setBusy(true);setResolution({complete:false,domains:evals.map(x=>({domain:x.domain,value:randomPercent(),target:x.value.winChancePercent}))});timer.current=window.setInterval(()=>setResolution(cur=>cur?{...cur,domains:cur.domains.map(x=>({...x,value:randomPercent()}))}:cur),70);try{const [data]=await Promise.all([onResolveEvent(event.instanceId),new Promise(r=>window.setTimeout(r,1250))]);if(timer.current)window.clearInterval(timer.current);const results=data?.result?.domainResults||[];const sides=session.config.event_die||12;setResolution({complete:true,overallSuccess:Boolean(data?.eventSuccess??data?.result?.success),data,domains:evals.map(x=>{const result=results.find((r:any)=>r.domain===x.domain);return{domain:x.domain,target:x.value.winChancePercent,value:result?enginePercent(Number(result.dieRoll),sides):randomPercent(),success:result?Boolean(result.domainSuccess):undefined}})});setBusy(false);}catch(error:any){if(timer.current)window.clearInterval(timer.current);setResolution(null);setBusy(false);window.alert(error.message||'Challenge could not be resolved.')}};
 
