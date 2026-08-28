@@ -63,7 +63,9 @@ export function captureRoundSnapshot(company: CompanyV2, round: number): RoundSn
 
 const TrendChart: React.FC<{ title: string; rounds: number[]; series: Series[]; enabled: Record<string, boolean>; scales?: Record<string, Scale> }> = ({ title, rounds, series, enabled, scales }) => {
   const shown = series.filter((s) => enabled[s.id]);
-  const width = 760, height = 112, left = 20, right = 12, top = 8, bottom = 22;
+  // Keep the card compact, but use a viewBox aspect ratio close to the rendered
+  // card so the SVG plot itself fills the vertical space instead of letterboxing.
+  const width = 400, height = 120, left = 10, right = 8, top = 4, bottom = 20;
   const innerW = width - left - right, innerH = height - top - bottom;
   const pointsFor = (s: Series) => {
     const supplied = scales?.[s.id];
@@ -77,9 +79,9 @@ const TrendChart: React.FC<{ title: string; rounds: number[]; series: Series[]; 
     }).join(' ');
   };
   return <section className="rounded-xl border border-slate-700 bg-slate-950/85 p-2 min-w-0">
-    <div className="font-black text-white text-base leading-tight mb-1.5">{title}</div>
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[102px] bg-slate-900/55 rounded-lg">
-      {rounds.map((r,i)=>{const x=left+(rounds.length<=1?innerW/2:i*innerW/(rounds.length-1));return <g key={r}><line x1={x} y1={top} x2={x} y2={top+innerH} stroke="#334155" strokeWidth="1"/><text x={x} y={height-4} textAnchor="middle" fill="#cbd5e1" fontSize="12" fontWeight="700">R{r}</text></g>})}
+    <div className="font-black text-white text-base leading-tight mb-1">{title}</div>
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[112px] bg-slate-900/55 rounded-lg">
+      {rounds.map((r,i)=>{const x=left+(rounds.length<=1?innerW/2:i*innerW/(rounds.length-1));return <g key={r}><line x1={x} y1={top} x2={x} y2={top+innerH} stroke="#334155" strokeWidth="1"/><text x={x} y={height-4} textAnchor="middle" fill="#cbd5e1" fontSize="9" fontWeight="700">R{r}</text></g>})}
       {shown.map((s)=><polyline key={s.id} points={pointsFor(s)} fill="none" stroke={LINE_COLORS[series.findIndex(x=>x.id===s.id)%LINE_COLORS.length]} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>)}
     </svg>
   </section>;
