@@ -138,7 +138,7 @@ export const V2_BALANCE: V2BalanceConfig = {
   lateBalanceElapsedMinutes: 40,
   lateBalanceMaxTypeGap: 2,
   timerDurationSeconds: 50 * 60,
-  startingReputationPoints: 3,
+  startingReputationPoints: 2,
 };
 
 export const V2_VERSION = {
