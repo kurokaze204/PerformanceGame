@@ -42,6 +42,27 @@ function combinedProbability(session: GameSessionV2, company: CompanyV2, event: 
   }
 }
 
+function addCorporateSpend(company: CompanyV2, amount: number) {
+  if (amount <= 0) return;
+  company.cumulativeCorporateKnowledgeSpend += amount;
+  const active = company.sites.filter((site) => !site.isClosed);
+  if (!active.length) return;
+  const totalTurnover = active.reduce((sum, site) => sum + site.turnover, 0);
+  let remaining = amount;
+  active.forEach((site, index) => {
+    const share = index === active.length - 1
+      ? remaining
+      : Math.round(amount * (totalTurnover > 0 ? site.turnover / totalTurnover : 1 / active.length));
+    company.cumulativeSiteKnowledgeSpend[site.id] = (company.cumulativeSiteKnowledgeSpend[site.id] || 0) + share;
+    remaining -= share;
+  });
+}
+
+function addSiteSpend(company: CompanyV2, siteId: string, amount: number) {
+  if (amount <= 0) return;
+  company.cumulativeSiteKnowledgeSpend[siteId] = (company.cumulativeSiteKnowledgeSpend[siteId] || 0) + amount;
+}
+
 export async function captureSessionStart(session: GameSessionV2): Promise<void> {
   await initialiseAnalyticsRun(session);
   for (const company of session.companies) await captureRoundReveals(session, company);
@@ -68,6 +89,14 @@ export async function captureResolvedEvent(session: GameSessionV2, company: Comp
   company.expectedSuccesses = Math.round((company.expectedSuccesses + probabilityPercent / 100) * 1000) / 1000;
   if (result.success) company.actualSuccesses += 1;
   company.cumulativeConsultantSpend += Number(event.consultantSpend || 0);
+
+  const interventionCost = Number(result.interventionCost || 0);
+  if (interventionCost > 0) {
+    company.cumulativeKnowledgeSpend += interventionCost;
+    if (event.card.scope === 'local' && event.targetSiteId) addSiteSpend(company, event.targetSiteId, interventionCost);
+    else addCorporateSpend(company, interventionCost);
+  }
+
   await saveSessionV2(session);
   await recordEventResolution(session, company, event, probabilityPercent, result);
   await recordCompanyMetric(session, company, 'EVENT_RESOLVED');
@@ -75,7 +104,15 @@ export async function captureResolvedEvent(session: GameSessionV2, company: Comp
 
 export async function captureKnowledgeAction(session: GameSessionV2, company: CompanyV2, result: any, actionType: string): Promise<void> {
   const cost = Number(result?.costTurnover || 0);
-  if (cost > 0) company.cumulativeKnowledgeSpend += cost;
+  if (cost > 0) {
+    company.cumulativeKnowledgeSpend += cost;
+    const directSiteId = result?.investmentAttribution?.siteId as string | undefined;
+    const corporateCost = Number(result?.investmentAttribution?.corporateCost || 0);
+    const directCost = Number(result?.investmentAttribution?.siteCost || 0);
+    if (directSiteId && directCost > 0) addSiteSpend(company, directSiteId, directCost);
+    if (corporateCost > 0) addCorporateSpend(company, corporateCost);
+    if (!directSiteId && corporateCost <= 0) addCorporateSpend(company, cost);
+  }
   await saveSessionV2(session);
   await recordCompanyMetric(session, company, `ACTION_${actionType}`);
 }
