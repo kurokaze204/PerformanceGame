@@ -2,7 +2,7 @@ import React from 'react';
 import { Building2, MapPin, Users } from 'lucide-react';
 import type { KnowledgeDomain } from '../types/game.ts';
 import { DOMAIN_INFO } from '../types/game.ts';
-import type { ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
+import type { ActiveEventAllocationV2, ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { calculateUsableIntranetV2 } from '../engine/coreV2.ts';
 import { KnowledgeHubPanel } from './KnowledgeHubPanel.tsx';
 import { formatCurrency } from '../utils/format.ts';
@@ -29,7 +29,9 @@ export const BoardSidePanel: React.FC<BoardSidePanelProps> = ({
   const selectedSite = company.sites.find((site) => site.id === selectedSiteId) || company.sites[0];
   const committedExpertIds = new Set(
     currentEvent
-      ? Object.values(currentEvent.allocations).map((allocation) => allocation?.expertId).filter(Boolean)
+      ? (Object.values(currentEvent.allocations) as ActiveEventAllocationV2[])
+          .map((allocation) => allocation.expertId)
+          .filter((expertId): expertId is string => Boolean(expertId))
       : [],
   );
 
