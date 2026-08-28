@@ -268,6 +268,7 @@ export interface ActionPayload {
   siteId?: string;
   expertId?: string;
   domain?: KnowledgeDomain;
+  eventInstanceId?: string; // For Lessons Learned / AAR: the specific challenge being reviewed
   targetLocation?: string; // For MOVE_EXPERT
   learningTarget?: 'team' | 'expert' | 'codified'; // For AAR / Lessons learned
 }
