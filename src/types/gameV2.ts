@@ -73,6 +73,24 @@ export interface CompanyV2 extends Company {
 }
 
 export interface RiskSummaryV2 {
+  expertChecks?: {
+    expertId: string;
+    expertName: string;
+    domains: KnowledgeDomain[];
+    wasSPOF: boolean;
+    roll: number;
+    threshold: number;
+    departed: boolean;
+    location: string;
+  }[];
+  siteChecks?: {
+    siteId: string;
+    siteName: string;
+    domain: KnowledgeDomain | null;
+    previousScore: number | null;
+    newScore: number | null;
+    knowledgeLost: boolean;
+  }[];
   departedExperts: {
     expertId: string;
     expertName: string;
