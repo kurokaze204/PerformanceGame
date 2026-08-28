@@ -70,6 +70,11 @@ export interface CompanyV2 extends Company {
   actualSuccesses: number;
   cumulativeKnowledgeSpend: number;
   cumulativeConsultantSpend: number;
+
+  // Cost attribution for the round-by-round charts. Site totals include direct
+  // local spend plus that site's allocated share of corporate spend.
+  cumulativeCorporateKnowledgeSpend: number;
+  cumulativeSiteKnowledgeSpend: Record<string, number>;
 }
 
 export interface RiskSummaryV2 {
@@ -90,6 +95,8 @@ export interface RiskSummaryV2 {
     previousScore: number | null;
     newScore: number | null;
     knowledgeLost: boolean;
+    roll?: number;
+    threshold?: number;
   }[];
   departedExperts: {
     expertId: string;
@@ -165,6 +172,9 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.actualSuccesses ??= 0;
   c.cumulativeKnowledgeSpend ??= 0;
   c.cumulativeConsultantSpend ??= 0;
+  c.cumulativeCorporateKnowledgeSpend ??= 0;
+  c.cumulativeSiteKnowledgeSpend ??= {};
+  for (const site of c.sites || []) c.cumulativeSiteKnowledgeSpend[site.id] ??= 0;
   return c;
 }
 
