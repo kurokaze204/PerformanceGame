@@ -1,4 +1,4 @@
-import type { ActionPayload, KnowledgeDomain, Site } from '../types/game.ts';
+import type { ActionPayload, KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { AUSTRALIAN_CITIES, HQ_COORDINATES } from './config.ts';
 import { recalculateCompanySPOFV2 } from './coreV2.ts';
@@ -46,9 +46,6 @@ export function copPeerKnowledgeScoreV4(session: GameSessionV2, company: Company
   const own = companyBestKnowledge(company, domain);
   const others = session.companies.filter((c) => c.id !== company.id);
   if (others.length) return Math.max(0, ...others.map((c) => companyBestKnowledge(c, domain)));
-  // Solo games simulate a wider professional community. Three of the five domains
-  // expose knowledge materially above the player's current organisation so the
-  // value of external networks is visible even without another player company.
   const strong = (hash(`${session.id}:${domain}`) % 5) < 3;
   return strong ? Math.min(8, own + 2) : own;
 }
@@ -74,6 +71,13 @@ function spendCompany(company: CompanyV2, amount: number) {
   recalcTurnover(company);
 }
 
+function spendSite(company: CompanyV2, siteId: string, amount: number) {
+  const site = company.sites.find((candidate) => candidate.id === siteId && !candidate.isClosed);
+  if (!site || amount <= 0) return;
+  site.turnover = Math.max(0, site.turnover - amount);
+  recalcTurnover(company);
+}
+
 function expertAvailable(expert: CompanyV2['experts'][number]) {
   return !expert.isVacant && (expert.state === 'Available' || expert.state === 'HQ Assignment');
 }
@@ -89,7 +93,13 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
   const baseCost = INVESTMENT_COSTS_V4[type] ?? 0;
   const findSite = () => company.sites.find((s) => s.id === siteId && !s.isClosed);
   const findExpert = () => company.experts.find((e) => e.id === expertId && !e.isVacant);
-  const consume = (totalCost: number) => { spendCompany(company, totalCost); company.actionsRemaining -= 1; recalculateCompanySPOFV2(company, session.config); };
+  const finish = (totalCost: number, directSiteId?: string) => {
+    if (directSiteId) spendSite(company, directSiteId, totalCost);
+    else spendCompany(company, totalCost);
+    company.actionsRemaining -= 1;
+    recalculateCompanySPOFV2(company, session.config);
+    return { siteId: directSiteId, siteCost: directSiteId ? totalCost : 0, corporateCost: directSiteId ? 0 : totalCost };
+  };
 
   if (type === 'KNOWLEDGE_TRANSFER') {
     if (!siteId || !expertId || !domain) return { success: false, message: 'Choose a site, expert and domain.' };
@@ -99,10 +109,11 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (!skill) return { success: false, message: 'That expert does not have this domain.' };
     if (site.teamCapability[domain] >= skill.score) return { success: false, message: 'Team capability is already at the expert ceiling.' };
     const travelCost = expertTravelCostV4(expert.location, site.id);
+    const totalCost = baseCost + travelCost;
     site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
     expert.state = 'Knowledge Transfer';
-    consume(baseCost + travelCost);
-    return { success: true, message: `${site.name} ${domain} Team Capability increased to ${site.teamCapability[domain]}. Cost $${baseCost + travelCost}k${travelCost ? ` including $${travelCost}k travel` : ''}.`, costTurnover: baseCost + travelCost, travelCost };
+    const investmentAttribution = finish(totalCost, site.id);
+    return { success: true, message: `${site.name} ${domain} Team Capability increased to ${site.teamCapability[domain]}. Cost $${totalCost}k${travelCost ? ` including $${travelCost}k travel` : ''}.`, costTurnover: totalCost, travelCost, investmentAttribution };
   }
 
   if (type === 'TRAIN_EXPERT') {
@@ -110,8 +121,10 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const expert = findExpert(); if (!expert || !expertAvailable(expert)) return { success: false, message: 'Expert is unavailable.' };
     const skill = expert.domains.find((x) => x.domain === domain); if (!skill) return { success: false, message: 'Domain not held by expert.' };
     if (skill.score >= 8) return { success: false, message: 'This expert is already at the maximum score.' };
-    skill.score += 1; expert.state = 'Training'; consume(baseCost);
-    return { success: true, message: `${expert.name} increased ${domain} expertise to ${skill.score}. Cost $${baseCost}k.`, costTurnover: baseCost };
+    skill.score += 1; expert.state = 'Training';
+    const directSiteId = expert.location === 'HQ' ? undefined : expert.location;
+    const investmentAttribution = finish(baseCost, directSiteId);
+    return { success: true, message: `${expert.name} increased ${domain} expertise to ${skill.score}. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'CORPORATE_TRAINING') {
@@ -119,16 +132,17 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     let changed = 0;
     company.sites.forEach((site) => { if (!site.isClosed && site.teamCapability[domain] < company.intranet[domain]) { site.teamCapability[domain] += 1; changed++; } });
     if (!changed) return { success: false, message: 'No site can currently benefit from this Corporate Training.' };
-    consume(baseCost);
-    return { success: true, message: `${domain} Team Capability increased at ${changed} site(s). Cost $${baseCost}k.`, costTurnover: baseCost };
+    const investmentAttribution = finish(baseCost);
+    return { success: true, message: `${domain} Team Capability increased at ${changed} site(s). Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'CODIFY_SITE') {
     if (!siteId || !domain) return { success: false, message: 'Choose a site and domain.' };
     const site = findSite(); if (!site) return { success: false, message: 'Site not found.' };
     if (site.codifiedKnowledge[domain] >= site.teamCapability[domain]) return { success: false, message: 'Local knowledge is already codified to Team Capability.' };
-    site.codifiedKnowledge[domain] += 1; consume(baseCost);
-    return { success: true, message: `${site.name} ${domain} Local Codified Knowledge increased to ${site.codifiedKnowledge[domain]}. Cost $${baseCost}k.`, costTurnover: baseCost };
+    site.codifiedKnowledge[domain] += 1;
+    const investmentAttribution = finish(baseCost, site.id);
+    return { success: true, message: `${site.name} ${domain} Local Codified Knowledge increased to ${site.codifiedKnowledge[domain]}. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'UPDATE_INTRANET') {
@@ -141,8 +155,9 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (company.intranet[domain] >= sourceCeiling) return { success: false, message: 'No deeper organisational knowledge is currently available to publish.' };
     const increment = hqSkills.length ? session.config.hq_expert_intranet_increment : session.config.normal_intranet_increment;
     const growth = Math.min(increment, remaining, sourceCeiling - company.intranet[domain]);
-    company.intranet[domain] += growth; company.intranetRoundGrowth[domain] += growth; consume(baseCost);
-    return { success: true, message: `${domain} Corporate Intranet increased +${growth} to ${company.intranet[domain]}. Cost $${baseCost}k.`, costTurnover: baseCost };
+    company.intranet[domain] += growth; company.intranetRoundGrowth[domain] += growth;
+    const investmentAttribution = finish(baseCost);
+    return { success: true, message: `${domain} Corporate Intranet increased +${growth} to ${company.intranet[domain]}. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'LESSONS_LEARNED') {
@@ -152,34 +167,34 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (!relevant) return { success: false, message: 'Lessons Learned requires a relevant event from this round.' };
     if (learningTarget === 'team') site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
     else site.codifiedKnowledge[domain] = Math.min(6, site.codifiedKnowledge[domain] + 1);
-    consume(baseCost);
-    return { success: true, message: `Lessons Learned increased ${site.name} ${domain} ${learningTarget === 'team' ? 'Team Capability' : 'Codified Knowledge'} +1. Cost $${baseCost}k.`, costTurnover: baseCost };
+    const investmentAttribution = finish(baseCost, site.id);
+    return { success: true, message: `Lessons Learned increased ${site.name} ${domain} ${learningTarget === 'team' ? 'Team Capability' : 'Codified Knowledge'} +1. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'JOIN_COP') {
     if (!expertId || !domain) return { success: false, message: 'Choose an expert and domain.' };
     const expert = findExpert(); if (!expert || !expertAvailable(expert) || !expert.domains.some((x) => x.domain === domain)) return { success: false, message: 'Eligible available expert required.' };
     const existing = session.copMemberships.find((m) => m.companyId === company.id && m.domain === domain);
-    // activeRound is treated as the last active round. Joining during Invest gives
-    // access for the next two challenge rounds, without taking the expert out of play.
     const activeThrough = session.round + 2;
     if (existing) { existing.expertId = expert.id; existing.activeRound = activeThrough; }
     else session.copMemberships.push({ companyId: company.id, domain, expertId: expert.id, activeRound: activeThrough });
-    consume(baseCost);
-    return { success: true, message: `${expert.name} joined the ${domain} CoP. Network support is available for the next two rounds. Cost $${baseCost}k.`, costTurnover: baseCost };
+    const investmentAttribution = finish(baseCost);
+    return { success: true, message: `${expert.name} joined the ${domain} CoP. Network support is available for the next two rounds. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'HORIZON_SCAN') {
     if (!domain) return { success: false, message: 'Choose a domain.' };
-    company.horizonScanDomain = domain; company.horizonScanAvailableRound = session.round + 1; company.horizonScanUsedThisRound = false; consume(baseCost);
-    return { success: true, message: `${domain} Horizon Scan armed for next round. Cost $${baseCost}k.`, costTurnover: baseCost };
+    company.horizonScanDomain = domain; company.horizonScanAvailableRound = session.round + 1; company.horizonScanUsedThisRound = false;
+    const investmentAttribution = finish(baseCost);
+    return { success: true, message: `${domain} Horizon Scan armed for next round. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'AUTOMATE') {
     if (!domain) return { success: false, message: 'Choose a domain.' };
     if (company.automatedDomains.includes(domain)) return { success: false, message: 'This domain is already automated.' };
-    company.automatedDomains.push(domain); consume(baseCost);
-    return { success: true, message: `${domain} automated company-wide (+${session.config.automation_bonus} future challenge knowledge). Cost $${baseCost}k.`, costTurnover: baseCost };
+    company.automatedDomains.push(domain);
+    const investmentAttribution = finish(baseCost);
+    return { success: true, message: `${domain} automated company-wide (+${session.config.automation_bonus} future challenge knowledge). Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   return { success: false, message: 'Unknown V4 investment action.' };
