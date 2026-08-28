@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2, ShieldAlert, UserCheck, UserX, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Lightbulb, ShieldAlert, UserCheck, UserX, Users } from 'lucide-react';
 import type { Company, GameSession, KnowledgeDomain } from '../types/game.ts';
 import { DOMAIN_INFO } from '../types/game.ts';
 
@@ -17,9 +17,11 @@ type RiskCard = {
   location?: string;
   domainLines?: string[];
   detail: string;
+  detailDomain?: string;
   impact: string;
   roll?: number;
   warning?: string;
+  hint?: string;
 };
 
 export const AttritionModal: React.FC<AttritionModalProps> = ({
@@ -73,6 +75,7 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
             : 'Standard career transition / relocation.',
           detail: 'A Deep Expert has left the organisation.',
           impact: 'Uncodified expertise is lost. The role remains VACANT until its replacement arrives next round at baseline score 4.',
+          hint: 'Reduce the probability next time by dealing with Single Point of Failure pressure: share the workload, build backup expertise and capture critical expert knowledge before it walks out the door.',
         };
       }
 
@@ -109,7 +112,9 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
           location: check.siteName,
           domainLines: domainLabel ? [domainLabel] : undefined,
           detail: `Routine staff turnover reduced local ${domainLabel || 'team'} capability.`,
+          detailDomain: domainLabel || undefined,
           impact: `Team Capability ${check.previousScore} → ${check.newScore}. Codified and corporate knowledge are unaffected.`,
+          hint: 'Reduce the impact next time by codifying important local knowledge so routine staff turnover does not take capability with it.',
         };
       }
 
@@ -145,6 +150,12 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
     else setCurrentIndex((value) => Math.min(value + 1, cards.length - 1));
   };
 
+  const renderDetail = () => {
+    if (!card.detailDomain || !card.detail.includes(card.detailDomain)) return card.detail;
+    const [before, after] = card.detail.split(card.detailDomain);
+    return <>{before}<strong className="font-black text-white">{card.detailDomain}</strong>{after}</>;
+  };
+
   return (
     <div className="w-full min-h-[560px] flex items-start justify-center pt-5 px-4">
       <div className={`w-full max-w-3xl rounded-2xl border-2 shadow-2xl overflow-hidden ${negative ? 'border-rose-700 bg-slate-950' : 'border-emerald-800 bg-slate-950'}`}>
@@ -152,8 +163,8 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-indigo-300" />
             <div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-black">Knowledge Risk</div>
-              <div className="text-sm font-black text-white">{currentIndex < 2 ? 'Expert risk' : 'City office risk'} · test {currentIndex + 1} of {cards.length}</div>
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-500 font-black">Knowledge Risk</div>
+              <div className="text-base font-black text-white">{currentIndex < 2 ? 'Expert risk' : 'City office risk'} · test {currentIndex + 1} of {cards.length}</div>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -171,37 +182,44 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
               </div>
               <div className="min-w-0">
                 <h2 className={`text-2xl font-black leading-tight ${negative ? 'text-rose-300' : 'text-emerald-300'}`}>{card.title}</h2>
-                {card.location && <div className="text-sm text-slate-400 mt-1">{card.location}</div>}
-                {card.domainLines?.length ? <div className="flex flex-wrap gap-2 mt-2">{card.domainLines.map((line) => <span key={line} className="rounded-full bg-slate-900 border border-slate-700 px-2.5 py-1 text-xs font-bold text-slate-300">{line}</span>)}</div> : null}
+                {card.location && <div className="text-base text-slate-400 mt-1">{card.location}</div>}
+                {card.domainLines?.length ? <div className="flex flex-wrap gap-2 mt-2">{card.domainLines.map((line) => <span key={line} className="rounded-full bg-slate-900 border border-slate-700 px-2.5 py-1 text-sm font-bold text-slate-300">{line}</span>)}</div> : null}
               </div>
             </div>
-            {card.roll != null && <div className="rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-right shrink-0"><div className="text-[9px] uppercase tracking-widest text-slate-500 font-black">Roll</div><div className="text-2xl font-black text-white">{card.roll}</div></div>}
+            {card.roll != null && <div className="rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-right shrink-0"><div className="text-[11px] uppercase tracking-widest text-slate-500 font-black">Roll</div><div className="text-2xl font-black text-white">{card.roll}</div></div>}
           </div>
 
           {card.warning && (
-            <div className="rounded-xl border border-amber-800 bg-amber-950/35 px-4 py-3 flex items-start gap-2 text-sm text-amber-100">
+            <div className="rounded-xl border border-amber-800 bg-amber-950/35 px-4 py-3 flex items-start gap-2 text-base text-amber-100">
               <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
               <span>{card.warning}</span>
             </div>
           )}
 
           <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-            <div className="text-sm text-slate-300">{card.detail}</div>
-            <div className="mt-3 pt-3 border-t border-slate-800 text-sm">
+            <div className="text-base text-slate-300">{renderDetail()}</div>
+            <div className="mt-3 pt-3 border-t border-slate-800 text-base">
               <span className="font-black text-white">Impact: </span>
               <span className="text-slate-400">{card.impact}</span>
             </div>
           </div>
 
+          {card.hint && (
+            <div className="rounded-xl border border-indigo-700 bg-indigo-950/35 px-4 py-3 flex items-start gap-3 text-base text-indigo-100">
+              <Lightbulb className="w-5 h-5 text-amber-300 mt-0.5 shrink-0" />
+              <div><span className="font-black text-white">How to reduce this risk: </span>{card.hint}</div>
+            </div>
+          )}
+
           {isFinal && summary.closedSites.length > 0 && (
-            <div className="rounded-xl border border-rose-700 bg-rose-950/40 p-4 text-sm text-rose-200">
+            <div className="rounded-xl border border-rose-700 bg-rose-950/40 p-4 text-base text-rose-200">
               <div className="font-black text-rose-300">Site insolvency</div>
               <div className="mt-1">Closed this round: {summary.closedSites.join(', ')}. Corporate Intranet knowledge survives the closure.</div>
             </div>
           )}
 
           <div className="flex items-center justify-between gap-4 pt-1">
-            <div className="text-xs text-slate-500">Two Experts are checked first, then two city offices. Outcomes are calculated once when Knowledge Risk begins; Next only reveals them.</div>
+            <div className="text-sm text-slate-400 max-w-xl">Staff retire and resign from time to time, taking valuable knowledge with them. Experts take the most and a more likely to leave if they are under pressure as a Single Point of Failure.</div>
             <button onClick={next} className={`shrink-0 rounded-xl px-5 py-3 font-black flex items-center gap-2 transition active:scale-95 ${isFinal ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-white hover:bg-slate-100 text-slate-950'}`}>
               {isFinal ? (session.round >= session.config.rounds ? 'FINAL DISRUPTION' : 'NEXT ROUND') : 'NEXT'}
               <ArrowRight className="w-4 h-4" />
