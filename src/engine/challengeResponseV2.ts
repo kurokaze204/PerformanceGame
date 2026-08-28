@@ -9,6 +9,7 @@ import {
   resolveSingleEventV2,
   validateEventAllocationV2,
 } from './coreV2.ts';
+import { copMembershipActiveV4 } from './investmentActionsV4.ts';
 
 export interface ExplicitSourceValues {
   team: number;
@@ -114,8 +115,10 @@ export function evaluateEventDomainKnowledgeExplicitV2(
   const base = evaluateEventDomainKnowledgeV2(session, company, event, domain, config, true);
   const sources = explicitSourceValuesV2(company, event, domain, config);
   const difficulty = event.card.domains.find((requirement) => requirement.domain === domain)?.difficulty ?? base.difficulty;
-  const withoutConsultant = sources.selectedBaseKnowledge + base.expertBonus + base.copBonus + base.automationBonus;
-  const requestedConsultant = ignoreConsultant ? 0 : Math.max(0, Math.min(V2_BALANCE.consultantMaxPointsPerDomain, event.allocations[domain]?.consultantPoints || 0));
+  const allocation = event.allocations[domain] || {};
+  const copBonus = allocation.useCoPSupport && copMembershipActiveV4(session, company.id, domain) ? config.cop_support_bonus : 0;
+  const withoutConsultant = sources.selectedBaseKnowledge + base.expertBonus + copBonus + base.automationBonus;
+  const requestedConsultant = ignoreConsultant ? 0 : Math.max(0, Math.min(V2_BALANCE.consultantMaxPointsPerDomain, allocation.consultantPoints || 0));
   const consultantPoints = requestedConsultant;
   const totalKnowledge = withoutConsultant + consultantPoints;
   const targetThreshold = difficulty + config.resolution_offset;
@@ -129,6 +132,7 @@ export function evaluateEventDomainKnowledgeExplicitV2(
     localCodified: sources.selectedLocalCodified,
     usableIntranet: sources.selectedUsableIntranet,
     baseKnowledge: sources.selectedBaseKnowledge,
+    copBonus,
     consultantPoints,
     usefulConsultantGap: Math.min(V2_BALANCE.consultantMaxPointsPerDomain, usefulGap),
     totalKnowledge,
@@ -148,13 +152,17 @@ export function validateEventAllocationExplicitV2(
   domain: KnowledgeDomain,
   allocation: ActiveEventAllocationV2,
 ): { ok: boolean; message?: string } {
+  const session = asSessionV2(sessionInput);
+  const company = asCompanyV2(companyInput);
   const event = eventInput as ActiveEventV2;
   const old = event.allocations[domain];
-  event.allocations[domain] = { ...allocation, consultantPoints: 0 };
-  const baseValidation = validateEventAllocationV2(sessionInput, companyInput, event, domain, event.allocations[domain]);
+  const v4CopAllowed = !!allocation.useCoPSupport && copMembershipActiveV4(session, company.id, domain);
+  event.allocations[domain] = { ...allocation, consultantPoints: 0, useCoPSupport: v4CopAllowed ? false : allocation.useCoPSupport };
+  const baseValidation = validateEventAllocationV2(session, company, event, domain, event.allocations[domain]);
   event.allocations[domain] = old;
   if (!baseValidation.ok) return baseValidation;
 
+  if (allocation.useCoPSupport && !v4CopAllowed) return { ok: false, message: 'No active Community of Practice is available for this domain.' };
   if (allocation.consultantPoints != null) {
     const points = Math.floor(allocation.consultantPoints);
     if (points < 0 || points > V2_BALANCE.consultantMaxPointsPerDomain) {
@@ -173,12 +181,19 @@ export function resolveSingleEventExplicitV2(sessionInput: GameSessionV2, compan
   const penalties = new Map<KnowledgeDomain, number>();
   const sourceSnapshots = new Map<KnowledgeDomain, ExplicitSourceValues>();
   const plannedTravelByExpert = new Map<string, number>();
+  const temporaryCopMemberships: any[] = [];
 
   for (const requirement of event.card.domains) {
     const domain = requirement.domain;
     const allocation = event.allocations[domain] || {};
     if (allocation.expertId && !plannedTravelByExpert.has(allocation.expertId)) {
       plannedTravelByExpert.set(allocation.expertId, Math.max(0, allocation.expertTravelCost || 0));
+    }
+    if (allocation.useCoPSupport && copMembershipActiveV4(session, company.id, domain)) {
+      const ownCurrent = { companyId: company.id, domain, expertId: 'cop-network', activeRound: session.round };
+      const externalCurrent = { companyId: `external-network-${company.id}`, domain, expertId: 'external-peer', activeRound: session.round };
+      session.copMemberships.push(ownCurrent, externalCurrent);
+      temporaryCopMemberships.push(ownCurrent, externalCurrent);
     }
     originalDifficulties.set(domain, requirement.difficulty);
     const automatic = evaluateEventDomainKnowledgeV2(session, company, event, domain, session.config, true).baseKnowledge;
@@ -192,9 +207,6 @@ export function resolveSingleEventExplicitV2(sessionInput: GameSessionV2, compan
   try {
     const result = resolveSingleEventV2(session, company, event);
 
-    // coreV2 historically rolled expert travel cost at resolution. The V4 game
-    // prices travel when an expert is selected, so correct the resolved cost back
-    // to that committed amount and restore the planned values on the allocations.
     const plannedTravel = [...plannedTravelByExpert.values()].reduce((sum, cost) => sum + cost, 0);
     const consultantSpend = (result.consultantDetails || []).reduce((sum: number, item: any) => sum + (item.cost || 0), 0);
     const rolledTravel = Math.max(0, result.interventionCost - consultantSpend);
@@ -240,6 +252,7 @@ export function resolveSingleEventExplicitV2(sessionInput: GameSessionV2, compan
     recalculateCompanySPOFV2(company, session.config);
     return result;
   } finally {
+    if (temporaryCopMemberships.length) session.copMemberships = session.copMemberships.filter((m) => !temporaryCopMemberships.includes(m));
     for (const requirement of event.card.domains) {
       const original = originalDifficulties.get(requirement.domain);
       if (original != null) requirement.difficulty = original;
