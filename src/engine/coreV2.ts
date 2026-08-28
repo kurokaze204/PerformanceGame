@@ -594,29 +594,61 @@ export function executeRiskPhaseV2(sessionInput: GameSession, companyInput: Comp
   const session = asSessionV2(sessionInput); const company = asCompanyV2(companyInput);
   const departedExperts: RiskSummaryV2['departedExperts'] = [];
   const workforceAttrition: RiskSummaryV2['workforceAttrition'] = [];
+  const expertChecks: NonNullable<RiskSummaryV2['expertChecks']> = [];
+  const siteChecks: NonNullable<RiskSummaryV2['siteChecks']> = [];
 
   recalculateCompanySPOFV2(company, session.config);
-  for (const expert of company.experts) {
-    if (expert.isVacant) continue;
+
+  // Knowledge Risk is four visible tests: two randomly selected Deep Experts,
+  // followed by two randomly selected city offices. Outcomes are committed here
+  // once, then the UI reveals them sequentially without rerolling.
+  const checkedExperts = shuffle(company.experts.filter((expert) => !expert.isVacant)).slice(0, 2);
+  for (const expert of checkedExperts) {
     const roll = d(session.config.event_die);
     const threshold = expert.isSPOF ? session.config.spof_leave_threshold : session.config.normal_leave_threshold;
-    if (roll <= threshold) {
+    const departed = roll <= threshold;
+    const location = expert.location === 'HQ'
+      ? 'Corporate HQ'
+      : company.sites.find((site) => site.id === expert.location)?.name || expert.location;
+
+    expertChecks.push({
+      expertId: expert.id,
+      expertName: expert.name,
+      domains: expert.domains.map((x) => x.domain),
+      wasSPOF: expert.isSPOF,
+      roll,
+      threshold,
+      departed,
+      location,
+    });
+
+    if (departed) {
       departedExperts.push({ expertId: expert.id, expertName: expert.name, domains: expert.domains.map((x) => x.domain), wasSPOF: expert.isSPOF, roll });
-      expert.isVacant = true; expert.replacementDueRound = session.round + 1; expert.state = 'Available';
+      expert.isVacant = true;
+      expert.replacementDueRound = session.round + 1;
+      expert.state = 'Available';
     }
   }
 
-  const candidates = company.sites.filter((s) => !s.isClosed).flatMap((site) => DOMAINS.filter((domain) => site.teamCapability[domain] > site.codifiedKnowledge[domain] && site.teamCapability[domain] > 1).map((domain) => ({ site, domain })));
-  if (candidates.length) {
-    const picked = candidates[Math.floor(Math.random() * candidates.length)];
-    const previousScore = picked.site.teamCapability[picked.domain];
-    picked.site.teamCapability[picked.domain] -= 1;
-    workforceAttrition.push({ siteName: picked.site.name, domain: picked.domain, previousScore, newScore: picked.site.teamCapability[picked.domain] });
+  const checkedSites = shuffle(company.sites.filter((site) => !site.isClosed)).slice(0, 2);
+  for (const site of checkedSites) {
+    const vulnerableDomains = DOMAINS.filter((domain) => site.teamCapability[domain] > site.codifiedKnowledge[domain] && site.teamCapability[domain] > 1);
+    if (!vulnerableDomains.length) {
+      siteChecks.push({ siteId: site.id, siteName: site.name, domain: null, previousScore: null, newScore: null, knowledgeLost: false });
+      continue;
+    }
+
+    const domain = vulnerableDomains[Math.floor(Math.random() * vulnerableDomains.length)];
+    const previousScore = site.teamCapability[domain];
+    site.teamCapability[domain] -= 1;
+    const newScore = site.teamCapability[domain];
+    workforceAttrition.push({ siteName: site.name, domain, previousScore, newScore });
+    siteChecks.push({ siteId: site.id, siteName: site.name, domain, previousScore, newScore, knowledgeLost: true });
   }
 
   const closedSites = closeFailedSites(company, session.round);
   recalculateCompanySPOFV2(company, session.config);
-  return { departedExperts, workforceAttrition, closedSites };
+  return { expertChecks, siteChecks, departedExperts, workforceAttrition, closedSites };
 }
 
 export function prepareNextRoundV2(sessionInput: GameSession): void {
