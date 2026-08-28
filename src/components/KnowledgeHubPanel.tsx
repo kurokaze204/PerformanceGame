@@ -5,6 +5,7 @@ import type { CompanyV2 } from '../types/gameV2.ts';
 
 interface KnowledgeHubPanelProps {
   company: CompanyV2;
+  embedded?: boolean;
 }
 
 const NAV_ITEMS = ['Home', 'Departments', 'Directory', 'Calendar', 'Documents', 'Learning', 'News'];
@@ -42,8 +43,42 @@ const FILE_ROWS = [
   ['Records and information guide', 'PDF · Updated 18 Jul'],
 ];
 
-export const KnowledgeHubPanel: React.FC<KnowledgeHubPanelProps> = ({ company }) => {
+export const KnowledgeHubPanel: React.FC<KnowledgeHubPanelProps> = ({ company, embedded = false }) => {
   const domains = Object.keys(DOMAIN_INFO) as KnowledgeDomain[];
+
+  if (embedded) {
+    return (
+      <section className="overflow-hidden rounded-2xl border border-slate-300 bg-[#f3f5f2] text-slate-700 shadow-lg">
+        <div className="flex items-center justify-between gap-3 bg-white px-3 py-2 border-b border-slate-200">
+          <div className="text-sm font-black leading-tight text-[#1f6f43] truncate">{company.name}</div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Intranet</div>
+        </div>
+        <div className="bg-[#eef3ef] px-3 py-3">
+          <div className="mb-2">
+            <div className="text-base font-black tracking-wide text-[#245d47]">Knowledge Hub</div>
+            <div className="text-[9px] text-slate-500">Corporate knowledge available across the organisation</div>
+          </div>
+          <div className="space-y-1.5">
+            {domains.map((domain) => {
+              const info = DOMAIN_INFO[domain];
+              return (
+                <div key={domain} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 flex items-center justify-between gap-2 shadow-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white shadow-sm" style={{ backgroundColor: info.color }} />
+                    <span className="font-bold text-[11px] text-slate-700 truncate">{info.label}</span>
+                  </div>
+                  <span className="text-xl leading-none font-black text-[#245d47] tabular-nums">{company.intranet[domain]}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5 bg-white px-2 py-2 text-[7px] font-semibold text-[#40758a]">
+          <span className="truncate">Policies</span><span className="truncate">Learning</span><span className="truncate">Directory</span>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <aside className="h-[586px] lg:h-[646px] overflow-hidden rounded-2xl border border-slate-300 bg-[#f3f5f2] text-slate-700 shadow-xl">
