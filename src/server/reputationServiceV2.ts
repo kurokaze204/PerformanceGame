@@ -1,6 +1,6 @@
 import { captureResolvedEvent } from './analyticsHooksV2.ts';
 import { getSessionV2, logGameEvent, saveSessionV2 } from './dbV2.ts';
-import { advancePhaseV2, broadcastV2 } from './gameServiceV2.ts';
+import { broadcastV2 } from './gameServiceV2.ts';
 
 function recalcCompanyTurnover(company: any): void {
   company.turnover = Math.round(company.sites.reduce((sum: number, s: any) => sum + (s.isClosed ? 0 : s.turnover), 0));
@@ -110,7 +110,7 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
     result,
   });
 
-  const allResolved = session.companies.every((c) => (session.activeEvents[c.id] || []).every((e) => e.isResolved));
-  const finalSession = allResolved ? (await advancePhaseV2(session.id)).session : session;
-  return { success: true, session: finalSession, result };
+  // Keep the result in the normal challenge flow. The client advances only
+  // after the player acknowledges the resolution, avoiding an SSE/phase race.
+  return { success: true, session, result };
 }
