@@ -25,6 +25,9 @@ export type KnowledgeStrategy =
   | 'no_particular_strategy';
 
 export interface ActiveEventAllocationV2 extends ActiveEventAllocation {
+  useTeamCapability?: boolean;
+  useLocalCodified?: boolean;
+  useCorporateIntranet?: boolean;
   consultantPoints?: number;
   consultantCost?: number;
   expertTravelCost?: number;
@@ -120,7 +123,7 @@ export const V2_BALANCE: V2BalanceConfig = {
 };
 
 export const V2_VERSION = {
-  rules: '2.1.0-alpha.1',
+  rules: '2.2.0-alpha.1',
   deck: '1.2.0',
   balance: '2.1.0-alpha.2',
 };
