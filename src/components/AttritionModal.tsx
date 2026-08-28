@@ -30,6 +30,8 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const summary = phaseResult?.attritionSummaries?.[company.id] || {
+    expertChecks: [],
+    siteChecks: [],
     departedExperts: [],
     workforceAttrition: [],
     closedSites: [],
@@ -38,25 +40,35 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
   const cards = useMemo<RiskCard[]>(() => {
     const departedById = new Map(summary.departedExperts.map((entry: any) => [entry.expertId, entry]));
 
-    // The engine currently performs one attrition check for each of the three Deep Experts,
-    // followed by one general-workforce knowledge-loss check. The outcomes are already
-    // committed server-side before this screen appears; this component only reveals them.
-    const expertCards = company.experts.slice(0, 3).map((expert) => {
-      const departure: any = departedById.get(expert.id);
-      const location = expert.location === 'HQ'
-        ? 'Corporate HQ'
-        : company.sites.find((site) => site.id === expert.location)?.name || expert.location;
-      const domainLines = expert.domains.map((skill) => `${DOMAIN_INFO[skill.domain].label} ${skill.score}`);
+    const recordedExpertChecks = Array.isArray(summary.expertChecks) && summary.expertChecks.length
+      ? summary.expertChecks.slice(0, 2)
+      : company.experts.filter((expert) => !expert.isVacant || departedById.has(expert.id)).slice(0, 2).map((expert) => {
+          const departure: any = departedById.get(expert.id);
+          return {
+            expertId: expert.id,
+            expertName: departure?.expertName || expert.name,
+            domains: expert.domains.map((skill) => skill.domain),
+            wasSPOF: departure?.wasSPOF ?? expert.isSPOF,
+            roll: departure?.roll,
+            departed: Boolean(departure),
+            location: expert.location === 'HQ' ? 'Corporate HQ' : company.sites.find((site) => site.id === expert.location)?.name || expert.location,
+          };
+        });
 
-      if (departure) {
+    const expertCards: RiskCard[] = recordedExpertChecks.map((check: any, index: number) => {
+      const expert = company.experts.find((candidate) => candidate.id === check.expertId);
+      const domainLines = expert?.domains.map((skill) => `${DOMAIN_INFO[skill.domain].label} ${skill.score}`)
+        || (check.domains || []).map((domain: KnowledgeDomain) => DOMAIN_INFO[domain]?.label || domain);
+
+      if (check.departed) {
         return {
-          id: `expert-${expert.id}`,
-          kind: 'expert-departed' as const,
-          title: `${departure.expertName} Resigned!`,
-          location,
+          id: `expert-${check.expertId}-${index}`,
+          kind: 'expert-departed',
+          title: `${check.expertName} Resigned!`,
+          location: check.location,
           domainLines,
-          roll: departure.roll,
-          warning: departure.wasSPOF
+          roll: check.roll,
+          warning: check.wasSPOF
             ? 'Single Point of Failure: high workload and market poaching triggered departure.'
             : 'Standard career transition / relocation.',
           detail: 'A Deep Expert has left the organisation.',
@@ -65,41 +77,59 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
       }
 
       return {
-        id: `expert-${expert.id}`,
-        kind: 'expert-retained' as const,
-        title: `${expert.name} Retained`,
-        location,
+        id: `expert-${check.expertId}-${index}`,
+        kind: 'expert-retained',
+        title: `${check.expertName} Retained`,
+        location: check.location,
         domainLines,
+        roll: check.roll,
         detail: 'The expert attrition check did not trigger a departure.',
         impact: 'No expert capability is lost this round.',
       };
     });
 
-    const loss = summary.workforceAttrition[0];
-    const workforceCard: RiskCard = loss
-      ? {
-          id: 'workforce-loss',
-          kind: 'workforce-loss',
-          title: `${loss.siteName} Workforce Knowledge Loss`,
-          location: loss.siteName,
-          domainLines: [DOMAIN_INFO[loss.domain as KnowledgeDomain]?.label || String(loss.domain)],
-          detail: `Routine staff turnover reduced local ${DOMAIN_INFO[loss.domain as KnowledgeDomain]?.label || loss.domain} capability.`,
-          impact: `Team Capability ${loss.previousScore} → ${loss.newScore}. Codified and corporate knowledge are unaffected.`,
-        }
-      : {
-          id: 'workforce-stable',
-          kind: 'workforce-stable',
-          title: 'Workforce Knowledge Stable',
-          detail: 'No eligible local team capability was lost in the general workforce check.',
-          impact: 'Site Team Capability remains unchanged.',
-        };
+    const activeSites = company.sites.filter((site) => !site.isClosed);
+    const recordedSiteChecks = Array.isArray(summary.siteChecks) && summary.siteChecks.length
+      ? summary.siteChecks.slice(0, 2)
+      : activeSites.slice(0, 2).map((site, index) => {
+          const loss = summary.workforceAttrition[index];
+          const matchingLoss = loss?.siteName === site.name ? loss : summary.workforceAttrition.find((entry: any) => entry.siteName === site.name);
+          return matchingLoss
+            ? { siteId: site.id, siteName: site.name, domain: matchingLoss.domain, previousScore: matchingLoss.previousScore, newScore: matchingLoss.newScore, knowledgeLost: true }
+            : { siteId: site.id, siteName: site.name, domain: null, previousScore: null, newScore: null, knowledgeLost: false };
+        });
 
-    return [...expertCards, workforceCard];
-  }, [company.experts, company.sites, summary.departedExperts, summary.workforceAttrition]);
+    const officeCards: RiskCard[] = recordedSiteChecks.map((check: any, index: number) => {
+      const domainLabel = check.domain ? DOMAIN_INFO[check.domain as KnowledgeDomain]?.label || String(check.domain) : null;
+      if (check.knowledgeLost) {
+        return {
+          id: `office-${check.siteId}-${index}`,
+          kind: 'workforce-loss',
+          title: `${check.siteName} Workforce Knowledge Loss`,
+          location: check.siteName,
+          domainLines: domainLabel ? [domainLabel] : undefined,
+          detail: `Routine staff turnover reduced local ${domainLabel || 'team'} capability.`,
+          impact: `Team Capability ${check.previousScore} → ${check.newScore}. Codified and corporate knowledge are unaffected.`,
+        };
+      }
+
+      return {
+        id: `office-${check.siteId}-${index}`,
+        kind: 'workforce-stable',
+        title: `${check.siteName} Workforce Knowledge Stable`,
+        location: check.siteName,
+        detail: 'This city office had no vulnerable uncodified team knowledge to lose in the workforce check.',
+        impact: 'Site Team Capability remains unchanged.',
+      };
+    });
+
+    return [...expertCards, ...officeCards].slice(0, 4);
+  }, [company.experts, company.sites, summary.departedExperts, summary.expertChecks, summary.siteChecks, summary.workforceAttrition]);
 
   useEffect(() => setCurrentIndex(0), [session.round, company.id]);
 
-  const card = cards[Math.min(currentIndex, cards.length - 1)];
+  const card = cards[Math.min(currentIndex, Math.max(0, cards.length - 1))];
+  if (!card) return null;
   const isFinal = currentIndex >= cards.length - 1;
   const negative = card.kind === 'expert-departed' || card.kind === 'workforce-loss';
   const Icon = card.kind === 'expert-departed'
@@ -123,7 +153,7 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
             <ShieldAlert className="w-5 h-5 text-indigo-300" />
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-black">Knowledge Risk</div>
-              <div className="text-sm font-black text-white">Risk event {currentIndex + 1} of {cards.length}</div>
+              <div className="text-sm font-black text-white">{currentIndex < 2 ? 'Expert risk' : 'City office risk'} · test {currentIndex + 1} of {cards.length}</div>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -171,7 +201,7 @@ export const AttritionModal: React.FC<AttritionModalProps> = ({
           )}
 
           <div className="flex items-center justify-between gap-4 pt-1">
-            <div className="text-xs text-slate-500">Outcomes were calculated once when Knowledge Risk began. Next only reveals the committed result.</div>
+            <div className="text-xs text-slate-500">Two Experts are checked first, then two city offices. Outcomes are calculated once when Knowledge Risk begins; Next only reveals them.</div>
             <button onClick={next} className={`shrink-0 rounded-xl px-5 py-3 font-black flex items-center gap-2 transition active:scale-95 ${isFinal ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-white hover:bg-slate-100 text-slate-950'}`}>
               {isFinal ? (session.round >= session.config.rounds ? 'FINAL DISRUPTION' : 'NEXT ROUND') : 'NEXT'}
               <ArrowRight className="w-4 h-4" />
