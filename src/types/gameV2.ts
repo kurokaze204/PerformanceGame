@@ -28,6 +28,7 @@ export interface ActiveEventAllocationV2 extends ActiveEventAllocation {
   useTeamCapability?: boolean;
   useLocalCodified?: boolean;
   useCorporateIntranet?: boolean;
+  acceptRisk?: boolean;
   consultantPoints?: number;
   consultantCost?: number;
   expertTravelCost?: number;
