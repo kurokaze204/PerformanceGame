@@ -78,8 +78,10 @@ function spendSite(company: CompanyV2, siteId: string, amount: number) {
   recalcTurnover(company);
 }
 
+// Invest actions consume Actions and money, not an Expert's whole round. An Expert
+// can therefore participate in multiple Invest interventions while they remain employed.
 function expertAvailable(expert: CompanyV2['experts'][number]) {
-  return !expert.isVacant && (expert.state === 'Available' || expert.state === 'HQ Assignment');
+  return !expert.isVacant;
 }
 
 export function isInvestmentActionV4(type: string): boolean {
@@ -89,7 +91,7 @@ export function isInvestmentActionV4(type: string): boolean {
 export function executeInvestmentActionV4(session: GameSessionV2, company: CompanyV2, payload: ActionPayload) {
   if (session.phase !== 'investment') return { success: false, message: 'Knowledge actions can only be used during the Invest phase.' };
   if (company.actionsRemaining <= 0) return { success: false, message: 'No knowledge actions remaining this round.' };
-  const { type, siteId, expertId, domain, learningTarget } = payload;
+  const { type, siteId, expertId, domain, learningTarget, eventInstanceId } = payload;
   const baseCost = INVESTMENT_COSTS_V4[type] ?? 0;
   const findSite = () => company.sites.find((s) => s.id === siteId && !s.isClosed);
   const findExpert = () => company.experts.find((e) => e.id === expertId && !e.isVacant);
@@ -104,14 +106,13 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
   if (type === 'KNOWLEDGE_TRANSFER') {
     if (!siteId || !expertId || !domain) return { success: false, message: 'Choose a site, expert and domain.' };
     const site = findSite(); const expert = findExpert();
-    if (!site || !expert || !expertAvailable(expert)) return { success: false, message: 'Choose an available expert and active site.' };
+    if (!site || !expert || !expertAvailable(expert)) return { success: false, message: 'Choose an employed expert and active site.' };
     const skill = expert.domains.find((x) => x.domain === domain);
     if (!skill) return { success: false, message: 'That expert does not have this domain.' };
     if (site.teamCapability[domain] >= skill.score) return { success: false, message: 'Team capability is already at the expert ceiling.' };
     const travelCost = expertTravelCostV4(expert.location, site.id);
     const totalCost = baseCost + travelCost;
     site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
-    expert.state = 'Knowledge Transfer';
     const investmentAttribution = finish(totalCost, site.id);
     return { success: true, message: `${site.name} ${domain} Team Capability increased to ${site.teamCapability[domain]}. Cost $${totalCost}k${travelCost ? ` including $${travelCost}k travel` : ''}.`, costTurnover: totalCost, travelCost, investmentAttribution };
   }
@@ -121,7 +122,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const expert = findExpert(); if (!expert || !expertAvailable(expert)) return { success: false, message: 'Expert is unavailable.' };
     const skill = expert.domains.find((x) => x.domain === domain); if (!skill) return { success: false, message: 'Domain not held by expert.' };
     if (skill.score >= 8) return { success: false, message: 'This expert is already at the maximum score.' };
-    skill.score += 1; expert.state = 'Training';
+    skill.score += 1;
     const directSiteId = expert.location === 'HQ' ? undefined : expert.location;
     const investmentAttribution = finish(baseCost, directSiteId);
     return { success: true, message: `${expert.name} increased ${domain} expertise to ${skill.score}. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
@@ -161,19 +162,21 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
   }
 
   if (type === 'LESSONS_LEARNED') {
-    if (!siteId || !domain || !learningTarget) return { success: false, message: 'Choose site, domain and learning target.' };
+    if (!siteId || !domain || !learningTarget || !eventInstanceId) return { success: false, message: 'Choose a recent challenge, site, domain and learning target.' };
     const site = findSite(); if (!site) return { success: false, message: 'Site not found.' };
-    const relevant = (session.activeEvents[company.id] || []).some((e) => e.isResolved && e.card.domains.some((r) => r.domain === domain) && (e.card.scope === 'enterprise' || e.targetSiteId === site.id));
-    if (!relevant) return { success: false, message: 'Lessons Learned requires a relevant event from this round.' };
+    const event = (session.activeEvents[company.id] || []).find((e) => e.instanceId === eventInstanceId && e.isResolved);
+    if (!event) return { success: false, message: 'Lessons Learned can only use one of this round’s completed challenges.' };
+    if (!event.card.domains.some((r) => r.domain === domain)) return { success: false, message: 'Choose a domain that was part of the selected challenge.' };
+    if (event.card.scope === 'local' && event.targetSiteId !== site.id) return { success: false, message: 'A local challenge can only generate Lessons Learned at the site where it occurred.' };
     if (learningTarget === 'team') site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
     else site.codifiedKnowledge[domain] = Math.min(6, site.codifiedKnowledge[domain] + 1);
     const investmentAttribution = finish(baseCost, site.id);
-    return { success: true, message: `Lessons Learned increased ${site.name} ${domain} ${learningTarget === 'team' ? 'Team Capability' : 'Codified Knowledge'} +1. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `AAR on “${event.card.title}” increased ${site.name} ${domain} ${learningTarget === 'team' ? 'Team Capability' : 'Codified Knowledge'} +1. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution, eventInstanceId };
   }
 
   if (type === 'JOIN_COP') {
     if (!expertId || !domain) return { success: false, message: 'Choose an expert and domain.' };
-    const expert = findExpert(); if (!expert || !expertAvailable(expert) || !expert.domains.some((x) => x.domain === domain)) return { success: false, message: 'Eligible available expert required.' };
+    const expert = findExpert(); if (!expert || !expertAvailable(expert) || !expert.domains.some((x) => x.domain === domain)) return { success: false, message: 'Eligible employed expert required.' };
     const existing = session.copMemberships.find((m) => m.companyId === company.id && m.domain === domain);
     const activeThrough = session.round + 2;
     if (existing) { existing.expertId = expert.id; existing.activeRound = activeThrough; }
