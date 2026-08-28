@@ -24,6 +24,30 @@ function activeSites(company: CompanyV2): Site[] {
   return company.sites.filter((site) => !site.isClosed);
 }
 
+function recalcCompanyTurnover(company: CompanyV2): void {
+  company.turnover = Math.round(company.sites.reduce((sum, site) => sum + (site.isClosed ? 0 : site.turnover), 0));
+}
+
+function applySiteDelta(company: CompanyV2, site: Site, delta: number): void {
+  site.turnover = Math.max(0, Math.round(site.turnover + delta));
+  recalcCompanyTurnover(company);
+}
+
+function applyCompanyDelta(company: CompanyV2, delta: number): void {
+  const sites = activeSites(company);
+  if (!sites.length || delta === 0) return;
+  const total = sites.reduce((sum, site) => sum + site.turnover, 0);
+  let remaining = Math.round(delta);
+  sites.forEach((site, index) => {
+    const share = index === sites.length - 1
+      ? remaining
+      : Math.round(delta * (total > 0 ? site.turnover / total : 1 / sites.length));
+    site.turnover = Math.max(0, site.turnover + share);
+    remaining -= share;
+  });
+  recalcCompanyTurnover(company);
+}
+
 export function explicitSourceValuesV2(
   companyInput: Company,
   eventInput: ActiveEvent,
@@ -148,9 +172,14 @@ export function resolveSingleEventExplicitV2(sessionInput: GameSessionV2, compan
   const originalDifficulties = new Map<KnowledgeDomain, number>();
   const penalties = new Map<KnowledgeDomain, number>();
   const sourceSnapshots = new Map<KnowledgeDomain, ExplicitSourceValues>();
+  const plannedTravelByExpert = new Map<string, number>();
 
   for (const requirement of event.card.domains) {
     const domain = requirement.domain;
+    const allocation = event.allocations[domain] || {};
+    if (allocation.expertId && !plannedTravelByExpert.has(allocation.expertId)) {
+      plannedTravelByExpert.set(allocation.expertId, Math.max(0, allocation.expertTravelCost || 0));
+    }
     originalDifficulties.set(domain, requirement.difficulty);
     const automatic = evaluateEventDomainKnowledgeV2(session, company, event, domain, session.config, true).baseKnowledge;
     const sources = explicitSourceValuesV2(company, event, domain, session.config);
@@ -162,6 +191,27 @@ export function resolveSingleEventExplicitV2(sessionInput: GameSessionV2, compan
 
   try {
     const result = resolveSingleEventV2(session, company, event);
+
+    // coreV2 historically rolled expert travel cost at resolution. The V4 game
+    // prices travel when an expert is selected, so correct the resolved cost back
+    // to that committed amount and restore the planned values on the allocations.
+    const plannedTravel = [...plannedTravelByExpert.values()].reduce((sum, cost) => sum + cost, 0);
+    const consultantSpend = (result.consultantDetails || []).reduce((sum: number, item: any) => sum + (item.cost || 0), 0);
+    const rolledTravel = Math.max(0, result.interventionCost - consultantSpend);
+    const travelCorrection = plannedTravel - rolledTravel;
+    if (travelCorrection !== 0) {
+      if (event.card.scope === 'local' && event.targetSiteId) {
+        const target = company.sites.find((site) => site.id === event.targetSiteId && !site.isClosed);
+        if (target) applySiteDelta(company, target, -travelCorrection);
+      } else {
+        applyCompanyDelta(company, -travelCorrection);
+      }
+      result.interventionCost += travelCorrection;
+    }
+    for (const requirement of event.card.domains) {
+      const allocation = event.allocations[requirement.domain];
+      if (allocation?.expertId) allocation.expertTravelCost = plannedTravelByExpert.get(allocation.expertId) || 0;
+    }
 
     const normalized = result.domainResults.map((domainResult: any) => {
       const domain = domainResult.domain as KnowledgeDomain;
