@@ -1,6 +1,5 @@
 import { captureResolvedEvent } from './analyticsHooksV2.ts';
 import { getSessionV2, logGameEvent, saveSessionV2 } from './dbV2.ts';
-import { broadcastV2 } from './gameServiceV2.ts';
 
 function recalcCompanyTurnover(company: any): void {
   company.turnover = Math.round(company.sites.reduce((sum: number, s: any) => sum + (s.isClosed ? 0 : s.turnover), 0));
@@ -102,15 +101,11 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
     payload: { eventInstanceId, cardId: event.card.id, reputationRemaining: company.reputationPoints },
   });
 
-  broadcastV2(session, 'EVENT_RESOLVED', {
-    companyId: company.id,
-    eventInstanceId: event.instanceId,
-    targetSiteId: event.targetSiteId,
-    scope: event.card.scope,
-    result,
-  });
-
-  // Keep the result in the normal challenge flow. The client advances only
-  // after the player acknowledges the resolution, avoiding an SSE/phase race.
+  // Deliberately do not broadcast EVENT_RESOLVED here. Unlike a normal challenge,
+  // the reputation path resolves inside EventDecisionCardV4 and does not first set
+  // AppBoardV5's deferUpdates flag. Broadcasting at this point can replace the
+  // event underneath the acknowledgement screen, leaving CONTINUE stuck in its
+  // busy state. The saved session returned below is applied when the player clicks
+  // CONTINUE; subsequent normal session broadcasts keep other clients in sync.
   return { success: true, session, result };
 }
