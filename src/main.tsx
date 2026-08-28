@@ -1,10 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import AppBoardV2 from './AppBoardV2.tsx';
+import AppBoardV4 from './AppBoardV4.tsx';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppBoardV2 />
+    <AppBoardV4 />
   </StrictMode>,
 );
