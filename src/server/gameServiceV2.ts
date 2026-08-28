@@ -23,6 +23,7 @@ import {
   redrawEventSameTypeV2,
   resolveSingleEventV2,
 } from '../engine/coreV2.ts';
+import { executeInvestmentActionV4, isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import {
   resolveSingleEventExplicitV2,
   validateEventAllocationExplicitV2,
@@ -100,11 +101,6 @@ export async function initializeDefaultSessionV2(): Promise<GameSessionV2> {
       existing.companies.some((c) => c.name === 'Apex Technologies') &&
       existing.companies.some((c) => c.name === 'Vanguard Systems');
 
-    // KM2026 is the built-in local/test session. Older builds created a second
-    // placeholder company (Vanguard Systems), which meant Apex could finish both
-    // challenge cards and still be blocked waiting for a company nobody was
-    // actually controlling. Migrate that legacy test session to a true one-team
-    // session. Explicitly created multiplayer sessions are not affected.
     if (!legacyPlaceholderSession) return existing;
     return createNewSessionV2('KM2026', 'The Performance Gap', ['Apex Technologies']);
   }
@@ -199,10 +195,12 @@ export async function applyLearningV2(sessionId: string, companyId: string, even
 export async function knowledgeActionV2(sessionId: string, companyId: string, payload: ActionPayload) {
   const session = await getSessionOrThrow(sessionId);
   const company = session.companies.find((c) => c.id === companyId); if (!company) throw new Error('Company not found.');
-  const result: any = executeKnowledgeActionV2(session, company, payload);
+  const result: any = isInvestmentActionV4(payload.type)
+    ? executeInvestmentActionV4(session, company, payload)
+    : executeKnowledgeActionV2(session, company, payload);
   if (!result.success) return { ...result, session };
   await saveAndBroadcast(session, 'ACTION_EXECUTED', { actionType: payload.type, message: result.message });
-  await log(session, payload.type, payload.type.replaceAll('_', ' '), result.message, company.id, { ...payload, costTurnover: result.costTurnover });
+  await log(session, payload.type, payload.type.replaceAll('_', ' '), result.message, company.id, { ...payload, costTurnover: result.costTurnover, travelCost: result.travelCost });
   return { ...result, session };
 }
 
