@@ -22,8 +22,11 @@ import {
   recalculateCompanySPOFV2,
   redrawEventSameTypeV2,
   resolveSingleEventV2,
-  validateEventAllocationV2,
 } from '../engine/coreV2.ts';
+import {
+  resolveSingleEventExplicitV2,
+  validateEventAllocationExplicitV2,
+} from '../engine/challengeResponseV2.ts';
 import {
   deleteSessionV2,
   getGameEventLogs,
@@ -136,7 +139,7 @@ export async function setEventAllocationV2(sessionId: string, companyId: string,
   const company = session.companies.find((c) => c.id === companyId); if (!company) throw new Error('Company not found.');
   const event = (session.activeEvents[company.id] || []).find((e) => e.instanceId === eventInstanceId); if (!event) throw new Error('Event not found.');
   const proposed = { ...event.allocations[domain], ...allocation };
-  const validation = validateEventAllocationV2(session, company, event, domain, proposed);
+  const validation = validateEventAllocationExplicitV2(session, company, event, domain, proposed);
   if (!validation.ok) return { success: false, message: validation.message, session };
   event.allocations[domain] = proposed;
   await saveAndBroadcast(session, 'EVENT_ALLOCATION_UPDATED', { companyId, eventInstanceId, domain });
@@ -167,7 +170,7 @@ export async function resolveEventV2(sessionId: string, companyId: string, event
   const events = session.activeEvents[company.id] || [];
   const event = eventInstanceId ? events.find((e) => e.instanceId === eventInstanceId) : events.find((e) => !e.isResolved);
   if (!event) return { success: false, message: 'No unresolved event found.', session };
-  const result = resolveSingleEventV2(session, company, event);
+  const result = resolveSingleEventExplicitV2(session, company, event);
   await saveAndBroadcast(session, 'EVENT_RESOLVED', { companyId, eventInstanceId: event.instanceId, targetSiteId: event.targetSiteId, scope: event.card.scope, result });
   await log(session, result.success ? 'EVENT_SUCCESS' : 'EVENT_FAILURE', `${event.card.title}: ${result.success ? 'Success' : 'Failure'}`, `Business impact ${result.turnoverChange >= 0 ? '+' : ''}$${result.turnoverChange}k; intervention cost $${result.interventionCost}k.`, company.id, { ...result, eventTitle: event.card.title });
   for (const c of result.consultantDetails) await log(session, 'CONSULTANT_ENGAGED', `External expertise: ${c.domain}`, `${c.points} consultant point(s) at $${c.rate}k/point cost $${c.cost}k.`, company.id, c);
