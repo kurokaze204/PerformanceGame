@@ -21,13 +21,24 @@ import { formatCurrency } from '../utils/format.ts';
 
 type DecisionMode = 'existing' | 'consultant' | 'expert' | 'reputation' | 'network' | 'risk';
 
+type ResolutionDisplay = {
+  complete: boolean;
+  overallSuccess?: boolean;
+  domains: {
+    domain: KnowledgeDomain;
+    value: number;
+    target: number;
+    success?: boolean;
+  }[];
+};
+
 interface EventDecisionCardV2Props {
   session: GameSessionV2;
   company: CompanyV2;
   event: ActiveEventV2;
   cardNumber: number;
   onSetAllocation: (eventId: string, domain: KnowledgeDomain, allocation: any) => Promise<void> | void;
-  onResolveEvent: (eventId: string) => Promise<void> | void;
+  onResolveEvent: (eventId: string) => Promise<any> | any;
   onRedrawEvent?: (eventId: string) => Promise<void> | void;
   canHorizonRedraw?: boolean;
 }
@@ -40,6 +51,16 @@ const RESPONSE_MODES: { id: DecisionMode; label: string; sub: string; icon: Reac
   { id: 'network', label: 'Ask our network for help', sub: 'Draw on an active Community of Practice', icon: Handshake },
   { id: 'risk', label: 'Accept the risk', sub: 'Proceed without deliberately adding knowledge', icon: ShieldQuestion },
 ];
+
+function targetPercent(requiredDie: number, sides: number): number {
+  if (requiredDie <= 1) return 0;
+  if (requiredDie > sides) return 100;
+  return Math.round(((requiredDie - 1) / Math.max(1, sides - 1)) * 99);
+}
+
+function rollPercent(dieRoll: number, sides: number): number {
+  return Math.round(((Math.max(1, dieRoll) - 1) / Math.max(1, sides - 1)) * 99);
+}
 
 export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
   session,
@@ -54,12 +75,15 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
   const [domain, setDomain] = useState<KnowledgeDomain>(event.card.domains[0].domain);
   const [mode, setMode] = useState<DecisionMode>('existing');
   const [isResolving, setIsResolving] = useState(false);
+  const [resolutionDisplay, setResolutionDisplay] = useState<ResolutionDisplay | null>(null);
   const card = event.card;
   const targetSite = event.targetSiteId ? company.sites.find((site) => site.id === event.targetSiteId) : undefined;
 
   useEffect(() => {
     setDomain(event.card.domains[0].domain);
     setMode('existing');
+    setResolutionDisplay(null);
+    setIsResolving(false);
   }, [event.instanceId]);
 
   const allocation: ActiveEventAllocationV2 = event.allocations[domain] || {};
@@ -174,7 +198,6 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
       if (!response.ok || data.success === false) throw new Error(data.message || data.error || 'Could not use Reputation.');
     } catch (error: any) {
       window.alert(error.message || 'Could not use Reputation.');
-    } finally {
       setIsResolving(false);
     }
   };
@@ -182,8 +205,56 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
   const resolve = async () => {
     if (isResolving) return;
     setIsResolving(true);
-    try { await onResolveEvent(event.instanceId); }
-    finally { setIsResolving(false); }
+    const sides = session.config.event_die || 12;
+    setResolutionDisplay({
+      complete: false,
+      domains: evaluations.map((entry) => ({
+        domain: entry.domain,
+        value: Math.floor(Math.random() * 100),
+        target: targetPercent(entry.value.requiredDie, sides),
+      })),
+    });
+
+    const spinner = window.setInterval(() => {
+      setResolutionDisplay((current) => current ? {
+        ...current,
+        domains: current.domains.map((item) => ({ ...item, value: Math.floor(Math.random() * 100) })),
+      } : current);
+    }, 75);
+
+    try {
+      const [data] = await Promise.all([
+        Promise.resolve(onResolveEvent(event.instanceId)),
+        new Promise((resolveDelay) => window.setTimeout(resolveDelay, 1350)),
+      ]);
+      window.clearInterval(spinner);
+      const results = data?.result?.domainResults || [];
+      const domains = card.domains.map((requirement) => {
+        const result = results.find((candidate: any) => candidate.domain === requirement.domain);
+        const fallback = evaluations.find((entry) => entry.domain === requirement.domain)!.value;
+        if (!result) {
+          return {
+            domain: requirement.domain,
+            value: Math.floor(Math.random() * 100),
+            target: targetPercent(fallback.requiredDie, sides),
+            success: undefined,
+          };
+        }
+        const requiredDie = Number(result.requiredTotal) - Number(result.totalKnowledge);
+        return {
+          domain: requirement.domain,
+          value: rollPercent(Number(result.dieRoll), sides),
+          target: targetPercent(requiredDie, sides),
+          success: Boolean(result.domainSuccess),
+        };
+      });
+      setResolutionDisplay({ complete: true, overallSuccess: Boolean(data?.eventSuccess ?? data?.result?.success), domains });
+    } catch (error: any) {
+      window.clearInterval(spinner);
+      setResolutionDisplay(null);
+      setIsResolving(false);
+      window.alert(error?.message || 'Challenge could not be resolved.');
+    }
   };
 
   const solutionItems = [
@@ -233,7 +304,7 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
                   const gap = Math.max(0, requirement.difficulty - entry.totalKnowledge);
                   const selected = domain === requirement.domain;
                   return (
-                    <button key={requirement.domain} onClick={() => { setDomain(requirement.domain); setMode('existing'); }} className={`rounded-xl border-2 px-3 py-2.5 text-left transition ${selected ? 'border-white bg-white/10' : 'border-slate-700 bg-slate-900/80 hover:border-slate-500'}`}>
+                    <button key={requirement.domain} disabled={isResolving} onClick={() => { setDomain(requirement.domain); setMode('existing'); }} className={`rounded-xl border-2 px-3 py-2.5 text-left transition ${selected ? 'border-white bg-white/10' : 'border-slate-700 bg-slate-900/80 hover:border-slate-500'}`}>
                       <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: info.color }} /><span className="font-black text-white text-sm">{info.label}</span></div>
                       <div className="mt-1 text-[11px] text-slate-400">Challenge {requirement.difficulty} · Knowledge {entry.totalKnowledge}</div>
                       <div className="text-[10px] text-slate-500">Knowledge gap {gap}</div>
@@ -259,7 +330,7 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
           </div>
         </section>
 
-        {!event.isResolved && (
+        {!event.isResolved && !isResolving && (
           <motion.section layout className="rounded-2xl border border-slate-700 bg-[#11162a]/95 p-4 shadow-2xl min-h-28">
             {mode === 'existing' && (
               <div>
@@ -326,8 +397,28 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
           </motion.section>
         )}
 
-        {!event.isResolved && (
-          <button onClick={resolve} disabled={isResolving} className="w-full rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60 text-white px-5 py-3.5 text-lg font-black shadow-xl shadow-indigo-950/40 transition active:scale-[0.995]">{isResolving ? 'COMMITTING…' : 'COMMIT RESPONSE'}</button>
+        {resolutionDisplay && (
+          <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className={`rounded-2xl border-2 p-5 shadow-2xl ${resolutionDisplay.complete ? resolutionDisplay.overallSuccess ? 'border-emerald-500 bg-emerald-950/45' : 'border-rose-500 bg-rose-950/45' : 'border-indigo-500 bg-slate-950'}`}>
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div><div className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-black">Resolution</div><div className="text-lg font-black text-white">{resolutionDisplay.complete ? 'Result locked' : 'Testing your response…'}</div></div>
+              {resolutionDisplay.complete && <div className={`text-2xl font-black ${resolutionDisplay.overallSuccess ? 'text-emerald-300' : 'text-rose-300'}`}>{resolutionDisplay.overallSuccess ? 'SUCCESS' : 'FAIL'}</div>}
+            </div>
+            <div className={`grid gap-3 ${resolutionDisplay.domains.length > 1 ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+              {resolutionDisplay.domains.map((item) => (
+                <div key={item.domain} className="rounded-xl border border-slate-700 bg-slate-950/85 p-4">
+                  <div className="flex items-center justify-between gap-3"><span className="font-black text-white">{DOMAIN_INFO[item.domain].label}</span>{resolutionDisplay.complete && item.success != null && <span className={`text-sm font-black ${item.success ? 'text-emerald-400' : 'text-rose-400'}`}>{item.success ? 'SUCCESS' : 'FAIL'}</span>}</div>
+                  <div className="grid grid-cols-2 gap-3 mt-3 text-center">
+                    <div className="rounded-lg bg-slate-900 border border-slate-700 p-3"><div className="text-[9px] uppercase tracking-widest text-slate-500 font-black">Target</div><div className="text-2xl font-black text-white">≥ {String(item.target).padStart(2, '0')}%</div></div>
+                    <div className="rounded-lg bg-slate-900 border border-indigo-700 p-3"><div className="text-[9px] uppercase tracking-widest text-indigo-300 font-black">Roll</div><div className={`text-3xl font-black tabular-nums ${resolutionDisplay.complete ? item.success ? 'text-emerald-300' : 'text-rose-300' : 'text-white'}`}>{String(item.value).padStart(2, '0')}%</div></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.section>
+        )}
+
+        {!event.isResolved && !resolutionDisplay?.complete && (
+          <button onClick={resolve} disabled={isResolving} className="w-full rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60 text-white px-5 py-3.5 text-lg font-black shadow-xl shadow-indigo-950/40 transition active:scale-[0.995]">{isResolving ? 'ROLLING…' : 'GO'}</button>
         )}
       </div>
 
@@ -337,7 +428,7 @@ export const EventDecisionCardV2: React.FC<EventDecisionCardV2Props> = ({
           const Icon = choice.icon;
           const active = mode === choice.id;
           const selected = selectedByMode[choice.id];
-          return <button key={choice.id} onClick={() => chooseMode(choice.id)} className={`relative w-full min-h-[86px] rounded-xl border-2 p-3 text-left transition ${active ? 'border-indigo-300 bg-indigo-950/90 shadow-lg shadow-indigo-950/50' : 'border-slate-700 bg-slate-900/95 hover:border-slate-500'}`}><div className="flex items-start gap-3"><Icon className="w-5 h-5 text-indigo-300 mt-0.5 shrink-0" /><div><div className="font-black text-white text-sm leading-tight">{choice.label}</div><div className="text-[10px] text-slate-400 mt-1 leading-snug">{choice.id === 'consultant' ? `Bring in temporary capability from $${consultantRate}k per point` : choice.id === 'reputation' ? `${choice.sub} (${company.reputationPoints} left)` : choice.sub}</div></div></div>{selected && <span className="absolute -right-2 -top-2 w-8 h-8 rounded-full bg-emerald-400 border-4 border-slate-950 grid place-items-center text-emerald-950 shadow-lg"><Check className="w-4 h-4 stroke-[4]" /></span>}</button>;
+          return <button key={choice.id} disabled={isResolving} onClick={() => chooseMode(choice.id)} className={`relative w-full min-h-[86px] rounded-xl border-2 p-3 text-left transition ${active ? 'border-indigo-300 bg-indigo-950/90 shadow-lg shadow-indigo-950/50' : 'border-slate-700 bg-slate-900/95 hover:border-slate-500'} disabled:opacity-60`}><div className="flex items-start gap-3"><Icon className="w-5 h-5 text-indigo-300 mt-0.5 shrink-0" /><div><div className="font-black text-white text-sm leading-tight">{choice.label}</div><div className="text-[10px] text-slate-400 mt-1 leading-snug">{choice.id === 'consultant' ? `Bring in temporary capability from $${consultantRate}k per point` : choice.id === 'reputation' ? `${choice.sub} (${company.reputationPoints} left)` : choice.sub}</div></div></div>{selected && <span className="absolute -right-2 -top-2 w-8 h-8 rounded-full bg-emerald-400 border-4 border-slate-950 grid place-items-center text-emerald-950 shadow-lg"><Check className="w-4 h-4 stroke-[4]" /></span>}</button>;
         })}
       </aside>
     </motion.div>
