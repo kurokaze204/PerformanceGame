@@ -62,7 +62,7 @@ export function AppBoardV5(){
  if(!session||!company)return <div className="min-h-screen bg-slate-950 text-white grid place-items-center">Loading The Performance Gap…</div>;
  const events=session.activeEvents[company.id]||[];const firstUnresolved=events.findIndex(e=>!e.isResolved);const activeEventIndex=firstUnresolved>=0?firstUnresolved:Math.min(selectedEventIndex,Math.max(0,events.length-1));const selectedEvent=events[activeEventIndex];
  const isFacilitator=participant?.role==='facilitator';const horizonCanRedraw=selectedEvent&&company.horizonScanAvailableRound===session.round&&!company.horizonScanUsedThisRound&&!!company.horizonScanDomain&&selectedEvent.card.domains.some(r=>r.domain===company.horizonScanDomain);
- const needsInitialStrategy=!!participant&&!isFacilitator&&!company.knowledgeStrategyInitial;const needsFinalStrategy=!!participant&&!isFacilitator&&!!session.finalDisruptionResolved&&!company.knowledgeStrategyFinal;
+ const needsInitialStrategy=!!participant&&session.round===1&&startStage==='explore'&&!company.knowledgeStrategyInitial&&(!isFacilitator||session.companies.length===1);const needsFinalStrategy=!!participant&&!isFacilitator&&!!session.finalDisruptionResolved&&!company.knowledgeStrategyFinal;
  const setStage=(stage:StartStage)=>{setStartStage(stage);localStorage.setItem(`tpg_start_stage_${session.id}_r${session.round}`,stage)};
  const ownComplete=events.length>0&&events.every(e=>e.isResolved);const otherIncomplete=session.companies.filter(c=>c.id!==company.id).filter(c=>(session.activeEvents[c.id]||[]).some(e=>!e.isResolved)).length;
  const taskStatus=!ownComplete?'Complete your tasks below':otherIncomplete>0?`Waiting on ${otherIncomplete} other team${otherIncomplete===1?'':'s'}`:'All teams complete';
