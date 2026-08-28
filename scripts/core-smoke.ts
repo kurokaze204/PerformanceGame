@@ -9,6 +9,10 @@ import {
   resolveSingleEventV2,
   validateEventAllocationV2,
 } from '../src/engine/coreV2.ts';
+import {
+  evaluateEventDomainKnowledgeExplicitV2,
+  resolveSingleEventExplicitV2,
+} from '../src/engine/challengeResponseV2.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -99,6 +103,74 @@ function makeSession() {
   session.phase = 'respond';
   const result = executeKnowledgeActionV2(session, company, { type: 'HORIZON_SCAN', companyId: company.id, domain: 'finance' });
   assert.equal(result.success, false);
+}
+
+// 7. Challenge knowledge is OFF by default and only selected sources contribute.
+{
+  const { session, company } = makeSession();
+  session.phase = 'respond';
+  const site = company.sites.find((candidate) => !candidate.isClosed)!;
+  site.teamCapability.finance = 4;
+  site.codifiedKnowledge.finance = 3;
+  company.intranet.finance = 5;
+  const card: EventCard = {
+    id: 'TEST-EXPLICIT-SOURCES', type: 'problem', scope: 'local', title: 'Explicit source test', description: 'Smoke test',
+    domains: [{ domain: 'finance', difficulty: 6 }], impact: 100, tags: ['test'],
+  };
+  const event: ActiveEvent = {
+    instanceId: 'EXPLICIT',
+    card,
+    targetSiteId: site.id,
+    allocations: { finance: {} } as any,
+    isResolved: false,
+  };
+
+  const none = evaluateEventDomainKnowledgeExplicitV2(session, company, event, 'finance', session.config);
+  assert.equal(none.baseKnowledge, 0);
+  assert.equal(none.team, 0);
+  assert.equal(none.localCodified, 0);
+  assert.equal(none.usableIntranet, 0);
+
+  (event.allocations.finance as any).useTeamCapability = true;
+  const teamOnly = evaluateEventDomainKnowledgeExplicitV2(session, company, event, 'finance', session.config);
+  assert.equal(teamOnly.baseKnowledge, 4);
+  assert.equal(teamOnly.team, 4);
+  assert.equal(teamOnly.localCodified, 0);
+
+  (event.allocations.finance as any).useTeamCapability = false;
+  (event.allocations.finance as any).useLocalCodified = true;
+  const docsOnly = evaluateEventDomainKnowledgeExplicitV2(session, company, event, 'finance', session.config);
+  assert.equal(docsOnly.baseKnowledge, 3);
+  assert.equal(docsOnly.localCodified, 3);
+
+  (event.allocations.finance as any).useLocalCodified = false;
+  (event.allocations.finance as any).useCorporateIntranet = true;
+  const intranetOnly = evaluateEventDomainKnowledgeExplicitV2(session, company, event, 'finance', session.config);
+  assert.equal(intranetOnly.baseKnowledge, Math.min(company.intranet.finance, site.teamCapability.finance + session.config.absorptive_capacity_bonus));
+}
+
+// 8. Explicit-source resolution records only deliberately selected organisational knowledge.
+{
+  const { session, company } = makeSession();
+  session.phase = 'respond';
+  const site = company.sites.find((candidate) => !candidate.isClosed)!;
+  site.teamCapability.finance = 5;
+  site.codifiedKnowledge.finance = 4;
+  company.intranet.finance = 5;
+  const card: EventCard = {
+    id: 'TEST-EXPLICIT-RESOLVE', type: 'problem', scope: 'local', title: 'Certain explicit loss', description: 'Smoke test',
+    domains: [{ domain: 'finance', difficulty: 99 }], impact: 10, tags: ['test'],
+  };
+  const event: ActiveEvent = {
+    instanceId: 'EXPLICIT-RESOLVE', card, targetSiteId: site.id,
+    allocations: { finance: { useLocalCodified: true } } as any, isResolved: false,
+  };
+  const result = resolveSingleEventExplicitV2(session, company, event);
+  assert.equal(result.success, false);
+  assert.equal(result.domainResults[0].baseKnowledge, 4);
+  assert.equal(result.domainResults[0].team, 0);
+  assert.equal(result.domainResults[0].localCodified, 4);
+  assert.equal(result.domainResults[0].difficulty, 99);
 }
 
 console.log('Core V2 smoke tests passed.');
