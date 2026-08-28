@@ -49,7 +49,7 @@ const INTERVENTIONS: Intervention[] = [
   { id: 'codify-site', title: 'Codify Site Knowledge', description: 'Document local operating knowledge at a site (+1 Local Codified up to Team level).', anchor: 'existing', icon: BookOpen },
   { id: 'train-expert', title: 'Train Expert', description: 'Formal training advances one expert domain score by +1. Cost is determined when committed.', anchor: 'expert', icon: GraduationCap },
   { id: 'update-intranet', title: 'Update Corporate Intranet Domain', description: 'Capture the strongest available organisational knowledge into the corporate knowledge environment.', anchor: 'expert', icon: Building2 },
-  { id: 'aar', title: 'After Action Review (AAR)', description: 'Convert a relevant event from this round into persistent local team or codified capability.', anchor: 'risk', icon: Sparkles },
+  { id: 'aar', title: 'Lessons Learned / AAR', description: 'Spend an Action to review a relevant resolved challenge and convert experience into persistent local Team Capability or Codified Knowledge.', anchor: 'risk', icon: Sparkles },
   { id: 'join-cop', title: 'Join Community of Practice', description: 'Commit an eligible expert to a domain Community of Practice. Cost is determined when committed.', anchor: 'network', icon: Network },
   { id: 'horizon-scan', title: 'Horizon Scan', description: 'Scout one domain so one matching event next round can be rejected and redrawn.', anchor: 'risk', icon: Radar },
 ];
@@ -76,6 +76,17 @@ export const ActionsPanel: React.FC<ActionsPanelProps> = ({ session, company, on
   const selectedSite = activeSites.find((site) => site.id === siteId) || activeSites[0];
   const selectedExpert = activeExperts.find((expert) => expert.id === expertId) || activeExperts[0];
 
+  const learningDomains = useMemo<KnowledgeDomain[]>(() => {
+    if (selectedId !== 'aar' || !selectedSite) return DOMAINS;
+    const relevant = new Set<KnowledgeDomain>();
+    for (const event of session.activeEvents[company.id] || []) {
+      if (!event.isResolved) continue;
+      if (event.card.scope === 'local' && event.targetSiteId !== selectedSite.id) continue;
+      for (const requirement of event.card.domains) relevant.add(requirement.domain);
+    }
+    return DOMAINS.filter((candidate) => relevant.has(candidate));
+  }, [company.id, selectedId, selectedSite?.id, session.activeEvents]);
+
   useEffect(() => {
     if (selectedSite && selectedSite.id !== siteId) setSiteId(selectedSite.id);
   }, [selectedSite?.id]);
@@ -83,6 +94,10 @@ export const ActionsPanel: React.FC<ActionsPanelProps> = ({ session, company, on
   useEffect(() => {
     if (selectedExpert && selectedExpert.id !== expertId) setExpertId(selectedExpert.id);
   }, [selectedExpert?.id]);
+
+  useEffect(() => {
+    if (selectedId === 'aar' && learningDomains.length && !learningDomains.includes(domain)) setDomain(learningDomains[0]);
+  }, [domain, learningDomains, selectedId]);
 
   const expectedEffect = useMemo(() => {
     if (selectedId === 'transfer') {
@@ -105,12 +120,13 @@ export const ActionsPanel: React.FC<ActionsPanelProps> = ({ session, company, on
       return `${DOMAIN_INFO[domain].label} Corporate Intranet ${company.intranet[domain]} → higher if deeper source knowledge is available`;
     }
     if (selectedId === 'aar') {
+      if (!learningDomains.length) return 'No resolved challenge this round provides learning that can be applied at this site.';
       const before = learningTarget === 'team' ? selectedSite?.teamCapability[domain] ?? 0 : selectedSite?.codifiedKnowledge[domain] ?? 0;
       return selectedSite ? `${selectedSite.name} ${DOMAIN_INFO[domain].label} ${learningTarget === 'team' ? 'Team Capability' : 'Local Codified'} ${before} → ${Math.min(6, before + 1)}` : 'Choose an active site.';
     }
     if (selectedId === 'join-cop') return `Commit ${selectedExpert?.name || 'an eligible expert'} to the ${DOMAIN_INFO[domain].label} CoP for this round`;
     return `Arm ${DOMAIN_INFO[domain].label} Horizon Scan for round ${session.round + 1}`;
-  }, [activeSites, company.intranet, domain, learningTarget, selectedExpert, selectedId, selectedSite, session.round]);
+  }, [activeSites, company.intranet, domain, learningDomains.length, learningTarget, selectedExpert, selectedId, selectedSite, session.round]);
 
   const actionParams = () => {
     if (selectedId === 'transfer') return ['KNOWLEDGE_TRANSFER', { siteId, expertId, domain }] as const;
@@ -131,6 +147,8 @@ export const ActionsPanel: React.FC<ActionsPanelProps> = ({ session, company, on
   const needsSite = selectedId === 'transfer' || selectedId === 'codify-site' || selectedId === 'aar';
   const needsExpert = selectedId === 'transfer' || selectedId === 'train-expert' || selectedId === 'join-cop';
   const noActions = company.actionsRemaining <= 0;
+  const noLearningAvailable = selectedId === 'aar' && learningDomains.length === 0;
+  const domainOptions = selectedId === 'aar' ? learningDomains : DOMAINS;
 
   return (
     <div className="space-y-4">
@@ -179,7 +197,7 @@ export const ActionsPanel: React.FC<ActionsPanelProps> = ({ session, company, on
             {needsExpert && (
               <label className="block"><span className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Expert</span><select value={expertId} onChange={(event) => setExpertId(event.target.value)} className="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white">{activeExperts.map((expert) => <option key={expert.id} value={expert.id}>{expert.name} · {expert.location === 'HQ' ? 'HQ' : company.sites.find((site) => site.id === expert.location)?.name || expert.location}</option>)}</select></label>
             )}
-            <label className="block"><span className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Domain</span><select value={domain} onChange={(event) => setDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white">{DOMAINS.map((item) => <option key={item} value={item}>{DOMAIN_INFO[item].label}</option>)}</select></label>
+            <label className="block"><span className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Domain</span><select value={domainOptions.includes(domain) ? domain : domainOptions[0] || ''} onChange={(event) => setDomain(event.target.value as KnowledgeDomain)} disabled={!domainOptions.length} className="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white disabled:text-slate-600">{domainOptions.map((item) => <option key={item} value={item}>{DOMAIN_INFO[item].label}</option>)}</select></label>
             {selectedId === 'aar' && (
               <label className="block"><span className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Capture learning as</span><select value={learningTarget} onChange={(event) => setLearningTarget(event.target.value as 'team' | 'codified')} className="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"><option value="team">Team Capability</option><option value="codified">Local Codified Knowledge</option></select></label>
             )}
@@ -192,7 +210,7 @@ export const ActionsPanel: React.FC<ActionsPanelProps> = ({ session, company, on
 
           <div className="mt-3 flex items-center justify-between text-xs"><span className="text-slate-500 font-black uppercase tracking-wider">Cost</span><span className="font-black text-white">1 Action{selectedId === 'train-expert' || selectedId === 'join-cop' ? ' + variable turnover' : ''}</span></div>
 
-          <button onClick={commit} disabled={noActions || (needsExpert && !selectedExpert) || (needsSite && !selectedSite)} className="mt-4 w-full rounded-xl bg-amber-400 hover:bg-amber-300 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 px-4 py-3 font-black transition active:scale-[0.99]">
+          <button onClick={commit} disabled={noActions || noLearningAvailable || (needsExpert && !selectedExpert) || (needsSite && !selectedSite)} className="mt-4 w-full rounded-xl bg-amber-400 hover:bg-amber-300 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 px-4 py-3 font-black transition active:scale-[0.99]">
             RUN {selected.title.toUpperCase()} · 1 ACTION
           </button>
           <div className="text-[10px] text-slate-500 mt-2 text-center">Execution is immediate and cannot be undone.</div>
