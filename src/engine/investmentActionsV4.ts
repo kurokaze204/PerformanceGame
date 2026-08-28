@@ -168,10 +168,12 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const site = findSite(); if (!site) return { success: false, message: 'Site not found.' };
     const event = (session.activeEvents[company.id] || []).find((e) => e.instanceId === eventInstanceId && e.isResolved);
     if (!event) return { success: false, message: 'Lessons Learned can only use one of this round’s completed challenges.' };
+    if (event.experientialLearningAwarded) return { success: false, message: 'An AAR has already been completed for this challenge. Each challenge can only be used once for Lessons Learned.' };
     if (!event.card.domains.some((r) => r.domain === domain)) return { success: false, message: 'Choose a domain that was part of the selected challenge.' };
     if (event.card.scope === 'local' && event.targetSiteId !== site.id) return { success: false, message: 'A local challenge can only generate Lessons Learned at the site where it occurred.' };
     if (learningTarget === 'team') site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
     else site.codifiedKnowledge[domain] = Math.min(6, site.codifiedKnowledge[domain] + 1);
+    event.experientialLearningAwarded = true;
     const investmentAttribution = finish(baseCost, site.id);
     return { success: true, message: `AAR on “${event.card.title}” increased ${site.name} ${domain} ${learningTarget === 'team' ? 'Team Capability' : 'Codified Knowledge'} +1. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution, eventInstanceId };
   }
