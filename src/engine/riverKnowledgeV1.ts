@@ -1,6 +1,6 @@
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, ExperienceMode, GameSessionV2 } from '../types/gameV2.ts';
-import { INVESTMENT_COSTS_V4 } from './investmentActionsV4.ts';
+import { INVESTMENT_COSTS_V4, recordPublicationEvidenceV4 } from './investmentActionsV4.ts';
 import { recalculateCompanySPOFV2 } from './coreV2.ts';
 
 export function riverSiteKnowledgeScore(site:CompanyV2['sites'][number],domain:KnowledgeDomain,mode:ExperienceMode='expert'):number{
@@ -31,6 +31,7 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   const before=target.teamCapability[domain]||0;
   if(targetScore<=before)return{success:false,message:`${target.name} already has Team Capability ${before}; ${source.name} cannot lift it further through this sharing action.`,session};
   target.teamCapability[domain]=targetScore;
+  recordPublicationEvidenceV4(company,domain,1);
   const cost=INVESTMENT_COSTS_V4.KNOWLEDGE_TRANSFER;
   target.turnover=Math.max(0,target.turnover-cost);
   company.turnover=Math.round(company.sites.reduce((sum,s)=>sum+(s.isClosed?0:s.turnover),0));
