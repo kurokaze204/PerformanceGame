@@ -1,1 +1,1 @@
-export * from './gameServiceV4.ts';
+export * from './gameServiceV5.ts';
