@@ -16,7 +16,7 @@ import {
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
-function makeSession() {
+function makeSession(mode:'newbie'|'expert'='newbie') {
   const company = createInitialCompanyV2('Smoke Co', 'smoke-co', DEFAULT_CONFIG);
   const session = asSessionV2({
     id: 'SMOKE',
@@ -32,6 +32,7 @@ function makeSession() {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   } as GameSession);
+  session.experienceMode=mode;
   return { session, company };
 }
 
@@ -105,9 +106,9 @@ function makeSession() {
   assert.equal(result.success, false);
 }
 
-// 7. Challenge knowledge is OFF by default and only selected sources contribute.
+// 7. Expert mode retains explicit Team / Local Codified / Intranet source selection.
 {
-  const { session, company } = makeSession();
+  const { session, company } = makeSession('expert');
   session.phase = 'respond';
   const site = company.sites.find((candidate) => !candidate.isClosed)!;
   site.teamCapability.finance = 4;
@@ -149,9 +150,9 @@ function makeSession() {
   assert.equal(intranetOnly.baseKnowledge, Math.min(company.intranet.finance, site.teamCapability.finance + session.config.absorptive_capacity_bonus));
 }
 
-// 8. Explicit-source resolution records only deliberately selected organisational knowledge.
+// 8. Expert explicit-source resolution records deliberately selected Local Codified knowledge.
 {
-  const { session, company } = makeSession();
+  const { session, company } = makeSession('expert');
   session.phase = 'respond';
   const site = company.sites.find((candidate) => !candidate.isClosed)!;
   site.teamCapability.finance = 5;
@@ -171,6 +172,19 @@ function makeSession() {
   assert.equal(result.domainResults[0].team, 0);
   assert.equal(result.domainResults[0].localCodified, 4);
   assert.equal(result.domainResults[0].difficulty, 99);
+}
+
+// 9. Newbie mode deliberately ignores Local Codified Knowledge as a selectable challenge source.
+{
+  const { session, company } = makeSession('newbie');
+  session.phase='respond';
+  const site=company.sites.find(candidate=>!candidate.isClosed)!;
+  site.teamCapability.finance=2; site.codifiedKnowledge.finance=6;
+  const card:EventCard={id:'NEWBIE-NO-DOCS',type:'problem',scope:'local',title:'Simplified Newbie source model',description:'Smoke test',domains:[{domain:'finance',difficulty:6}],impact:10,tags:['test']};
+  const event:ActiveEvent={instanceId:'NEWBIE-NO-DOCS',card,targetSiteId:site.id,allocations:{finance:{useLocalCodified:true}} as any,isResolved:false};
+  const value=evaluateEventDomainKnowledgeExplicitV2(session,company,event,'finance',session.config);
+  assert.equal(value.localCodified,0);
+  assert.equal(value.baseKnowledge,0);
 }
 
 console.log('Core V2 smoke tests passed.');
