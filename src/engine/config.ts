@@ -1,8 +1,10 @@
 import { SimulationConfig } from '../types/game.ts';
 
 export const DEFAULT_CONFIG: SimulationConfig = {
-  starting_turnover: 3500,
-  minimum_site_turnover: 300,
+  // Reduced to one quarter of the original $3.5m company so event exposure
+  // becomes strategically meaningful much earlier in a session.
+  starting_turnover: 875,
+  minimum_site_turnover: 75,
   sites_per_company: 6,
   experts_per_company: 3,
 
@@ -21,6 +23,12 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   // Original rule: succeed when d12 roll is higher than the remaining
   // knowledge gap. In integer form this is roll + knowledge >= difficulty + 1.
   resolution_offset: 1,
+
+  // Escalating-stakes playtest controls. These are deliberately explicit so
+  // they can be tuned from playtest evidence without rewriting the deck.
+  event_value_growth_factor: 1.8,
+  event_difficulty_growth_per_move: 0.75,
+  event_initial_impact_multiplier: 0.12,
 
   absorptive_capacity_bonus: 2,
   expert_support_bonus: 2,
