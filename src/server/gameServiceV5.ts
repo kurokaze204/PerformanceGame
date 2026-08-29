@@ -1,7 +1,7 @@
-import type { GamePhase } from '../types/game.ts';
+import type { GamePhase, KnowledgeDomain } from '../types/game.ts';
 import type { GameSessionV2 } from '../types/gameV2.ts';
 import { DEFAULT_CONFIG } from '../engine/config.ts';
-import { applyProgressionToCurrentEvents, diversifyInitialKnowledge } from '../engine/eventProgressionV5.ts';
+import { applyProgressionToCurrentEvents, diversifyInitialKnowledge, progressEventCard } from '../engine/eventProgressionV5.ts';
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import {
@@ -9,6 +9,7 @@ import {
   broadcastV2,
   createNewSessionV2 as baseCreateNewSessionV2,
   initializeDefaultSessionV2 as baseInitializeDefaultSessionV2,
+  redrawEventV2 as baseRedrawEventV2,
 } from './gameServiceV2.ts';
 
 export * from './gameServiceV2.ts';
@@ -28,6 +29,13 @@ function applyFreshGameModel(session:GameSessionV2):void {
   }
 }
 
+function looksLikeUnstartedGame(session:GameSessionV2):boolean {
+  return session.round===1 && session.companies.every(company=>{
+    const events=session.activeEvents[company.id]||[];
+    return events.length>0&&events.every(event=>!event.isResolved&&!/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):/.test(event.card.title));
+  });
+}
+
 export async function createNewSessionV2(sessionId:string,title:string,companyNames:string[]=['Apex Technologies']):Promise<GameSessionV2>{
   const session=await baseCreateNewSessionV2(sessionId,title,companyNames);
   applyFreshGameModel(session);
@@ -39,7 +47,31 @@ export async function createNewSessionV2(sessionId:string,title:string,companyNa
 export async function initializeDefaultSessionV2():Promise<GameSessionV2>{
   const session=await baseInitializeDefaultSessionV2();
   ensureProgressionConfig(session);
+  if(looksLikeUnstartedGame(session)){
+    applyFreshGameModel(session);
+    await saveSessionV2(session);
+  }
   return session;
+}
+
+export async function redrawEventV2(sessionId:string,companyId:string,eventInstanceId:string){
+  const result=await baseRedrawEventV2(sessionId,companyId,eventInstanceId);
+  if(!result.success)return result;
+  ensureProgressionConfig(result.session);
+  const company=result.session.companies.find(c=>c.id===companyId);
+  const events=company?(result.session.activeEvents[company.id]||[]):[];
+  const eventIndex=events.findIndex(event=>event.instanceId===eventInstanceId);
+  if(company&&eventIndex>=0){
+    const firstMove=Math.max(1,company.eventsDrawnCount-events.length+1);
+    const event=events[eventIndex];
+    event.card=progressEventCard(event.card,firstMove+eventIndex,result.session.config);
+    const allocations:Partial<Record<KnowledgeDomain,any>>={};
+    event.card.domains.forEach(req=>{allocations[req.domain]=event.allocations?.[req.domain]||{}});
+    event.allocations=allocations as any;
+    await saveSessionV2(result.session);
+    broadcastV2(result.session,'HORIZON_SCAN_REDRAW_ESCALATED',{companyId,eventInstanceId});
+  }
+  return result;
 }
 
 export async function advancePhaseV2(sessionId:string,requested?:GamePhase){
