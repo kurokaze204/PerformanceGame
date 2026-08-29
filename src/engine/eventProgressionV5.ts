@@ -40,7 +40,9 @@ export function progressEventCard(fallback:EventCard, moveNumber:number, config:
   const difficultyGrowth=config.event_difficulty_growth_per_move ?? 0.75;
   const initialMultiplier=config.event_initial_impact_multiplier ?? 0.12;
   const valueFactor=Math.pow(growth,Math.max(0,moveNumber-1));
-  const startingMultiplier=moveNumber<=2?1:initialMultiplier;
+  const isLearning=card.tags.includes('learning');
+  const isEscalation=card.tags.includes('escalation');
+  const startingMultiplier=(isLearning||isEscalation)?1:initialMultiplier;
   card.impact=Math.max(5,Math.round(card.impact*startingMultiplier*valueFactor));
   card.domains=card.domains.map(req=>({ ...req, difficulty:Math.max(1,Math.round(req.difficulty+(moveNumber-1)*difficultyGrowth)) }));
   const tier=moveNumber<=2?'LEARNING':moveNumber<=4?'MATERIAL':moveNumber<=6?'HIGH STAKES':'CRITICAL';
