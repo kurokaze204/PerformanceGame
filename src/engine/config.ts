@@ -24,11 +24,15 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   // knowledge gap. In integer form this is roll + knowledge >= difficulty + 1.
   resolution_offset: 1,
 
-  // Escalating-stakes playtest controls. These are deliberately explicit so
-  // they can be tuned from playtest evidence without rewriting the deck.
-  event_value_growth_factor: 1.8,
-  event_difficulty_growth_per_move: 0.75,
+  // Tuned after the 100-game archetype study. Newbie mode escalates every move;
+  // Expert mode advances the same pressure curve more slowly so KM practitioners
+  // can run 25–30 rounds and compare long-horizon strategy differences.
+  event_value_growth_factor: 1.40,
+  event_difficulty_growth_per_move: 0.28,
   event_initial_impact_multiplier: 0.12,
+  event_impact_cap_ratio: 0.35,
+  event_difficulty_cap: 9,
+  event_expert_moves_per_pressure_step: 6,
 
   absorptive_capacity_bonus: 2,
   expert_support_bonus: 2,
