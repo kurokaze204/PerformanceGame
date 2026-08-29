@@ -40,6 +40,9 @@ export interface SimulationConfig {
   event_value_growth_factor?:number;
   event_difficulty_growth_per_move?:number;
   event_initial_impact_multiplier?:number;
+  event_impact_cap_ratio?:number;
+  event_difficulty_cap?:number;
+  event_expert_moves_per_pressure_step?:number;
   absorptive_capacity_bonus:number;
   expert_support_bonus:number;
   cop_support_bonus:number;
