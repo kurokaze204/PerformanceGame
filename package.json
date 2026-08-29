@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
-    "test:core": "tsx scripts/core-smoke.ts"
+    "test:core": "tsx scripts/core-smoke.ts && tsx scripts/progression-smoke.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
