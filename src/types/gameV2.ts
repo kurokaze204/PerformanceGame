@@ -6,6 +6,7 @@ import {
   Expert,
   GameSession,
   KnowledgeDomain,
+  Participant,
 } from './game.ts';
 
 export type BusinessStrategy =
@@ -23,6 +24,8 @@ export type KnowledgeStrategy =
   | 'automate_critical_knowledge'
   | 'buy_expertise'
   | 'no_particular_strategy';
+
+export type ExperienceMode = 'newbie' | 'expert';
 
 export interface ActiveEventAllocationV2 extends ActiveEventAllocation {
   useTeamCapability?: boolean;
@@ -61,7 +64,6 @@ export interface CompanyV2 extends Company {
   reputationPoints: number;
   reputationPointsStarted: number;
 
-  // AAR / benchmarking state
   businessStrategyInitial: BusinessStrategy | null;
   knowledgeStrategyInitial: KnowledgeStrategy | null;
   businessStrategyFinal: BusinessStrategy | null;
@@ -71,8 +73,6 @@ export interface CompanyV2 extends Company {
   cumulativeKnowledgeSpend: number;
   cumulativeConsultantSpend: number;
 
-  // Cost attribution for the round-by-round charts. Site totals include direct
-  // local spend plus that site's allocated share of corporate spend.
   cumulativeCorporateKnowledgeSpend: number;
   cumulativeSiteKnowledgeSpend: Record<string, number>;
 }
@@ -124,6 +124,15 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   rulesVersion: string;
   deckVersion: string;
   balanceVersion: string;
+
+  // Workshop/game experience controls. Stored in the authoritative JSON snapshot so
+  // existing databases do not need a schema migration.
+  experienceMode: ExperienceMode;
+  gameDurationMinutes: number;
+  finalWindowMinutes: number;
+  minutesPerMove: number;
+  maxPlayersPerCompany: number;
+  participants: Participant[];
 }
 
 export interface V2BalanceConfig {
@@ -144,14 +153,14 @@ export const V2_BALANCE: V2BalanceConfig = {
   expertTravelCostDieMultiplier: 10,
   lateBalanceElapsedMinutes: 40,
   lateBalanceMaxTypeGap: 2,
-  timerDurationSeconds: 50 * 60,
+  timerDurationSeconds: 60 * 60,
   startingReputationPoints: 2,
 };
 
 export const V2_VERSION = {
-  rules: '2.2.0-alpha.1',
+  rules: '2.3.0-alpha.1',
   deck: '1.2.0',
-  balance: '2.1.0-alpha.2',
+  balance: '2.2.0-alpha.1',
 };
 
 export function asCompanyV2(company: Company): CompanyV2 {
@@ -188,5 +197,11 @@ export function asSessionV2(session: GameSession): GameSessionV2 {
   s.rulesVersion ??= V2_VERSION.rules;
   s.deckVersion ??= V2_VERSION.deck;
   s.balanceVersion ??= V2_VERSION.balance;
+  s.experienceMode ??= 'newbie';
+  s.gameDurationMinutes = Math.max(20, Math.min(240, Number(s.gameDurationMinutes || 60)));
+  s.finalWindowMinutes = Math.max(5, Math.min(30, Number(s.finalWindowMinutes || 10)));
+  s.minutesPerMove = Math.max(4, Math.min(20, Number(s.minutesPerMove || 8)));
+  s.maxPlayersPerCompany = Math.max(1, Math.min(20, Number(s.maxPlayersPerCompany || 6)));
+  s.participants ??= [];
   return s;
 }
