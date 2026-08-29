@@ -1,6 +1,7 @@
 import type { GamePhase, KnowledgeDomain } from '../types/game.ts';
 import type { ActiveEventAllocationV2, GameSessionV2 } from '../types/gameV2.ts';
 import { DEFAULT_CONFIG } from '../engine/config.ts';
+import { calculateCardImpact } from '../engine/cards.ts';
 import { PROGRAMMED_FAILURE_TAG, applyProgressionToCurrentEvents, capProgressedEventImpact, diversifyInitialKnowledge, progressEventCard } from '../engine/eventProgressionV5.ts';
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { executeRiverKnowledgeSharing } from '../engine/riverKnowledgeV1.ts';
@@ -14,6 +15,7 @@ import {
   initializeDefaultSessionV2 as baseInitializeDefaultSessionV2,
   knowledgeActionV2 as baseKnowledgeActionV2,
   redrawEventV2 as baseRedrawEventV2,
+  resolveFinalDisruptionV2 as baseResolveFinalDisruptionV2,
   setEventAllocationV2 as baseSetEventAllocationV2,
 } from './gameServiceV4.ts';
 
@@ -53,6 +55,25 @@ function tutorialAllocationAllowed(allocation:ActiveEventAllocationV2):boolean {
     && !allocation.useCoPSupport
     && !allocation.useCorporateIntranet
     && Math.max(0,allocation.consultantPoints||0)===0;
+}
+
+function scaleFinalDisruptionToRoundsPlayed(session:GameSessionV2):void {
+  const card=session.finalDisruptionCard;
+  if(!card||card.tags?.includes('round-scaled-final'))return;
+
+  // The original climactic event is tuned for roughly eight rounds of capability building.
+  // Shorter games must still be demanding, but a well-played company needs a credible path to success.
+  const designRound=8;
+  const completedRounds=Math.max(1,session.round);
+  const progress=Math.max(0,Math.min(1,(completedRounds-1)/(designRound-1)));
+  card.domains=card.domains.map(requirement=>{
+    const floor=Math.max(3,requirement.difficulty-5);
+    const scaled=Math.round(floor+(requirement.difficulty-floor)*progress);
+    return {...requirement,difficulty:Math.max(floor,Math.min(requirement.difficulty,scaled))};
+  });
+  card.impact=calculateCardImpact(card);
+  card.tags=[...(card.tags||[]),'round-scaled-final',`final-round:${completedRounds}`];
+  card.description=`${card.description} The scale of this final test reflects how many rounds your company had to build capability.`;
 }
 
 export async function createNewSessionV2(sessionId:string,title:string,companyNames:string[]=['Apex Technologies'],options:CreateGameOptions={}):Promise<GameSessionV2>{
@@ -130,6 +151,12 @@ export async function redrawEventV2(sessionId:string,companyId:string,eventInsta
 
 export async function advancePhaseV2(sessionId:string,requested?:GamePhase){
   const result=await baseAdvancePhaseV2(sessionId,requested);
+  if(result.success&&result.session.isFinalDisruptionActive&&!result.session.finalDisruptionResolved){
+    scaleFinalDisruptionToRoundsPlayed(result.session);
+    await saveSessionV2(result.session);
+    broadcastV2(result.session,'FINAL_DISRUPTION_SCALED',{round:result.session.round,domains:result.session.finalDisruptionCard?.domains});
+    return result;
+  }
   if(result.success&&result.session.phase==='respond'&&!result.session.isFinalDisruptionActive){
     ensureProgressionConfig(result.session);
     for(const company of result.session.companies){
@@ -138,6 +165,21 @@ export async function advancePhaseV2(sessionId:string,requested?:GamePhase){
     }
     await saveSessionV2(result.session);
     broadcastV2(result.session,'ROUND_EVENTS_ESCALATED',{round:result.session.round});
+  }
+  return result;
+}
+
+export async function resolveFinalDisruptionV2(sessionId:string){
+  const existing=await baseGetSessionV2(sessionId.toUpperCase());
+  if(existing&&!existing.finalDisruptionResolved){
+    scaleFinalDisruptionToRoundsPlayed(existing);
+    await saveSessionV2(existing);
+  }
+  const result=await baseResolveFinalDisruptionV2(sessionId);
+  if(result?.success&&result.session){
+    (result.session as any).finalDisruptionResults=result.results||[];
+    await saveSessionV2(result.session);
+    broadcastV2(result.session,'FINAL_DISRUPTION_RESULTS_STORED',{results:result.results||[]});
   }
   return result;
 }
