@@ -56,7 +56,7 @@ async function startServer() {
 
   app.post('/api/sessions', async (req, res) => {
     try {
-      const { sessionId, title, name, companyNames, companyCount, experienceMode, gameDurationMinutes, maxPlayersPerCompany } = req.body || {};
+      const { sessionId, title, name, companyNames, companyCount, experienceMode, gameDurationMinutes, maxPlayersPerCompany, actionsPerRound } = req.body || {};
       const code = String(sessionId || `KM${Math.floor(1000 + Math.random() * 9000)}`).toUpperCase();
       let names: string[] = Array.isArray(companyNames) ? companyNames : [];
       if (!names.length) {
@@ -68,6 +68,7 @@ async function startServer() {
         experienceMode: experienceMode as ExperienceMode,
         gameDurationMinutes: Number(gameDurationMinutes || 60),
         maxPlayersPerCompany: Number(maxPlayersPerCompany || 6),
+        actionsPerRound: Number(actionsPerRound || 5),
       });
       await captureSessionStart(session);
       res.json(session);
