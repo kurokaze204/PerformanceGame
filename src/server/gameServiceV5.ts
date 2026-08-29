@@ -1,7 +1,7 @@
 import type { GamePhase, KnowledgeDomain } from '../types/game.ts';
-import type { GameSessionV2 } from '../types/gameV2.ts';
+import type { ActiveEventAllocationV2, GameSessionV2 } from '../types/gameV2.ts';
 import { DEFAULT_CONFIG } from '../engine/config.ts';
-import { applyProgressionToCurrentEvents, diversifyInitialKnowledge, progressEventCard } from '../engine/eventProgressionV5.ts';
+import { PROGRAMMED_FAILURE_TAG, applyProgressionToCurrentEvents, diversifyInitialKnowledge, progressEventCard } from '../engine/eventProgressionV5.ts';
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import type { CreateGameOptions } from './gameServiceV4.ts';
@@ -9,8 +9,10 @@ import { broadcastV2 } from './gameServiceV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
   createNewSessionV2 as baseCreateNewSessionV2,
+  getSessionV2 as baseGetSessionV2,
   initializeDefaultSessionV2 as baseInitializeDefaultSessionV2,
   redrawEventV2 as baseRedrawEventV2,
+  setEventAllocationV2 as baseSetEventAllocationV2,
 } from './gameServiceV4.ts';
 
 export * from './gameServiceV4.ts';
@@ -37,6 +39,17 @@ function looksLikeUnstartedGame(session:GameSessionV2):boolean {
   });
 }
 
+function isProgrammedFailure(event:any):boolean {
+  return Boolean(event?.card?.tags?.includes(PROGRAMMED_FAILURE_TAG));
+}
+
+function tutorialAllocationAllowed(allocation:ActiveEventAllocationV2):boolean {
+  return !allocation.expertId
+    && !allocation.useCoPSupport
+    && !allocation.useCorporateIntranet
+    && Math.max(0,allocation.consultantPoints||0)===0;
+}
+
 export async function createNewSessionV2(sessionId:string,title:string,companyNames:string[]=['Apex Technologies'],options:CreateGameOptions={}):Promise<GameSessionV2>{
   const session=await baseCreateNewSessionV2(sessionId,title,companyNames,options);
   applyFreshGameModel(session);
@@ -55,7 +68,28 @@ export async function initializeDefaultSessionV2():Promise<GameSessionV2>{
   return session;
 }
 
+export async function setEventAllocationV2(sessionId:string,companyId:string,eventInstanceId:string,domain:KnowledgeDomain,allocation:ActiveEventAllocationV2){
+  const session=await baseGetSessionV2(sessionId.toUpperCase());
+  const company=session?.companies.find(c=>c.id===companyId);
+  const event=company?(session?.activeEvents[company.id]||[]).find(item=>item.instanceId===eventInstanceId):undefined;
+  if(event&&isProgrammedFailure(event)&&!tutorialAllocationAllowed(allocation)){
+    return {
+      success:false,
+      message:'Opening learning challenge: only knowledge already held at this site can be used. Experts, the Corporate Intranet, networks, favours and consultants are deliberately unavailable so you can see the cost of knowledge being trapped elsewhere.',
+      session,
+    };
+  }
+  return baseSetEventAllocationV2(sessionId,companyId,eventInstanceId,domain,allocation);
+}
+
 export async function redrawEventV2(sessionId:string,companyId:string,eventInstanceId:string){
+  const session=await baseGetSessionV2(sessionId.toUpperCase());
+  const companyBefore=session?.companies.find(c=>c.id===companyId);
+  const eventBefore=companyBefore?(session?.activeEvents[companyBefore.id]||[]).find(event=>event.instanceId===eventInstanceId):undefined;
+  if(eventBefore&&isProgrammedFailure(eventBefore)){
+    return {success:false,message:'The opening learning challenge cannot be redrawn.',session};
+  }
+
   const result=await baseRedrawEventV2(sessionId,companyId,eventInstanceId);
   if(!result.success)return result;
   ensureProgressionConfig(result.session);
