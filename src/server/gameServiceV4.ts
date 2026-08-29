@@ -46,6 +46,7 @@ export interface CreateGameOptions {
   experienceMode?: ExperienceMode;
   gameDurationMinutes?: number;
   maxPlayersPerCompany?: number;
+  actionsPerRound?: number;
 }
 
 const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
@@ -58,7 +59,7 @@ async function startFinal(session:GameSessionV2){session.isFinalDisruptionActive
 
 export async function createNewSessionV2(sessionId:string,title:string,companyNames:string[]=['Apex Technologies'],options:CreateGameOptions={}):Promise<GameSessionV2>{
  const id=sessionId.toUpperCase();
- const config={...DEFAULT_CONFIG,rounds:99,events_per_round:2};
+ const config={...DEFAULT_CONFIG,rounds:99,events_per_round:2,actions_per_round:clamp(Number(options.actionsPerRound??DEFAULT_CONFIG.actions_per_round),1,10)};
  const companies=companyNames.map((name,idx)=>createInitialCompanyV2(name,`comp-${idx+1}-${id.toLowerCase()}`,config));
  const session=asSessionV2({id,title,round:1,phase:'respond',isPaused:false,isFinalDisruptionActive:false,companies,activeEvents:{},copMemberships:[],config,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()} as GameSession);
  session.experienceMode=options.experienceMode==='expert'?'expert':'newbie';
