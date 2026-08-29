@@ -12,7 +12,8 @@
     "lint": "tsc --noEmit",
     "test:core": "tsx scripts/core-smoke.ts && tsx scripts/progression-smoke.ts",
     "test:balance": "tsx scripts/balance-study.ts",
-    "test:balance:team": "tsx scripts/team-balance-study.ts"
+    "test:balance:team": "tsx scripts/team-balance-study.ts",
+    "test:balance:strategy": "tsx scripts/strategy-team-balance-study.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
