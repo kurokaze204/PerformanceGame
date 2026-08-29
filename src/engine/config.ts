@@ -16,7 +16,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
 
   rounds: 5,
   events_per_round: 2,
-  actions_per_round: 4,
+  actions_per_round: 5,
 
   event_die: 12,
   cost_die: 6,
