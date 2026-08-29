@@ -29,6 +29,7 @@ class RNG { constructor(public s:number){} next(){this.s=(this.s*1664525+1013904
 const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
 const mean=(a:number[])=>a.reduce((s,x)=>s+x,0)/Math.max(1,a.length);
 const rec=<T extends string>(keys:T[],v:number)=>Object.fromEntries(keys.map(k=>[k,v])) as Record<T,number>;
+const COSTS:Record<Intervention,number>={river:18,intranet:35,codify:20,train:20,aar:15,cop:25,automation:150,'corporate-training':95};
 
 const CORE:Persona[]=[
  {name:'CEO sceptic',risk:.65,tech:.35,sharing:.35,codify:.25,learning:.25,expert:.45,network:.25,spend:.35},
@@ -59,7 +60,7 @@ function diversify(m:Record<Domain,number>,r:RNG){const vals=DOMAINS.map(d=>m[d]
 function makeCompany(r:RNG){
  const sites:Site[]=SITES.map(()=>{const team=rec(DOMAINS,0),docs=rec(DOMAINS,0);for(const d of DOMAINS){team[d]=1+r.int(3);docs[d]=1+r.int(3)}diversify(team,r);diversify(docs,r);return{turnover:Math.round(DEFAULT_CONFIG.starting_turnover/6),team,docs}});
  const intranet=rec(DOMAINS,DEFAULT_CONFIG.starting_intranet_score);diversify(intranet,r);
- const experts=DOMAINS.map(d=>4+r.int(3));
+ const experts=DOMAINS.map(()=>4+r.int(3));
  return{sites,intranet,experts,automated:new Set<Domain>(),cop:new Set<Domain>(),turnover:DEFAULT_CONFIG.starting_turnover};
 }
 function siteKnowledge(s:Site,d:Domain){return Math.max(s.team[d],s.docs[d])}
@@ -92,8 +93,8 @@ function simulate(mode:Mode,t:Tune,seed:number):RunResult{
      choices.push({i:'intranet',w:(round>1?1:0)*(.6+persona.codify)*Math.max(0,Math.max(...c.sites.map(s=>siteKnowledge(s,g.d)))-c.intranet[g.d])});
      choices.push({i:'codify',w:persona.codify*1.4});choices.push({i:'aar',w:persona.learning*(mode==='newbie'?1.6:1.0)});choices.push({i:'train',w:persona.expert*.8});choices.push({i:'cop',w:persona.network*.75});choices.push({i:'automation',w:persona.tech*(round>=3||mode==='expert'?1:0)*.8});choices.push({i:'corporate-training',w:.5+persona.learning*.5});
      const total=choices.reduce((s,x)=>s+x.w,0);let z=r.next()*total;let picked=choices[0].i;for(const x of choices){z-=x.w;if(z<=0){picked=x.i;break}}
-     let did=false;const d=picked==='river'?g.d:chooseDomain(r);const cost:{[K in Intervention]:number}={river:18,intranet:35,codify:20,train:20,aar:15,cop:25,automation:150,'corporate-training':95}[picked];if(cost>c.turnover*(.08+.25*persona.spend)&&r.chance(.70))continue;
-     if(picked==='river'){const sorted=[...c.sites].sort((a,b)=>siteKnowledge(a,d)-siteKnowledge(b,d));const lo=sorted[0],hi=sorted[sorted.length-1],target=Math.round(siteKnowledge(hi,d)*t.riverEfficiency);if(target>lo.team[d]){lo.team[d]=Math.min(6,target);did=true;learning+=.8}}
+     let did=false;const d=picked==='river'?g.d:chooseDomain(r);const cost=COSTS[picked];if(cost>c.turnover*(.08+.25*persona.spend)&&r.chance(.70))continue;
+     if(picked==='river'){const sorted=[...c.sites].sort((a,b)=>siteKnowledge(a,d)-siteKnowledge(b,d));const lo=sorted[0],hi=sorted[sorted.length-1],targetScore=Math.round(siteKnowledge(hi,d)*t.riverEfficiency);if(targetScore>lo.team[d]){lo.team[d]=Math.min(6,targetScore);did=true;learning+=.8}}
      else if(picked==='intranet'){const best=Math.max(...c.sites.map(s=>siteKnowledge(s,d)));if(best>c.intranet[d]){c.intranet[d]=Math.min(best,c.intranet[d]+t.intranetIncrement);did=true;learning+=.55}}
      else if(picked==='codify'){const s=r.pick(c.sites);if(s.docs[d]<s.team[d]){s.docs[d]++;did=true;learning+=.45}}
      else if(picked==='aar'){const s=r.pick(c.sites);if(r.chance(.5))s.team[d]=Math.min(6,s.team[d]+1);else s.docs[d]=Math.min(6,s.docs[d]+1);did=true;learning+=.9}
@@ -104,7 +105,7 @@ function simulate(mode:Mode,t:Tune,seed:number):RunResult{
      if(did){used[picked]++;actionsUsed++;c.turnover-=cost;const share=Math.round(cost/6);for(const s of c.sites)s.turnover-=share;if(c.sites.some(s=>s.turnover<0))negativeSite=true}
    }
  }
- const counts=Object.values(used);const nonzero=counts.filter(x=>x>0).length;const totalUsed=counts.reduce((s,x)=>s+x,0);const dominant=totalUsed?Math.max(...counts)/totalUsed:1;
+ const counts:number[]=Object.values(used);const nonzero=counts.filter(x=>x>0).length;const totalUsed=counts.reduce((s,x)=>s+x,0);const dominant=totalUsed?Math.max(...counts)/totalUsed:1;
  return{mode,turnoverRatio:c.turnover/initialTurnover,successRate:successes/Math.max(1,challenges-1),lateExposure:lateExposure/Math.max(1,challenges-5),bankrupt:c.turnover<=0,negativeSite,actionsUsed,actionCapacity:rounds*actionsPerRound,diversity:nonzero,riverUses:used.river,intranetUses:used.intranet,aarUses:used.aar,automationUses:used.automation,learning,falseLessonPenalty,dominantShare:dominant,rounds};
 }
 function quality(r:RunResult){
