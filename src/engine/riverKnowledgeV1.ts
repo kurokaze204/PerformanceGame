@@ -1,10 +1,14 @@
 import type { KnowledgeDomain } from '../types/game.ts';
-import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
+import type { CompanyV2, ExperienceMode, GameSessionV2 } from '../types/gameV2.ts';
 import { INVESTMENT_COSTS_V4 } from './investmentActionsV4.ts';
 import { recalculateCompanySPOFV2 } from './coreV2.ts';
 
-export function riverSiteKnowledgeScore(site:CompanyV2['sites'][number],domain:KnowledgeDomain):number{
-  return Math.max(site.teamCapability[domain]||0,site.codifiedKnowledge[domain]||0);
+export function riverSiteKnowledgeScore(site:CompanyV2['sites'][number],domain:KnowledgeDomain,mode:ExperienceMode='expert'):number{
+  // Newbie deliberately collapses local knowledge into Team Capability so players
+  // do not have to reason about a second hidden local codification metric.
+  return mode==='newbie'
+    ? (site.teamCapability[domain]||0)
+    : Math.max(site.teamCapability[domain]||0,site.codifiedKnowledge[domain]||0);
 }
 
 export function riverTransferTarget(sourceScore:number):number{
@@ -22,7 +26,7 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   const source=company.sites.find(s=>s.id===sourceSiteId&&!s.isClosed);
   const target=company.sites.find(s=>s.id===siteId&&!s.isClosed);
   if(!source||!target)return{success:false,message:'Both sites must be active.',session};
-  const sourceScore=riverSiteKnowledgeScore(source,domain);
+  const sourceScore=riverSiteKnowledgeScore(source,domain,session.experienceMode);
   const targetScore=riverTransferTarget(sourceScore);
   const before=target.teamCapability[domain]||0;
   if(targetScore<=before)return{success:false,message:`${target.name} already has Team Capability ${before}; ${source.name} cannot lift it further through this sharing action.`,session};
@@ -35,7 +39,7 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   return{
     success:true,
     session,
-    message:`${source.name} shared ${domain} practice with ${target.name}. ${target.name} Team Capability increased ${before} → ${targetScore}, approximately 80% of ${source.name}'s local knowledge score ${sourceScore}. Cost $${cost}k.`,
+    message:`${source.name} shared ${domain} practice with ${target.name}. ${target.name} Team Capability increased ${before} → ${targetScore}, approximately 80% of ${source.name}'s locally available ${session.experienceMode==='newbie'?'Team Capability':'knowledge score'} ${sourceScore}. Cost $${cost}k.`,
     costTurnover:cost,
     investmentAttribution:{siteId:target.id,siteCost:cost,corporateCost:0},
     riverTransfer:{sourceSiteId:source.id,targetSiteId:target.id,domain,sourceScore,targetScore,before},
