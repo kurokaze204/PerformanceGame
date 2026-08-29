@@ -12,7 +12,7 @@ interface Props {
   onSoloStart: (options: CreateOptions) => void;
 }
 
-export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSession, onCreateNewSession, onSoloStart }) => {
+export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSession }) => {
   const [mode, setMode] = useState<'join'|'current'|'create'>('join');
   const [sessionId, setSessionId] = useState('');
   const [playerName, setPlayerName] = useState('');
@@ -23,10 +23,22 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
   const [duration, setDuration] = useState(60);
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [actionsPerRound, setActionsPerRound] = useState(defaultActionsForMode('newbie'));
+  const [createError, setCreateError] = useState<string|null>(null);
+  const [creating, setCreating] = useState(false);
   const selectExperienceMode=(next:ExperienceMode)=>{setExperienceMode(next);setActionsPerRound(defaultActionsForMode(next));};
   const options = { experienceMode, gameDurationMinutes: duration, maxPlayersPerCompany: maxPlayers, actionsPerRound };
   const hasName = playerName.trim().length > 0;
   const rememberName = () => { try { localStorage.setItem('tpg_entered_player_name', playerName.trim()); } catch { /* ignore */ } };
+  const createAndJoin = async (count:number) => {
+    if (!hasName || creating) return;
+    setCreating(true); setCreateError(null); rememberName();
+    try {
+      const res=await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,companyCount:count,...options})});
+      const created=await res.json();
+      if(!res.ok) throw new Error(created.error||'Could not create the game.');
+      onJoinSession(created.id,created.companies?.[0]?.id||'',playerName.trim());
+    } catch (error:any) { setCreateError(error.message||'Could not create the game.'); setCreating(false); }
+  };
 
   return <div className="fixed inset-0 z-[250] bg-[#080b12]/95 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="join-title">
     <div className="w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-slate-200">
@@ -62,8 +74,9 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
         <div className="grid grid-cols-3 gap-3"><Field label="Game length (minutes)"><input type="number" min={20} max={240} step={5} value={duration} onChange={e=>setDuration(Math.max(20,Number(e.target.value)))} className="control"/></Field><Field label="Max players / company"><input type="number" min={1} max={20} value={maxPlayers} onChange={e=>setMaxPlayers(Math.max(1,Number(e.target.value)))} className="control"/></Field><Field label="Actions / company / round"><input type="number" min={1} max={10} value={actionsPerRound} onChange={e=>setActionsPerRound(Math.max(1,Math.min(10,Number(e.target.value))))} className="control"/></Field></div>
         <div className="rounded-xl border border-indigo-800 bg-indigo-950/25 p-3 text-xs text-slate-300">Defaults are tuned by mode: Newbie starts at 5 Actions per company per round; Expert starts at 3 to create stronger portfolio trade-offs. The facilitator can override either value here.</div>
         {!hasName&&<p className="text-[11px] text-amber-300">Enter your name before starting a game.</p>}
-        <button disabled={!hasName} onClick={()=>{rememberName();onCreateNewSession(name,companyCount,options)}} className="primary disabled:opacity-40 disabled:cursor-not-allowed"><Sparkles className="w-4 h-4"/>LAUNCH NEW GAME</button>
-        <button disabled={!hasName} onClick={()=>{rememberName();onSoloStart(options)}} className="w-full text-xs text-indigo-300 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Launch a 1-company solo game with these settings</button>
+        {createError&&<p className="text-[11px] text-rose-300">{createError}</p>}
+        <button disabled={!hasName||creating} onClick={()=>void createAndJoin(companyCount)} className="primary disabled:opacity-40 disabled:cursor-not-allowed"><Sparkles className="w-4 h-4"/>{creating?'CREATING…':'LAUNCH NEW GAME'}</button>
+        <button disabled={!hasName||creating} onClick={()=>void createAndJoin(1)} className="w-full text-xs text-indigo-300 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Launch a 1-company solo game with these settings</button>
       </div>}
     </div>
   </div>;
