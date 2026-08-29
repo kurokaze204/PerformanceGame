@@ -1,4 +1,4 @@
-import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
+import type { CompanyV2, ExperienceMode, GameSessionV2 } from '../types/gameV2.ts';
 import type { DomainScoreMap, EventCard, EventType, KnowledgeDomain, SimulationConfig, Site } from '../types/game.ts';
 
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
@@ -73,27 +73,42 @@ export function buildProgrammedOpeningFailure(company:CompanyV2):{card:EventCard
   return {card,targetSiteId:gap.targetSite.id,gap};
 }
 
-function pickProgressionCard(type:EventType, moveNumber:number, fallback:EventCard):EventCard {
-  if (moveNumber <= 2) return cloneCard(pick(EARLY_CARDS.filter(c=>c.type===type)));
-  if (moveNumber >= 5 && Math.random() < 0.65) return cloneCard(pick(HIGH_STAKES_CARDS.filter(c=>c.type===type)));
+function pressureMove(moveNumber:number, config:SimulationConfig, experienceMode:ExperienceMode='newbie'):number {
+  if(experienceMode!=='expert') return moveNumber;
+  const movesPerStep=Math.max(1,Math.round(config.event_expert_moves_per_pressure_step ?? 6));
+  return 1+Math.floor(Math.max(0,moveNumber-1)/movesPerStep);
+}
+
+function pickProgressionCard(type:EventType, pressureNumber:number, fallback:EventCard):EventCard {
+  if (pressureNumber <= 2) return cloneCard(pick(EARLY_CARDS.filter(c=>c.type===type)));
+  if (pressureNumber >= 5 && Math.random() < 0.65) return cloneCard(pick(HIGH_STAKES_CARDS.filter(c=>c.type===type)));
   return cloneCard(fallback);
 }
 
-export function progressEventCard(fallback:EventCard, moveNumber:number, config:SimulationConfig):EventCard {
-  const card=pickProgressionCard(fallback.type,moveNumber,fallback);
-  const growth=config.event_value_growth_factor ?? 1.8;
-  const difficultyGrowth=config.event_difficulty_growth_per_move ?? 0.75;
+export function progressEventCard(fallback:EventCard, moveNumber:number, config:SimulationConfig, experienceMode:ExperienceMode='newbie'):EventCard {
+  const pressureNumber=pressureMove(moveNumber,config,experienceMode);
+  const card=pickProgressionCard(fallback.type,pressureNumber,fallback);
+  const growth=config.event_value_growth_factor ?? 1.4;
+  const difficultyGrowth=config.event_difficulty_growth_per_move ?? 0.28;
+  const difficultyCap=config.event_difficulty_cap ?? 9;
   const initialMultiplier=config.event_initial_impact_multiplier ?? 0.12;
-  const valueFactor=Math.pow(growth,Math.max(0,moveNumber-1));
+  const valueFactor=Math.pow(growth,Math.max(0,pressureNumber-1));
   const isLearning=card.tags.includes('learning');
   const isEscalation=card.tags.includes('escalation');
   const startingMultiplier=(isLearning||isEscalation)?1:initialMultiplier;
   card.impact=Math.max(5,Math.round(card.impact*startingMultiplier*valueFactor));
-  card.domains=card.domains.map(req=>({ ...req, difficulty:Math.max(1,Math.round(req.difficulty+(moveNumber-1)*difficultyGrowth)) }));
-  const tier=moveNumber<=2?'LEARNING':moveNumber<=4?'MATERIAL':moveNumber<=6?'HIGH STAKES':'CRITICAL';
+  card.domains=card.domains.map(req=>({ ...req, difficulty:Math.min(difficultyCap,Math.max(1,Math.round(req.difficulty+(pressureNumber-1)*difficultyGrowth))) }));
+  const tier=pressureNumber<=2?'LEARNING':pressureNumber<=4?'MATERIAL':pressureNumber<=6?'HIGH STAKES':'CRITICAL';
   card.title=`${tier}: ${card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,'')}`;
-  card.description=`${card.description} This is move ${moveNumber}; the financial stakes and knowledge difficulty are deliberately higher as the game progresses.`;
+  card.description=`${card.description} This is move ${moveNumber}; the financial stakes and knowledge difficulty increase as the simulation develops.`;
   return card;
+}
+
+export function capProgressedEventImpact(card:EventCard, company:CompanyV2, targetSiteId:string|undefined, config:SimulationConfig):EventCard {
+  const ratio=Math.max(0.05,config.event_impact_cap_ratio ?? 0.35);
+  const site=targetSiteId?company.sites.find(s=>s.id===targetSiteId&&!s.isClosed):undefined;
+  const scopeTurnover=card.scope==='local'&&site?Math.max(1,site.turnover):Math.max(1,company.turnover);
+  return {...card,impact:Math.max(5,Math.min(card.impact,Math.round(scopeTurnover*ratio)))};
 }
 
 function chooseSite(company:CompanyV2):Site|undefined { const active=company.sites.filter(s=>!s.isClosed); return active.length?pick(active):undefined; }
@@ -108,10 +123,11 @@ export function applyProgressionToCurrentEvents(session:GameSessionV2, company:C
       event.card=tutorial.card;
       event.targetSiteId=tutorial.targetSiteId;
     } else {
-      event.card=progressEventCard(event.card,moveNumber,session.config);
+      event.card=progressEventCard(event.card,moveNumber,session.config,session.experienceMode);
       if(event.card.scope==='local'){
         if(!event.targetSiteId||!company.sites.some(s=>s.id===event.targetSiteId&&!s.isClosed)) event.targetSiteId=chooseSite(company)?.id;
       } else event.targetSiteId=undefined;
+      event.card=capProgressedEventImpact(event.card,company,event.targetSiteId,session.config);
     }
     const allocations:any={};
     event.card.domains.forEach(req=>{allocations[req.domain]=event.allocations?.[req.domain]||{}});
