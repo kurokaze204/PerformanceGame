@@ -16,7 +16,7 @@ export const LEARNING_CURVE_PROFILES: Record<ExperienceMode, LearningCurveProfil
   newbie: {
     defaultActionsPerRound: 5,
     showLocalCodifiedKnowledge: false,
-    expertEarlyBonus: 1,
+    expertEarlyBonus: 2,
     expertMiddlePenalty: 1,
     expertLateSpecialistBonus: 2,
     expertEarlyThroughRound: 2,
@@ -26,7 +26,7 @@ export const LEARNING_CURVE_PROFILES: Record<ExperienceMode, LearningCurveProfil
   expert: {
     defaultActionsPerRound: 3,
     showLocalCodifiedKnowledge: true,
-    expertEarlyBonus: 2,
+    expertEarlyBonus: 3,
     expertMiddlePenalty: 2,
     expertLateSpecialistBonus: 4,
     expertEarlyThroughRound: 2,
@@ -45,9 +45,12 @@ export function localCodifiedVisible(mode: ExperienceMode): boolean {
 
 export function inferredSpecialisation(card: EventCard): number {
   const tags = card.tags || [];
+  // Late escalation alone is not enough to justify an Expert. The challenge must
+  // genuinely be specialist/novel (or unusually multi-domain) so the late-game
+  // Expert return remains a selective troubleshooting move rather than a generic buff.
   if (tags.includes('specialist') || tags.includes('specialised') || tags.includes('novel')) return 5;
-  if (tags.includes('escalation') || tags.includes('critical')) return 4;
   if (card.domains.length >= 3) return 4;
+  if (tags.includes('critical') || tags.includes('safety')) return 3;
   if (card.domains.length === 2) return 3;
   return 2;
 }
