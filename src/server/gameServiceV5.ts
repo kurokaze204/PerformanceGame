@@ -1,4 +1,4 @@
-import type { GamePhase, GameSession } from '../types/game.ts';
+import type { GamePhase } from '../types/game.ts';
 import type { GameSessionV2 } from '../types/gameV2.ts';
 import { DEFAULT_CONFIG } from '../engine/config.ts';
 import { applyProgressionToCurrentEvents, diversifyInitialKnowledge } from '../engine/eventProgressionV5.ts';
@@ -43,8 +43,6 @@ export async function initializeDefaultSessionV2():Promise<GameSessionV2>{
 }
 
 export async function advancePhaseV2(sessionId:string,requested?:GamePhase){
-  const before=await baseInitializeDefaultSessionV2().catch(()=>null);
-  void before; // keeps this wrapper independent of persistence implementation details
   const result=await baseAdvancePhaseV2(sessionId,requested);
   if(result.success&&result.session.phase==='respond'&&!result.session.isFinalDisruptionActive){
     ensureProgressionConfig(result.session);
@@ -52,7 +50,7 @@ export async function advancePhaseV2(sessionId:string,requested?:GamePhase){
       const events=result.session.activeEvents[company.id]||[];
       if(events.length&&events.every(event=>!event.isResolved)) applyProgressionToCurrentEvents(result.session,company);
     }
-    await saveSessionV2(result.session as unknown as GameSession);
+    await saveSessionV2(result.session);
     broadcastV2(result.session,'ROUND_EVENTS_ESCALATED',{round:result.session.round});
   }
   return result;
