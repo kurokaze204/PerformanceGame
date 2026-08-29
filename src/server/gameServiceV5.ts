@@ -4,15 +4,16 @@ import { DEFAULT_CONFIG } from '../engine/config.ts';
 import { applyProgressionToCurrentEvents, diversifyInitialKnowledge, progressEventCard } from '../engine/eventProgressionV5.ts';
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { saveSessionV2 } from './dbV2.ts';
+import type { CreateGameOptions } from './gameServiceV4.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
   broadcastV2,
   createNewSessionV2 as baseCreateNewSessionV2,
   initializeDefaultSessionV2 as baseInitializeDefaultSessionV2,
   redrawEventV2 as baseRedrawEventV2,
-} from './gameServiceV2.ts';
+} from './gameServiceV4.ts';
 
-export * from './gameServiceV2.ts';
+export * from './gameServiceV4.ts';
 
 function ensureProgressionConfig(session:GameSessionV2):void {
   session.config.event_value_growth_factor ??= DEFAULT_CONFIG.event_value_growth_factor;
@@ -36,8 +37,8 @@ function looksLikeUnstartedGame(session:GameSessionV2):boolean {
   });
 }
 
-export async function createNewSessionV2(sessionId:string,title:string,companyNames:string[]=['Apex Technologies']):Promise<GameSessionV2>{
-  const session=await baseCreateNewSessionV2(sessionId,title,companyNames);
+export async function createNewSessionV2(sessionId:string,title:string,companyNames:string[]=['Apex Technologies'],options:CreateGameOptions={}):Promise<GameSessionV2>{
+  const session=await baseCreateNewSessionV2(sessionId,title,companyNames,options);
   applyFreshGameModel(session);
   await saveSessionV2(session);
   broadcastV2(session,'SESSION_PROGRESSIVE_BALANCE_APPLIED',{valueGrowthFactor:session.config.event_value_growth_factor,difficultyGrowthPerMove:session.config.event_difficulty_growth_per_move});
