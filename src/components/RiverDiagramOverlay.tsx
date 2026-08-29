@@ -2,15 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, X } from 'lucide-react';
 import type { GamePhase, KnowledgeDomain } from '../types/game.ts';
 import { DOMAIN_INFO } from '../types/game.ts';
-import type { CompanyV2 } from '../types/gameV2.ts';
+import type { CompanyV2, ExperienceMode } from '../types/gameV2.ts';
 import { riverSiteKnowledgeScore, riverTransferTarget } from '../engine/riverKnowledgeV1.ts';
 import { formatCurrency } from '../utils/format.ts';
 
-interface Props { company: CompanyV2; phase:GamePhase; onClose: () => void; onShare:(sourceSiteId:string,targetSiteId:string,domain:KnowledgeDomain)=>Promise<{success:boolean;message?:string}>; }
+interface Props { company: CompanyV2; mode:ExperienceMode; phase:GamePhase; onClose: () => void; onShare:(sourceSiteId:string,targetSiteId:string,domain:KnowledgeDomain)=>Promise<{success:boolean;message?:string}>; }
 const DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations','finance'];
 const ABBR: Record<string,string> = { melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW' };
 
-export const RiverDiagramOverlay:React.FC<Props>=({company,phase,onClose,onShare})=>{
+export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,onShare})=>{
  const sites=company.sites.filter(s=>!s.isClosed);
  const [domain,setDomain]=useState<KnowledgeDomain>('engineering');
  const [sourceSiteId,setSourceSiteId]=useState('');
@@ -18,19 +18,19 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,phase,onClose,onShare
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
  const data=useMemo(()=>DOMAINS.map(d=>{
-   const scores=sites.map(site=>({site,score:riverSiteKnowledgeScore(site,d)}));
+   const scores=sites.map(site=>({site,score:riverSiteKnowledgeScore(site,d,mode)}));
    return {domain:d,scores,south:Math.min(...scores.map(x=>x.score)),north:Math.max(...scores.map(x=>x.score))};
- }),[company]);
+ }),[company,mode]);
  const selectedData=data.find(d=>d.domain===domain)!;
  useEffect(()=>{
    if(!selectedData?.scores.length)return;
    const sorted=[...selectedData.scores].sort((a,b)=>b.score-a.score);
    setSourceSiteId(current=>selectedData.scores.some(x=>x.site.id===current)?current:sorted[0].site.id);
    setTargetSiteId(current=>selectedData.scores.some(x=>x.site.id===current)?current:sorted[sorted.length-1].site.id);
- },[domain,company]);
+ },[domain,company,mode]);
  const source=sites.find(s=>s.id===sourceSiteId);
  const target=sites.find(s=>s.id===targetSiteId);
- const sourceScore=source?riverSiteKnowledgeScore(source,domain):0;
+ const sourceScore=source?riverSiteKnowledgeScore(source,domain,mode):0;
  const currentTarget=target?.teamCapability[domain]||0;
  const transferTarget=riverTransferTarget(sourceScore);
  const canBenefit=Boolean(source&&target&&source.id!==target.id&&transferTarget>currentTarget);
@@ -42,9 +42,12 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,phase,onClose,onShare
  const southPath=data.map((d,i)=>`${i?'L':'M'} ${x(i)} ${y(d.south)}`).join(' ');
  const riverFill=`${northPath} ${[...data].reverse().map((d,ri)=>`L ${x(data.length-1-ri)} ${y(d.south)}`).join(' ')} Z`;
  const share=async()=>{if(!canBenefit||phase!=='investment'||busy)return;setBusy(true);setMessage('');try{const result=await onShare(sourceSiteId,targetSiteId,domain);setMessage(result.message||'Knowledge shared.');}finally{setBusy(false)}};
+ const knowledgeExplanation=mode==='newbie'
+   ? 'Each dot is that site’s Team Capability in the domain. The green banks show the weakest and strongest sites. The blue river is the internal sharing opportunity: close that gap before assuming the answer has to come from outside.'
+   : 'Each dot is a site’s strongest locally available knowledge in that domain — Team Capability or Local Codified Knowledge, whichever is higher. The green banks show the weakest and strongest sites. The blue river is the internal sharing opportunity: close that gap before assuming the answer has to come from outside.';
  return <div className="fixed inset-0 z-[220] bg-black/75 backdrop-blur-sm p-4 grid place-items-center" role="dialog" aria-modal="true" aria-label="River diagram">
    <div className="w-full max-w-6xl max-h-[96vh] overflow-auto rounded-3xl border border-slate-600 bg-[#0b1020] shadow-2xl p-5">
-    <div className="flex items-start justify-between gap-4"><div><div className="text-[10px] uppercase tracking-[0.18em] text-sky-300 font-black">Business intelligence · River Diagram</div><h2 className="text-2xl font-black text-white">Where does knowledge already exist?</h2><p className="text-sm text-slate-300 mt-1 max-w-4xl">Each dot is a site’s strongest locally available knowledge in that domain — Team Capability or Local Codified Knowledge, whichever is higher. The green banks show the weakest and strongest sites. The blue river is the internal sharing opportunity: close that gap before assuming the answer has to come from outside.</p></div><button onClick={onClose} className="rounded-xl border border-slate-700 bg-slate-900 p-2 text-white" aria-label="Close river diagram"><X className="w-5 h-5"/></button></div>
+    <div className="flex items-start justify-between gap-4"><div><div className="text-[10px] uppercase tracking-[0.18em] text-sky-300 font-black">Business intelligence · River Diagram</div><h2 className="text-2xl font-black text-white">Where does knowledge already exist?</h2><p className="text-sm text-slate-300 mt-1 max-w-4xl">{knowledgeExplanation}</p></div><button onClick={onClose} className="rounded-xl border border-slate-700 bg-slate-900 p-2 text-white" aria-label="Close river diagram"><X className="w-5 h-5"/></button></div>
     <div className="mt-4 grid lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
      <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3 overflow-hidden">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[440px]" role="img" aria-label="River diagram showing site knowledge scores by domain">
