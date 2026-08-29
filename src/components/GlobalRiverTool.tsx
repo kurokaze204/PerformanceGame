@@ -7,10 +7,22 @@ import { RiverDiagramOverlay } from './RiverDiagramOverlay.tsx';
 export const GlobalRiverTool:React.FC=()=>{
  const [session,setSession]=useState<GameSessionV2|null>(null);
  const [open,setOpen]=useState(false);
- const sessionId=typeof window!=='undefined'?localStorage.getItem('tpg_session_id'):null;
- const companyId=typeof window!=='undefined'?localStorage.getItem('tpg_company_id'):null;
+ const [sessionId,setSessionId]=useState<string|null>(()=>typeof window!=='undefined'?localStorage.getItem('tpg_session_id'):null);
+ const [companyId,setCompanyId]=useState<string|null>(()=>typeof window!=='undefined'?localStorage.getItem('tpg_company_id'):null);
  useEffect(()=>{
-  if(!sessionId)return;
+  const sync=()=>{
+   const nextSession=localStorage.getItem('tpg_session_id');
+   const nextCompany=localStorage.getItem('tpg_company_id');
+   setSessionId(current=>current===nextSession?current:nextSession);
+   setCompanyId(current=>current===nextCompany?current:nextCompany);
+  };
+  sync();
+  const timer=window.setInterval(sync,500);
+  window.addEventListener('storage',sync);
+  return()=>{window.clearInterval(timer);window.removeEventListener('storage',sync)};
+ },[]);
+ useEffect(()=>{
+  if(!sessionId){setSession(null);return;}
   let cancelled=false;
   fetch(`/api/sessions/${sessionId}`).then(r=>r.ok?r.json():null).then(data=>{if(!cancelled&&data)setSession(data)}).catch(()=>undefined);
   const stream=new EventSource(`/api/sessions/${sessionId}/stream`);
