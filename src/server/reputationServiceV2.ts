@@ -1,3 +1,4 @@
+import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { captureResolvedEvent } from './analyticsHooksV2.ts';
 import { getSessionV2, logGameEvent, saveSessionV2 } from './dbV2.ts';
 
@@ -37,6 +38,9 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
   const event = (session.activeEvents[company.id] || []).find((e) => e.instanceId === eventInstanceId);
   if (!event) return { success: false, message: 'Event not found.', session };
   if (event.isResolved) return { success: false, message: 'This event is already resolved.', session };
+  if (event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)) {
+    return { success: false, message: 'This opening learning challenge is intentionally limited to knowledge already accessible at the site. Other rescue routes become part of play after this learning step.', session };
+  }
 
   company.reputationPoints -= 1;
   event.reputationUsed = true;
