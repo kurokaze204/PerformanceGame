@@ -37,9 +37,9 @@ export interface SimulationConfig {
   event_die:number;
   cost_die:number;
   resolution_offset:number;
-  event_value_growth_factor:number;
-  event_difficulty_growth_per_move:number;
-  event_initial_impact_multiplier:number;
+  event_value_growth_factor?:number;
+  event_difficulty_growth_per_move?:number;
+  event_initial_impact_multiplier?:number;
   absorptive_capacity_bonus:number;
   expert_support_bonus:number;
   cop_support_bonus:number;
