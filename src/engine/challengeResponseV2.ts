@@ -9,7 +9,7 @@ import {
   resolveSingleEventV2,
   validateEventAllocationV2,
 } from './coreV2.ts';
-import { copMembershipActiveV4 } from './investmentActionsV4.ts';
+import { copMembershipActiveV4, recordPublicationEvidenceV4 } from './investmentActionsV4.ts';
 import { expertCurveModifier } from './learningCurveBalanceV1.ts';
 
 export interface ExplicitSourceValues {
@@ -96,6 +96,11 @@ export function resolveSingleEventExplicitV2(sessionInput: GameSessionV2, compan
     if (travelCorrection !== 0) { if (event.card.scope === 'local' && event.targetSiteId) { const target = company.sites.find((site) => site.id === event.targetSiteId && !site.isClosed); if (target) applySiteDelta(company, target, -travelCorrection); } else applyCompanyDelta(company, -travelCorrection); result.interventionCost += travelCorrection; }
     for (const requirement of event.card.domains) { const allocation = event.allocations[requirement.domain]; if (allocation?.expertId) allocation.expertTravelCost = plannedTravelByExpert.get(allocation.expertId) || 0; }
     const normalized = result.domainResults.map((domainResult: any) => { const domain = domainResult.domain as KnowledgeDomain; const penalty = penalties.get(domain) || 0; const modifier = expertModifiers.get(domain) || 0; const sources = sourceSnapshots.get(domain)!; const originalDifficulty = originalDifficulties.get(domain) ?? domainResult.difficulty; const totalKnowledge = Math.max(0, domainResult.totalKnowledge - penalty + modifier); const requiredTotal = originalDifficulty + session.config.resolution_offset; const achievedTotal = domainResult.dieRoll + totalKnowledge; return { ...domainResult, baseKnowledge: sources.selectedBaseKnowledge, usableIntranet: sources.selectedUsableIntranet, team: sources.selectedTeam, localCodified: sources.selectedLocalCodified, expertCurveModifier: modifier, totalKnowledge, difficulty: originalDifficulty, requiredTotal, achievedTotal, explanation: `Selected knowledge ${totalKnowledge}; rolled ${domainResult.dieRoll}; needed ${requiredTotal}.` }; });
-    event.domainResults = normalized; result.domainResults = normalized; recalculateCompanySPOFV2(company, session.config); return result;
+    event.domainResults = normalized;
+    result.domainResults = normalized;
+    const highValueEvidence = event.card.tags?.some((tag) => ['critical','safety','site-threatening','specialist','novel'].includes(tag)) ? 2 : 1;
+    for (const requirement of event.card.domains) recordPublicationEvidenceV4(company, requirement.domain, highValueEvidence);
+    recalculateCompanySPOFV2(company, session.config);
+    return result;
   } finally { if (temporaryCopMemberships.length) session.copMemberships = session.copMemberships.filter((m) => !temporaryCopMemberships.includes(m)); for (const requirement of event.card.domains) { const original = originalDifficulties.get(requirement.domain); if (original != null) requirement.difficulty = original; } }
 }
