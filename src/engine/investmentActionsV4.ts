@@ -21,6 +21,24 @@ const cityDistances = AUSTRALIAN_CITIES.flatMap((a, i) => AUSTRALIAN_CITIES.slic
 const minCityDistance = Math.min(...cityDistances);
 const maxCityDistance = Math.max(...cityDistances);
 
+// Deliberately kept as hidden engine state: players should learn "publish recurring or
+// critical knowledge", not learn another meter. Evidence is created by using knowledge
+// in work, sharing it, or reflecting on it. The UI only needs to explain the rule.
+export function publicationEvidenceV4(company: CompanyV2, domain: KnowledgeDomain): number {
+  const store = ((company as any).publicationEvidence ??= {});
+  return Math.max(0, Number(store[domain] || 0));
+}
+
+export function recordPublicationEvidenceV4(company: CompanyV2, domain: KnowledgeDomain, amount = 1): number {
+  const store = ((company as any).publicationEvidence ??= {});
+  store[domain] = Math.max(0, Number(store[domain] || 0) + amount);
+  return store[domain];
+}
+
+export function intranetKnowledgeReadyV4(company: CompanyV2, domain: KnowledgeDomain): boolean {
+  return publicationEvidenceV4(company, domain) >= 2;
+}
+
 export function expertTravelCostV4(from: string, target?: string): number {
   if (!target || from === target) return 0;
   const a = cityPoint(from); const b = cityPoint(target);
@@ -78,8 +96,6 @@ function spendSite(company: CompanyV2, siteId: string, amount: number) {
   recalcTurnover(company);
 }
 
-// Invest actions consume Actions and money, not an Expert's whole round. An Expert
-// can therefore participate in multiple Invest interventions while they remain employed.
 function expertAvailable(expert: CompanyV2['experts'][number]) {
   return !expert.isVacant;
 }
@@ -113,6 +129,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const travelCost = expertTravelCostV4(expert.location, site.id);
     const totalCost = baseCost + travelCost;
     site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
+    recordPublicationEvidenceV4(company, domain, 1);
     const investmentAttribution = finish(totalCost, site.id);
     return { success: true, message: `${site.name} ${domain} Team Capability increased to ${site.teamCapability[domain]}. Cost $${totalCost}k${travelCost ? ` including $${travelCost}k travel` : ''}.`, costTurnover: totalCost, travelCost, investmentAttribution };
   }
@@ -148,6 +165,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
 
   if (type === 'UPDATE_INTRANET') {
     if (!domain) return { success: false, message: 'Choose a domain.' };
+    if (!intranetKnowledgeReadyV4(company, domain)) return { success: false, message: 'This knowledge has not yet demonstrated enough recurring or critical value to justify corporate publication. Use it in work, share it, or run an AAR first.' };
     const remaining = session.config.max_intranet_domain_growth_per_round - company.intranetRoundGrowth[domain];
     if (remaining <= 0) return { success: false, message: 'This Intranet domain has reached its growth limit for the round.' };
     const expertSkills = company.experts.flatMap((e) => !e.isVacant ? e.domains.filter((x) => x.domain === domain).map((x) => ({ score: x.score, atHQ: e.location === 'HQ' })) : []);
@@ -173,6 +191,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (event.card.scope === 'local' && event.targetSiteId !== site.id) return { success: false, message: 'A local challenge can only generate Lessons Learned at the site where it occurred.' };
     if (learningTarget === 'team') site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
     else site.codifiedKnowledge[domain] = Math.min(6, site.codifiedKnowledge[domain] + 1);
+    recordPublicationEvidenceV4(company, domain, 2);
     event.experientialLearningAwarded = true;
     const investmentAttribution = finish(baseCost, site.id);
     return { success: true, message: `AAR on “${event.card.title}” increased ${site.name} ${domain} ${learningTarget === 'team' ? 'Team Capability' : 'Codified Knowledge'} +1. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution, eventInstanceId };
