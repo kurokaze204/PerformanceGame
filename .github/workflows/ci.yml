@@ -16,6 +16,7 @@ jobs:
       - run: bun run test:core
       - run: bun run test:balance
       - run: bun run test:balance:team
+      - run: bun run test:balance:strategy
       - name: Upload balance study results
         uses: actions/upload-artifact@v4
         with:
