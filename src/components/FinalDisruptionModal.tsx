@@ -68,7 +68,7 @@ export const FinalDisruptionModal: React.FC<FinalDisruptionModalProps> = ({
           </div>
           {isResolved ? (
             <button onClick={onOpenAAR} className="rounded-xl border border-indigo-600 bg-indigo-950 px-4 py-2.5 text-xs font-black text-indigo-100 flex items-center gap-2 shrink-0">
-              <BookOpen className="w-4 h-4" /> Executive AAR
+              <BookOpen className="w-4 h-4" /> Start After Action Review
             </button>
           ) : (
             <div className="rounded-xl border border-violet-700 bg-violet-950/50 px-3 py-2 text-right shrink-0">
@@ -189,7 +189,7 @@ export const FinalDisruptionModal: React.FC<FinalDisruptionModalProps> = ({
                   </tbody>
                 </table>
               </div>
-              <button onClick={onOpenAAR} className="mt-4 w-full rounded-xl border border-indigo-600 bg-indigo-950 px-4 py-3 font-black text-indigo-100 flex items-center justify-center gap-2"><BookOpen className="w-4 h-4"/>OPEN EXECUTIVE AAR</button>
+              <button onClick={onOpenAAR} className="mt-4 w-full rounded-xl border border-indigo-500 bg-indigo-600 px-4 py-3.5 font-black text-white flex items-center justify-center gap-2"><BookOpen className="w-4 h-4"/>START AFTER ACTION REVIEW</button>
             </section>
           </div>
         )}
