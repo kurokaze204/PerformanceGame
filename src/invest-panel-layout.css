@@ -1,0 +1,4 @@
+/* Keep the normal board phase/status row visible while the full-screen Invest workspace is open. */
+[aria-label="Investment actions"] {
+  top: 146px !important;
+}
