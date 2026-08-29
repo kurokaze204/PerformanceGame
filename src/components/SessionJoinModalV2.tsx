@@ -25,6 +25,8 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
   const [actionsPerRound, setActionsPerRound] = useState(defaultActionsForMode('newbie'));
   const selectExperienceMode=(next:ExperienceMode)=>{setExperienceMode(next);setActionsPerRound(defaultActionsForMode(next));};
   const options = { experienceMode, gameDurationMinutes: duration, maxPlayersPerCompany: maxPlayers, actionsPerRound };
+  const hasName = playerName.trim().length > 0;
+  const rememberName = () => { try { localStorage.setItem('tpg_entered_player_name', playerName.trim()); } catch { /* ignore */ } };
 
   return <div className="fixed inset-0 z-[250] bg-[#080b12]/95 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="join-title">
     <div className="w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-slate-200">
@@ -36,19 +38,22 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
       </div>
 
       {mode==='join'&&<div className="mt-5 space-y-3">
-        <Field label="Your name"><input value={playerName} onChange={e=>setPlayerName(e.target.value)} className="control" placeholder="e.g. Sarah Jenkins"/></Field>
+        <Field label="Your name"><input required value={playerName} onChange={e=>setPlayerName(e.target.value)} className="control" placeholder="e.g. Sarah Jenkins"/></Field>
         <Field label="Game code"><input value={sessionId} onChange={e=>setSessionId(e.target.value.toUpperCase())} className="control" placeholder="e.g. KM2026"/></Field>
-        <button onClick={()=>sessionId.trim()&&onJoinSession(sessionId.trim(),' ',playerName||'Player')} className="primary">CONNECT TO GAME <ArrowRight className="w-4 h-4"/></button>
+        <button disabled={!hasName||!sessionId.trim()} onClick={()=>{rememberName();onJoinSession(sessionId.trim(),' ',playerName.trim())}} className="primary disabled:opacity-40 disabled:cursor-not-allowed">CONNECT TO GAME <ArrowRight className="w-4 h-4"/></button>
+        {!hasName&&<p className="text-[11px] text-amber-300">Enter your name before connecting. It is used to identify you to your team and in the game record.</p>}
         <p className="text-[11px] text-slate-500">If you do not choose a company, the game assigns you to the smallest available team.</p>
       </div>}
 
       {mode==='current'&&currentSession&&<div className="mt-5 space-y-3">
-        <Field label="Your name"><input value={playerName} onChange={e=>setPlayerName(e.target.value)} className="control" placeholder="e.g. Sarah Jenkins"/></Field>
+        <Field label="Your name"><input required value={playerName} onChange={e=>setPlayerName(e.target.value)} className="control" placeholder="e.g. Sarah Jenkins"/></Field>
         <div><div className="label">Choose a company</div><div className="space-y-1.5 mt-1 max-h-48 overflow-auto">{currentSession.companies.map(c=><button key={c.id} onClick={()=>setCompanyId(c.id)} className={`w-full rounded-xl border p-3 text-left flex justify-between items-center ${companyId===c.id?'border-indigo-400 bg-indigo-950/60':'border-slate-700 bg-slate-950'}`}><span><b className="text-white">{c.name}</b><span className="block text-[10px] text-slate-500">{c.sites.length} sites · {c.experts.length} Experts · {formatCurrency(c.turnover)}</span></span><Building2 className="w-4 h-4 text-indigo-300"/></button>)}</div></div>
-        <button onClick={()=>onJoinSession(currentSession.id,companyId,playerName||'Player')} className="primary">ENTER GAME <ArrowRight className="w-4 h-4"/></button>
+        <button disabled={!hasName||!companyId} onClick={()=>{rememberName();onJoinSession(currentSession.id,companyId,playerName.trim())}} className="primary disabled:opacity-40 disabled:cursor-not-allowed">ENTER GAME <ArrowRight className="w-4 h-4"/></button>
+        {!hasName&&<p className="text-[11px] text-amber-300">Enter your name before entering the game.</p>}
       </div>}
 
       {mode==='create'&&<div className="mt-5 space-y-4">
+        <Field label="Your name"><input required value={playerName} onChange={e=>setPlayerName(e.target.value)} className="control" placeholder="e.g. Sarah Jenkins"/></Field>
         <div className="grid grid-cols-2 gap-3"><Field label="Game name"><input value={name} onChange={e=>setName(e.target.value)} className="control"/></Field><Field label="Companies"><select value={companyCount} onChange={e=>setCompanyCount(Number(e.target.value))} className="control">{[1,2,3,4,5,6,7,8].map(n=><option key={n} value={n}>{n} {n===1?'company':'companies'}</option>)}</select></Field></div>
         <div><div className="label">Player experience</div><div className="grid grid-cols-2 gap-2 mt-1">
           <button onClick={()=>selectExperienceMode('newbie')} className={`mode-card ${experienceMode==='newbie'?'selected':''}`}><GraduationCap className="w-5 h-5"/><span><b>Newbie</b><small>Guided reveal; simpler local capability model</small></span></button>
@@ -56,8 +61,9 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
         </div></div>
         <div className="grid grid-cols-3 gap-3"><Field label="Game length (minutes)"><input type="number" min={20} max={240} step={5} value={duration} onChange={e=>setDuration(Math.max(20,Number(e.target.value)))} className="control"/></Field><Field label="Max players / company"><input type="number" min={1} max={20} value={maxPlayers} onChange={e=>setMaxPlayers(Math.max(1,Number(e.target.value)))} className="control"/></Field><Field label="Actions / company / round"><input type="number" min={1} max={10} value={actionsPerRound} onChange={e=>setActionsPerRound(Math.max(1,Math.min(10,Number(e.target.value))))} className="control"/></Field></div>
         <div className="rounded-xl border border-indigo-800 bg-indigo-950/25 p-3 text-xs text-slate-300">Defaults are tuned by mode: Newbie starts at 5 Actions per company per round; Expert starts at 3 to create stronger portfolio trade-offs. The facilitator can override either value here.</div>
-        <button onClick={()=>onCreateNewSession(name,companyCount,options)} className="primary"><Sparkles className="w-4 h-4"/>LAUNCH NEW GAME</button>
-        <button onClick={()=>onSoloStart(options)} className="w-full text-xs text-indigo-300 underline">Launch a 1-company solo game with these settings</button>
+        {!hasName&&<p className="text-[11px] text-amber-300">Enter your name before starting a game.</p>}
+        <button disabled={!hasName} onClick={()=>{rememberName();onCreateNewSession(name,companyCount,options)}} className="primary disabled:opacity-40 disabled:cursor-not-allowed"><Sparkles className="w-4 h-4"/>LAUNCH NEW GAME</button>
+        <button disabled={!hasName} onClick={()=>{rememberName();onSoloStart(options)}} className="w-full text-xs text-indigo-300 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Launch a 1-company solo game with these settings</button>
       </div>}
     </div>
   </div>;
