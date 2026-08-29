@@ -11,7 +11,8 @@
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
     "test:core": "tsx scripts/core-smoke.ts && tsx scripts/progression-smoke.ts",
-    "test:balance": "tsx scripts/balance-study.ts"
+    "test:balance": "tsx scripts/balance-study.ts",
+    "test:balance:team": "tsx scripts/team-balance-study.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
