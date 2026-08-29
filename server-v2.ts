@@ -23,7 +23,7 @@ import {
   timerPauseV2,
   timerResetV2,
   timerStartV2,
-} from './src/server/gameServiceV2.ts';
+} from './src/server/gameServiceV5.ts';
 import {
   captureKnowledgeAction,
   captureResolvedEvent,
@@ -146,7 +146,6 @@ async function startServer() {
       const companyBefore = before.companies.find((c) => c.id === req.body?.companyId);
       const eventBefore = companyBefore ? (before.activeEvents[companyBefore.id] || []).find((e) => e.instanceId === req.body?.eventInstanceId) : undefined;
       const probability = companyBefore && eventBefore ? committedProbability(before, companyBefore, eventBefore) : 0;
-
       const result = await resolveEventV2(req.params.id, req.body?.companyId, req.body?.eventInstanceId);
       if (result.success) {
         const company = result.session.companies.find((c) => c.id === req.body?.companyId);
@@ -240,11 +239,7 @@ async function startServer() {
 
   app.post('/api/ai/debrief', async (req, res) => {
     const logs = await getGameEventLogs(String(req.body?.sessionId || 'KM2026').toUpperCase());
-    res.json({
-      summary: 'Use the evidence to ask what was planned, what happened, why it differed, and what the team would do better.',
-      facilitatorQuestions: ['What was planned?', 'What actually happened?', 'Why was there a difference?', 'What would you do better next time?'],
-      recordedEvents: logs.length,
-    });
+    res.json({ summary: 'Use the evidence to ask what was planned, what happened, why it differed, and what the team would do better.', facilitatorQuestions: ['What was planned?', 'What actually happened?', 'Why was there a difference?', 'What would you do better next time?'], recordedEvents: logs.length });
   });
 
   if (process.env.NODE_ENV !== 'production') {
