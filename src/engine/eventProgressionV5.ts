@@ -1,4 +1,4 @@
-import type { ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
+import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import type { DomainScoreMap, EventCard, EventType, KnowledgeDomain, SimulationConfig, Site } from '../types/game.ts';
 
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
@@ -36,23 +36,20 @@ function pickProgressionCard(type:EventType, moveNumber:number, fallback:EventCa
 
 export function progressEventCard(fallback:EventCard, moveNumber:number, config:SimulationConfig):EventCard {
   const card=pickProgressionCard(fallback.type,moveNumber,fallback);
-  const valueFactor=Math.pow(config.event_value_growth_factor,Math.max(0,moveNumber-1));
-  const startingMultiplier=moveNumber<=2?1:config.event_initial_impact_multiplier;
+  const growth=config.event_value_growth_factor ?? 1.8;
+  const difficultyGrowth=config.event_difficulty_growth_per_move ?? 0.75;
+  const initialMultiplier=config.event_initial_impact_multiplier ?? 0.12;
+  const valueFactor=Math.pow(growth,Math.max(0,moveNumber-1));
+  const startingMultiplier=moveNumber<=2?1:initialMultiplier;
   card.impact=Math.max(5,Math.round(card.impact*startingMultiplier*valueFactor));
-  card.domains=card.domains.map(req=>({
-    ...req,
-    difficulty:Math.max(1,Math.round(req.difficulty+(moveNumber-1)*config.event_difficulty_growth_per_move)),
-  }));
+  card.domains=card.domains.map(req=>({ ...req, difficulty:Math.max(1,Math.round(req.difficulty+(moveNumber-1)*difficultyGrowth)) }));
   const tier=moveNumber<=2?'LEARNING':moveNumber<=4?'MATERIAL':moveNumber<=6?'HIGH STAKES':'CRITICAL';
   card.title=`${tier}: ${card.title}`;
   card.description=`${card.description} This is move ${moveNumber}; the financial stakes and knowledge difficulty are deliberately higher as the game progresses.`;
   return card;
 }
 
-function chooseSite(company:CompanyV2):Site|undefined {
-  const active=company.sites.filter(s=>!s.isClosed);
-  return active.length?pick(active):undefined;
-}
+function chooseSite(company:CompanyV2):Site|undefined { const active=company.sites.filter(s=>!s.isClosed); return active.length?pick(active):undefined; }
 
 export function applyProgressionToCurrentEvents(session:GameSessionV2, company:CompanyV2):void {
   const events=session.activeEvents[company.id]||[];
@@ -81,9 +78,6 @@ function diversifyMap(map:DomainScoreMap):void {
 }
 
 export function diversifyInitialKnowledge(company:CompanyV2):void {
-  for(const site of company.sites){
-    diversifyMap(site.teamCapability);
-    diversifyMap(site.codifiedKnowledge);
-  }
+  for(const site of company.sites){ diversifyMap(site.teamCapability); diversifyMap(site.codifiedKnowledge); }
   diversifyMap(company.intranet);
 }
