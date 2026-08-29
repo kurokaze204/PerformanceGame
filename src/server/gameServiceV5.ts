@@ -71,7 +71,7 @@ export async function initializeDefaultSessionV2():Promise<GameSessionV2>{
 }
 
 export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
-  if(payload?.type!=='KNOWLEDGE_TRANSFER')return baseKnowledgeActionV2(sessionId,companyId,payload);
+  if(payload?.type!=='SITE_KNOWLEDGE_SHARING')return baseKnowledgeActionV2(sessionId,companyId,payload);
   const session=await baseGetSessionV2(sessionId.toUpperCase());
   if(!session)return{success:false,message:'Session not found.'};
   const company=session.companies.find(c=>c.id===companyId);
