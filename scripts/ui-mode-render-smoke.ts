@@ -30,7 +30,7 @@ for(const mode of ['newbie','expert'] as const){
   assert.equal(challenge.includes('Local Codified'),false,'Newbie Challenge UI must not expose Local Codified Knowledge');
   assert.ok(actions.includes('Actions'),'Newbie Invest UI should still show Actions');
  }else{
-  assert.ok(actions.includes('Local Codified Knowledge'),'Expert AAR UI should retain the tacit/codified distinction');
+  assert.ok(actions.includes('Codify Site Knowledge'),'Expert Invest UI should retain site codification as a distinct intervention');
   assert.ok(challenge.includes('Local Codified'),'Expert Challenge UI should retain Local Codified Knowledge');
  }
 }
