@@ -1,157 +1,25 @@
-import React from 'react';
-import { GameSession, Company, DOMAIN_INFO } from '../types/game.ts';
+import React, { useMemo, useState } from 'react';
+import { AlertTriangle, BookOpen, Building2, Dices, Flame, ShieldCheck, Sparkles } from 'lucide-react';
+import type { KnowledgeDomain } from '../types/game.ts';
+import { DOMAIN_INFO } from '../types/game.ts';
+import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { formatCurrency } from '../utils/format.ts';
-import {
-  AlertTriangle,
-  Flame,
-  ShieldCheck,
-  Building2,
-  TrendingDown,
-  TrendingUp,
-  Award,
-  BookOpen,
-  CheckCircle2,
-  XCircle,
-  Dices
-} from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-interface FinalDisruptionModalProps {
-  session: GameSession;
-  company: Company;
-  onResolveFinalDisruption: () => void;
-  onOpenAAR: () => void;
-}
+interface FinalDisruptionModalProps { session: GameSessionV2; company: CompanyV2; onResolveFinalDisruption: () => Promise<void> | void; onOpenAAR: () => void; }
+const bestLocal=(company:CompanyV2,domain:KnowledgeDomain)=>Math.max(0,...company.sites.filter(s=>!s.isClosed).map(s=>Math.max(s.teamCapability[domain]||0,s.codifiedKnowledge[domain]||0)));
+const bestExpert=(company:CompanyV2,domain:KnowledgeDomain)=>Math.max(0,...company.experts.filter(e=>!e.isVacant).flatMap(e=>e.domains.filter(d=>d.domain===domain).map(d=>d.score)));
 
-export const FinalDisruptionModal: React.FC<FinalDisruptionModalProps> = ({
-  session,
-  company,
-  onResolveFinalDisruption,
-  onOpenAAR,
-}) => {
-  const card = session.finalDisruptionCard;
-  const isResolved = session.finalDisruptionResolved;
-
-  return (
-    <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm space-y-4 text-[#c9d1d9]">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[#30363d]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#21262d] border border-[#30363d] flex items-center justify-center text-purple-400 font-bold shadow-inner">
-            <Flame className="w-5 h-5 text-purple-400 animate-pulse" />
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-purple-950/80 border border-purple-700/60 text-purple-300 font-bold">
-              ROUND 6 • CLIMAX GAME EVENT
-            </span>
-            <h2 className="text-sm font-bold text-white tracking-tight font-mono mt-0.5">
-              THE FINAL DISRUPTION EVENT
-            </h2>
-          </div>
-        </div>
-
-        {isResolved ? (
-          <button
-            onClick={onOpenAAR}
-            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-semibold rounded-lg shadow-xs flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>OPEN EXECUTIVE AAR DEBRIEF</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => {
-              onResolveFinalDisruption();
-              confetti({ particleCount: 50, spread: 80, origin: { y: 0.6 } });
-            }}
-            className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-semibold rounded-lg shadow-xs flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap"
-          >
-            <Dices className="w-3.5 h-3.5" />
-            <span>RESOLVE FINAL DISRUPTION (ALL COMPANIES)</span>
-          </button>
-        )}
-      </div>
-
-      {/* Disruption Card Presentation */}
-      {card && (
-        <div className="p-3.5 bg-[#0d1117] border border-purple-700/60 rounded-lg space-y-3">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold font-mono text-purple-400 uppercase tracking-wider">
-                Systemic Macro Disruption
-              </span>
-              <span className="text-xs font-mono font-bold text-rose-400">
-                Failure Impact: -{formatCurrency(card.impact || 500)} Turnover
-              </span>
-            </div>
-            <h3 className="text-sm font-bold text-white tracking-tight font-mono mt-0.5">{card.title}</h3>
-            <p className="text-xs text-[#8b949e] leading-relaxed mt-1">{card.description}</p>
-          </div>
-
-          {/* Required Domains */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-            {card.domains.map((d) => (
-              <div key={d.domain} className="p-2.5 bg-[#161b22] rounded-lg border border-[#30363d] space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: DOMAIN_INFO[d.domain].color }} />
-                  <span className="text-xs font-semibold text-white">{DOMAIN_INFO[d.domain].label}</span>
-                </div>
-                <div className="text-[11px] text-[#8b949e] flex items-center justify-between">
-                  <span>Required Difficulty:</span>
-                  <strong className="text-indigo-300 font-mono">Level {d.difficulty}</strong>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Companies Outcome Comparison Table (if resolved) */}
-      {isResolved && (
-        <div className="space-y-2 pt-1">
-          <h3 className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider font-mono">
-            Comparative Final Performance & Resilience
-          </h3>
-
-          <div className="overflow-x-auto border border-[#30363d] rounded-lg bg-[#0d1117]">
-            <table className="w-full text-left text-xs font-mono border-collapse">
-              <thead>
-                <tr className="border-b border-[#30363d] text-[#8b949e] text-[10px] uppercase bg-[#161b22]">
-                  <th className="py-2 px-3">Company</th>
-                  <th className="py-2 px-3">Final Turnover</th>
-                  <th className="py-2 px-3">Surviving Sites</th>
-                  <th className="py-2 px-3">Intranet Mean</th>
-                  <th className="py-2 px-3">Automated Domains</th>
-                  <th className="py-2 px-3 text-right">Disruption Outcome</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#30363d]/60">
-                {session.companies.map((comp) => {
-                  const activeSites = comp.sites.filter((s) => !s.isClosed).length;
-                  const intranetMean = (
-                    (Object.values(comp.intranet) as number[]).reduce((a, b) => a + b, 0) / 5
-                  ).toFixed(1);
-
-                  return (
-                    <tr key={comp.id} className="hover:bg-[#161b22] transition">
-                      <td className="py-2 px-3 font-bold text-white">{comp.name}</td>
-                      <td className="py-2 px-3 font-mono font-bold text-emerald-400">{formatCurrency(comp.turnover)}</td>
-                      <td className="py-2 px-3 text-[#8b949e]">{activeSites}/6 Sites</td>
-                      <td className="py-2 px-3 font-mono text-purple-300">Level {intranetMean}</td>
-                      <td className="py-2 px-3 text-[#8b949e]">{comp.automatedDomains.length} Domains</td>
-                      <td className="py-2 px-3 text-right">
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 font-bold font-mono">
-                          SURVIVED
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+export const FinalDisruptionModal:React.FC<FinalDisruptionModalProps>=({session,company,onResolveFinalDisruption,onOpenAAR})=>{
+ const card=session.finalDisruptionCard;const isResolved=Boolean(session.finalDisruptionResolved);const[busy,setBusy]=useState(false);const domains=card?.domains||[];const riskPercent=card&&company.turnover>0?Math.round((card.impact/company.turnover)*100):0;
+ const intranetMean=useMemo(()=>{const values=Object.values(company.intranet) as number[];return values.length?(values.reduce((a,b)=>a+b,0)/values.length).toFixed(1):'0.0'},[company.intranet]);
+ if(!card)return null;
+ const resolve=async()=>{if(busy||isResolved)return;setBusy(true);try{await onResolveFinalDisruption();if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches)confetti({particleCount:70,spread:90,origin:{y:.62}})}finally{setBusy(false)}};
+ return <div className="fixed left-3 right-3 top-[94px] bottom-3 z-[170] rounded-3xl border-2 border-violet-700 bg-[#080b12]/[0.99] shadow-2xl p-4 overflow-hidden text-slate-200" role="dialog" aria-modal="true" aria-labelledby="climactic-title"><div className="h-full flex flex-col min-h-0">
+  <div className="flex items-start justify-between gap-4 shrink-0 pb-3 border-b border-slate-800"><div className="flex items-center gap-3 min-w-0"><div className="w-11 h-11 shrink-0 rounded-xl border border-violet-600 bg-violet-950 grid place-items-center shadow-lg shadow-violet-950/50"><Flame className="w-6 h-6 text-violet-300" aria-hidden="true"/></div><div className="min-w-0"><div className="text-[10px] uppercase tracking-[0.18em] text-violet-300 font-black">Round {session.round} · Climactic Event</div><h2 id="climactic-title" className="text-2xl font-black text-white">The final disruption</h2><p className="text-xs text-slate-400 mt-0.5">This is the cumulative test of the knowledge capability you built during the game.</p></div></div>{isResolved?<button onClick={onOpenAAR} className="rounded-xl border border-indigo-600 bg-indigo-950 px-4 py-2.5 text-xs font-black text-indigo-100 flex items-center gap-2 shrink-0"><BookOpen className="w-4 h-4"/>Start After Action Review</button>:<div className="rounded-xl border border-violet-700 bg-violet-950/50 px-3 py-2 text-right shrink-0"><div className="text-[9px] uppercase text-violet-300 font-black">Final test</div><div className="text-sm font-black text-white">No new investment</div></div>}</div>
+  {!isResolved?<div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-4 mt-4 min-h-0 flex-1"><div className="space-y-3 min-h-0"><section className="rounded-2xl overflow-hidden border-2 border-rose-700/80 bg-slate-950 shadow-2xl"><div className="px-5 py-4 bg-gradient-to-r from-rose-950 via-violet-950/60 to-slate-950"><div className="flex justify-between gap-4"><div className="min-w-0"><div className="text-[9px] uppercase tracking-wider font-black text-white/60">Climactic event · Whole company</div><h3 className="text-2xl font-black text-white mt-1">{card.title}</h3><p className="text-sm text-slate-300 mt-2 leading-relaxed">{card.description}</p></div><div className="text-right shrink-0"><div className="text-[9px] uppercase text-slate-500 font-black">Loss if failed</div><div className="text-2xl font-black text-rose-200">−{formatCurrency(card.impact)}</div><div className="text-[10px] text-slate-400">{riskPercent}% of current turnover</div></div></div></div><div className="p-4 border-t border-slate-800"><div className="text-[10px] uppercase tracking-wider text-slate-500 font-black mb-2">Knowledge required</div><div className={`grid gap-2 ${domains.length>=3?'grid-cols-3':domains.length===2?'grid-cols-2':'grid-cols-1'}`}>{domains.map(d=><div key={d.domain} className="rounded-xl border border-slate-700 bg-slate-900 p-3"><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:DOMAIN_INFO[d.domain].color}} aria-hidden="true"/><b className="text-sm text-white">{DOMAIN_INFO[d.domain].label}</b></div><div className="mt-2 flex justify-between items-end"><span className="text-[9px] uppercase text-slate-500 font-black">Difficulty</span><span className="text-xl font-black text-indigo-200">{d.difficulty}</span></div></div>)}</div></div></section><div className="rounded-2xl border border-amber-700/60 bg-amber-950/20 px-4 py-3 flex items-start gap-3"><AlertTriangle className="w-5 h-5 text-amber-300 shrink-0 mt-0.5"/><div><div className="text-sm font-black text-amber-100">You cannot buy your way out now.</div><div className="text-xs text-amber-100/70 mt-0.5">The climactic event tests the corporate, local, expert, network and embedded capability you built through the earlier rounds.</div></div></div></div>
+   <aside className="rounded-2xl border-2 border-violet-500 bg-violet-950/55 p-4 shadow-xl min-h-0 overflow-auto"><div className="text-[10px] uppercase tracking-wider text-violet-300 font-black">Your capability going in</div><h3 className="text-lg font-black text-white mt-1">Final knowledge position</h3><div className="space-y-2 mt-3">{domains.map(d=>{const local=bestLocal(company,d.domain);const expert=bestExpert(company,d.domain);const corporate=company.intranet[d.domain]||0;const automated=company.automatedDomains.includes(d.domain);return <div key={d.domain} className="rounded-xl border border-violet-800 bg-slate-950/75 p-3"><div className="flex justify-between items-center gap-2"><b className="text-sm text-white">{DOMAIN_INFO[d.domain].label}</b><span className="text-xs font-black text-violet-200">Need {d.difficulty}</span></div><div className="grid grid-cols-3 gap-1.5 mt-2 text-center"><Metric label="Corporate" value={corporate}/><Metric label="Best local" value={local}/><Metric label="Best expert" value={expert}/></div><div className={`mt-2 rounded-lg px-2 py-1.5 text-[10px] font-bold ${automated?'bg-emerald-950 text-emerald-300 border border-emerald-800':'bg-slate-900 text-slate-500 border border-slate-800'}`}>{automated?<><Sparkles className="inline w-3 h-3 mr-1"/>Automation embedded in this domain</>:'No automation bonus in this domain'}</div></div>})}</div><button onClick={resolve} disabled={busy} className="mt-4 w-full rounded-xl bg-white text-slate-950 py-3.5 font-black text-sm disabled:opacity-50 flex items-center justify-center gap-2"><Dices className="w-5 h-5"/>{busy?'RESOLVING…':'RESOLVE CLIMACTIC EVENT'}</button></aside></div>
+  :<div className="mt-4 min-h-0 flex-1 grid lg:grid-cols-[340px_minmax(0,1fr)] gap-4"><section className="rounded-2xl border-2 border-emerald-600 bg-emerald-950/35 p-5"><div className="flex items-center gap-2 text-emerald-300"><ShieldCheck className="w-6 h-6"/><span className="text-xs uppercase tracking-wider font-black">Climactic event resolved</span></div><h3 className="text-2xl font-black text-white mt-3">{company.name}</h3><div className="mt-4 rounded-xl border border-slate-700 bg-slate-950 p-4"><div className="text-[10px] uppercase text-slate-500 font-black">Final turnover</div><div className="text-3xl font-black text-emerald-300 mt-1">{formatCurrency(company.turnover)}</div></div><div className="grid grid-cols-2 gap-2 mt-2"><Metric label="Surviving sites" value={company.sites.filter(s=>!s.isClosed).length}/><Metric label="Intranet mean" value={intranetMean}/></div><div className="mt-2"><Metric label="Automated domains" value={company.automatedDomains.length}/></div><p className="text-xs text-slate-400 mt-4">The final result reflects the capability and resilience accumulated across all earlier rounds.</p></section><section className="rounded-2xl border border-slate-700 bg-slate-950 p-4 overflow-auto"><div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-indigo-300"/><h3 className="text-sm font-black text-white">Final company comparison</h3></div><div className="mt-3 overflow-x-auto rounded-xl border border-slate-800"><table className="w-full text-left text-xs"><thead className="bg-slate-900 text-slate-500 uppercase text-[9px] tracking-wider"><tr><th className="px-3 py-2">Company</th><th className="px-3 py-2">Final turnover</th><th className="px-3 py-2">Sites</th><th className="px-3 py-2">Intranet mean</th><th className="px-3 py-2">Automation</th></tr></thead><tbody className="divide-y divide-slate-800">{session.companies.map(comp=>{const values=Object.values(comp.intranet) as number[];const mean=values.length?(values.reduce((a,b)=>a+b,0)/values.length).toFixed(1):'0.0';return <tr key={comp.id} className={comp.id===company.id?'bg-indigo-950/25':''}><td className="px-3 py-3 font-black text-white">{comp.name}</td><td className="px-3 py-3 font-black text-emerald-300">{formatCurrency(comp.turnover)}</td><td className="px-3 py-3 text-slate-300">{comp.sites.filter(s=>!s.isClosed).length}</td><td className="px-3 py-3 text-violet-300">{mean}</td><td className="px-3 py-3 text-slate-300">{comp.automatedDomains.length}</td></tr>})}</tbody></table></div><button onClick={onOpenAAR} className="mt-4 w-full rounded-xl border border-indigo-500 bg-indigo-600 px-4 py-3.5 font-black text-white flex items-center justify-center gap-2"><BookOpen className="w-4 h-4"/>START AFTER ACTION REVIEW</button></section></div>}
+ </div></div>;
 };
+const Metric:React.FC<{label:string;value:number|string}>=({label,value})=><div className="rounded-lg border border-slate-700 bg-slate-900 p-2 text-center"><div className="text-[8px] uppercase tracking-wide text-slate-500 font-black">{label}</div><div className="text-xl font-black text-white mt-0.5">{value}</div></div>;

@@ -1,29 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Company,
-  GameSession,
-  KnowledgeDomain,
-  DOMAIN_INFO,
-  ActionCategory,
-  ActionType,
-  Site,
-  Expert
-} from '../types/game.ts';
-import {
-  Users,
-  GraduationCap,
-  Building,
+  ArrowRight,
   BookOpen,
-  Zap,
-  RotateCcw,
+  BriefcaseBusiness,
+  Building2,
+  GraduationCap,
+  Handshake,
   Network,
-  Radio,
-  Cpu,
-  Info,
-  CheckCircle,
-  AlertTriangle,
-  ArrowRight
+  Radar,
+  Sparkles,
+  Users,
 } from 'lucide-react';
+import type { Company, GameSession, KnowledgeDomain } from '../types/game.ts';
+import { DOMAIN_INFO } from '../types/game.ts';
 
 interface ActionsPanelProps {
   session: GameSession;
@@ -32,677 +21,205 @@ interface ActionsPanelProps {
   onNextPhase: () => void;
 }
 
+type InterventionId =
+  | 'transfer'
+  | 'corporate-training'
+  | 'codify-site'
+  | 'train-expert'
+  | 'update-intranet'
+  | 'aar'
+  | 'join-cop'
+  | 'horizon-scan';
+
+type AnchorId = 'existing' | 'external' | 'expert' | 'favour' | 'network' | 'risk';
+
+type Intervention = {
+  id: InterventionId;
+  title: string;
+  description: string;
+  anchor: AnchorId;
+  icon: React.ElementType;
+};
+
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
 
-export const ActionsPanel: React.FC<ActionsPanelProps> = ({
-  session,
-  company,
-  onPerformAction,
-  onNextPhase,
-}) => {
-  const [activeCategory, setActiveCategory] = useState<ActionCategory>('DEVELOP');
+const INTERVENTIONS: Intervention[] = [
+  { id: 'transfer', title: 'Knowledge Transfer', description: 'An expert at a site transfers domain expertise directly to the local team (+1 Team Capability).', anchor: 'existing', icon: Users },
+  { id: 'corporate-training', title: 'Corporate Training', description: 'Raise Team Capability at all sites (+1) up to the Corporate Intranet score.', anchor: 'existing', icon: Building2 },
+  { id: 'codify-site', title: 'Codify Site Knowledge', description: 'Document local operating knowledge at a site (+1 Local Codified up to Team level).', anchor: 'existing', icon: BookOpen },
+  { id: 'train-expert', title: 'Train Expert', description: 'Formal training advances one expert domain score by +1. Cost is determined when committed.', anchor: 'expert', icon: GraduationCap },
+  { id: 'update-intranet', title: 'Update Corporate Intranet Domain', description: 'Capture the strongest available organisational knowledge into the corporate knowledge environment.', anchor: 'expert', icon: Building2 },
+  { id: 'aar', title: 'Lessons Learned / AAR', description: 'Spend an Action to review a relevant resolved challenge and convert experience into persistent local Team Capability or Codified Knowledge.', anchor: 'risk', icon: Sparkles },
+  { id: 'join-cop', title: 'Join Community of Practice', description: 'Commit an eligible expert to a domain Community of Practice. Cost is determined when committed.', anchor: 'network', icon: Network },
+  { id: 'horizon-scan', title: 'Horizon Scan', description: 'Scout one domain so one matching event next round can be rejected and redrawn.', anchor: 'risk', icon: Radar },
+];
 
-  // Form states
-  const [selectedSiteId, setSelectedSiteId] = useState<string>(company.sites[0]?.id || '');
-  const [selectedExpertId, setSelectedExpertId] = useState<string>(company.experts[0]?.id || '');
-  const [selectedDomain, setSelectedDomain] = useState<KnowledgeDomain>('engineering');
-  const [selectedLearningTarget, setSelectedLearningTarget] = useState<'team' | 'codified'>('team');
+const ANCHORS: { id: AnchorId; title: string; description: string; disabled?: boolean; icon: React.ElementType }[] = [
+  { id: 'existing', title: 'Use what we already know', description: 'Strengthen internal capability, codification and reuse.', icon: Building2 },
+  { id: 'external', title: 'Engage external expertise', description: 'Challenge-response mechanism only.', disabled: true, icon: BriefcaseBusiness },
+  { id: 'expert', title: 'Ask one of our experts to help', description: 'Develop or capture scarce deep expertise.', icon: Users },
+  { id: 'favour', title: 'Call in a favour', description: 'Challenge-response mechanism only.', disabled: true, icon: Sparkles },
+  { id: 'network', title: 'Ask our network for help', description: 'Invest in the relationships that make network help possible.', icon: Handshake },
+  { id: 'risk', title: 'Accept the risk', description: 'Learn from outcomes and improve anticipation of future disruption.', icon: Radar },
+];
 
-  const activeSites = company.sites.filter((s) => !s.isClosed);
-  const activeExperts = company.experts.filter((e) => !e.isVacant);
+export const ActionsPanel: React.FC<ActionsPanelProps> = ({ session, company, onPerformAction, onNextPhase }) => {
+  const [selectedId, setSelectedId] = useState<InterventionId>('transfer');
+  const [siteId, setSiteId] = useState(company.sites.find((site) => !site.isClosed)?.id || '');
+  const [expertId, setExpertId] = useState(company.experts.find((expert) => !expert.isVacant)?.id || '');
+  const [domain, setDomain] = useState<KnowledgeDomain>('engineering');
+  const [learningTarget, setLearningTarget] = useState<'team' | 'codified'>('team');
 
-  const categories: { id: ActionCategory; label: string; icon: any; color: string }[] = [
-    { id: 'DEVELOP', label: 'Develop Capability', icon: Users, color: 'text-indigo-400' },
-    { id: 'CAPTURE', label: 'Capture & Codify', icon: BookOpen, color: 'text-sky-400' },
-    { id: 'CONNECT', label: 'Connect & Relate', icon: Network, color: 'text-amber-400' },
-    { id: 'EMBED', label: 'Embed Automation', icon: Cpu, color: 'text-emerald-400' },
-    { id: 'DIAGNOSE', label: 'Diagnose & Audit', icon: Info, color: 'text-purple-400' },
-  ];
+  const activeSites = company.sites.filter((site) => !site.isClosed);
+  const activeExperts = company.experts.filter((expert) => !expert.isVacant && (expert.state === 'Available' || expert.state === 'HQ Assignment'));
+  const selected = INTERVENTIONS.find((item) => item.id === selectedId) || INTERVENTIONS[0];
+  const selectedSite = activeSites.find((site) => site.id === siteId) || activeSites[0];
+  const selectedExpert = activeExperts.find((expert) => expert.id === expertId) || activeExperts[0];
+
+  const learningDomains = useMemo<KnowledgeDomain[]>(() => {
+    if (selectedId !== 'aar' || !selectedSite) return DOMAINS;
+    const relevant = new Set<KnowledgeDomain>();
+    for (const event of session.activeEvents[company.id] || []) {
+      if (!event.isResolved) continue;
+      if (event.card.scope === 'local' && event.targetSiteId !== selectedSite.id) continue;
+      for (const requirement of event.card.domains) relevant.add(requirement.domain);
+    }
+    return DOMAINS.filter((candidate) => relevant.has(candidate));
+  }, [company.id, selectedId, selectedSite?.id, session.activeEvents]);
+
+  useEffect(() => {
+    if (selectedSite && selectedSite.id !== siteId) setSiteId(selectedSite.id);
+  }, [selectedSite?.id]);
+
+  useEffect(() => {
+    if (selectedExpert && selectedExpert.id !== expertId) setExpertId(selectedExpert.id);
+  }, [selectedExpert?.id]);
+
+  useEffect(() => {
+    if (selectedId === 'aar' && learningDomains.length && !learningDomains.includes(domain)) setDomain(learningDomains[0]);
+  }, [domain, learningDomains, selectedId]);
+
+  const expectedEffect = useMemo(() => {
+    if (selectedId === 'transfer') {
+      const before = selectedSite?.teamCapability[domain] ?? 0;
+      return selectedSite ? `${selectedSite.name} ${DOMAIN_INFO[domain].label} Team Capability ${before} → ${Math.min(6, before + 1)}` : 'Choose an active site.';
+    }
+    if (selectedId === 'corporate-training') {
+      const eligible = activeSites.filter((site) => site.teamCapability[domain] < company.intranet[domain]).length;
+      return `${eligible} site${eligible === 1 ? '' : 's'} can gain +1 ${DOMAIN_INFO[domain].label} Team Capability`;
+    }
+    if (selectedId === 'codify-site') {
+      const before = selectedSite?.codifiedKnowledge[domain] ?? 0;
+      return selectedSite ? `${selectedSite.name} ${DOMAIN_INFO[domain].label} Local Codified ${before} → ${Math.min(6, before + 1)}` : 'Choose an active site.';
+    }
+    if (selectedId === 'train-expert') {
+      const skill = selectedExpert?.domains.find((entry) => entry.domain === domain);
+      return skill ? `${selectedExpert?.name} ${DOMAIN_INFO[domain].label} ${skill.score} → ${Math.min(8, skill.score + 1)}` : 'Choose a domain already held by the expert.';
+    }
+    if (selectedId === 'update-intranet') {
+      return `${DOMAIN_INFO[domain].label} Corporate Intranet ${company.intranet[domain]} → higher if deeper source knowledge is available`;
+    }
+    if (selectedId === 'aar') {
+      if (!learningDomains.length) return 'No resolved challenge this round provides learning that can be applied at this site.';
+      const before = learningTarget === 'team' ? selectedSite?.teamCapability[domain] ?? 0 : selectedSite?.codifiedKnowledge[domain] ?? 0;
+      return selectedSite ? `${selectedSite.name} ${DOMAIN_INFO[domain].label} ${learningTarget === 'team' ? 'Team Capability' : 'Local Codified'} ${before} → ${Math.min(6, before + 1)}` : 'Choose an active site.';
+    }
+    if (selectedId === 'join-cop') return `Commit ${selectedExpert?.name || 'an eligible expert'} to the ${DOMAIN_INFO[domain].label} CoP for this round`;
+    return `Arm ${DOMAIN_INFO[domain].label} Horizon Scan for round ${session.round + 1}`;
+  }, [activeSites, company.intranet, domain, learningDomains.length, learningTarget, selectedExpert, selectedId, selectedSite, session.round]);
+
+  const actionParams = () => {
+    if (selectedId === 'transfer') return ['KNOWLEDGE_TRANSFER', { siteId, expertId, domain }] as const;
+    if (selectedId === 'corporate-training') return ['CORPORATE_TRAINING', { domain }] as const;
+    if (selectedId === 'codify-site') return ['CODIFY_SITE', { siteId, domain }] as const;
+    if (selectedId === 'train-expert') return ['TRAIN_EXPERT', { expertId, domain }] as const;
+    if (selectedId === 'update-intranet') return ['UPDATE_INTRANET', { domain }] as const;
+    if (selectedId === 'aar') return ['LESSONS_LEARNED', { siteId, domain, learningTarget }] as const;
+    if (selectedId === 'join-cop') return ['JOIN_COP', { expertId, domain }] as const;
+    return ['HORIZON_SCAN', { domain }] as const;
+  };
+
+  const commit = () => {
+    const [type, params] = actionParams();
+    onPerformAction(type, params);
+  };
+
+  const needsSite = selectedId === 'transfer' || selectedId === 'codify-site' || selectedId === 'aar';
+  const needsExpert = selectedId === 'transfer' || selectedId === 'train-expert' || selectedId === 'join-cop';
+  const noActions = company.actionsRemaining <= 0;
+  const noLearningAvailable = selectedId === 'aar' && learningDomains.length === 0;
+  const domainOptions = selectedId === 'aar' ? learningDomains : DOMAINS;
 
   return (
-    <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm space-y-4 text-[#c9d1d9]">
-      {/* Header with Actions Remaining & Next Phase button */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[#30363d]">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-white tracking-tight font-mono">PHASE 4: STRATEGIC KNOWLEDGE INVESTMENT</h2>
-            <span className="px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-700/60 text-indigo-300 text-[11px] font-bold font-mono">
-              {company.actionsRemaining}/4 ACTIONS REMAINING
-            </span>
-          </div>
-          <p className="text-[11px] text-[#8b949e] mt-0.5">
-            Build appropriate knowledge capability at an acceptable cost across human, organizational, and technological layers.
-          </p>
+    <div className="space-y-4">
+      <div className="grid xl:grid-cols-[270px_28px_minmax(280px,1fr)_minmax(300px,0.9fr)] gap-3 items-start">
+        <div className="space-y-2">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-black px-1">Knowledge Suite</div>
+          {ANCHORS.map((anchor) => {
+            const Icon = anchor.icon;
+            const related = INTERVENTIONS.some((item) => item.anchor === anchor.id && item.id === selectedId);
+            return (
+              <div key={anchor.id} className={`rounded-xl border px-3 py-3 ${anchor.disabled ? 'border-slate-800 bg-slate-950/55 text-slate-600' : related ? 'border-indigo-400 bg-indigo-950/70 text-white shadow-lg shadow-indigo-950/40' : 'border-slate-700 bg-slate-900 text-slate-200'}`}>
+                <div className="flex items-center gap-2"><Icon className="w-4 h-4" /><span className="font-black text-sm">{anchor.title}</span></div>
+                <div className="text-[10px] mt-1 opacity-70 leading-snug">{anchor.description}</div>
+              </div>
+            );
+          })}
         </div>
 
-        <button
-          onClick={onNextPhase}
-          className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap"
-        >
-          <span>Complete Phase 4 → Attrition</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+        <div className="hidden xl:flex min-h-[520px] items-center justify-center text-amber-400 text-2xl font-black">→</div>
+
+        <div className="space-y-2">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-400 font-black px-1">Knowledge-building interventions</div>
+          {INTERVENTIONS.map((item) => {
+            const Icon = item.icon;
+            const isSelected = item.id === selectedId;
+            return (
+              <button key={item.id} onClick={() => setSelectedId(item.id)} className={`w-full rounded-xl border-2 px-4 py-3 text-left transition ${isSelected ? 'border-white bg-emerald-800/90 shadow-xl shadow-emerald-950/40' : 'border-emerald-800 bg-emerald-950/70 hover:border-emerald-500'}`}>
+                <div className="flex items-start gap-3">
+                  <Icon className="w-5 h-5 text-emerald-300 mt-0.5 shrink-0" />
+                  <div><div className="font-black text-white">{item.title}</div><div className="text-xs text-emerald-100/75 mt-0.5 leading-snug">{item.description}</div></div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="xl:sticky xl:top-24 rounded-2xl border-2 border-slate-600 bg-slate-900/95 p-4 shadow-2xl">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-indigo-300 font-black">Investment action</div>
+          <h3 className="text-xl font-black text-white mt-1">{selected.title}</h3>
+          <p className="text-xs text-slate-400 mt-1 leading-relaxed">{selected.description}</p>
+
+          <div className="mt-4 space-y-3">
+            {needsSite && (
+              <label className="block"><span className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Site</span><select value={siteId} onChange={(event) => setSiteId(event.target.value)} className="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white">{activeSites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
+            )}
+            {needsExpert && (
+              <label className="block"><span className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Expert</span><select value={expertId} onChange={(event) => setExpertId(event.target.value)} className="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white">{activeExperts.map((expert) => <option key={expert.id} value={expert.id}>{expert.name} · {expert.location === 'HQ' ? 'HQ' : company.sites.find((site) => site.id === expert.location)?.name || expert.location}</option>)}</select></label>
+            )}
+            <label className="block"><span className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Domain</span><select value={domainOptions.includes(domain) ? domain : domainOptions[0] || ''} onChange={(event) => setDomain(event.target.value as KnowledgeDomain)} disabled={!domainOptions.length} className="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white disabled:text-slate-600">{domainOptions.map((item) => <option key={item} value={item}>{DOMAIN_INFO[item].label}</option>)}</select></label>
+            {selectedId === 'aar' && (
+              <label className="block"><span className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Capture learning as</span><select value={learningTarget} onChange={(event) => setLearningTarget(event.target.value as 'team' | 'codified')} className="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white"><option value="team">Team Capability</option><option value="codified">Local Codified Knowledge</option></select></label>
+            )}
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-3">
+            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Expected effect</div>
+            <div className="text-sm text-slate-200 mt-1 leading-snug">{expectedEffect}</div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between text-xs"><span className="text-slate-500 font-black uppercase tracking-wider">Cost</span><span className="font-black text-white">1 Action{selectedId === 'train-expert' || selectedId === 'join-cop' ? ' + variable turnover' : ''}</span></div>
+
+          <button onClick={commit} disabled={noActions || noLearningAvailable || (needsExpert && !selectedExpert) || (needsSite && !selectedSite)} className="mt-4 w-full rounded-xl bg-amber-400 hover:bg-amber-300 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 px-4 py-3 font-black transition active:scale-[0.99]">
+            RUN {selected.title.toUpperCase()} · 1 ACTION
+          </button>
+          <div className="text-[10px] text-slate-500 mt-2 text-center">Execution is immediate and cannot be undone.</div>
+        </div>
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex items-center gap-1 bg-[#0d1117] p-1 rounded-lg border border-[#30363d] overflow-x-auto">
-        {categories.map((cat) => {
-          const Icon = cat.icon;
-          const isActive = activeCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition whitespace-nowrap ${
-                isActive
-                  ? 'bg-[#21262d] text-white border border-[#484f58] shadow-xs'
-                  : 'text-[#8b949e] hover:text-white hover:bg-[#161b22]'
-              }`}
-            >
-              <Icon className={`w-3.5 h-3.5 ${cat.color}`} />
-              <span>{cat.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Category Content Area */}
-      <div className="p-3.5 bg-[#0d1117] border border-[#30363d] rounded-lg space-y-3">
-        {/* DEVELOP CATEGORY */}
-        {activeCategory === 'DEVELOP' && (
-          <div className="space-y-3">
-            <div className="text-[11px] text-[#8b949e] font-mono">
-              // DEVELOP HUMAN & SOCIAL CAPITAL ACROSS SITES
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* 1. Knowledge Transfer */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300 font-mono">
-                    <Users className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Knowledge Transfer</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    An expert located at a site transfers domain expertise directly to the local team (+1 Team Capability).
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Site:</label>
-                    <select
-                      value={selectedSiteId}
-                      onChange={(e) => setSelectedSiteId(e.target.value)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {activeSites.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Expert:</label>
-                    <select
-                      value={selectedExpertId}
-                      onChange={(e) => setSelectedExpertId(e.target.value)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {activeExperts.map((exp) => (
-                        <option key={exp.id} value={exp.id}>
-                          {exp.name} ({exp.location === 'HQ' ? 'HQ' : exp.location})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Domain:</label>
-                    <select
-                      value={selectedDomain}
-                      onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {DOMAINS.map((d) => (
-                        <option key={d} value={d}>
-                          {DOMAIN_INFO[d].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('KNOWLEDGE_TRANSFER', {
-                        siteId: selectedSiteId,
-                        expertId: selectedExpertId,
-                        domain: selectedDomain,
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0}
-                    className="w-full py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Execute Transfer (1 Act)
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Train Expert */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-300 font-mono">
-                    <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Train Expert</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    Formal training to advance an expert's domain score by +1. Costs 2d6 turnover.
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Expert:</label>
-                    <select
-                      value={selectedExpertId}
-                      onChange={(e) => setSelectedExpertId(e.target.value)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {activeExperts.map((exp) => (
-                        <option key={exp.id} value={exp.id}>
-                          {exp.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Domain:</label>
-                    <select
-                      value={selectedDomain}
-                      onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {DOMAINS.map((d) => (
-                        <option key={d} value={d}>
-                          {DOMAIN_INFO[d].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('TRAIN_EXPERT', {
-                        expertId: selectedExpertId,
-                        domain: selectedDomain,
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0 || company.turnover < 12}
-                    className="w-full py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Train Expert (1 Act + 2d6 $)
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. Corporate Training */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300 font-mono">
-                    <Building className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Corporate Training</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    Deploy nationwide curriculum raising Team Capability at all sites (+1) up to the Corporate Intranet score.
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Curriculum Domain:</label>
-                    <select
-                      value={selectedDomain}
-                      onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {DOMAINS.map((d) => (
-                        <option key={d} value={d}>
-                          {DOMAIN_INFO[d].label} (Intranet: {company.intranet[d]})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="p-2 bg-[#0d1117] rounded border border-[#30363d] text-[10px] text-[#8b949e]">
-                    Boosts absorptive capacity across all sites in {DOMAIN_INFO[selectedDomain].label}!
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('CORPORATE_TRAINING', {
-                        domain: selectedDomain,
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0}
-                    className="w-full py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Deploy Nationwide (1 Act)
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CAPTURE CATEGORY */}
-        {activeCategory === 'CAPTURE' && (
-          <div className="space-y-3">
-            <div className="text-[11px] text-[#8b949e] font-mono">
-              // CODIFY & PERSIST OPERATING KNOWLEDGE IN REPOSITORIES
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* 1. Codify Site Knowledge */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-sky-300 font-mono">
-                    <BookOpen className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Codify Site Knowledge</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    Document local operating knowledge at a site (+1 Local Codified up to Team level).
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Site:</label>
-                    <select
-                      value={selectedSiteId}
-                      onChange={(e) => setSelectedSiteId(e.target.value)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {activeSites.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Domain:</label>
-                    <select
-                      value={selectedDomain}
-                      onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {DOMAINS.map((d) => (
-                        <option key={d} value={d}>
-                          {DOMAIN_INFO[d].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('CODIFY_SITE', {
-                        siteId: selectedSiteId,
-                        domain: selectedDomain,
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0}
-                    className="w-full py-1.5 rounded bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Codify Locally (1 Act)
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Update Corporate Intranet */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300 font-mono">
-                    <Building className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Update Corporate Intranet</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    Aggregate company knowledge into corporate intranet (+1 normal, +2 if HQ expert).
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Domain:</label>
-                    <select
-                      value={selectedDomain}
-                      onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {DOMAINS.map((d) => (
-                        <option key={d} value={d}>
-                          {DOMAIN_INFO[d].label} (Current: {company.intranet[d]})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="p-2 bg-[#0d1117] rounded border border-[#30363d] text-[10px] text-[#8b949e]">
-                    {company.experts.some((e) => !e.isVacant && e.location === 'HQ' && e.domains.some((dm) => dm.domain === selectedDomain))
-                      ? '⚡ HQ expert available: Grants +2 boost!'
-                      : 'Standard update: +1 growth'}
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('UPDATE_INTRANET', {
-                        domain: selectedDomain,
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0 || (company.intranetRoundGrowth[selectedDomain] || 0) >= 2}
-                    className="w-full py-1.5 rounded bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Update Repository (1 Act)
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. After Action Review / Lessons Learned */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300 font-mono">
-                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                    <span>After Action Review (AAR)</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    Conduct deliberate post-event reflection to convert event experience into +1 capability.
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Site:</label>
-                    <select
-                      value={selectedSiteId}
-                      onChange={(e) => setSelectedSiteId(e.target.value)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {activeSites.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Target:</label>
-                    <select
-                      value={selectedLearningTarget}
-                      onChange={(e) => setSelectedLearningTarget(e.target.value as any)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      <option value="team">Team Capability (+1)</option>
-                      <option value="codified">Local Codified (+1)</option>
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('LESSONS_LEARNED', {
-                        siteId: selectedSiteId,
-                        domain: selectedDomain,
-                        learningTarget: selectedLearningTarget,
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0}
-                    className="w-full py-1.5 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Conduct AAR (1 Act)
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CONNECT CATEGORY */}
-        {activeCategory === 'CONNECT' && (
-          <div className="space-y-3">
-            <div className="text-[11px] text-[#8b949e] font-mono">
-              // INTER-FIRM SOCIAL CAPITAL & STRATEGIC HORIZON SCANNING
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* 1. Join / Maintain CoP */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300 font-mono">
-                    <Network className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Join Community of Practice</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    Assign a Deep Expert to an industry CoP (Fee 1d6 $). Active when ≥2 companies participate.
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Expert:</label>
-                    <select
-                      value={selectedExpertId}
-                      onChange={(e) => setSelectedExpertId(e.target.value)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {activeExperts.map((exp) => (
-                        <option key={exp.id} value={exp.id}>
-                          {exp.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Domain:</label>
-                    <select
-                      value={selectedDomain}
-                      onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {DOMAINS.map((d) => (
-                        <option key={d} value={d}>
-                          {DOMAIN_INFO[d].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('JOIN_COP', {
-                        expertId: selectedExpertId,
-                        domain: selectedDomain,
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0 || company.turnover < 6}
-                    className="w-full py-1.5 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Assign to CoP (1 Act + 1d6 $)
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Capture CoP Learning */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-sky-300 font-mono">
-                    <BookOpen className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Capture CoP Learning</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    Convert relational insights from partner companies in active CoP into permanent intranet knowledge (+1).
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">CoP Domain:</label>
-                    <select
-                      value={selectedDomain}
-                      onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {DOMAINS.map((d) => (
-                        <option key={d} value={d}>
-                          {DOMAIN_INFO[d].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('CAPTURE_COP_LEARNING', {
-                        domain: selectedDomain,
-                        learningTarget: 'intranet',
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0}
-                    className="w-full py-1.5 rounded bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Capture into Intranet (1 Act)
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. Horizon Scanning */}
-              <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300 font-mono">
-                    <Radio className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Horizon Scanning Radar</span>
-                  </div>
-                  <p className="text-[11px] text-[#8b949e] mt-1">
-                    Scout emerging trends. If a drawn event next round matches the scanned domain, you may redraw it once!
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <label className="text-[10px] text-[#8b949e] font-mono block">Domain to Scout:</label>
-                    <select
-                      value={selectedDomain}
-                      onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                      className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs text-[#c9d1d9] font-mono"
-                    >
-                      {DOMAINS.map((d) => (
-                        <option key={d} value={d}>
-                          {DOMAIN_INFO[d].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      onPerformAction('HORIZON_SCAN', {
-                        domain: selectedDomain,
-                      })
-                    }
-                    disabled={company.actionsRemaining <= 0}
-                    className="w-full py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-mono text-xs font-bold transition shadow-xs"
-                  >
-                    Activate Radar (1 Act)
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* EMBED CATEGORY */}
-        {activeCategory === 'EMBED' && (
-          <div className="space-y-3">
-            <div className="text-[11px] text-[#8b949e] font-mono">
-              // EMBED CAPABILITY INTO ENTERPRISE AUTOMATION & WORKFLOWS
-            </div>
-
-            <div className="p-3.5 bg-[#161b22] border border-emerald-500/40 rounded-lg space-y-2.5 max-w-xl">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs font-mono">
-                <Cpu className="w-4 h-4" />
-                <span>ENTERPRISE DOMAIN AUTOMATION</span>
-              </div>
-              <p className="text-[11px] text-[#c9d1d9] leading-relaxed">
-                Automation embeds knowledge permanently into enterprise software workflows.
-                It provides <strong className="text-emerald-300 font-mono">+2 event support permanently across all 6 sites</strong> and survives employee attrition.
-              </p>
-              <div className="p-2 bg-[#0d1117] rounded text-[10px] text-amber-300 border border-amber-800/60 font-mono">
-                <strong>CAPITAL_INVESTMENT:</strong> Costs 1d6 turnover from <em>every active site</em>.
-              </div>
-
-              <div className="flex items-center gap-2.5 pt-1">
-                <select
-                  value={selectedDomain}
-                  onChange={(e) => setSelectedDomain(e.target.value as KnowledgeDomain)}
-                  className="bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1.5 text-xs text-[#c9d1d9] font-mono"
-                >
-                  {DOMAINS.map((d) => (
-                    <option key={d} value={d} disabled={company.automatedDomains.includes(d)}>
-                      {DOMAIN_INFO[d].label} {company.automatedDomains.includes(d) ? '(Already Automated)' : ''}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={() => onPerformAction('AUTOMATE', { domain: selectedDomain })}
-                  disabled={company.actionsRemaining <= 0 || company.automatedDomains.includes(selectedDomain)}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold font-mono rounded transition shadow-xs"
-                >
-                  Automate Domain (1 Act + Cost)
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* DIAGNOSE CATEGORY */}
-        {activeCategory === 'DIAGNOSE' && (
-          <div className="space-y-3">
-            <div className="text-[11px] text-[#8b949e] font-mono">
-              // FORENSIC AUDIT & ABSORPTIVE BOTTLENECK DISCOVERY
-            </div>
-
-            <div className="p-3.5 bg-[#161b22] border border-purple-500/40 rounded-lg space-y-2.5 max-w-xl">
-              <div className="flex items-center gap-2 text-purple-400 font-bold text-xs font-mono">
-                <Info className="w-4 h-4" />
-                <span>SITE KNOWLEDGE AUDIT</span>
-              </div>
-              <p className="text-[11px] text-[#c9d1d9] leading-relaxed">
-                Conducts a forensic audit of an operating site to reveal its weakest capability, largest expert-to-site SPOF gap, uncodified processes, and absorptive capacity bottlenecks.
-              </p>
-
-              <div className="flex items-center gap-2.5 pt-1">
-                <select
-                  value={selectedSiteId}
-                  onChange={(e) => setSelectedSiteId(e.target.value)}
-                  className="bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1.5 text-xs text-[#c9d1d9] font-mono"
-                >
-                  {activeSites.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} Site
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={() => onPerformAction('KNOWLEDGE_AUDIT', { siteId: selectedSiteId })}
-                  disabled={company.actionsRemaining <= 0}
-                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs font-bold font-mono rounded transition shadow-xs"
-                >
-                  Audit Site (1 Act)
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="flex items-center justify-between gap-4 pt-3 border-t border-slate-800">
+        <div className="text-xs text-slate-500">{company.actionsRemaining} of {session.config.actions_per_round} Actions remain this round.</div>
+        <button onClick={onNextPhase} className="rounded-xl border border-indigo-500 bg-indigo-950/70 hover:bg-indigo-900 text-indigo-100 px-4 py-2.5 font-black text-sm flex items-center gap-2">Finish investing <ArrowRight className="w-4 h-4" /></button>
       </div>
     </div>
   );

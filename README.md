@@ -1,72 +1,114 @@
 # The Performance Gap — Simulation Platform
 
-**The Performance Gap** is an interactive, multiplayer strategic simulation platform exploring organizational knowledge, deep expertise, absorptive capacity, single points of failure (SPOF), relational knowledge networks (Communities of Practice), and enterprise resilience.
+**The Performance Gap** is a multiplayer business simulation exploring how organisations turn expertise into performance and resilience.
 
----
+## V2 recovery branch
 
-## 🌟 Core Simulation Concepts & Mechanics
+The current recovery work lives on `fix/core-game-loop-v1`. It introduces an authoritative V2 rules engine and a simplified board-game style player interface. Do not merge the draft PR to `main` until the branch has completed a full playtest.
 
-1. **6 Operating Sites & Geographic Map**:
-   - Melbourne, Sydney, Brisbane, Perth, Adelaide, and Darwin.
-   - Each site maintains localized **Team Capability** (determines operational absorptive capacity) and **Local Codified Knowledge** (survives employee turnover).
-2. **Deep Experts & Single Point of Failure (SPOF)**:
-   - Deep Experts possess high individual expertise (score 4–6).
-   - If an expert's score exceeds site capability by $\ge 3$, they become a **SPOF** with heightened attrition vulnerability ($d12 \le 2$).
-3. **Corporate Headquarters & Intranet**:
-   - Enterprise knowledge repository accessible by all sites up to their local absorptive capacity limit ($\text{Team Capability} + 2$).
-   - Experts stationed at HQ boost corporate codification up to $+2$ per round.
-4. **Relational Knowledge & Communities of Practice (CoP)**:
-   - Inter-organizational knowledge exchange across the 5 domains (Engineering, HR, Marketing, Operations, Finance).
-   - Becomes active when $\ge 2$ companies maintain participating experts.
-5. **Dynamic 5-Phase Round Engine**:
-   - **Phase 1 (Draw)**: Receive local operational problems and market opportunities.
-   - **Phase 2 (Respond & Resolve)**: Allocate deep experts, CoP assistance, and evaluate success probabilities with 2d6 event dice rolls.
-   - **Phase 3 (Consequences & Learning)**: Apply financial turnover impact and convert successful opportunities into experiential learning.
-   - **Phase 4 (Knowledge Investment)**: Spend 4 strategic actions across *Develop*, *Capture*, *Connect*, *Embed*, and *Diagnose*.
-   - **Phase 5 (Attrition & Solvency)**: d12 expert resignation checks, workforce turnover, and site solvency evaluations.
-6. **Round 6 Final Disruption**:
-   - Macro shock testing accumulated corporate capability, automation, and organizational resilience.
-7. **Facilitator Command & AI Executive Debrief**:
-   - Comprehensive dashboard with full session overrides, event logs, 17 facilitation questions, and AI-powered AAR executive summaries via the Gemini API.
+### Core V2 mechanics
 
----
+- Five knowledge domains: Engineering, HR, Marketing, Operations and Finance.
+- Six operating sites with Team Capability and Local Codified Knowledge.
+- Corporate Intranet constrained by local absorptive capacity.
+- Deep Experts, expert location, travel, SPOF risk and attrition.
+- Current-round Communities of Practice and one-round Horizon Scanning.
+- Automation as persistent embedded capability.
+- Consultants as temporary external expertise: starting at $15k per knowledge point, +35% after each engagement, maximum three points per domain/event.
+- Two cards per round, resolved one at a time using a d12.
+- Four Knowledge Actions per round.
+- Shared 50-minute session timer.
 
-## 🚀 Quick Start Guide
+## AAR and benchmarking evidence
+
+V2 keeps the live game snapshot but also writes structured longitudinal evidence to Neon/PostgreSQL for After Action Review and cross-game benchmarking.
+
+The analytics model records:
+
+- initial business and knowledge strategy choices;
+- post-game knowledge strategy choice, shown alongside the original choice;
+- turnover through the game;
+- average Team Capability;
+- average Local Codified Knowledge;
+- average Corporate Intranet and average Usable Intranet;
+- knowledge-investment and consultant expenditure;
+- event financial exposure and net financial impact;
+- probability of success when an event is revealed and after the team commits its interventions;
+- expected versus actual successes, allowing the AAR to distinguish decision quality from unusually good or bad dice rolls;
+- version identifiers for rules, deck and balance settings so historical comparisons only combine genuinely comparable games.
+
+Primary tables are:
+
+- `performance_gap.session_snapshots_v2` — current authoritative game state;
+- `performance_gap.game_runs_v2` — one row per simulation run;
+- `performance_gap.company_runs_v2` — one row per company/run for benchmark summaries;
+- `performance_gap.event_decisions_v2` — reveal, commitment and result evidence for every event;
+- `performance_gap.company_metrics_v2` — time-series snapshots for turnover and knowledge capability;
+- existing `performance_gap.game_events` — append-only narrative event log.
+
+AAR endpoints:
+
+- `GET /api/sessions/:id/aar`
+- `GET /api/sessions/:id/benchmark/:companyId`
+
+The AAR presentation should support the standard questions rather than prescribe conclusions:
+
+1. What was planned?
+2. What actually happened?
+3. Why was there a difference?
+4. What would you do better?
+
+### Final disruption and luck variance
+
+Expected-versus-actual success is now captured explicitly. A small hidden final-disruption variance correction is intentionally **not activated yet**. Its threshold and cap should be calibrated from early playtests so it reduces extreme bad-luck noise without rescuing poor strategy. Persistent Team Capability, Codification, Usable Intranet, Automation, expert depth and reduced SPOF exposure remain the primary resilience mechanisms.
+
+## Development
 
 ### Prerequisites
-- Node.js 18+ or 20+
-- npm or yarn
 
-### Installation
+- Node.js 18+ or 20+
+- npm, yarn or Bun
+
+### Environment
+
+Copy `.env.example` to `.env` and configure at least:
+
+```bash
+DATABASE_URL=postgresql://...
+FACILITATOR_SECRET=choose-a-test-passcode
+```
+
+`DATABASE_URL` should point to the Neon database. If omitted, the simulation can run in memory but AAR/benchmark history will report that analytics persistence is unavailable.
+
+### Run
+
 ```bash
 npm install
-```
-
-### Environment Configuration
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-Fill in your `GEMINI_API_KEY` (for AI debriefs) and optional `DATABASE_URL` for PostgreSQL persistence (defaults to fast in-memory storage if omitted).
-
-### Development Server
-```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Production Build
+Open `http://localhost:3000`.
+
+### Validate
+
 ```bash
+npm run lint
+npm run test:core
 npm run build
-npm start
 ```
 
----
+## Google AI Studio
 
-## 🏛️ Architecture
+Google AI Studio Build mode supports importing a GitHub repository and two-way GitHub sync. For this recovery work, keep the draft branch separate from `main` while testing.
 
-- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + Lucide Icons + Canvas Confetti
-- **Backend Server**: Express custom server running on Node.js / `dist/server.cjs`
-- **Real-Time Concurrency**: Server-Sent Events (SSE) streaming state updates across all connected cohort participants
-- **AI Integration**: Google Gemini API (`@google/genai`) for real-time strategic debrief generation
-- **Persistence Layer**: Dual-mode PostgreSQL with atomic transactions and seamless In-Memory fallback
+Preferred test path:
+
+1. In AI Studio Build mode, use **Add files (+) → Import from GitHub**.
+2. Import `kurokaze204/PerformanceGame` as a separate test app.
+3. If AI Studio offers a branch/ref choice, select `fix/core-game-loop-v1`.
+4. If the existing linked project can explicitly pull that branch, that is also fine.
+5. If AI Studio only follows `main`, do **not** merge the draft PR just to make the code visible; use a separate import/workspace where possible, or validate the branch elsewhere first.
+6. Add `DATABASE_URL` and `FACILITATOR_SECRET` to the AI Studio app's secrets/environment configuration before starting a test game.
+7. Start with a new one-company solo session so the analytics tables are created automatically and the strategy prompts/event flow can be checked end-to-end.
+
+The runtime does not require Gemini. AI features are optional; game rules, persistence and AAR evidence are deterministic application code.

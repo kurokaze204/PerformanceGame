@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+@layer components {
+  .control { @apply mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-400; }
+  .label { @apply text-[10px] uppercase tracking-wider text-slate-500 font-black; }
+  .primary { @apply w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-3 text-sm font-black text-white flex items-center justify-center gap-2; }
+  .mode-card { @apply rounded-xl border border-slate-700 bg-slate-950 p-3 text-left flex items-start gap-3 text-slate-300 hover:border-indigo-700; }
+  .mode-card.selected { @apply border-indigo-400 bg-indigo-950/60 text-white; }
+  .mode-card small { @apply block text-[10px] text-slate-500 mt-0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

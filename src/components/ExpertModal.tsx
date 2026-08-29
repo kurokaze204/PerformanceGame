@@ -44,7 +44,6 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-[#0a0c10]/80 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-[#161b22] border border-[#30363d] rounded-xl max-w-lg w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-[#c9d1d9]">
-        {/* Modal Header */}
         <div className="flex items-start justify-between pb-3 border-b border-[#30363d]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[#21262d] border border-[#30363d] flex items-center justify-center text-white font-mono font-bold text-lg shadow-xs">
@@ -79,10 +78,9 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
           </button>
         </div>
 
-        {/* Domain Proficiencies */}
         <div>
           <h4 className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider font-mono mb-1.5">
-            Domain Expertise Proficiencies
+            Domain Expertise
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {expert.domains.map((d) => {
@@ -104,9 +102,7 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold font-mono text-indigo-300">Level {d.score}</span>
-                    {isSpofInDomain && (
-                      <span title="SPOF Gap >= 3" className="text-amber-400">⚠</span>
-                    )}
+                    {isSpofInDomain && <span title="SPOF Gap >= 3" className="text-amber-400">⚠</span>}
                   </div>
                 </div>
               );
@@ -114,7 +110,6 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
           </div>
         </div>
 
-        {/* SPOF Diagnostic Explanation Box */}
         {expert.isSPOF && (
           <div className="p-3 bg-amber-950/30 border border-amber-800/60 rounded-lg text-[11px] text-amber-200/90 space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-amber-300 font-mono">
@@ -122,20 +117,18 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
               Single Point of Failure (SPOF) Risk
             </div>
             <p>
-              {expert.name}'s expertise exceeds the surrounding site's capability by ≥{config.spof_gap} levels.
-              If {expert.name} departs (attrition check d12 ≤ 2), this uncodified knowledge will vanish!
+              {expert.name} holds expertise that exceeds the surrounding site's capability by ≥{config.spof_gap} levels.
+              If {expert.name} leaves, important organisational know-how may leave with them unless it has been shared or captured.
             </p>
           </div>
         )}
 
-        {/* Action Controls for Expert */}
         <div className="space-y-2">
           <h4 className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider font-mono">
-            Deploy Expert Knowledge Actions (1 Action)
+            Ways to work with {expert.name} (1 Action)
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {/* Knowledge Transfer to local team */}
             <button
               onClick={() => {
                 onPerformAction('KNOWLEDGE_TRANSFER', {
@@ -150,14 +143,13 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
             >
               <div className="flex items-center gap-1.5 text-xs font-bold font-mono text-indigo-300">
                 <Users className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Knowledge Transfer</span>
+                <span>Share Expertise with Team</span>
               </div>
               <p className="text-[10px] text-[#8b949e] mt-0.5">
-                Increase {site?.name} Team Capability +1 in {DOMAIN_INFO[selectedDomain].label}.
+                Work with the {site?.name} team to increase Team Capability +1 in {DOMAIN_INFO[selectedDomain].label}.
               </p>
             </button>
 
-            {/* Train Expert */}
             <button
               onClick={() => {
                 onPerformAction('TRAIN_EXPERT', {
@@ -171,14 +163,13 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
             >
               <div className="flex items-center gap-1.5 text-xs font-bold font-mono text-blue-300">
                 <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
-                <span>Train Expert ($20k-$120k)</span>
+                <span>Professional Development ($20k-$120k)</span>
               </div>
               <p className="text-[10px] text-[#8b949e] mt-0.5">
-                Advance {expert.name}'s {DOMAIN_INFO[selectedDomain].label} score +1.
+                Invest in further development of {expert.name}'s {DOMAIN_INFO[selectedDomain].label} expertise (+1).
               </p>
             </button>
 
-            {/* Codify Local Expert Knowledge */}
             <button
               onClick={() => {
                 onPerformAction('CODIFY_EXPERT', {
@@ -193,14 +184,13 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
             >
               <div className="flex items-center gap-1.5 text-xs font-bold font-mono text-sky-300">
                 <BookOpen className="w-3.5 h-3.5 text-sky-400" />
-                <span>Local Codification</span>
+                <span>Capture Local Know-how</span>
               </div>
               <p className="text-[10px] text-[#8b949e] mt-0.5">
-                Document standard procedures locally (+1 Local Codified).
+                Work with {expert.name} to document useful local practices (+1 Local Codified).
               </p>
             </button>
 
-            {/* Expertise Capture into Intranet */}
             <button
               onClick={() => {
                 onPerformAction('EXPERTISE_CAPTURE', {
@@ -214,19 +204,18 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
             >
               <div className="flex items-center gap-1.5 text-xs font-bold font-mono text-purple-300">
                 <Zap className="w-3.5 h-3.5 text-purple-400" />
-                <span>Expertise Capture ($10k-$60k)</span>
+                <span>Capture Expertise ($10k-$60k)</span>
               </div>
               <p className="text-[10px] text-[#8b949e] mt-0.5">
-                Capture deep insights directly into Corporate Intranet (+2).
+                Work with {expert.name} to make deep insights available through the Corporate Intranet (+2).
               </p>
             </button>
           </div>
         </div>
 
-        {/* Permanent Relocation */}
         <div className="pt-3 border-t border-[#30363d] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#8b949e] font-mono">Relocate to:</span>
+            <span className="text-[11px] text-[#8b949e] font-mono">Discuss relocation to:</span>
             <select
               value={selectedRelocationTarget}
               onChange={(e) => setSelectedRelocationTarget(e.target.value)}
@@ -253,7 +242,7 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-mono font-semibold shadow-xs transition"
           >
             <ArrowRightLeft className="w-3.5 h-3.5" />
-            <span>RELOCATE (1 ACTION)</span>
+            <span>CONFIRM RELOCATION (1 ACTION)</span>
           </button>
         </div>
       </div>
