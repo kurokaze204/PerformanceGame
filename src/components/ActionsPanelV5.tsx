@@ -4,6 +4,7 @@ import type { KnowledgeDomain } from '../types/game.ts';
 import { DOMAIN_INFO } from '../types/game.ts';
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { INVESTMENT_COSTS_V4, copPeerKnowledgeScoreV4, expertTravelCostV4 } from '../engine/investmentActionsV4.ts';
+import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { capabilityUnlocked, interventionUnlocked } from '../engine/experienceModeV3.ts';
 import { formatCurrency } from '../utils/format.ts';
 
@@ -41,13 +42,17 @@ function anchorVisible(session:GameSessionV2,id:AnchorId){
 }
 
 export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,onNextPhase})=>{
- const visibleInterventions=INTERVENTIONS.filter(item=>interventionUnlocked(session.experienceMode,session.round,item.actionType));
+ const resolvedEvents=(session.activeEvents[company.id]||[]).filter(e=>e.isResolved);
+ const tutorialEvent=resolvedEvents.find(e=>e.card.tags?.includes(PROGRAMMED_FAILURE_TAG));
+ const tutorialComplete=Boolean(tutorialEvent&&tutorialEvent.success===false);
+ const lessonKey=`tpg_intranet_unlock_${session.id}_${company.id}`;
+ const [showIntranetLesson,setShowIntranetLesson]=useState(()=>tutorialComplete&&!localStorage.getItem(lessonKey));
+ const visibleInterventions=INTERVENTIONS.filter(item=>interventionUnlocked(session.experienceMode,session.round,item.actionType)&&(item.actionType!=='UPDATE_INTRANET'||session.round>1||tutorialComplete));
  const [selectedId,setSelectedId]=useState<InterventionId>(visibleInterventions[0]?.id||'transfer');
  const [siteId,setSiteId]=useState(company.sites.find(s=>!s.isClosed)?.id||'');
  const [expertId,setExpertId]=useState(company.experts.find(e=>!e.isVacant)?.id||'');
  const [domain,setDomain]=useState<KnowledgeDomain>('engineering');
  const [learningTarget,setLearningTarget]=useState<'team'|'codified'>('team');
- const resolvedEvents=(session.activeEvents[company.id]||[]).filter(e=>e.isResolved);
  const [aarEventId,setAarEventId]=useState(resolvedEvents[0]?.instanceId||'');
  const activeSites=company.sites.filter(s=>!s.isClosed);
  const activeExperts=company.experts.filter(e=>!e.isVacant);
@@ -55,12 +60,21 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const selectedAarEvent=resolvedEvents.find(e=>e.instanceId===aarEventId)||resolvedEvents[0];
  const selectedSite=activeSites.find(s=>s.id===siteId)||activeSites[0];
  const selectedExpert=activeExperts.find(e=>e.id===expertId)||activeExperts[0];
- useEffect(()=>{if(!visibleInterventions.some(i=>i.id===selectedId)&&visibleInterventions[0])setSelectedId(visibleInterventions[0].id)},[session.round,session.experienceMode,selectedId]);
+ useEffect(()=>{if(tutorialComplete&&!localStorage.getItem(lessonKey))setShowIntranetLesson(true)},[tutorialComplete,lessonKey]);
+ useEffect(()=>{if(!visibleInterventions.some(i=>i.id===selectedId)&&visibleInterventions[0])setSelectedId(visibleInterventions[0].id)},[session.round,session.experienceMode,selectedId,tutorialComplete]);
  useEffect(()=>{if(selectedSite&&selectedSite.id!==siteId)setSiteId(selectedSite.id)},[selectedSite?.id]);
  useEffect(()=>{if(selectedExpert&&selectedExpert.id!==expertId)setExpertId(selectedExpert.id)},[selectedExpert?.id]);
  useEffect(()=>{if(resolvedEvents.length&&!resolvedEvents.some(e=>e.instanceId===aarEventId))setAarEventId(resolvedEvents[0].instanceId)},[aarEventId,resolvedEvents]);
  useEffect(()=>{if(selectedId==='aar'&&selectedAarEvent?.card.scope==='local'&&selectedAarEvent.targetSiteId)setSiteId(selectedAarEvent.targetSiteId)},[selectedId,selectedAarEvent?.instanceId]);
  if(!selected)return null;
+
+ const tutorialDomain=tutorialEvent?.card.domains[0]?.domain;
+ const tutorialSourceId=tutorialEvent?.card.tags?.find(tag=>tag.startsWith('tutorial-source:'))?.slice('tutorial-source:'.length);
+ const tutorialTargetId=tutorialEvent?.card.tags?.find(tag=>tag.startsWith('tutorial-target:'))?.slice('tutorial-target:'.length);
+ const tutorialSource=company.sites.find(site=>site.id===tutorialSourceId);
+ const tutorialTarget=company.sites.find(site=>site.id===tutorialTargetId);
+ const tutorialSourceScore=tutorialDomain&&tutorialSource?Math.max(tutorialSource.teamCapability[tutorialDomain]||0,tutorialSource.codifiedKnowledge[tutorialDomain]||0):0;
+ const tutorialTargetScore=tutorialDomain&&tutorialTarget?Math.max(tutorialTarget.teamCapability[tutorialDomain]||0,tutorialTarget.codifiedKnowledge[tutorialDomain]||0):0;
 
  const needsSite=['transfer','codify-site','aar'].includes(selectedId);
  const needsExpert=['transfer','train-expert','join-cop'].includes(selectedId);
@@ -94,12 +108,15 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
 
  const commit=()=>{const map:Record<InterventionId,[string,any]>={
   'transfer':['KNOWLEDGE_TRANSFER',{siteId,expertId,domain}],'corporate-training':['CORPORATE_TRAINING',{domain}],'codify-site':['CODIFY_SITE',{siteId,domain}],'train-expert':['TRAIN_EXPERT',{expertId,domain}],'update-intranet':['UPDATE_INTRANET',{domain}],'aar':['LESSONS_LEARNED',{siteId,domain,learningTarget,eventInstanceId:selectedAarEvent?.instanceId}],'join-cop':['JOIN_COP',{expertId,domain}],'horizon-scan':['HORIZON_SCAN',{domain}],'automate':['AUTOMATE',{domain}],};const [type,params]=map[selectedId];onPerformAction(type,params)};
+ const openIntranet=()=>{localStorage.setItem(lessonKey,'1');setShowIntranetLesson(false);setSelectedId('update-intranet');if(tutorialDomain)setDomain(tutorialDomain)};
  const anchorTitle=(id:AnchorId)=>ANCHORS.find(a=>a.id===id)!.title;
  const actionTotal=session.config.actions_per_round;
  const expertLocation=selectedExpert?(selectedExpert.location==='HQ'?'Corporate HQ':activeSites.find(s=>s.id===selectedExpert.location)?.name||selectedExpert.location):'';
  const aarSiteLocked=selectedId==='aar'&&selectedAarEvent?.card.scope==='local';
 
- return <div className="fixed left-3 right-3 top-[94px] bottom-3 z-[90] rounded-3xl border border-slate-700 bg-[#080b12]/[0.985] shadow-2xl p-3 overflow-hidden flex flex-col" role="region" aria-label="Investment actions">
+ return <>
+ {showIntranetLesson&&<div className="fixed inset-0 z-[150] bg-black/70 grid place-items-center p-6" role="dialog" aria-modal="true" aria-labelledby="intranet-unlock-title"><div className="w-full max-w-2xl rounded-3xl border-2 border-indigo-400 bg-slate-950 p-6 shadow-2xl"><div className="text-[10px] uppercase tracking-[0.2em] text-indigo-300 font-black">A knowledge gap is not always a knowledge shortage</div><h2 id="intranet-unlock-title" className="mt-2 text-2xl font-black text-white">The company knew. {tutorialTarget?.name||'This site'} didn’t.</h2><p className="mt-3 text-sm leading-relaxed text-slate-300">That first failure was deliberate. {tutorialTarget?.name||'The affected site'} could reach about <b className="text-white">{tutorialTargetScore}</b> in {tutorialDomain?DOMAIN_INFO[tutorialDomain].label:'the required domain'}, while {tutorialSource?.name||'another site'} already held capability around <b className="text-white">{tutorialSourceScore}</b>. The knowledge existed inside the organisation; it was stranded in another place when the decision had to be made.</p><p className="mt-3 text-sm leading-relaxed text-slate-300">This is where a corporate knowledge base can change the system. Publishing stronger knowledge to the <b className="text-white">Corporate Intranet</b> makes it reusable across geography instead of forcing every site to rediscover the answer. It does not magically make every team expert — local people still need enough capability to understand and apply what they find — but it turns isolated knowledge into organisational capability.</p><button onClick={openIntranet} className="mt-5 w-full rounded-xl bg-indigo-400 py-3 font-black text-slate-950">OPEN THE CORPORATE INTRANET</button></div></div>}
+ <div className="fixed left-3 right-3 top-[94px] bottom-3 z-[90] rounded-3xl border border-slate-700 bg-[#080b12]/[0.985] shadow-2xl p-3 overflow-hidden flex flex-col" role="region" aria-label="Investment actions">
    <div className="flex items-center justify-between gap-4 shrink-0"><div><div className="text-[10px] uppercase tracking-[0.18em] text-indigo-300 font-black">Invest</div><h2 className="text-xl font-black text-white">Build capability for the next round</h2></div><div className="flex items-center gap-4"><div className="flex items-center gap-2" aria-label={`${company.actionsRemaining} of ${actionTotal} actions left`}><span className="text-[10px] uppercase text-slate-500 font-black mr-1">Actions</span>{Array.from({length:actionTotal},(_,i)=>{const available=i<company.actionsRemaining;return <div key={i} aria-hidden="true" className={`w-9 h-9 rounded-full border-2 grid place-items-center text-sm font-black ${available?'border-amber-300 bg-amber-400 text-slate-950 shadow-lg shadow-amber-950/40':'border-slate-700 bg-slate-950 text-slate-600'}`}>{i+1}</div>})}</div><button onClick={onNextPhase} className="rounded-xl border border-indigo-500 bg-indigo-950 px-4 py-2 font-black text-indigo-100 flex items-center gap-2">Finish investing <ArrowRight className="w-4 h-4"/></button></div></div>
    <div className="mt-3 grid grid-cols-[230px_minmax(0,1fr)_320px] gap-3 min-h-0 flex-1">
      <div className="space-y-1.5 min-h-0"><div className="text-[9px] uppercase tracking-wider text-slate-500 font-black">Knowledge capabilities</div>{ANCHORS.filter(a=>anchorVisible(session,a.id)).map(a=>{const Icon=a.icon;const active=selected.anchor===a.id;return <div key={a.id} className={`rounded-lg border px-2.5 py-2 ${a.disabled?'border-slate-800 bg-slate-950/60 opacity-45':active?'border-violet-300 bg-violet-950/80 shadow-lg shadow-violet-950/40':'border-slate-700 bg-slate-900'}`}><div className="flex items-center gap-2"><Icon className="w-4 h-4"/><b className="text-xs">{a.title}</b></div><div className="text-[9px] text-slate-500 mt-0.5">{a.description}</div></div>})}</div>
@@ -118,7 +135,8 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
        <button onClick={commit} disabled={company.actionsRemaining<=0||(needsExpert&&!selectedExpert)||(needsSite&&!selectedSite)||(selectedId==='aar'&&!selectedAarEvent)||(selectedId==='aar'&&relevantDomains.length===0)||(selectedId==='automate'&&company.automatedDomains.includes(domain))} className="mt-3 w-full rounded-xl bg-amber-400 text-slate-950 py-2.5 font-black disabled:bg-slate-800 disabled:text-slate-600">RUN · 1 ACTION · {formatCurrency(totalCost)}</button>{selectedId==='aar'&&!selectedAarEvent&&<div className="text-[10px] text-rose-300 mt-1">No completed challenge from this round is available for Lessons Learned.</div>}
      </div>
    </div>
- </div>;
+ </div>
+ </>;
 };
 
 const Metric:React.FC<{label:string;value:number|string}>=({label,value})=><div className="rounded-lg border border-indigo-900 bg-slate-950 p-1.5"><div className="text-[8px] uppercase text-slate-500 font-black">{label}</div><div className="text-lg font-black text-white">{value}</div></div>;
