@@ -25,5 +25,5 @@ export const GlobalRiverTool:React.FC=()=>{
   if(data.session)setSession(data.session);
   return{success:res.ok&&data.success!==false,message:data.message||data.error};
  };
- return <><button onClick={()=>setOpen(true)} className="fixed bottom-4 left-4 z-[125] rounded-xl border border-sky-500 bg-sky-950/95 px-4 py-2.5 text-xs font-black text-sky-100 shadow-xl flex items-center gap-2" aria-label="Open River Diagram"><Waves className="w-4 h-4"/>River Diagram</button>{open&&<RiverDiagramOverlay company={company} phase={session.phase} onClose={()=>setOpen(false)} onShare={share}/>}</>;
+ return <><button onClick={()=>setOpen(true)} className="fixed bottom-4 left-4 z-[125] rounded-xl border border-sky-500 bg-sky-950/95 px-4 py-2.5 text-xs font-black text-sky-100 shadow-xl flex items-center gap-2" aria-label="Open River Diagram"><Waves className="w-4 h-4"/>River Diagram</button>{open&&<RiverDiagramOverlay company={company} mode={session.experienceMode} phase={session.phase} onClose={()=>setOpen(false)} onShare={share}/>}</>;
 };
