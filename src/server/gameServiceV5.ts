@@ -3,6 +3,7 @@ import type { ActiveEventAllocationV2, GameSessionV2 } from '../types/gameV2.ts'
 import { DEFAULT_CONFIG } from '../engine/config.ts';
 import { PROGRAMMED_FAILURE_TAG, applyProgressionToCurrentEvents, diversifyInitialKnowledge, progressEventCard } from '../engine/eventProgressionV5.ts';
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
+import { executeRiverKnowledgeSharing } from '../engine/riverKnowledgeV1.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import type { CreateGameOptions } from './gameServiceV4.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
@@ -11,6 +12,7 @@ import {
   createNewSessionV2 as baseCreateNewSessionV2,
   getSessionV2 as baseGetSessionV2,
   initializeDefaultSessionV2 as baseInitializeDefaultSessionV2,
+  knowledgeActionV2 as baseKnowledgeActionV2,
   redrawEventV2 as baseRedrawEventV2,
   setEventAllocationV2 as baseSetEventAllocationV2,
 } from './gameServiceV4.ts';
@@ -66,6 +68,19 @@ export async function initializeDefaultSessionV2():Promise<GameSessionV2>{
     await saveSessionV2(session);
   }
   return session;
+}
+
+export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
+  if(payload?.type!=='KNOWLEDGE_TRANSFER')return baseKnowledgeActionV2(sessionId,companyId,payload);
+  const session=await baseGetSessionV2(sessionId.toUpperCase());
+  if(!session)return{success:false,message:'Session not found.'};
+  const company=session.companies.find(c=>c.id===companyId);
+  if(!company)return{success:false,message:'Company not found.',session};
+  const result=executeRiverKnowledgeSharing(session,company,payload);
+  if(!result.success)return result;
+  await saveSessionV2(session);
+  broadcastV2(session,'RIVER_KNOWLEDGE_SHARED',{companyId,sourceSiteId:payload.sourceSiteId,targetSiteId:payload.siteId,domain:payload.domain});
+  return result;
 }
 
 export async function setEventAllocationV2(sessionId:string,companyId:string,eventInstanceId:string,domain:KnowledgeDomain,allocation:ActiveEventAllocationV2){
