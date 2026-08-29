@@ -81,8 +81,8 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
   const topEvents = [...resolvedEvents].sort((a: any, b: any) => Math.abs(n(b.net_financial_impact)) - Math.abs(n(a.net_financial_impact))).slice(0, 4);
   const siteScores = company.sites.filter(s => !s.isClosed).map(site => ({
     name: site.name,
-    team: Object.values(site.teamCapability).reduce((a, b) => a + b, 0),
-    docs: Object.values(site.codifiedKnowledge).reduce((a, b) => a + b, 0),
+    team: (Object.values(site.teamCapability) as number[]).reduce((a, b) => a + b, 0),
+    docs: (Object.values(site.codifiedKnowledge) as number[]).reduce((a, b) => a + b, 0),
     turnover: site.turnover,
   })).sort((a, b) => a.team - b.team);
 
