@@ -1,7 +1,7 @@
 import type { GamePhase, KnowledgeDomain } from '../types/game.ts';
 import type { ActiveEventAllocationV2, GameSessionV2 } from '../types/gameV2.ts';
 import { DEFAULT_CONFIG } from '../engine/config.ts';
-import { PROGRAMMED_FAILURE_TAG, applyProgressionToCurrentEvents, diversifyInitialKnowledge, progressEventCard } from '../engine/eventProgressionV5.ts';
+import { PROGRAMMED_FAILURE_TAG, applyProgressionToCurrentEvents, capProgressedEventImpact, diversifyInitialKnowledge, progressEventCard } from '../engine/eventProgressionV5.ts';
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { executeRiverKnowledgeSharing } from '../engine/riverKnowledgeV1.ts';
 import { saveSessionV2 } from './dbV2.ts';
@@ -23,6 +23,9 @@ function ensureProgressionConfig(session:GameSessionV2):void {
   session.config.event_value_growth_factor ??= DEFAULT_CONFIG.event_value_growth_factor;
   session.config.event_difficulty_growth_per_move ??= DEFAULT_CONFIG.event_difficulty_growth_per_move;
   session.config.event_initial_impact_multiplier ??= DEFAULT_CONFIG.event_initial_impact_multiplier;
+  session.config.event_impact_cap_ratio ??= DEFAULT_CONFIG.event_impact_cap_ratio;
+  session.config.event_difficulty_cap ??= DEFAULT_CONFIG.event_difficulty_cap;
+  session.config.event_expert_moves_per_pressure_step ??= DEFAULT_CONFIG.event_expert_moves_per_pressure_step;
 }
 
 function applyFreshGameModel(session:GameSessionV2):void {
@@ -56,7 +59,7 @@ export async function createNewSessionV2(sessionId:string,title:string,companyNa
   const session=await baseCreateNewSessionV2(sessionId,title,companyNames,options);
   applyFreshGameModel(session);
   await saveSessionV2(session);
-  broadcastV2(session,'SESSION_PROGRESSIVE_BALANCE_APPLIED',{valueGrowthFactor:session.config.event_value_growth_factor,difficultyGrowthPerMove:session.config.event_difficulty_growth_per_move});
+  broadcastV2(session,'SESSION_PROGRESSIVE_BALANCE_APPLIED',{valueGrowthFactor:session.config.event_value_growth_factor,difficultyGrowthPerMove:session.config.event_difficulty_growth_per_move,impactCapRatio:session.config.event_impact_cap_ratio,expertMovesPerPressureStep:session.config.event_expert_moves_per_pressure_step});
   return session;
 }
 
@@ -114,7 +117,8 @@ export async function redrawEventV2(sessionId:string,companyId:string,eventInsta
   if(company&&eventIndex>=0){
     const firstMove=Math.max(1,company.eventsDrawnCount-events.length+1);
     const event=events[eventIndex];
-    event.card=progressEventCard(event.card,firstMove+eventIndex,result.session.config);
+    event.card=progressEventCard(event.card,firstMove+eventIndex,result.session.config,result.session.experienceMode);
+    event.card=capProgressedEventImpact(event.card,company,event.targetSiteId,result.session.config);
     const allocations:Partial<Record<KnowledgeDomain,any>>={};
     event.card.domains.forEach(req=>{allocations[req.domain]=event.allocations?.[req.domain]||{}});
     event.allocations=allocations as any;
