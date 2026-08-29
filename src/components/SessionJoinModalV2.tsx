@@ -20,7 +20,8 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
   const [experienceMode, setExperienceMode] = useState<ExperienceMode>('newbie');
   const [duration, setDuration] = useState(60);
   const [maxPlayers, setMaxPlayers] = useState(6);
-  const options = { experienceMode, gameDurationMinutes: duration, maxPlayersPerCompany: maxPlayers };
+  const [actionsPerRound, setActionsPerRound] = useState(5);
+  const options = { experienceMode, gameDurationMinutes: duration, maxPlayersPerCompany: maxPlayers, actionsPerRound };
 
   return <div className="fixed inset-0 z-[250] bg-[#080b12]/95 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="join-title">
     <div className="w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-slate-200">
@@ -50,8 +51,8 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
           <button onClick={()=>setExperienceMode('newbie')} className={`mode-card ${experienceMode==='newbie'?'selected':''}`}><GraduationCap className="w-5 h-5"/><span><b>Newbie</b><small>Guided reveal over Rounds 1–3</small></span></button>
           <button onClick={()=>setExperienceMode('expert')} className={`mode-card ${experienceMode==='expert'?'selected':''}`}><Gauge className="w-5 h-5"/><span><b>Expert</b><small>All features available from Round 1</small></span></button>
         </div></div>
-        <div className="grid grid-cols-2 gap-3"><Field label="Game length (minutes)"><input type="number" min={20} max={240} step={5} value={duration} onChange={e=>setDuration(Math.max(20,Number(e.target.value)))} className="control"/></Field><Field label="Max players / company"><input type="number" min={1} max={20} value={maxPlayers} onChange={e=>setMaxPlayers(Math.max(1,Number(e.target.value)))} className="control"/></Field></div>
-        <div className="rounded-xl border border-indigo-800 bg-indigo-950/25 p-3 text-xs text-slate-300">The final climactic Challenge begins after the current round finishes once the game enters its last 10 minutes. Normal play assumes about one Challenge move every 8 minutes.</div>
+        <div className="grid grid-cols-3 gap-3"><Field label="Game length (minutes)"><input type="number" min={20} max={240} step={5} value={duration} onChange={e=>setDuration(Math.max(20,Number(e.target.value)))} className="control"/></Field><Field label="Max players / company"><input type="number" min={1} max={20} value={maxPlayers} onChange={e=>setMaxPlayers(Math.max(1,Number(e.target.value)))} className="control"/></Field><Field label="Actions / company / round"><input type="number" min={1} max={10} value={actionsPerRound} onChange={e=>setActionsPerRound(Math.max(1,Math.min(10,Number(e.target.value))))} className="control"/></Field></div>
+        <div className="rounded-xl border border-indigo-800 bg-indigo-950/25 p-3 text-xs text-slate-300">The final climactic Challenge begins after the current round finishes once the game enters its last 10 minutes. Normal play assumes about one Challenge move every 8 minutes. Each company starts every Invest phase with the number of Actions selected above.</div>
         <button onClick={()=>onCreateNewSession(name,companyCount,options)} className="primary"><Sparkles className="w-4 h-4"/>LAUNCH NEW GAME</button>
         <button onClick={()=>onSoloStart(options)} className="w-full text-xs text-indigo-300 underline">Launch a 1-company solo game with these settings</button>
       </div>}
