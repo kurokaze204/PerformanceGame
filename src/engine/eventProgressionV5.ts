@@ -2,6 +2,7 @@ import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import type { DomainScoreMap, EventCard, EventType, KnowledgeDomain, SimulationConfig, Site } from '../types/game.ts';
 
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
+export const PROGRAMMED_FAILURE_TAG = 'tutorial-programmed-failure';
 
 const EARLY_CARDS: EventCard[] = [
   { id:'LEARN-P-OPS', type:'problem', scope:'local', title:'Late Dispatch at a Local Site', description:'A routine scheduling mistake has delayed several customer deliveries. The financial exposure is small, making this a safe chance to learn how local knowledge affects a response.', domains:[{domain:'operations',difficulty:2}], impact:18, tags:['learning','routine','operations'] },
@@ -27,6 +28,50 @@ const HIGH_STAKES_CARDS: EventCard[] = [
 
 function pick<T>(items:T[]):T { return items[Math.floor(Math.random()*items.length)]; }
 function cloneCard(card:EventCard):EventCard { return { ...card, domains: card.domains.map(d=>({...d})), tags:[...card.tags] }; }
+function siteKnowledge(site:Site,domain:KnowledgeDomain):number { return Math.max(site.teamCapability[domain]||0,site.codifiedKnowledge[domain]||0); }
+
+export interface OpeningKnowledgeGap {
+  domain: KnowledgeDomain;
+  targetSite: Site;
+  sourceSite: Site;
+  targetScore: number;
+  sourceScore: number;
+}
+
+export function findOpeningKnowledgeGap(company:CompanyV2):OpeningKnowledgeGap {
+  const sites=company.sites.filter(site=>!site.isClosed);
+  let best:OpeningKnowledgeGap|undefined;
+  for(const domain of DOMAINS){
+    for(const targetSite of sites){
+      for(const sourceSite of sites){
+        if(sourceSite.id===targetSite.id)continue;
+        const targetScore=siteKnowledge(targetSite,domain);
+        const sourceScore=siteKnowledge(sourceSite,domain);
+        const candidate={domain,targetSite,sourceSite,targetScore,sourceScore};
+        if(!best || sourceScore-targetScore>best.sourceScore-best.targetScore)best=candidate;
+      }
+    }
+  }
+  if(best)return best;
+  const site=sites[0];
+  return {domain:'operations',targetSite:site,sourceSite:site,targetScore:siteKnowledge(site,'operations'),sourceScore:siteKnowledge(site,'operations')};
+}
+
+export function buildProgrammedOpeningFailure(company:CompanyV2):{card:EventCard;targetSiteId:string;gap:OpeningKnowledgeGap} {
+  const gap=findOpeningKnowledgeGap(company);
+  const domainLabel=gap.domain==='hr'?'Human Resources':gap.domain[0].toUpperCase()+gap.domain.slice(1);
+  const card:EventCard={
+    id:`TUTORIAL-ISOLATED-${gap.domain.toUpperCase()}`,
+    type:'problem',
+    scope:'local',
+    title:'LEARNING: A Problem Another Site Knows How to Solve',
+    description:`${gap.targetSite.name} faces a contained ${domainLabel.toLowerCase()} problem. This opening challenge deliberately tests only knowledge the site can reach today. Elsewhere in the company, ${gap.sourceSite.name} already has stronger ${domainLabel} knowledge — but that knowledge is not yet available here through the Corporate Intranet.`,
+    domains:[{domain:gap.domain,difficulty:99}],
+    impact:18,
+    tags:[PROGRAMMED_FAILURE_TAG,'learning','knowledge-isolation',`tutorial-domain:${gap.domain}`,`tutorial-source:${gap.sourceSite.id}`,`tutorial-target:${gap.targetSite.id}`],
+  };
+  return {card,targetSiteId:gap.targetSite.id,gap};
+}
 
 function pickProgressionCard(type:EventType, moveNumber:number, fallback:EventCard):EventCard {
   if (moveNumber <= 2) return cloneCard(pick(EARLY_CARDS.filter(c=>c.type===type)));
@@ -46,7 +91,7 @@ export function progressEventCard(fallback:EventCard, moveNumber:number, config:
   card.impact=Math.max(5,Math.round(card.impact*startingMultiplier*valueFactor));
   card.domains=card.domains.map(req=>({ ...req, difficulty:Math.max(1,Math.round(req.difficulty+(moveNumber-1)*difficultyGrowth)) }));
   const tier=moveNumber<=2?'LEARNING':moveNumber<=4?'MATERIAL':moveNumber<=6?'HIGH STAKES':'CRITICAL';
-  card.title=`${tier}: ${card.title}`;
+  card.title=`${tier}: ${card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,'')}`;
   card.description=`${card.description} This is move ${moveNumber}; the financial stakes and knowledge difficulty are deliberately higher as the game progresses.`;
   return card;
 }
@@ -58,14 +103,27 @@ export function applyProgressionToCurrentEvents(session:GameSessionV2, company:C
   const firstMove=Math.max(1,company.eventsDrawnCount-events.length+1);
   events.forEach((event,index)=>{
     const moveNumber=firstMove+index;
-    event.card=progressEventCard(event.card,moveNumber,session.config);
-    if(event.card.scope==='local'){
-      if(!event.targetSiteId||!company.sites.some(s=>s.id===event.targetSiteId&&!s.isClosed)) event.targetSiteId=chooseSite(company)?.id;
-    } else event.targetSiteId=undefined;
+    if(session.round===1&&moveNumber===1){
+      const tutorial=buildProgrammedOpeningFailure(company);
+      event.card=tutorial.card;
+      event.targetSiteId=tutorial.targetSiteId;
+    } else {
+      event.card=progressEventCard(event.card,moveNumber,session.config);
+      if(event.card.scope==='local'){
+        if(!event.targetSiteId||!company.sites.some(s=>s.id===event.targetSiteId&&!s.isClosed)) event.targetSiteId=chooseSite(company)?.id;
+      } else event.targetSiteId=undefined;
+    }
     const allocations:any={};
     event.card.domains.forEach(req=>{allocations[req.domain]=event.allocations?.[req.domain]||{}});
     event.allocations=allocations;
   });
+
+  // Keep the event-mix counters aligned with the cards the player actually sees.
+  if(session.round===1&&firstMove===1){
+    company.problemEventsDrawn=events.filter(event=>event.card.type==='problem').length;
+    company.opportunityEventsDrawn=events.filter(event=>event.card.type==='opportunity').length;
+    company.eventsDrawnCount=events.length;
+  }
 }
 
 function diversifyMap(map:DomainScoreMap):void {
