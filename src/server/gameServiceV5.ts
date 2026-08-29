@@ -5,9 +5,9 @@ import { applyProgressionToCurrentEvents, diversifyInitialKnowledge, progressEve
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import type { CreateGameOptions } from './gameServiceV4.ts';
+import { broadcastV2 } from './gameServiceV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
-  broadcastV2,
   createNewSessionV2 as baseCreateNewSessionV2,
   initializeDefaultSessionV2 as baseInitializeDefaultSessionV2,
   redrawEventV2 as baseRedrawEventV2,
