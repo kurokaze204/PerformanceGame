@@ -28,7 +28,8 @@ const HIGH_STAKES_CARDS: EventCard[] = [
 
 function pick<T>(items:T[]):T { return items[Math.floor(Math.random()*items.length)]; }
 function cloneCard(card:EventCard):EventCard { return { ...card, domains: card.domains.map(d=>({...d})), tags:[...card.tags] }; }
-function siteKnowledge(site:Site,domain:KnowledgeDomain):number { return Math.max(site.teamCapability[domain]||0,site.codifiedKnowledge[domain]||0); }
+function openingDomains(mode:ExperienceMode):KnowledgeDomain[] { return mode==='newbie'?DOMAINS.filter(domain=>domain!=='finance'):DOMAINS; }
+function siteKnowledge(site:Site,domain:KnowledgeDomain,mode:ExperienceMode):number { return mode==='newbie'?(site.teamCapability[domain]||0):Math.max(site.teamCapability[domain]||0,site.codifiedKnowledge[domain]||0); }
 
 export interface OpeningKnowledgeGap {
   domain: KnowledgeDomain;
@@ -38,27 +39,46 @@ export interface OpeningKnowledgeGap {
   sourceScore: number;
 }
 
-export function findOpeningKnowledgeGap(company:CompanyV2):OpeningKnowledgeGap {
+/**
+ * The opening challenge must visually and mathematically make sense: the target
+ * site cannot already be strong in the tested domain. Prefer an existing local
+ * score of 0–1. If random setup produced no such gap, deliberately create one
+ * in the weakest site/domain pair so the learning event is never a 100% walkover.
+ */
+export function findOpeningKnowledgeGap(company:CompanyV2,mode:ExperienceMode='newbie'):OpeningKnowledgeGap {
   const sites=company.sites.filter(site=>!site.isClosed);
+  const domains=openingDomains(mode);
   let best:OpeningKnowledgeGap|undefined;
-  for(const domain of DOMAINS){
+  for(const domain of domains){
     for(const targetSite of sites){
+      const targetScore=siteKnowledge(targetSite,domain,mode);
+      if(targetScore>1)continue;
       for(const sourceSite of sites){
         if(sourceSite.id===targetSite.id)continue;
-        const targetScore=siteKnowledge(targetSite,domain);
-        const sourceScore=siteKnowledge(sourceSite,domain);
+        const sourceScore=siteKnowledge(sourceSite,domain,mode);
+        if(sourceScore<=targetScore)continue;
         const candidate={domain,targetSite,sourceSite,targetScore,sourceScore};
         if(!best || sourceScore-targetScore>best.sourceScore-best.targetScore)best=candidate;
       }
     }
   }
   if(best)return best;
-  const site=sites[0];
-  return {domain:'operations',targetSite:site,sourceSite:site,targetScore:siteKnowledge(site,'operations'),sourceScore:siteKnowledge(site,'operations')};
+
+  // No naturally weak target was generated. Choose the weakest site/domain pair,
+  // make that opening weakness explicit, then select the strongest other site as
+  // the knowledge source. This is part of the tutorial setup, not a mid-game nerf.
+  let weakest={domain:domains[0],site:sites[0],score:Number.POSITIVE_INFINITY};
+  for(const domain of domains)for(const site of sites){const score=siteKnowledge(site,domain,mode);if(score<weakest.score)weakest={domain,site,score};}
+  weakest.site.teamCapability[weakest.domain]=Math.min(1,weakest.site.teamCapability[weakest.domain]||1);
+  if(mode==='expert')weakest.site.codifiedKnowledge[weakest.domain]=Math.min(1,weakest.site.codifiedKnowledge[weakest.domain]||1);
+  const others=sites.filter(site=>site.id!==weakest.site.id);
+  let source=others.sort((a,b)=>siteKnowledge(b,weakest.domain,mode)-siteKnowledge(a,weakest.domain,mode))[0]||weakest.site;
+  if(source.id!==weakest.site.id&&siteKnowledge(source,weakest.domain,mode)<=1)source.teamCapability[weakest.domain]=3;
+  return {domain:weakest.domain,targetSite:weakest.site,sourceSite:source,targetScore:siteKnowledge(weakest.site,weakest.domain,mode),sourceScore:siteKnowledge(source,weakest.domain,mode)};
 }
 
-export function buildProgrammedOpeningFailure(company:CompanyV2):{card:EventCard;targetSiteId:string;gap:OpeningKnowledgeGap} {
-  const gap=findOpeningKnowledgeGap(company);
+export function buildProgrammedOpeningFailure(company:CompanyV2,mode:ExperienceMode='newbie'):{card:EventCard;targetSiteId:string;gap:OpeningKnowledgeGap} {
+  const gap=findOpeningKnowledgeGap(company,mode);
   const domainLabel=gap.domain==='hr'?'Human Resources':gap.domain[0].toUpperCase()+gap.domain.slice(1);
   const card:EventCard={
     id:`TUTORIAL-ISOLATED-${gap.domain.toUpperCase()}`,
@@ -119,7 +139,7 @@ export function applyProgressionToCurrentEvents(session:GameSessionV2, company:C
   events.forEach((event,index)=>{
     const moveNumber=firstMove+index;
     if(session.round===1&&moveNumber===1){
-      const tutorial=buildProgrammedOpeningFailure(company);
+      const tutorial=buildProgrammedOpeningFailure(company,session.experienceMode);
       event.card=tutorial.card;
       event.targetSiteId=tutorial.targetSiteId;
     } else {
@@ -134,7 +154,6 @@ export function applyProgressionToCurrentEvents(session:GameSessionV2, company:C
     event.allocations=allocations;
   });
 
-  // Keep the event-mix counters aligned with the cards the player actually sees.
   if(session.round===1&&firstMove===1){
     company.problemEventsDrawn=events.filter(event=>event.card.type==='problem').length;
     company.opportunityEventsDrawn=events.filter(event=>event.card.type==='opportunity').length;
