@@ -53,6 +53,75 @@
   touch-action: manipulation;
 }
 
+/* Event workspace typography: eliminate prototype-sized labels. */
+div[class*="max-w-[1100px]"] [class~="text-[9px]"],
+div[class*="max-w-[1100px]"] [class~="text-[10px]"] {
+  font-size: .8125rem !important;
+  line-height: 1.35 !important;
+}
+div[class*="max-w-[1100px]"] .text-xs {
+  font-size: .9375rem !important;
+  line-height: 1.4 !important;
+}
+div[class*="max-w-[1100px]"] .text-sm {
+  font-size: 1rem !important;
+}
+div[class*="max-w-[1100px]"] h2.text-xl {
+  font-size: 1.625rem !important;
+  line-height: 1.2 !important;
+}
+
+/* Universal selection language: empty circle = available, circled tick = selected. */
+div[class*="max-w-[1100px]"] button[class*="border-violet-700"][class*="bg-slate-950"],
+div[class*="max-w-[1100px]"] button[class*="border-emerald-300"][class*="bg-emerald-950"] {
+  position: relative;
+  padding-right: 3rem !important;
+}
+div[class*="max-w-[1100px]"] button[class*="border-violet-700"][class*="bg-slate-950"]::after,
+div[class*="max-w-[1100px]"] button[class*="border-emerald-300"][class*="bg-emerald-950"]::after {
+  content: "";
+  position: absolute;
+  right: .75rem;
+  top: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  transform: translateY(-50%);
+  border: 2px solid rgb(148 163 184);
+  border-radius: 9999px;
+  background: rgb(15 23 42 / .85);
+  display: grid;
+  place-items: center;
+}
+div[class*="max-w-[1100px]"] button[class*="border-emerald-300"][class*="bg-emerald-950"]::after {
+  content: "✓";
+  border-color: rgb(110 231 183);
+  background: rgb(6 78 59);
+  color: rgb(209 250 229);
+  font-size: .95rem;
+  line-height: 1;
+  font-weight: 900;
+}
+div[class*="max-w-[1100px]"] aside > button.relative::after {
+  content: "";
+  position: absolute;
+  right: .7rem;
+  top: .75rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 2px solid rgb(100 116 139);
+  border-radius: 9999px;
+}
+div[class*="max-w-[1100px]"] aside > button.relative:has(> svg.absolute)::after { display: none; }
+div[class*="max-w-[1100px]"] aside > button.relative > svg.absolute {
+  width: 1.45rem !important;
+  height: 1.45rem !important;
+  padding: .18rem;
+  border: 2px solid rgb(110 231 183);
+  border-radius: 9999px;
+  background: rgb(6 78 59);
+  color: rgb(209 250 229) !important;
+}
+
 @media (max-width: 1280px) {
   [aria-label="Investment actions"] > div:nth-child(2) {
     grid-template-columns: 240px minmax(0, 1fr) 340px !important;
