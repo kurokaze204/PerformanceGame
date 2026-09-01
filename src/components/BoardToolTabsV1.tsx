@@ -3,6 +3,7 @@ import { BarChart3, Building2, MapPin, Users, X } from 'lucide-react';
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import type { Expert } from '../types/game.ts';
 import { BoardSidePanelV2 } from './BoardSidePanelV2.tsx';
+import { InvestmentDecisionDockV1 } from './InvestmentDecisionDockV1.tsx';
 import { expertDisplayName } from '../utils/expertDisplay.ts';
 import { DomainBadge, domainsForMode } from './DomainBadge.tsx';
 import { formatCurrency } from '../utils/format.ts';
@@ -10,7 +11,11 @@ import { formatCurrency } from '../utils/format.ts';
 type Tool='sites'|'experts'|'hq'|'score'|null;
 interface Props{session:GameSessionV2;company:CompanyV2;selectedSiteId:string;tool:Tool;onTool:(tool:Tool)=>void;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;onSelectExpert?:(expert:Expert)=>void;}
 const tabs=[['sites','Sites',MapPin],['experts','Experts',Users],['hq','HQ',Building2],['score','Score',BarChart3]] as const;
-export const BoardToolTabsV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert})=>{if(session.phase!=='respond')return null;const domains=domainsForMode(session.experienceMode),site=company.sites.find(s=>s.id===selectedSiteId)||company.sites[0];return <aside className="relative z-40 flex shrink-0 self-stretch min-h-[560px] sm:min-h-[620px]">
+export const BoardToolTabsV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert})=>{
+ if(session.phase==='investment')return <InvestmentDecisionDockV1 session={session} company={company} selectedSiteId={selectedSiteId} tool={tool} onTool={onTool} onSelectSite={onSelectSite} onSelectHQ={onSelectHQ} onSelectExpert={onSelectExpert}/>;
+ if(session.phase!=='respond')return null;
+ const domains=domainsForMode(session.experienceMode),site=company.sites.find(s=>s.id===selectedSiteId)||company.sites[0];
+ return <aside className="relative z-40 flex shrink-0 self-stretch min-h-[560px] sm:min-h-[620px]">
  <nav className="flex w-[96px] sm:w-[116px] flex-col gap-2 pt-12" aria-label="Board tools">{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>onTool(tool===id?null:id)} className={`min-h-16 rounded-l-2xl border-2 border-r-0 px-3 py-3 flex flex-col sm:flex-row items-center justify-center gap-2 text-base sm:text-lg font-black transition ${tool===id?'bg-violet-950 border-violet-300 text-white':'bg-[#10151f] border-slate-700 text-slate-100 hover:border-emerald-400'}`}><Icon className="w-5 h-5 shrink-0"/><span>{label}</span></button>)}</nav>
  {tool&&<div className="w-[min(440px,42vw)] min-w-[340px] bg-[#0b0f18] border-l-2 border-violet-500 overflow-y-auto p-5"><div className="flex justify-between items-center mb-4"><div className="text-sm uppercase tracking-[.18em] text-emerald-300 font-black">Board tool</div><button onClick={()=>onTool(null)} className="w-12 h-12 grid place-items-center rounded-xl border border-slate-700"><X className="w-6 h-6"/></button></div>
   {tool==='sites'&&<BoardSidePanelV2 session={session} company={company} selectedSiteId={selectedSiteId} isHQSelected={false} onSelectSite={onSelectSite} onSelectHQ={onSelectHQ}/>} 
