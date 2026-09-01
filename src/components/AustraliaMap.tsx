@@ -1,4 +1,4 @@
-import React,{useMemo}from'react';import type{Company,Expert}from'../types/game.ts';import{AUSTRALIAN_CITIES,HQ_COORDINATES,HOBART_COORDINATES}from'../engine/config.ts';import{AUSTRALIA_GRID}from'../utils/australiaGrid.ts';import{Building2,UserCheck}from'lucide-react';
+import React,{useMemo}from'react';import type{Company,Expert}from'../types/game.ts';import{AUSTRALIAN_CITIES,HQ_COORDINATES}from'../engine/config.ts';import{AUSTRALIA_GRID}from'../utils/australiaGrid.ts';import{Building2,UserCheck}from'lucide-react';
 export interface SiteImpactEffect{id:string;siteIds:string[];amount:number;enterprise:boolean}
 interface Props{company:Company;selectedSiteId:string|null;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;isHQSelected:boolean;onSelectExpert:(expert:Expert)=>void;impactEffect?:SiteImpactEffect|null}
 const CANONICAL:Record<string,{x:number;y:number}>={...Object.fromEntries(AUSTRALIAN_CITIES.map(c=>[c.id,c.coordinates])),melbourne:{x:71.8,y:78.3},sydney:{x:81.6,y:65.5},brisbane:{x:84.2,y:51.7},perth:{x:18.1,y:67.2},adelaide:{x:61.0,y:71.9},darwin:{x:44.8,y:15.4}};
