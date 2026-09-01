@@ -1,8 +1,6 @@
 import { SimulationConfig } from '../types/game.ts';
 
 export const DEFAULT_CONFIG: SimulationConfig = {
-  // Reduced to one quarter of the original $3.5m company so event exposure
-  // becomes strategically meaningful much earlier in a session.
   starting_turnover: 875,
   minimum_site_turnover: 75,
   sites_per_company: 6,
@@ -20,13 +18,8 @@ export const DEFAULT_CONFIG: SimulationConfig = {
 
   event_die: 12,
   cost_die: 6,
-  // Original rule: succeed when d12 roll is higher than the remaining
-  // knowledge gap. In integer form this is roll + knowledge >= difficulty + 1.
   resolution_offset: 1,
 
-  // Tuned after the 100-game archetype study. Newbie mode escalates every move;
-  // Expert mode advances the same pressure curve more slowly so KM practitioners
-  // can run 25–30 rounds and compare long-horizon strategy differences.
   event_value_growth_factor: 1.40,
   event_difficulty_growth_per_move: 0.28,
   event_initial_impact_multiplier: 0.12,
@@ -51,13 +44,19 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   three_domain_ratio: 0.05,
 };
 
+// Positions are plotted against the stylised but geographically proportioned
+// Australia outline in australiaGrid.ts. They correspond to the real relative
+// locations of the capital cities rather than being moved to make UI space.
 export const AUSTRALIAN_CITIES = [
-  { id: 'melbourne', name: 'Melbourne', coordinates: { x: 74, y: 81 } },
-  { id: 'sydney', name: 'Sydney', coordinates: { x: 86, y: 64 } },
-  { id: 'brisbane', name: 'Brisbane', coordinates: { x: 88, y: 46 } },
-  { id: 'adelaide', name: 'Adelaide', coordinates: { x: 58, y: 72 } },
-  { id: 'perth', name: 'Perth', coordinates: { x: 17, y: 66 } },
-  { id: 'darwin', name: 'Darwin', coordinates: { x: 44, y: 15 } },
+  { id: 'melbourne', name: 'Melbourne', coordinates: { x: 72.7, y: 79.4 } },
+  { id: 'sydney', name: 'Sydney', coordinates: { x: 83.2, y: 65.4 } },
+  { id: 'brisbane', name: 'Brisbane', coordinates: { x: 86.0, y: 52.1 } },
+  { id: 'adelaide', name: 'Adelaide', coordinates: { x: 61.0, y: 72.3 } },
+  { id: 'perth', name: 'Perth', coordinates: { x: 16.9, y: 67.2 } },
+  { id: 'darwin', name: 'Darwin', coordinates: { x: 44.6, y: 15.1 } },
 ];
 
-export const HQ_COORDINATES = { x: 50, y: 48 }; // Centered Inland Strategic Hub
+// Hobart is not a playable site, but Tasmania remains on the board and this
+// reference point is available for labels/visual orientation in the new UI.
+export const HOBART_COORDINATES = { x: 75.1, y: 92.2 };
+export const HQ_COORDINATES = { x: 50, y: 48 };
