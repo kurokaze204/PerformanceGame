@@ -71,6 +71,11 @@ div[class*="max-w-[1100px]"] h2.text-xl {
   line-height: 1.2 !important;
 }
 
+/* A single-domain challenge should use the available width instead of looking like half a card. */
+div[class*="max-w-[1100px]"] .grid.grid-cols-2.gap-2.mt-1:has(> :only-child) {
+  grid-template-columns: minmax(260px, 1fr) !important;
+}
+
 /* Universal selection language: empty circle = available, circled tick = selected. */
 div[class*="max-w-[1100px]"] button[class*="border-violet-700"][class*="bg-slate-950"],
 div[class*="max-w-[1100px]"] button[class*="border-emerald-300"][class*="bg-emerald-950"] {
