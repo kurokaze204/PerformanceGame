@@ -127,9 +127,33 @@ div[class*="max-w-[1100px]"] aside > button.relative > svg.absolute {
   color: rgb(209 250 229) !important;
 }
 
-@media (max-width: 1280px) {
+/* Desktop Invest is a planning desk with a dedicated right-hand reference lane. */
+@media (min-width: 1100px) {
+  [aria-label="Investment actions"] {
+    right: 350px !important;
+  }
   [aria-label="Investment actions"] > div:nth-child(2) {
-    grid-template-columns: 240px minmax(0, 1fr) 340px !important;
+    grid-template-columns: 190px minmax(0, 1fr) 260px !important;
+    gap: .85rem !important;
+  }
+}
+@media (min-width: 1351px) {
+  [aria-label="Investment actions"] > div:nth-child(2) > div:nth-child(2) > div.grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@media (min-width: 1100px) and (max-width: 1350px) {
+  [aria-label="Investment actions"] > div:nth-child(2) > div:nth-child(2) > div.grid {
+    grid-template-columns: 1fr !important;
+  }
+  [aria-label="Investment actions"] > div:nth-child(2) > div:nth-child(2) button {
+    min-height: 104px !important;
+  }
+}
+
+@media (max-width: 1099px) {
+  [aria-label="Investment actions"] > div:nth-child(2) {
+    grid-template-columns: 220px minmax(0, 1fr) 300px !important;
   }
 }
 @media (max-width: 1050px) {
