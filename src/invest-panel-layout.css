@@ -2,3 +2,27 @@
 [aria-label="Investment actions"] {
   top: 146px !important;
 }
+
+/* Large playtest screens: make Invest a deliberately narrower planning workspace.
+   The cards then resize because their available column is smaller, rather than
+   because each card has been artificially clamped to a narrow width. */
+@media (min-width: 1500px) {
+  [aria-label="Investment actions"] {
+    right: auto !important;
+    width: min(1180px, calc(100vw - 620px)) !important;
+    max-width: 1180px !important;
+  }
+
+  [aria-label="Investment actions"] > div:nth-child(2) {
+    grid-template-columns: 180px minmax(0, 1fr) 340px !important;
+  }
+
+  [aria-label="Investment actions"] > div:nth-child(2) > div:nth-child(2) > div:last-child {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  [aria-label="Investment actions"] > div:nth-child(2) > div:nth-child(2) > div:last-child > button {
+    max-width: none !important;
+    width: 100% !important;
+  }
+}
