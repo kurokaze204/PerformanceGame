@@ -17,19 +17,18 @@ const cardW=132;
 const cardH=184;
 const dealStartX=176;
 const dealGap=146;
-const deckDepth=12;
+const stackCards=12;
 
 function tilt(id:string,index:number){let hash=index*97;for(let i=0;i<id.length;i++)hash=(hash*31+id.charCodeAt(i))%10000;return -2.5+(hash%501)/100;}
 function short(text:string,max=94){return text.length<=max?text:`${text.slice(0,max-1).trim()}…`;}
 function stackRotation(index:number){
-  const fromTop=deckDepth-1-index;
-  if(fromTop===0)return -1.1;
-  if(fromTop===1)return .8;
-  if(fromTop===2)return -.35;
-  return ((index%3)-1)*.08;
+  if(index===stackCards-1)return 2;
+  if(index===stackCards-2)return -2;
+  const subtle=[0,-.15,.12,-.08,.18,-.12,.08,0,.14,-.1];
+  return subtle[index%subtle.length];
 }
 
-const CardBack:React.FC<{label?:string;stackLayer?:boolean}>=({label='EVENT',stackLayer=false})=><div className={`absolute inset-0 rounded-[15px] border-[4px] border-violet-300 bg-[radial-gradient(circle_at_50%_22%,#40246b_0%,#1b1034_48%,#080b12_100%)] grid place-items-center overflow-hidden ${stackLayer?'shadow-[0_2px_3px_rgba(0,0,0,.5)]':'shadow-[0_15px_34px_rgba(0,0,0,.48)]'}`}><div className="absolute inset-3 rounded-xl border-2 border-emerald-400/25"/><b className="-rotate-6 text-xl font-black tracking-[.15em] text-violet-100">{label}</b></div>;
+const CardBack:React.FC<{label?:string}>=({label='EVENT'})=><div className="absolute inset-0 rounded-[15px] border-[4px] border-violet-300 bg-[radial-gradient(circle_at_50%_22%,#40246b_0%,#1b1034_48%,#080b12_100%)] shadow-[0_8px_18px_rgba(0,0,0,.42)] grid place-items-center overflow-hidden"><div className="absolute inset-3 rounded-xl border-2 border-emerald-400/25"/><b className="text-xl font-black tracking-[.15em] text-violet-100">{label}</b></div>;
 
 const FaceCard:React.FC<{event:ActiveEventV2;canDelay?:boolean;onDelay?:()=>void;delayed?:boolean}>=({event,canDelay=false,onDelay,delayed=false})=><div className="absolute inset-0 rounded-[15px] border-[4px] border-violet-300 bg-[#0b0f18] p-3 shadow-[0_15px_34px_rgba(0,0,0,.48)] text-left overflow-hidden"><div className="flex items-center justify-between gap-2"><b className="text-[11px] font-black tracking-[.15em] text-violet-200">EVENT</b>{delayed&&<span className="rounded-full bg-violet-950 px-2 py-0.5 text-[9px] font-black tracking-wider text-violet-200">NEXT ROUND</span>}</div><div className="mt-2 text-[13px] font-black leading-[1.15] text-white">{short(event.card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,''),56)}</div><div className="mt-2 flex flex-wrap gap-1">{event.card.domains.slice(0,3).map(req=><DomainBadge key={req.domain} domain={req.domain}/>)}</div><p className="mt-2 text-[10px] leading-[1.28] text-slate-400">{short(event.card.description,112)}</p>{canDelay&&<button type="button" onClick={e=>{e.stopPropagation();onDelay?.();}} className="absolute bottom-2 left-2 right-2 rounded-lg border-2 border-violet-300 bg-violet-700 px-2 py-1.5 text-[10px] font-black text-white hover:bg-violet-600">DELAY UNTIL NEXT ROUND</button>}</div>;
 
@@ -39,12 +38,11 @@ export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,ca
  const delayed=company.delayedEvent;
  return <div className="absolute left-4 top-4 z-20 h-[440px] w-[650px] max-w-[calc(100%-24px)] select-none pointer-events-none" aria-label="Event cards">
    <div className="absolute left-0 top-0" style={{width:cardW+16,height:cardH+16}}><div className="absolute inset-0 rounded-[18px] border-[4px] border-dashed border-violet-700/80 bg-transparent grid place-items-center"><span className="text-sm font-black tracking-[.18em] text-violet-700/70">EVENTS</span></div></div>
-   <div className="absolute left-[8px] top-[8px] pointer-events-none" style={{width:cardW,height:cardH,filter:'drop-shadow(7px 10px 8px rgba(0,0,0,.42))'}}>
-    {Array.from({length:deckDepth},(_,index)=>{
-      const offset=deckDepth-1-index;
-      return <div key={index} className="absolute inset-0" style={{transform:`translate(${-offset}px,${-offset}px) rotate(${stackRotation(index)}deg)`,zIndex:index}}><CardBack stackLayer={index<deckDepth-1}/></div>;
-    })}
-   </div>
+   <div className="absolute left-[8px] top-[8px] pointer-events-none" style={{width:cardW,height:cardH,transform:'translate(4px,4px)',filter:'drop-shadow(0 13px 12px rgba(0,0,0,.6))'}}/>
+   {Array.from({length:stackCards},(_,index)=>{
+     const offset=stackCards-1-index;
+     return <div key={`deck-${index}`} className="absolute pointer-events-none" style={{left:8-offset,top:8-offset,width:cardW,height:cardH,zIndex:2+index,transform:`rotate(${stackRotation(index)}deg)`,transformOrigin:'center center'}}><CardBack/></div>;
+   })}
 
    <AnimatePresence initial>
     {unresolved.map(({event,index},slot)=>{
