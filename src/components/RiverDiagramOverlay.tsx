@@ -7,7 +7,8 @@ import { riverSiteKnowledgeScore, riverTransferTarget } from '../engine/riverKno
 import { formatCurrency } from '../utils/format.ts';
 
 interface Props { company: CompanyV2; mode:ExperienceMode; phase:GamePhase; onClose: () => void; onShare:(sourceSiteId:string,targetSiteId:string,domain:KnowledgeDomain)=>Promise<{success:boolean;message?:string}>; }
-const DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations','finance'];
+const NEWBIE_DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations'];
+const EXPERT_DOMAINS: KnowledgeDomain[] = [...NEWBIE_DOMAINS,'finance'];
 const ABBR: Record<string,string> = { melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW',HQ:'HQ' };
 const TRANSFER_COST=5;
 const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
@@ -15,17 +16,21 @@ const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map(p
 export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,onShare})=>{
  const sites=company.sites.filter(s=>!s.isClosed);
  const experts=company.experts.filter(e=>!e.isVacant);
+ const domains=mode==='expert'?EXPERT_DOMAINS:NEWBIE_DOMAINS;
  const [domain,setDomain]=useState<KnowledgeDomain>('engineering');
  const [sourceSiteId,setSourceSiteId]=useState('');
  const [targetSiteId,setTargetSiteId]=useState('');
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
- const data=useMemo(()=>DOMAINS.map(d=>{
+
+ useEffect(()=>{if(!domains.includes(domain))setDomain(domains[0])},[mode,domain]);
+
+ const data=useMemo(()=>domains.map(d=>{
    const scores=sites.map(site=>({site,score:riverSiteKnowledgeScore(site,d,mode)}));
    return {domain:d,scores,south:Math.min(...scores.map(x=>x.score)),north:Math.max(...scores.map(x=>x.score))};
  }),[company,mode]);
- const expertMarks=useMemo(()=>experts.flatMap(expert=>expert.domains.map(skill=>({expert,domain:skill.domain,score:skill.score}))),[company]);
- const selectedData=data.find(d=>d.domain===domain)!;
+ const expertMarks=useMemo(()=>experts.flatMap(expert=>expert.domains.filter(skill=>domains.includes(skill.domain)).map(skill=>({expert,domain:skill.domain,score:skill.score}))),[company,mode]);
+ const selectedData=data.find(d=>d.domain===domain)||data[0];
  useEffect(()=>{
    if(!selectedData?.scores.length)return;
    const sorted=[...selectedData.scores].sort((a,b)=>b.score-a.score);
@@ -40,7 +45,7 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,on
  const canBenefit=Boolean(source&&target&&source.id!==target.id&&transferTarget>currentTarget);
  const maxY=Math.max(6,...data.flatMap(d=>d.scores.map(x=>x.score)),...expertMarks.map(x=>x.score));
  const W=920,H=380,padL=58,padR=28,padT=24,padB=56;
- const x=(i:number)=>padL+i*((W-padL-padR)/(DOMAINS.length-1));
+ const x=(i:number)=>domains.length===1?(padL+(W-padR))/2:padL+i*((W-padL-padR)/(domains.length-1));
  const y=(v:number)=>padT+(maxY-v)*((H-padT-padB)/maxY);
  const northPath=data.map((d,i)=>`${i?'L':'M'} ${x(i)} ${y(d.north)}`).join(' ');
  const southPath=data.map((d,i)=>`${i?'L':'M'} ${x(i)} ${y(d.south)}`).join(' ');
@@ -73,7 +78,7 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,on
        </svg>
       </div>
       <aside className="rounded-2xl border border-emerald-800 bg-emerald-950/20 p-4"><div className="text-xs uppercase tracking-wider text-emerald-300 font-black">Knowledge Transfer</div><h3 className="text-lg font-black text-white mt-1">Move knowledge to where it is needed</h3><p className="text-sm text-slate-300 mt-1">Use a stronger site as the teacher. The receiving site can reach about <b>80%</b> of what that teaching site currently knows in the selected domain. This is more targeted than publishing the knowledge to the Corporate Intranet.</p>
-       <label className="block mt-3 text-xs uppercase text-slate-400 font-black">Domain<select value={domain} onChange={e=>{setDomain(e.target.value as KnowledgeDomain);setMessage('')}} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-white normal-case">{DOMAINS.map(d=><option key={d} value={d}>{DOMAIN_INFO[d].label}</option>)}</select></label>
+       <label className="block mt-3 text-xs uppercase text-slate-400 font-black">Domain<select value={domain} onChange={e=>{setDomain(e.target.value as KnowledgeDomain);setMessage('')}} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-white normal-case">{domains.map(d=><option key={d} value={d}>{DOMAIN_INFO[d].label}</option>)}</select></label>
        <label className="block mt-2 text-xs uppercase text-slate-400 font-black">Teaching site<select value={sourceSiteId} onChange={e=>{setSourceSiteId(e.target.value);setMessage('')}} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-white normal-case">{[...selectedData.scores].sort((a,b)=>b.score-a.score).map(({site,score})=><option key={site.id} value={site.id}>{site.name} · {score}</option>)}</select></label>
        <div className="my-2 flex justify-center text-emerald-300"><ArrowRight className="w-5 h-5"/></div>
        <label className="block text-xs uppercase text-slate-400 font-black">Receiving site<select value={targetSiteId} onChange={e=>{setTargetSiteId(e.target.value);setMessage('')}} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-white normal-case">{[...selectedData.scores].sort((a,b)=>a.score-b.score).map(({site,score})=><option key={site.id} value={site.id}>{site.name} · {score}</option>)}</select></label>
