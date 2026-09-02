@@ -25,10 +25,12 @@ const ROUND_ONE_DISABLED_LABELS = [
 ];
 
 export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
-  const {session,company,event,cardNumber,onAcknowledgeResolution}=props;
+  const {session,company,event,onAcknowledgeResolution}=props;
   const [pendingContinue,setPendingContinue]=useState<any|null>(null);
   const decisionRootRef=useRef<HTMLDivElement|null>(null);
-  const isOpeningLesson=session.experienceMode==='newbie'&&cardNumber===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
+  // The programmed tutorial event may be played in either dealt-card position.
+  // Identify it by its tag, never by cardNumber.
+  const isOpeningLesson=session.experienceMode==='newbie'&&session.round===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
   const lessonKey=`tpg_transfer_unlock_${session.id}_${company.id}`;
   const simplifyRoundOne=session.experienceMode==='newbie'&&session.round===1;
 
