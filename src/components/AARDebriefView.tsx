@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, ExternalLink, Lightbulb, Target } from 'lucide-react';
 import type { BusinessStrategy, CompanyV2, GameSessionV2, KnowledgeStrategy } from '../types/gameV2.ts';
 import { formatCurrency } from '../utils/format.ts';
+import { MiniRiverBenchmark } from './MiniRiverBenchmark.tsx';
 
 type QuestionId = 'plan' | 'actual' | 'why' | 'improve';
 type AnalyticsData = { available?: boolean; companies?: any[]; metrics?: any[]; events?: any[]; reason?: string };
@@ -190,7 +191,7 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
 
             {question === 'actual' && <div className="mt-5">
               <div className="grid md:grid-cols-2 gap-3">{actualCards.map(card => <Evidence key={card.title} card={card} toneClass={toneClass}/>)}</div>
-              <BenchmarkCharts rows={benchmarks} currentCompanyId={company.id}/>
+              <BenchmarkCharts rows={benchmarks} currentCompanyId={company.id} companies={session.companies} mode={session.experienceMode}/>
             </div>}
 
             {question === 'why' && <div className="mt-5 space-y-3">{whyPrompts.map((prompt, index) => <div key={index} className="rounded-xl border border-amber-800/70 bg-amber-950/20 p-4"><div className="text-[10px] uppercase tracking-wider text-amber-300 font-black">Discuss</div><div className="text-base text-white font-bold mt-1">{prompt}</div></div>)}</div>}
@@ -206,12 +207,13 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
   );
 };
 
-const BenchmarkCharts:React.FC<{rows:BenchmarkRow[];currentCompanyId:string}>=({rows,currentCompanyId})=>{
+const BenchmarkCharts:React.FC<{rows:BenchmarkRow[];currentCompanyId:string;companies:CompanyV2[];mode:GameSessionV2['experienceMode']}>=({rows,currentCompanyId,companies,mode})=>{
  const maxTurnover=Math.max(1,...rows.map(r=>r.finalTurnover));
  const maxCapability=Math.max(1,...rows.flatMap(r=>[r.avgTeam,r.avgCorporate]));
  return <div className="mt-5 rounded-2xl border-2 border-indigo-800 bg-indigo-950/15 p-4">
   <div className="text-[10px] uppercase tracking-[.16em] text-indigo-300 font-black">Game benchmark</div><h4 className="text-lg font-black text-white mt-1">How did the companies finish?</h4><p className="text-xs text-slate-400 mt-1">Use this for comparison and discussion, not as a single winner score. Different strategies can produce different kinds of resilience.</p>
   <div className="mt-4 grid lg:grid-cols-3 gap-3"><BenchmarkMetric title="Final turnover" rows={rows} currentCompanyId={currentCompanyId} value={r=>r.finalTurnover} max={maxTurnover} label={r=>formatCurrency(r.finalTurnover)}/><BenchmarkMetric title="Challenge success rate" rows={rows} currentCompanyId={currentCompanyId} value={r=>r.successRate} max={100} label={r=>pct(r.successRate)}/><BenchmarkCapability rows={rows} currentCompanyId={currentCompanyId} max={maxCapability}/></div>
+  <div className="mt-5 border-t border-indigo-900/70 pt-4"><div className="text-[10px] uppercase tracking-[.16em] text-emerald-300 font-black">Knowledge Rivers</div><h5 className="mt-1 text-base font-black text-white">Where did each company’s knowledge actually sit?</h5><p className="mt-1 text-xs text-slate-400">Compare the shape as well as the average. A wide blue gap means useful knowledge exists somewhere in the company but is unevenly distributed. Yellow people show expertise that may sit above the local capability available at sites.</p><div className="mt-3 grid md:grid-cols-2 gap-3">{companies.map(comp=><MiniRiverBenchmark key={comp.id} company={comp} mode={mode} highlight={comp.id===currentCompanyId}/>)}</div></div>
  </div>
 };
 
