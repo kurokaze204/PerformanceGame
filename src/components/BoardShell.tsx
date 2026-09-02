@@ -10,8 +10,8 @@ interface BoardShellProps {
 }
 
 export const BoardShell:React.FC<BoardShellProps>=({board,overlay,boardTools,eventDeck,phaseBar})=>(
- <section className="relative min-w-0">
-  <div className="relative min-h-[560px] sm:min-h-[620px] rounded-3xl border border-violet-900/70 bg-[#080b12] overflow-hidden">
+ <section className="relative min-w-0 w-full mx-auto max-w-[min(100%,calc((100dvh-112px)*4/3))]">
+  <div className="relative rounded-3xl border border-violet-900/70 bg-[#080b12] overflow-hidden">
    <div className="relative min-w-0 p-2 sm:p-3">
     <div className="h-full min-w-0">{board}</div>
     {eventDeck}
