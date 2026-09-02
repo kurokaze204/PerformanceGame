@@ -16,7 +16,7 @@ export const FacilitatorControlRoomV2:React.FC<Props>=({session,passcode,onSessi
  const estimatedRounds=Math.max(1,Math.floor(estimatedMoves/2));
  const grouped=useMemo(()=>new Map(session.companies.map(c=>[c.id,players.filter(p=>p.companyId===c.id)])),[session.companies,players]);
 
- const command=async(action:'start'|'pause'|'reset')=>{const r=await fetch(`/api/sessions/${session.id}/timer/${action}`,{method:'POST'});if(r.ok)onSessionUpdate(await r.json())};
+ const command=async(action:'start'|'pause'|'reset')=>{const r=await fetch(`/api/sessions/${session.id}/timer/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode})});const d=await r.json();if(!r.ok){onToast(d.error||`Could not ${action} the timer.`);return}onSessionUpdate(d)};
  const saveSettings=async()=>{const r=await fetch(`/api/sessions/${session.id}/facilitator/settings`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode,gameDurationMinutes:duration,maxPlayersPerCompany:maxPlayers})});const d=await r.json();if(!r.ok){onToast(d.error||'Could not save settings.');return}onSessionUpdate(d.session);onToast('Game settings updated.')};
  const move=async(participantId:string,companyId:string)=>{const r=await fetch(`/api/sessions/${session.id}/facilitator/move-player`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode,participantId,companyId})});const d=await r.json();if(!r.ok){onToast(d.error||'Could not move player.');return}onSessionUpdate(d.session);onToast('Player moved to the new company.')};
 
