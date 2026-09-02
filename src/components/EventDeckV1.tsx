@@ -1,50 +1,54 @@
-import React,{useEffect,useState}from'react';
-import{AnimatePresence,motion}from'motion/react';
-import type{ActiveEventV2}from'../types/gameV2.ts';
+import React from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import type { ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
+import { DomainBadge } from './DomainBadge.tsx';
 
-interface Props{events:ActiveEventV2[];activeIndex:number;horizonScan:boolean;onDraw:()=>void;onAdvance?:()=>void;cardOpen?:boolean;}
+interface Props {
+  session: GameSessionV2;
+  company: CompanyV2;
+  events: ActiveEventV2[];
+  activeIndex: number;
+  cardOpen?: boolean;
+  onOpenCard: (index:number)=>void;
+  onDelayCard: (eventInstanceId:string)=>void;
+}
 
-export const EventDeckV1:React.FC<Props>=({events,activeIndex,horizonScan,onDraw,onAdvance,cardOpen=false})=>{
- const remaining=events.filter(e=>!e.isResolved).length;
- const deckRemaining=Math.max(0,remaining-(cardOpen?1:0));
- const[drawing,setDrawing]=useState(false),[advancing,setAdvancing]=useState(false);
- useEffect(()=>{if(!cardOpen)setDrawing(false)},[cardOpen,activeIndex]);
- const draw=()=>{
-  if(drawing||cardOpen||remaining<=0)return;
-  setDrawing(true);
-  window.setTimeout(()=>onDraw(),430);
- };
- const advance=async()=>{
-  if(advancing)return;
-  if(onAdvance){onAdvance();return;}
-  const sessionId=localStorage.getItem('tpg_session_id');
-  if(!sessionId)return;
-  setAdvancing(true);
-  try{
-   let response=await fetch(`/api/sessions/${sessionId}/advance-phase`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-   let data=await response.json();
-   if(!response.ok||data.success===false)throw new Error(data.message||data.error||'Could not advance the game.');
-   if(data.session?.phase==='consequences'){
-    response=await fetch(`/api/sessions/${sessionId}/advance-phase`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-    data=await response.json();
-    if(!response.ok||data.success===false)throw new Error(data.message||data.error||'Could not move to Invest.');
-   }
-   window.location.reload();
-  }catch(error:any){setAdvancing(false);window.alert(error.message||'Could not advance the game.');}
- };
+const cardW=132;
+const cardH=184;
+const dealStartX=176;
+const dealGap=146;
 
- if(!remaining&&!cardOpen)return <div className="absolute left-5 top-5 z-20 w-[190px] sm:w-[230px] select-none pointer-events-auto"><div className="rounded-2xl border-[4px] border-emerald-300 bg-emerald-950/95 p-4 shadow-[0_0_30px_rgba(52,211,153,.3)]"><div className="text-sm uppercase tracking-wider text-emerald-200 font-black">Events complete</div><div className="mt-1 text-xl sm:text-2xl font-black text-white">All {events.length} cards resolved</div><button type="button" disabled={advancing} onClick={advance} className="mt-4 w-full min-h-14 rounded-xl border-[3px] border-violet-300 bg-violet-700 px-3 py-2 text-base sm:text-lg font-black text-white hover:bg-violet-600 focus:outline-none focus:ring-4 focus:ring-violet-300 disabled:opacity-60">{advancing?'MOVING TO INVEST…':'CONTINUE TO INVEST'}</button></div></div>;
+function tilt(id:string,index:number){let hash=index*97;for(let i=0;i<id.length;i++)hash=(hash*31+id.charCodeAt(i))%10000;return -2.5+(hash%501)/100;}
+function short(text:string,max=94){return text.length<=max?text:`${text.slice(0,max-1).trim()}…`;}
 
- return <div className="absolute left-5 top-5 z-20 w-[140px] sm:w-[168px] select-none pointer-events-auto">
-  <div className="relative w-full aspect-[5/7]">
-   <span className="absolute inset-0 translate-x-[10px] translate-y-[10px] rotate-[1.4deg] rounded-2xl border-[3px] border-violet-500/35 bg-[#0d0917] pointer-events-none"/>
-   <span className="absolute inset-0 translate-x-[5px] translate-y-[5px] rotate-[.7deg] rounded-2xl border-[3px] border-violet-500/55 bg-[#100b1e] pointer-events-none"/>
-   {cardOpen||drawing?<div className="absolute inset-0 rounded-2xl border-[3px] border-violet-600/55 bg-[radial-gradient(circle_at_50%_25%,#24163c_0%,#100b1e_58%,#080b12_100%)] shadow-[0_0_18px_rgba(168,85,247,.2)] grid place-items-center pointer-events-none"><span className="absolute inset-3 rounded-xl border-2 border-violet-400/15"/><span className="text-center"><b className="block text-sm font-black tracking-[.14em] text-violet-300/70">EVENT DECK</b><span className="mt-2 block text-xs font-bold text-slate-500">{deckRemaining>0?`${deckRemaining} waiting`:'card in play'}</span></span></div>:<button type="button" onClick={draw} aria-label={`Draw event card ${activeIndex+1}. ${remaining} cards remaining.`} className="absolute inset-0 block w-full rounded-2xl focus:outline-none focus:ring-4 focus:ring-violet-300 pointer-events-auto cursor-pointer">
-    <motion.span whileHover={{y:-8,rotate:-1.5}} whileTap={{scale:.96}} className="absolute inset-0 rounded-2xl border-[4px] border-violet-300 bg-[radial-gradient(circle_at_50%_25%,#35205b_0%,#160d2d_45%,#080b12_100%)] shadow-[0_0_28px_rgba(168,85,247,.38)] grid place-items-center overflow-hidden pointer-events-none"><span className="absolute inset-3 rounded-xl border-2 border-emerald-400/25"/><span className="font-black tracking-[.16em] text-violet-100 text-xl sm:text-2xl -rotate-6">EVENT</span></motion.span>
-   </button>}
-   <AnimatePresence>{drawing&&!cardOpen&&<motion.div key={`draw-${activeIndex}`} initial={{x:0,y:0,scale:1,rotate:0,opacity:1}} animate={{x:'clamp(260px,32vw,520px)',y:'clamp(70px,10vh,130px)',scale:1.32,rotate:4,opacity:[1,1,.18]}} exit={{opacity:0}} transition={{duration:.44,ease:[.22,.9,.28,1]}} className="absolute inset-0 z-[28] rounded-2xl border-[4px] border-violet-200 bg-[radial-gradient(circle_at_50%_25%,#4b2a78_0%,#1d1037_48%,#080b12_100%)] shadow-[0_20px_55px_rgba(0,0,0,.55)] grid place-items-center pointer-events-none"><span className="absolute inset-3 rounded-xl border-2 border-emerald-300/35"/><span className="font-black tracking-[.16em] text-white text-xl sm:text-2xl -rotate-6">EVENT</span></motion.div>}</AnimatePresence>
-  </div>
-  <div className="mt-3 text-center text-sm sm:text-base font-black text-slate-200 pointer-events-none">{cardOpen?`${deckRemaining} card${deckRemaining===1?'':'s'} still in deck`:`${remaining} card${remaining===1?'':'s'} remaining`}</div>
-  {horizonScan&&!cardOpen&&<div className="mt-1 text-center text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-300 pointer-events-none">Horizon scan ready</div>}
+const CardBack:React.FC<{label?:string}>=({label='EVENT'})=><div className="absolute inset-0 rounded-[15px] border-[4px] border-violet-300 bg-[radial-gradient(circle_at_50%_22%,#40246b_0%,#1b1034_48%,#080b12_100%)] shadow-[0_15px_34px_rgba(0,0,0,.48)] grid place-items-center overflow-hidden"><div className="absolute inset-3 rounded-xl border-2 border-emerald-400/25"/><b className="-rotate-6 text-xl font-black tracking-[.15em] text-violet-100">{label}</b></div>;
+
+const FaceCard:React.FC<{event:ActiveEventV2;canDelay?:boolean;onDelay?:()=>void;delayed?:boolean}>=({event,canDelay=false,onDelay,delayed=false})=><div className="absolute inset-0 rounded-[15px] border-[4px] border-violet-300 bg-[#0b0f18] p-3 shadow-[0_15px_34px_rgba(0,0,0,.48)] text-left overflow-hidden"><div className="flex items-center justify-between gap-2"><b className="text-[11px] font-black tracking-[.15em] text-violet-200">EVENT</b>{delayed&&<span className="rounded-full bg-violet-950 px-2 py-0.5 text-[9px] font-black tracking-wider text-violet-200">NEXT ROUND</span>}</div><div className="mt-2 text-[13px] font-black leading-[1.15] text-white">{short(event.card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,''),56)}</div><div className="mt-2 flex flex-wrap gap-1">{event.card.domains.slice(0,3).map(req=><DomainBadge key={req.domain} domain={req.domain}/>)}</div><p className="mt-2 text-[10px] leading-[1.28] text-slate-400">{short(event.card.description,112)}</p>{canDelay&&<button type="button" onClick={e=>{e.stopPropagation();onDelay?.();}} className="absolute bottom-2 left-2 right-2 rounded-lg border-2 border-violet-300 bg-violet-700 px-2 py-1.5 text-[10px] font-black text-white hover:bg-violet-600">DELAY UNTIL NEXT ROUND</button>}</div>;
+
+export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,cardOpen=false,onOpenCard,onDelayCard})=>{
+ const horizonActive=company.horizonScanAvailableRound===session.round&&!company.horizonScanUsedThisRound&&Boolean(company.horizonScanDomain);
+ const unresolved=events.map((event,index)=>({event,index})).filter(item=>!item.event.isResolved);
+ const delayed=company.delayedEvent;
+ return <div className="absolute left-4 top-4 z-20 h-[440px] w-[650px] max-w-[calc(100%-24px)] select-none pointer-events-none" aria-label="Event cards">
+   <div className="absolute left-0 top-0" style={{width:cardW+16,height:cardH+16}}><div className="absolute inset-0 rounded-[18px] border-[4px] border-dashed border-violet-700/80 bg-transparent grid place-items-center"><span className="text-sm font-black tracking-[.18em] text-violet-700/70">EVENTS</span></div></div>
+   <div className="absolute left-[8px] top-[8px] pointer-events-none" style={{width:cardW,height:cardH,transform:'rotate(-1.8deg)'}}><CardBack/></div>
+   <div className="absolute left-[9px] top-[9px] pointer-events-none" style={{width:cardW,height:cardH,transform:'rotate(1.1deg)'}}><CardBack/></div>
+   <div className="absolute left-[8px] top-[8px] pointer-events-none" style={{width:cardW,height:cardH,transform:'rotate(.2deg)'}}><CardBack/></div>
+
+   <AnimatePresence initial>
+    {unresolved.map(({event,index},slot)=>{
+      const faceUp=horizonActive&&(session.experienceMode==='newbie'||event.card.domains.some(req=>req.domain===company.horizonScanDomain));
+      const canDelay=faceUp&&!delayed;
+      const rotation=tilt(event.instanceId,slot);
+      const isCurrent=cardOpen&&index===activeIndex;
+      const finalLeft=dealStartX+slot*dealGap;
+      return <motion.button key={event.instanceId} type="button" onClick={()=>!cardOpen&&onOpenCard(index)} disabled={cardOpen} initial={{x:8-finalLeft,y:8,rotate:rotation,opacity:1}} animate={{x:0,y:0,rotate:rotation,opacity:isCurrent?0:1}} exit={{opacity:0,y:-18,scale:.94}} transition={{duration:1.2,delay:slot*.08,ease:[.2,.8,.22,1]}} className="absolute top-0 pointer-events-auto disabled:pointer-events-none focus:outline-none focus:ring-4 focus:ring-violet-300 rounded-[15px]" style={{left:finalLeft,width:cardW,height:cardH,zIndex:18-slot}} aria-label={faceUp?`Event: ${event.card.title}`:'Face-down Event card'}>{faceUp?<FaceCard event={event} canDelay={canDelay} onDelay={()=>onDelayCard(event.instanceId)}/>:<CardBack/>}</motion.button>;
+    })}
+   </AnimatePresence>
+
+   <div className="absolute left-0 top-[226px]" style={{width:cardW+16,height:cardH+16}}><div className="absolute inset-0 rounded-[18px] border-[4px] border-dashed border-violet-700/80 bg-transparent grid place-items-center"><span className="text-sm font-black tracking-[.18em] text-violet-700/70">DELAYED</span></div></div>
+   {delayed&&<motion.div initial={{opacity:0,y:-120,rotate:tilt(delayed.instanceId,0)}} animate={{opacity:1,y:0,rotate:0}} transition={{duration:.7,ease:[.2,.8,.2,1]}} className="absolute left-[8px] top-[234px] pointer-events-none" style={{width:cardW,height:cardH}}><FaceCard event={delayed} delayed/></motion.div>}
+
+   {horizonActive&&<div className="absolute left-[176px] top-[198px] rounded-full border border-emerald-700 bg-emerald-950/90 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-emerald-300">Horizon Scan · {session.experienceMode==='newbie'?'all Events revealed':`${company.horizonScanDomain} Events revealed`}</div>}
  </div>;
 };
