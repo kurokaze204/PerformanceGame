@@ -36,7 +36,7 @@ const INTERVENTIONS:Intervention[]=[
  {id:'automate',title:'Automation',description:'Embed critical domain knowledge in systems (+2 on future challenges).',anchor:'existing',icon:Bot,actionType:'AUTOMATE'},
 ];
 function anchorVisible(session:GameSessionV2,id:AnchorId){if(session.experienceMode==='expert')return true;if(id==='existing'||id==='favour'||id==='external')return true;if(id==='expert')return capabilityUnlocked(session.experienceMode,session.round,'expert');if(id==='network')return capabilityUnlocked(session.experienceMode,session.round,'network');return capabilityUnlocked(session.experienceMode,session.round,'foresight');}
-function costFor(actionType:string){return actionType==='SITE_KNOWLEDGE_SHARING'?INVESTMENT_COSTS_V4.KNOWLEDGE_TRANSFER:(INVESTMENT_COSTS_V4[actionType]||0);}
+function costFor(actionType:string){return INVESTMENT_COSTS_V4[actionType]||0;}
 
 export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,onNextPhase})=>{
  const showLocalCodified=localCodifiedVisible(session.experienceMode);
