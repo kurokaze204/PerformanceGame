@@ -9,6 +9,7 @@ import { formatCurrency } from '../utils/format.ts';
 interface Props { company: CompanyV2; mode:ExperienceMode; phase:GamePhase; onClose: () => void; onShare:(sourceSiteId:string,targetSiteId:string,domain:KnowledgeDomain)=>Promise<{success:boolean;message?:string}>; }
 const DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations','finance'];
 const ABBR: Record<string,string> = { melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW' };
+const TRANSFER_COST=5;
 
 export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,onShare})=>{
  const sites=company.sites.filter(s=>!s.isClosed);
@@ -68,7 +69,7 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,on
       <div className="my-2 flex justify-center text-emerald-300"><ArrowRight className="w-5 h-5"/></div>
       <label className="block text-xs uppercase text-slate-400 font-black">Receiving site<select value={targetSiteId} onChange={e=>{setTargetSiteId(e.target.value);setMessage('')}} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-white normal-case">{[...selectedData.scores].sort((a,b)=>a.score-b.score).map(({site,score})=><option key={site.id} value={site.id}>{site.name} · {score}</option>)}</select></label>
       <div className="mt-3 grid grid-cols-3 gap-1 text-center"><Metric label="Teacher" value={sourceScore}/><Metric label="Team now" value={currentTarget}/><Metric label="After" value={transferTarget}/></div>
-      {phase==='investment'?<button onClick={share} disabled={!canBenefit||busy} className="mt-3 w-full rounded-xl bg-amber-400 py-2.5 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-500">{busy?'TRANSFERRING…':`TRANSFER · 1 ACTION · ${formatCurrency(18)}`}</button>:<div className="mt-3 rounded-xl border border-slate-700 bg-slate-950 p-2 text-center text-xs text-slate-400">Planning view available now. Execute Knowledge Transfer during the <b className="text-white">Invest</b> phase.</div>}
+      {phase==='investment'?<button onClick={share} disabled={!canBenefit||busy} className="mt-3 w-full rounded-xl bg-amber-400 py-2.5 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-500">{busy?'TRANSFERRING…':`TRANSFER · 1 ACTION · ${formatCurrency(TRANSFER_COST)}`}</button>:<div className="mt-3 rounded-xl border border-slate-700 bg-slate-950 p-2 text-center text-xs text-slate-400">Planning view available now. Execute Knowledge Transfer during the <b className="text-white">Invest</b> phase.</div>}
       {!canBenefit&&source&&target&&<div className="mt-2 text-xs text-amber-300">Choose a stronger teaching site or a weaker receiving site; this pairing would not lift Team Capability.</div>}{message&&<div className="mt-2 rounded-lg border border-emerald-800 bg-emerald-950/30 p-2 text-xs text-emerald-200">{message}</div>}
      </aside>
     </div>
