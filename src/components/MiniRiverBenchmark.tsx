@@ -6,7 +6,6 @@ import { riverSiteKnowledgeScore } from '../engine/riverKnowledgeV1.ts';
 const NEWBIE_DOMAINS:KnowledgeDomain[]=['engineering','hr','marketing','operations'];
 const EXPERT_DOMAINS:KnowledgeDomain[]=[...NEWBIE_DOMAINS,'finance'];
 const DOMAIN_ABBR:Record<KnowledgeDomain,string>={engineering:'ENG',hr:'HR',marketing:'MKT',operations:'OPS',finance:'FIN'};
-const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW',HQ:'HQ'};
 const initials=(name:string)=>name.replace(/\s\([A-Z]{2,3}\)$/,'').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
 
 interface Props{company:CompanyV2;mode:ExperienceMode;highlight?:boolean;}
@@ -37,7 +36,7 @@ export const MiniRiverBenchmark:React.FC<Props>=({company,mode,highlight=false})
      <path d={southPath} fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinejoin="round"/>
      {data.map((item,index)=><g key={item.domain}>
        <text x={x(index)} y={H-10} textAnchor="middle" fill="#cbd5e1" fontSize="8" fontWeight="800">{DOMAIN_ABBR[item.domain]}</text>
-       {item.scores.map(({site,score},siteIndex)=>{const jitter=(siteIndex-(item.scores.length-1)/2)*4;return <g key={site.id}><circle cx={x(index)+jitter} cy={y(score)} r="3.5" fill="#f8fafc" stroke="#0f172a" strokeWidth="1.2"/><text x={x(index)+jitter+4} y={y(score)-4} fill="#e2e8f0" fontSize="6.5" fontWeight="800">{ABBR[site.id]||site.name.slice(0,3).toUpperCase()}</text></g>})}
+       {item.scores.map(({site,score},siteIndex)=>{const jitter=(siteIndex-(item.scores.length-1)/2)*4;return <circle key={site.id} cx={x(index)+jitter} cy={y(score)} r="3.5" fill="#f8fafc" stroke="#0f172a" strokeWidth="1.2"/>})}
        {expertMarks.filter(mark=>mark.domain===item.domain).map((mark,expertIndex)=>{const same=expertMarks.filter(other=>other.domain===item.domain);const jitter=(expertIndex-(same.length-1)/2)*13;const px=x(index)+jitter,py=y(mark.score);return <g key={`${mark.expert.id}-${item.domain}`}><circle cx={px} cy={py-4} r="3.2" fill="#facc15" stroke="#713f12" strokeWidth="1"/><path d={`M ${px} ${py} L ${px} ${py+7} M ${px-4} ${py+3} L ${px+4} ${py+3} M ${px} ${py+7} L ${px-3} ${py+12} M ${px} ${py+7} L ${px+3} ${py+12}`} fill="none" stroke="#facc15" strokeWidth="2.2" strokeLinecap="round"/><text x={px+5} y={py-4} fill="#fde047" fontSize="6.5" fontWeight="900">{initials(mark.expert.name)}</text></g>})}
      </g>)}
    </svg>
