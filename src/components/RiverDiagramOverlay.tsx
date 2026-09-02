@@ -8,11 +8,13 @@ import { formatCurrency } from '../utils/format.ts';
 
 interface Props { company: CompanyV2; mode:ExperienceMode; phase:GamePhase; onClose: () => void; onShare:(sourceSiteId:string,targetSiteId:string,domain:KnowledgeDomain)=>Promise<{success:boolean;message?:string}>; }
 const DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations','finance'];
-const ABBR: Record<string,string> = { melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW' };
+const ABBR: Record<string,string> = { melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW',HQ:'HQ' };
 const TRANSFER_COST=5;
+const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
 
 export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,onShare})=>{
  const sites=company.sites.filter(s=>!s.isClosed);
+ const experts=company.experts.filter(e=>!e.isVacant);
  const [domain,setDomain]=useState<KnowledgeDomain>('engineering');
  const [sourceSiteId,setSourceSiteId]=useState('');
  const [targetSiteId,setTargetSiteId]=useState('');
@@ -22,6 +24,7 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,on
    const scores=sites.map(site=>({site,score:riverSiteKnowledgeScore(site,d,mode)}));
    return {domain:d,scores,south:Math.min(...scores.map(x=>x.score)),north:Math.max(...scores.map(x=>x.score))};
  }),[company,mode]);
+ const expertMarks=useMemo(()=>experts.flatMap(expert=>expert.domains.map(skill=>({expert,domain:skill.domain,score:skill.score}))),[company]);
  const selectedData=data.find(d=>d.domain===domain)!;
  useEffect(()=>{
    if(!selectedData?.scores.length)return;
@@ -35,7 +38,7 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,on
  const currentTarget=target?.teamCapability[domain]||0;
  const transferTarget=riverTransferTarget(sourceScore);
  const canBenefit=Boolean(source&&target&&source.id!==target.id&&transferTarget>currentTarget);
- const maxY=Math.max(6,...data.flatMap(d=>d.scores.map(x=>x.score)));
+ const maxY=Math.max(6,...data.flatMap(d=>d.scores.map(x=>x.score)),...expertMarks.map(x=>x.score));
  const W=920,H=380,padL=58,padR=28,padT=24,padB=56;
  const x=(i:number)=>padL+i*((W-padL-padR)/(DOMAINS.length-1));
  const y=(v:number)=>padT+(maxY-v)*((H-padT-padB)/maxY);
@@ -44,15 +47,15 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,on
  const gapFill=`${northPath} ${[...data].reverse().map((d,ri)=>`L ${x(data.length-1-ri)} ${y(d.south)}`).join(' ')} Z`;
  const share=async()=>{if(!canBenefit||phase!=='investment'||busy)return;setBusy(true);setMessage('');try{const result=await onShare(sourceSiteId,targetSiteId,domain);setMessage(result.message||'Knowledge transferred.');}finally{setBusy(false)}};
  const knowledgeExplanation=mode==='newbie'
-   ? 'Each dot is that site’s Team Capability in the domain. The green lines show the weakest and strongest sites. The shaded area is the internal performance gap: knowledge the company already has, but has not yet moved to every place that needs it.'
-   : 'Each dot is a site’s strongest locally available knowledge in that domain — Team Capability or Local Codified Knowledge, whichever is higher. The green lines show the weakest and strongest sites. The shaded area highlights where internal transfer may close a performance gap before outside expertise is required.';
+   ? 'Each white dot is that site’s Team Capability in the domain. Yellow people show where your experts sit on the same knowledge scale. The green lines show the weakest and strongest sites. The shaded area is the internal performance gap: knowledge the company already has, but has not yet moved to every place that needs it.'
+   : 'Each white dot is a site’s strongest locally available knowledge in that domain — Team Capability or Local Codified Knowledge, whichever is higher. Yellow people show expert capability. The green lines show the weakest and strongest sites. The shaded area highlights where internal transfer may close a performance gap before outside expertise is required.';
  return <div className="fixed inset-0 z-[220] bg-black/75 backdrop-blur-sm p-3 sm:p-4 flex items-center justify-center overflow-hidden" role="dialog" aria-modal="true" aria-label="Knowledge Transfer">
    <div className="w-full max-w-6xl h-[min(90vh,820px)] rounded-3xl border border-slate-600 bg-[#0b1020] shadow-2xl overflow-hidden flex flex-col">
     <div className="shrink-0 sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-slate-800 bg-[#0b1020]/95 px-5 py-4 backdrop-blur-md"><div><div className="text-xs uppercase tracking-[0.18em] text-emerald-300 font-black">Knowledge Transfer · Internal capability map</div><h2 className="text-2xl font-black text-white">Where does knowledge already exist?</h2><p className="text-sm text-slate-300 mt-1 max-w-4xl">{knowledgeExplanation}</p></div><button onClick={onClose} className="shrink-0 rounded-xl border border-slate-700 bg-slate-900 p-2 text-white hover:border-emerald-400" aria-label="Close Knowledge Transfer"><X className="w-5 h-5"/></button></div>
     <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
      <div className="mt-4 grid lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
       <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3 overflow-hidden">
-       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[min(38vh,380px)] min-h-[300px]" role="img" aria-label="Knowledge Transfer map showing site knowledge scores by domain">
+       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[min(38vh,380px)] min-h-[300px]" role="img" aria-label="Knowledge Transfer map showing site and expert knowledge scores by domain">
         {[0,1,2,3,4,5,6,7,8].filter(v=>v<=maxY).map(v=><g key={v}><line x1={padL} y1={y(v)} x2={W-padR} y2={y(v)} stroke="#243047" strokeWidth="1"/><text x={padL-12} y={y(v)+4} textAnchor="end" fill="#94a3b8" fontSize="12">{v}</text></g>)}
         <path d={gapFill} fill="#0c4a6e" fillOpacity="0.78"/>
         <path d={northPath} fill="none" stroke="#22c55e" strokeWidth="4" strokeLinejoin="round"/>
@@ -60,6 +63,11 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,on
         {data.map((d,i)=><g key={d.domain}>
           <text x={x(i)} y={H-20} textAnchor="middle" fill="#e2e8f0" fontSize="13" fontWeight="700">{DOMAIN_INFO[d.domain].label}</text>
           {d.scores.map(({site,score},si)=>{const jitter=(si-(d.scores.length-1)/2)*7;return <g key={site.id}><circle cx={x(i)+jitter} cy={y(score)} r="5.5" fill="#f8fafc" stroke="#0f172a" strokeWidth="2"/><text x={x(i)+jitter+7} y={y(score)-7} fill="#f8fafc" fontSize="10" fontWeight="800">{ABBR[site.id]||site.name.slice(0,3).toUpperCase()}</text></g>})}
+          {expertMarks.filter(mark=>mark.domain===d.domain).map((mark,ei)=>{const sameDomain=expertMarks.filter(m=>m.domain===d.domain);const jitter=(ei-(sameDomain.length-1)/2)*22;const px=x(i)+jitter,py=y(mark.score);const loc=ABBR[mark.expert.location]||mark.expert.location.slice(0,3).toUpperCase();return <g key={`${mark.expert.id}-${d.domain}`} aria-label={`${mark.expert.name}, ${loc}, ${DOMAIN_INFO[d.domain].label} expert ${mark.score}`}>
+            <circle cx={px} cy={py-8} r="5" fill="#facc15" stroke="#713f12" strokeWidth="1.5"/>
+            <path d={`M ${px} ${py-2} L ${px} ${py+9} M ${px-7} ${py+2} L ${px+7} ${py+2} M ${px} ${py+9} L ${px-6} ${py+17} M ${px} ${py+9} L ${px+6} ${py+17}`} fill="none" stroke="#facc15" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+            <text x={px+9} y={py-5} fill="#fde047" fontSize="10" fontWeight="900">{initials(mark.expert.name)} · {loc}</text>
+          </g>})}
         </g>)}
         <text x="18" y={H/2} textAnchor="middle" fill="#94a3b8" fontSize="12" transform={`rotate(-90 18 ${H/2})`}>Knowledge level</text>
        </svg>
@@ -74,7 +82,7 @@ export const RiverDiagramOverlay:React.FC<Props>=({company,mode,phase,onClose,on
        {!canBenefit&&source&&target&&<div className="mt-2 text-xs text-amber-300">Choose a stronger teaching site or a weaker receiving site; this pairing would not lift Team Capability.</div>}{message&&<div className="mt-2 rounded-lg border border-emerald-800 bg-emerald-950/30 p-2 text-xs text-emerald-200">{message}</div>}
       </aside>
      </div>
-     <div className="mt-3 grid md:grid-cols-3 gap-3 text-xs"><div className="rounded-xl border border-emerald-800 bg-emerald-950/30 p-3"><b className="text-emerald-300">Strongest site</b><div className="text-slate-300 mt-1">The most your organisation currently knows in each domain. These sites are natural teachers. Beyond this level, genuinely new expertise may be needed.</div></div><div className="rounded-xl border border-sky-800 bg-sky-950/30 p-3"><b className="text-sky-300">Transfer gap</b><div className="text-slate-300 mt-1">The internal performance gap. Deliberately narrow it by moving proven knowledge from stronger sites to weaker sites.</div></div><div className="rounded-xl border border-emerald-800 bg-emerald-950/30 p-3"><b className="text-emerald-300">Weakest site</b><div className="text-slate-300 mt-1">The lowest current site score in each domain — often the best place to target internal Knowledge Transfer first.</div></div></div>
+     <div className="mt-3 grid md:grid-cols-3 gap-3 text-xs"><div className="rounded-xl border border-emerald-800 bg-emerald-950/30 p-3"><b className="text-emerald-300">Strongest site</b><div className="text-slate-300 mt-1">The most your organisation currently knows at site level in each domain. These sites are natural teachers. Yellow people show additional expert knowledge that may sit above the site capability line.</div></div><div className="rounded-xl border border-sky-800 bg-sky-950/30 p-3"><b className="text-sky-300">Transfer gap</b><div className="text-slate-300 mt-1">The internal performance gap. Deliberately narrow it by moving proven knowledge from stronger sites to weaker sites.</div></div><div className="rounded-xl border border-emerald-800 bg-emerald-950/30 p-3"><b className="text-emerald-300">Weakest site</b><div className="text-slate-300 mt-1">The lowest current site score in each domain — often the best place to target internal Knowledge Transfer first.</div></div></div>
     </div>
    </div>
  </div>;
