@@ -32,7 +32,7 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   if(targetScore<=before)return{success:false,message:`${target.name} already has Team Capability ${before}; ${source.name} cannot lift it further through Knowledge Transfer.`,session};
   target.teamCapability[domain]=targetScore;
   recordPublicationEvidenceV4(company,domain,1);
-  const cost=INVESTMENT_COSTS_V4.KNOWLEDGE_TRANSFER;
+  const cost=INVESTMENT_COSTS_V4.SITE_KNOWLEDGE_SHARING;
   target.turnover=Math.max(0,target.turnover-cost);
   company.turnover=Math.round(company.sites.reduce((sum,s)=>sum+(s.isClosed?0:s.turnover),0));
   company.actionsRemaining-=1;
