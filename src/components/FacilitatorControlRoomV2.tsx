@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Clock, Pause, Play, RotateCcw, Users } from 'lucide-react';
+import { ChevronDown, ChevronRight, Clock, Pause, Play, RotateCcw, Users, ArrowLeft } from 'lucide-react';
 import type { GameSessionV2 } from '../types/gameV2.ts';
 import { formatCurrency } from '../utils/format.ts';
 
@@ -19,8 +19,10 @@ export const FacilitatorControlRoomV2:React.FC<Props>=({session,passcode,onSessi
  const command=async(action:'start'|'pause'|'reset')=>{const r=await fetch(`/api/sessions/${session.id}/timer/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode})});const d=await r.json();if(!r.ok){onToast(d.error||`Could not ${action} the timer.`);return}onSessionUpdate(d)};
  const saveSettings=async()=>{const r=await fetch(`/api/sessions/${session.id}/facilitator/settings`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode,gameDurationMinutes:duration,maxPlayersPerCompany:maxPlayers})});const d=await r.json();if(!r.ok){onToast(d.error||'Could not save settings.');return}onSessionUpdate(d.session);onToast('Game settings updated.')};
  const move=async(participantId:string,companyId:string)=>{const r=await fetch(`/api/sessions/${session.id}/facilitator/move-player`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode,participantId,companyId})});const d=await r.json();if(!r.ok){onToast(d.error||'Could not move player.');return}onSessionUpdate(d.session);onToast('Player moved to the new company.')};
+ const returnToGame=()=>{try{const raw=localStorage.getItem('tpg_participant');if(raw){const facilitator=JSON.parse(raw);sessionStorage.setItem('tpg_facilitator_participant',raw);localStorage.setItem('tpg_participant',JSON.stringify({...facilitator,id:`fac-view-${facilitator.id}`,role:'participant'}));sessionStorage.setItem('tpg_facilitator_game_view','1')}}catch{}window.location.reload()};
 
  return <div className="space-y-4" aria-label="Facilitator control panel">
+  <div className="flex justify-end"><button onClick={returnToGame} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-black text-slate-300 flex items-center gap-2"><ArrowLeft className="w-4 h-4"/>Return to game</button></div>
   <section className="rounded-2xl border border-indigo-800 bg-indigo-950/25 p-4"><div className="text-[10px] uppercase tracking-wider text-indigo-300 font-black">How to run the room</div><div className="grid md:grid-cols-3 gap-3 mt-2 text-xs text-slate-300 leading-relaxed"><p><b className="text-white">1 · Form teams.</b> Players may choose a company when joining, or leave it blank and the game places them into the smallest team below the player limit.</p><p><b className="text-white">2 · Let teams decide.</b> Each company should discuss its own Challenges and investments. The facilitator watches progress here rather than making choices for them.</p><p><b className="text-white">3 · Manage exceptions.</b> Expand team assignments below to move somebody manually. Timer and game-length changes affect everyone immediately.</p></div></section>
 
   <div className="grid lg:grid-cols-[1fr_360px] gap-4">
