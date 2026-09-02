@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DEFAULT_CONFIG } from '../src/engine/config.ts';
 import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import { capProgressedEventImpact, diversifyInitialKnowledge, progressEventCard } from '../src/engine/eventProgressionV5.ts';
@@ -50,5 +51,15 @@ assert.ok(capped.impact<=Math.max(5,Math.round(localSite.turnover*0.35)),'local 
 const critical=progressEventCard(base,13,DEFAULT_CONFIG,'newbie');
 assert.ok(critical.title.startsWith('CRITICAL:'));
 assert.ok(critical.domains.every(d=>d.difficulty<=9),'difficulty must respect the tuned ceiling');
+
+// Round 1 regression: dealt Events may be clicked in either order. The teaching
+// moment must follow the programmed failure card itself, and completing the last
+// Event must bypass the legacy Consequences phase and enter Invest directly.
+const tutorialWrapper=readFileSync(new URL('../src/components/EventDecisionCardPlaytestV1.tsx',import.meta.url),'utf8');
+assert.ok(tutorialWrapper.includes("event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)"),'tutorial must identify the programmed failure by tag');
+assert.equal(tutorialWrapper.includes("cardNumber===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)"),false,'tutorial must not depend on dealt-card position');
+const appBoard=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
+assert.ok(appBoard.includes("targetPhase:'investment'"),'final Event must advance directly to Invest');
+assert.ok(appBoard.includes('await advanceToInvestment()'),'completion path must use the direct Invest transition');
 
 console.log('Progression V5 smoke tests passed.');
