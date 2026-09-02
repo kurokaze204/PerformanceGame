@@ -5,6 +5,7 @@ import { recalculateCompanySPOFV2 } from './coreV2.ts';
 
 export const INVESTMENT_COSTS_V4: Record<string, number> = {
   KNOWLEDGE_TRANSFER: 18,
+  SITE_KNOWLEDGE_SHARING: 5,
   CORPORATE_TRAINING: 95,
   CODIFY_SITE: 20,
   TRAIN_EXPERT: 20,
@@ -21,9 +22,6 @@ const cityDistances = AUSTRALIAN_CITIES.flatMap((a, i) => AUSTRALIAN_CITIES.slic
 const minCityDistance = Math.min(...cityDistances);
 const maxCityDistance = Math.max(...cityDistances);
 
-// Deliberately kept as hidden engine state: players should learn "publish recurring or
-// critical knowledge", not learn another meter. Evidence is created by using knowledge
-// in work, sharing it, or reflecting on it. The UI only needs to explain the rule.
 export function publicationEvidenceV4(company: CompanyV2, domain: KnowledgeDomain): number {
   const store = ((company as any).publicationEvidence ??= {});
   return Math.max(0, Number(store[domain] || 0));
@@ -101,7 +99,7 @@ function expertAvailable(expert: CompanyV2['experts'][number]) {
 }
 
 export function isInvestmentActionV4(type: string): boolean {
-  return Object.prototype.hasOwnProperty.call(INVESTMENT_COSTS_V4, type);
+  return Object.prototype.hasOwnProperty.call(INVESTMENT_COSTS_V4, type) && type !== 'SITE_KNOWLEDGE_SHARING';
 }
 
 export function executeInvestmentActionV4(session: GameSessionV2, company: CompanyV2, payload: ActionPayload) {
@@ -212,16 +210,16 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (!domain) return { success: false, message: 'Choose a domain.' };
     company.horizonScanDomain = domain; company.horizonScanAvailableRound = session.round + 1; company.horizonScanUsedThisRound = false;
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${domain} Horizon Scan armed for next round. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${domain} Horizon Scan armed for Round ${session.round + 1}. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'AUTOMATE') {
     if (!domain) return { success: false, message: 'Choose a domain.' };
-    if (company.automatedDomains.includes(domain)) return { success: false, message: 'This domain is already automated.' };
+    if (company.automatedDomains.includes(domain)) return { success: false, message: 'That domain is already automated.' };
     company.automatedDomains.push(domain);
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${domain} automated company-wide (+${session.config.automation_bonus} future challenge knowledge). Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${domain} knowledge automated. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution };
   }
 
-  return { success: false, message: 'Unknown V4 investment action.' };
+  return { success: false, message: 'Unknown investment action.' };
 }
