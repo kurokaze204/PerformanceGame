@@ -47,6 +47,7 @@ export interface ActiveEventV2 extends ActiveEvent {
   siteTurnoverBefore?: number | null;
   netFinancialImpact?: number;
   reputationUsed?: boolean;
+  delayedFromRound?: number;
 }
 
 export interface ExpertV2 extends Expert {
@@ -61,6 +62,7 @@ export interface CompanyV2 extends Company {
   problemEventsDrawn: number;
   opportunityEventsDrawn: number;
   horizonScanAvailableRound: number | null;
+  delayedEvent: ActiveEventV2 | null;
   reputationPoints: number;
   reputationPointsStarted: number;
 
@@ -125,8 +127,6 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   deckVersion: string;
   balanceVersion: string;
 
-  // Workshop/game experience controls. Stored in the authoritative JSON snapshot so
-  // existing databases do not need a schema migration.
   experienceMode: ExperienceMode;
   gameDurationMinutes: number;
   finalWindowMinutes: number;
@@ -171,6 +171,7 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.problemEventsDrawn ??= 0;
   c.opportunityEventsDrawn ??= 0;
   c.horizonScanAvailableRound ??= null;
+  c.delayedEvent ??= null;
   c.reputationPointsStarted = Math.min(c.reputationPointsStarted ?? V2_BALANCE.startingReputationPoints, V2_BALANCE.startingReputationPoints);
   c.reputationPoints = Math.min(c.reputationPoints ?? c.reputationPointsStarted, V2_BALANCE.startingReputationPoints);
   c.businessStrategyInitial ??= null;
