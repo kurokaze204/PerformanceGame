@@ -16,20 +16,20 @@ export function riverTransferTarget(sourceScore:number):number{
 }
 
 export function executeRiverKnowledgeSharing(session:GameSessionV2,company:CompanyV2,payload:any){
-  if(session.phase!=='investment')return{success:false,message:'Knowledge Sharing can only be used during the Invest phase.',session};
+  if(session.phase!=='investment')return{success:false,message:'Knowledge Transfer can only be used during the Invest phase.',session};
   if(company.actionsRemaining<=0)return{success:false,message:'No knowledge actions remaining this round.',session};
   const sourceSiteId=String(payload?.sourceSiteId||'');
   const siteId=String(payload?.siteId||'');
   const domain=payload?.domain as KnowledgeDomain|undefined;
   if(!sourceSiteId||!siteId||!domain)return{success:false,message:'Choose a teaching site, receiving site and domain.',session};
-  if(sourceSiteId===siteId)return{success:false,message:'Choose two different sites for Knowledge Sharing.',session};
+  if(sourceSiteId===siteId)return{success:false,message:'Choose two different sites for Knowledge Transfer.',session};
   const source=company.sites.find(s=>s.id===sourceSiteId&&!s.isClosed);
   const target=company.sites.find(s=>s.id===siteId&&!s.isClosed);
   if(!source||!target)return{success:false,message:'Both sites must be active.',session};
   const sourceScore=riverSiteKnowledgeScore(source,domain,session.experienceMode);
   const targetScore=riverTransferTarget(sourceScore);
   const before=target.teamCapability[domain]||0;
-  if(targetScore<=before)return{success:false,message:`${target.name} already has Team Capability ${before}; ${source.name} cannot lift it further through this sharing action.`,session};
+  if(targetScore<=before)return{success:false,message:`${target.name} already has Team Capability ${before}; ${source.name} cannot lift it further through Knowledge Transfer.`,session};
   target.teamCapability[domain]=targetScore;
   recordPublicationEvidenceV4(company,domain,1);
   const cost=INVESTMENT_COSTS_V4.KNOWLEDGE_TRANSFER;
@@ -40,7 +40,7 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   return{
     success:true,
     session,
-    message:`${source.name} shared ${domain} practice with ${target.name}. ${target.name} Team Capability increased ${before} → ${targetScore}, approximately 80% of ${source.name}'s locally available ${session.experienceMode==='newbie'?'Team Capability':'knowledge score'} ${sourceScore}. Cost $${cost}k.`,
+    message:`${source.name} transferred ${domain} practice to ${target.name}. ${target.name} Team Capability increased ${before} → ${targetScore}, approximately 80% of ${source.name}'s locally available ${session.experienceMode==='newbie'?'Team Capability':'knowledge score'} ${sourceScore}. Cost $${cost}k.`,
     costTurnover:cost,
     investmentAttribution:{siteId:target.id,siteCost:cost,corporateCost:0},
     riverTransfer:{sourceSiteId:source.id,targetSiteId:target.id,domain,sourceScore,targetScore,before},
