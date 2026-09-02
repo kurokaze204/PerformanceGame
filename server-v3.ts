@@ -35,7 +35,7 @@ import {
   committedProbability,
   setStrategyResponse,
 } from './src/server/analyticsHooksV2.ts';
-import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary } from './src/server/dbV2.ts';
+import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary, saveSessionV2 } from './src/server/dbV2.ts';
 import { resolveWithReputationV2 } from './src/server/reputationServiceV2.ts';
 import { applyCardDifficultyBumpV2 } from './src/engine/cardBalanceV2.ts';
 import type { BusinessStrategy, ExperienceMode, KnowledgeStrategy } from './src/types/gameV2.ts';
@@ -190,6 +190,24 @@ async function startServer() {
   };
   app.post('/api/sessions/:id/action', actionHandler);
   app.post('/api/sessions/:id/actions', actionHandler);
+
+  app.post('/api/sessions/:id/replacement-location', async (req, res) => {
+    try {
+      const session = await getSessionV2(req.params.id.toUpperCase());
+      if (!session) return res.status(404).json({ error: 'Session not found.' });
+      if (session.phase !== 'risk') return res.status(400).json({ error: 'Replacement location is chosen during Knowledge Risk.' });
+      const company = session.companies.find(c => c.id === req.body?.companyId);
+      if (!company) return res.status(404).json({ error: 'Company not found.' });
+      const expert = company.experts.find(e => e.id === req.body?.expertId);
+      if (!expert || !expert.isVacant || expert.replacementDueRound == null) return res.status(400).json({ error: 'No replacement is due for that expert.' });
+      const site = company.sites.find(s => s.id === req.body?.siteId && !s.isClosed);
+      if (!site) return res.status(400).json({ error: 'Choose an active city office.' });
+      expert.location = site.id;
+      expert.homeLocation = site.id;
+      await saveSessionV2(session);
+      res.json({ success: true, session, expertId: expert.id, siteId: site.id });
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
 
   const advanceHandler = async (req: express.Request, res: express.Response) => {
     try {
