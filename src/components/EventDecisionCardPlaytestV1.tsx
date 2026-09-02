@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
@@ -17,11 +17,43 @@ interface Props {
   canHorizonRedraw?: boolean;
 }
 
+const ROUND_ONE_DISABLED_LABELS = [
+  'Ask one of our experts to help',
+  'Ask our network for help',
+  'Call in a favour',
+  'Engage external expertise',
+];
+
 export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   const {session,company,event,cardNumber,onAcknowledgeResolution}=props;
   const [pendingContinue,setPendingContinue]=useState<any|null>(null);
+  const decisionRootRef=useRef<HTMLDivElement|null>(null);
   const isOpeningLesson=session.experienceMode==='newbie'&&cardNumber===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
   const lessonKey=`tpg_transfer_unlock_${session.id}_${company.id}`;
+  const simplifyRoundOne=session.experienceMode==='newbie'&&session.round===1;
+
+  useEffect(()=>{
+    const root=decisionRootRef.current;
+    if(!root)return;
+
+    const applyRoundOneLocks=()=>{
+      root.querySelectorAll('button').forEach(button=>{
+        const label=button.textContent?.trim()||'';
+        const locked=simplifyRoundOne&&ROUND_ONE_DISABLED_LABELS.some(target=>label.startsWith(target));
+        if(locked){
+          button.disabled=true;
+          button.setAttribute('aria-disabled','true');
+          button.classList.add('opacity-35','grayscale','cursor-not-allowed');
+          button.classList.remove('hover:border-violet-300','hover:bg-violet-950');
+        }
+      });
+    };
+
+    applyRoundOneLocks();
+    const observer=new MutationObserver(applyRoundOneLocks);
+    observer.observe(root,{childList:true,subtree:true});
+    return()=>observer.disconnect();
+  },[simplifyRoundOne,event.instanceId]);
 
   const interceptContinue=async(data:any)=>{
     if(isOpeningLesson&&!localStorage.getItem(lessonKey)){
@@ -47,5 +79,5 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
     return <NewbieTransferUnlockOverlay session={resolvedSession} company={resolvedCompany} onContinue={finishLesson}/>;
   }
 
-  return <EventDecisionCardV4 {...props} onAcknowledgeResolution={interceptContinue}/>;
+  return <div ref={decisionRootRef}><EventDecisionCardV4 {...props} onAcknowledgeResolution={interceptContinue}/></div>;
 };
