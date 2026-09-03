@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Building2, Gauge, GraduationCap, Settings2, Sparkles } from 'lucide-react';
+import { ArrowRight, Building2, Gauge, GraduationCap, Settings2, Sparkles, X } from 'lucide-react';
 import type { GameSessionV2, ExperienceMode } from '../types/gameV2.ts';
 import { defaultActionsForMode } from '../engine/learningCurveBalanceV1.ts';
 import { formatCurrency } from '../utils/format.ts';
@@ -11,9 +11,10 @@ interface Props {
   onCreateNewSession: (sessionName: string, companyCount: number, options: CreateOptions) => void;
   onSoloStart: (options: CreateOptions) => void;
   initialMode?: 'join'|'current'|'create'|'facilitator';
+  onClose?:()=>void;
 }
 
-export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSession, initialMode='join' }) => {
+export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSession, initialMode='join',onClose }) => {
   const [mode, setMode] = useState<'join'|'current'|'create'|'facilitator'>(initialMode);
   const [sessionId, setSessionId] = useState(currentSession?.id || '');
   const [playerName, setPlayerName] = useState(()=>{try{return localStorage.getItem('tpg_entered_player_name')||''}catch{return''}});
@@ -90,7 +91,8 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
   };
 
   return <div className="fixed inset-0 z-[250] bg-[#080b12]/95 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="join-title">
-    <div className="w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-slate-200">
+    <div className="relative w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-slate-200">
+      {onClose&&<button onClick={onClose} className="absolute right-3 top-3 w-9 h-9 grid place-items-center rounded-xl border border-slate-700 text-slate-400 hover:text-white" aria-label="Close"><X className="w-4 h-4"/></button>}
       <div className="text-center"><div className="text-[10px] uppercase tracking-[.2em] font-black text-indigo-300">Organisational knowledge & resilience</div><h1 id="join-title" className="text-2xl font-black text-white mt-1">The Performance Gap</h1><p className="text-xs text-slate-500 mt-1">Multiplayer strategic business simulation</p></div>
       <div className="grid grid-cols-4 gap-1 mt-5 rounded-xl border border-slate-700 bg-slate-950 p-1" role="tablist" aria-label="Game entry options">
         <Tab active={mode==='join'} onClick={()=>setMode('join')}>Join</Tab>
