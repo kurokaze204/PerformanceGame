@@ -26,6 +26,7 @@ export type KnowledgeStrategy =
   | 'no_particular_strategy';
 
 export type ExperienceMode = 'newbie' | 'expert';
+export type PopulationMode = 'expand' | 'balanced';
 
 export interface ActiveEventAllocationV2 extends ActiveEventAllocation {
   useTeamCapability?: boolean;
@@ -52,10 +53,12 @@ export interface ActiveEventV2 extends ActiveEvent {
 
 export interface ExpertV2 extends Expert {
   replacementDueRound?: number | null;
+  replacementName?: string | null;
 }
 
 export interface CompanyV2 extends Company {
   experts: ExpertV2[];
+  retiredExpertNames: string[];
   consultantEngagements: number;
   eventTypePlan: EventType[];
   eventsDrawnCount: number;
@@ -103,6 +106,7 @@ export interface RiskSummaryV2 {
   departedExperts: {
     expertId: string;
     expertName: string;
+    replacementName?: string;
     domains: KnowledgeDomain[];
     wasSPOF: boolean;
     roll: number;
@@ -132,6 +136,7 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   finalWindowMinutes: number;
   minutesPerMove: number;
   maxPlayersPerCompany: number;
+  populationMode: PopulationMode;
   participants: Participant[];
 }
 
@@ -165,6 +170,7 @@ export const V2_VERSION = {
 
 export function asCompanyV2(company: Company): CompanyV2 {
   const c = company as CompanyV2;
+  c.retiredExpertNames ??= [];
   c.consultantEngagements ??= 0;
   c.eventTypePlan ??= [];
   c.eventsDrawnCount ??= 0;
@@ -185,6 +191,7 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.cumulativeCorporateKnowledgeSpend ??= 0;
   c.cumulativeSiteKnowledgeSpend ??= {};
   for (const site of c.sites || []) c.cumulativeSiteKnowledgeSpend[site.id] ??= 0;
+  for (const expert of c.experts || []) expert.replacementName ??= null;
   return c;
 }
 
@@ -203,6 +210,7 @@ export function asSessionV2(session: GameSession): GameSessionV2 {
   s.finalWindowMinutes = Math.max(5, Math.min(30, Number(s.finalWindowMinutes || 10)));
   s.minutesPerMove = Math.max(4, Math.min(20, Number(s.minutesPerMove || 8)));
   s.maxPlayersPerCompany = Math.max(1, Math.min(20, Number(s.maxPlayersPerCompany || 6)));
+  s.populationMode ??= 'balanced';
   s.participants ??= [];
   return s;
 }
