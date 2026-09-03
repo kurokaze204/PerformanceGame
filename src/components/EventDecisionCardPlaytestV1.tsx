@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
@@ -24,6 +24,29 @@ const ROUND_ONE_DISABLED_LABELS = [
   'Engage external expertise',
 ];
 
+const OPENING_PROBLEMS:Record<KnowledgeDomain,{title:string;description:(site:string)=>string}>={
+  engineering:{
+    title:'Production Instrument Calibration Fault',
+    description:site=>`A critical production instrument at ${site} has begun returning inconsistent readings. Operations can continue briefly, but the fault must be diagnosed before quality is compromised.`,
+  },
+  hr:{
+    title:'Unexpected Shift Supervisor Absence',
+    description:site=>`Two experienced shift supervisors at ${site} call in sick just before a major production run. The site must reorganise coverage quickly without disrupting output or safety.`,
+  },
+  marketing:{
+    title:'Regional Customer Complaint Escalation',
+    description:site=>`A major regional customer served by ${site} has escalated a product complaint and is threatening to move future orders to a competitor unless the issue is handled quickly.`,
+  },
+  operations:{
+    title:'Dispatch Backlog After Scheduling Failure',
+    description:site=>`A scheduling failure at ${site} has created a growing dispatch backlog. Several customer deliveries are now at risk unless the site can rapidly reorganise the work.`,
+  },
+  finance:{
+    title:'Supplier Invoice Reconciliation Failure',
+    description:site=>`A batch of supplier invoices at ${site} no longer reconciles with purchase records. Payments are due today and the discrepancy must be resolved before suppliers place the account on hold.`,
+  },
+};
+
 export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   const {session,company,event,onAcknowledgeResolution}=props;
   const [pendingContinue,setPendingContinue]=useState<any|null>(null);
@@ -33,6 +56,14 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   const isOpeningLesson=session.experienceMode==='newbie'&&session.round===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
   const lessonKey=`tpg_transfer_unlock_${session.id}_${company.id}`;
   const simplifyRoundOne=session.experienceMode==='newbie'&&session.round===1;
+  const displayEvent=useMemo<ActiveEventV2>(()=>{
+    if(!isOpeningLesson)return event;
+    const domain=event.card.domains[0]?.domain;
+    const problem=domain?OPENING_PROBLEMS[domain]:undefined;
+    if(!problem)return event;
+    const site=company.sites.find(candidate=>candidate.id===event.targetSiteId)?.name||'the local site';
+    return {...event,card:{...event.card,title:problem.title,description:problem.description(site)}};
+  },[company.sites,event,isOpeningLesson]);
 
   useEffect(()=>{
     const root=decisionRootRef.current;
@@ -81,5 +112,5 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
     return <NewbieTransferUnlockOverlay session={resolvedSession} company={resolvedCompany} onContinue={finishLesson}/>;
   }
 
-  return <div ref={decisionRootRef}><EventDecisionCardV4 {...props} onAcknowledgeResolution={interceptContinue}/></div>;
+  return <div ref={decisionRootRef}><EventDecisionCardV4 {...props} event={displayEvent} onAcknowledgeResolution={interceptContinue}/></div>;
 };
