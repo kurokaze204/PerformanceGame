@@ -10,12 +10,13 @@ interface Props {
   onJoinSession: (sessionId: string, companyId: string, playerName: string) => void;
   onCreateNewSession: (sessionName: string, companyCount: number, options: CreateOptions) => void;
   onSoloStart: (options: CreateOptions) => void;
+  initialMode?: 'join'|'current'|'create'|'facilitator';
 }
 
-export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSession }) => {
-  const [mode, setMode] = useState<'join'|'current'|'create'|'facilitator'>('join');
-  const [sessionId, setSessionId] = useState('');
-  const [playerName, setPlayerName] = useState('');
+export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSession, initialMode='join' }) => {
+  const [mode, setMode] = useState<'join'|'current'|'create'|'facilitator'>(initialMode);
+  const [sessionId, setSessionId] = useState(currentSession?.id || '');
+  const [playerName, setPlayerName] = useState(()=>{try{return localStorage.getItem('tpg_entered_player_name')||''}catch{return''}});
   const [companyId, setCompanyId] = useState(currentSession?.companies[0]?.id || '');
   const [name, setName] = useState('Executive Game 2026');
   const [companyCount, setCompanyCount] = useState(4);
