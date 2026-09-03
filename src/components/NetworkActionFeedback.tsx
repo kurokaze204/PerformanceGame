@@ -33,6 +33,10 @@ export const NetworkActionFeedback:React.FC=()=>{
   window.addEventListener('pointerdown',acknowledge,true);
   return()=>{window.fetch=original;window.removeEventListener('pointerdown',acknowledge,true)};
  },[]);
+ useEffect(()=>{
+  document.documentElement.classList.toggle('tpg-network-busy',busy>0);
+  return()=>document.documentElement.classList.remove('tpg-network-busy');
+ },[busy]);
  if(!busy)return null;
  return <div className="fixed top-[calc(var(--tpg-header-height,88px)+8px)] left-1/2 -translate-x-1/2 z-[300] pointer-events-none rounded-full border border-emerald-600/70 bg-slate-950/95 px-3 py-1.5 text-xs font-black text-emerald-200 shadow-lg" role="status" aria-live="polite"><span className="inline-block mr-2 h-2 w-2 rounded-full bg-emerald-400 animate-pulse"/>Working…</div>;
 };
