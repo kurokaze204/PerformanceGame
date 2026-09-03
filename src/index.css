@@ -12,6 +12,10 @@
 :root { --tpg-header-height: 88px; }
 button, [role="button"] { transition-property: transform,filter,background-color,border-color,color,opacity; transition-duration: 120ms; }
 .tpg-click-ack { transform: scale(.965) !important; filter: brightness(1.22) !important; }
+html.tpg-network-busy,
+html.tpg-network-busy body,
+html.tpg-network-busy button,
+html.tpg-network-busy [role="button"] { cursor: progress !important; }
 
 /* Playtest polish: decision screens must be readable at normal laptop distance. */
 [aria-label="Investment actions"] {
