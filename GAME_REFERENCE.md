@@ -1,7 +1,7 @@
 # The Performance Gap — Game Reference
 
 **Status:** Living design, gameplay and architecture reference  
-**Purpose:** This file is the authoritative human-readable reference for what The Performance Gap is, why it exists, how it should feel to play, how the game works, and how the software is structured. Future feature work should be checked against this document before implementation.
+**Purpose:** This is the authoritative human-readable reference for what The Performance Gap is, why it exists, how it should feel to play, how the game works, and how the software is structured. Future feature work should be checked against this document before implementation.
 
 ---
 
@@ -11,17 +11,17 @@
 
 It is designed for business people rather than Knowledge Management specialists. Players run a company that must respond to operational and strategic Events while deliberately deciding how to use, move, protect and strengthen knowledge across the organisation.
 
-The simulation is intended to make invisible knowledge dynamics visible enough to discuss. It should help players experience the difference between:
+The simulation makes normally invisible knowledge dynamics visible enough to discuss. It should help players experience the difference between:
 
 - having information and having usable capability;
-- knowing that expertise exists and being able to deploy it;
+- knowing expertise exists and being able to deploy it;
 - relying on a few individuals and building organisational resilience;
 - reacting to problems and investing before problems occur;
 - local knowledge and reusable corporate knowledge;
 - temporary outside help and enduring internal capability;
-- knowledge that exists somewhere and knowledge that is available at the right place and time.
+- knowledge that exists somewhere and knowledge available at the right place and time.
 
-The game should feel like a **business simulation with board-game clarity**, not a KM training application or an enterprise dashboard.
+The game should feel like a **business simulation with board-game clarity**, not a KM training application or enterprise dashboard.
 
 ---
 
@@ -31,18 +31,18 @@ The central idea is:
 
 > Knowledge Management is not primarily about doing the organisation's knowledge work. It is about managing the conditions, infrastructure and flows that allow knowledge and expertise to create the greatest possible organisational impact.
 
-The simulation should encourage players to think about how an organisation can:
+The simulation encourages players to think about how an organisation can:
 
-1. **see its expertise and capability**;
-2. **make knowledge available where work occurs**;
-3. **protect scarce and vulnerable expertise**;
-4. **move knowledge between people and locations**;
-5. **turn individual expertise into broader organisational capability**;
-6. **use codification, networks and automation appropriately**;
-7. **anticipate knowledge risk before disruption exposes it**;
-8. **balance short-term performance with long-term resilience**.
+1. see its expertise and capability;
+2. make knowledge available where work occurs;
+3. protect scarce and vulnerable expertise;
+4. move knowledge between people and locations;
+5. turn individual expertise into broader organisational capability;
+6. use codification, networks and automation appropriately;
+7. anticipate knowledge risk before disruption exposes it;
+8. balance short-term performance with long-term resilience.
 
-The game should not tell players that there is one correct KM strategy. It should create consequences that make different strategies discussable.
+There is deliberately no single prescribed “correct KM strategy”. Different strategies should create consequences worth discussing.
 
 ---
 
@@ -56,21 +56,13 @@ Primary audience:
 - KM Week and conference participants;
 - facilitated organisational learning groups.
 
-The design supports:
+The design supports one-company solo play, multiple players collaborating as one company, multiple companies in parallel, facilitator-led sessions, and local or remote participation.
 
-- one-company solo play;
-- multiple players collaborating as one company;
-- multiple companies playing in parallel;
-- facilitator-led sessions;
-- local or remote participation.
-
-The player interface should be simple enough to approach with roughly the cognitive overhead of a mainstream board game such as Monopoly. Complexity should emerge from decisions and consequences, not from navigating the software.
+The interface should be approachable with roughly the cognitive overhead of a mainstream board game such as Monopoly. Complexity should emerge from decisions and consequences, not from navigating software.
 
 ---
 
-## 4. Player-experience design principles
-
-These are enduring product rules.
+## 4. Enduring player-experience design principles
 
 ### 4.1 The map is the primary board
 
@@ -78,9 +70,9 @@ The Australian company map is the player's main spatial reference. Sites, expert
 
 ### 4.2 Newbie and Expert are genuinely different experiences
 
-**Newbie** progressively reveals concepts and reduces initial cognitive load. It may hide advanced concepts such as Finance and Local Codified Knowledge until appropriate.
+**Newbie** progressively reveals concepts and reduces initial cognitive load. Finance and some codified-knowledge detail are hidden from normal player-facing decisions where appropriate.
 
-**Expert** exposes the fuller model from the beginning and assumes players can tolerate more simultaneous choices and tighter action constraints.
+**Expert** exposes the fuller model earlier and uses tighter action constraints.
 
 ### 4.3 Business language first
 
@@ -88,51 +80,42 @@ Player-facing wording should describe the business decision before the KM mechan
 
 ### 4.4 Decisions should be visually obvious
 
-Selection language is deliberately simple:
+Selection language is intentionally simple:
 
 - empty circle = available;
 - circled tick = selected;
-- category tick = something inside that category has been selected.
+- category tick = something inside the category has been selected.
 
-### 4.5 The game should remain playable on ordinary laptops
+### 4.5 Ordinary laptops are a first-class target
 
-Layouts should fit common laptop screens at normal browser zoom. The board should preserve its geometry and important content such as Tasmania and the phase indicator should not disappear below the viewport.
+Layouts must work at normal browser zoom on common laptop screens. The board should preserve its geometry and important content such as Tasmania and the phase tracker must not disappear below the viewport.
 
 ### 4.6 Immediate acknowledgement of user input is mandatory
 
-**This is a design goal for every future feature.**
+**This is a design goal for every future feature. A player must never be left wondering whether a click or tap was received.**
 
-A player must never be left wondering whether a click or tap was received.
-
-When the result can be predicted safely, use **optimistic UI**:
+When a result can be predicted safely, use optimistic UI:
 
 1. acknowledge the click immediately;
-2. update the local visual state immediately;
-3. calculate local deterministic implications immediately where practical;
+2. update local visual state immediately;
+3. calculate deterministic implications locally where practical;
 4. send the authoritative write to the backend asynchronously;
-5. reconcile to the backend response when it arrives;
+5. reconcile to the backend response;
 6. roll back or explain only if the backend rejects the action.
 
 Examples include tentative Event allocations and deterministic Invest actions.
 
-When an action **cannot** be predicted safely because it is random, shared, irreversible or server-authoritative, do not fake completion. Instead:
+When an action cannot be predicted safely because it is random, shared, irreversible or backend-authoritative, do not fake completion. Instead immediately depress/highlight the control, protect against duplicate submissions where appropriate, and show a progress cursor or concise state such as **Working…**, **Resolving…** or **Saving…** until confirmation returns.
 
-- visibly depress/highlight the control immediately;
-- disable or protect against duplicate submissions where appropriate;
-- show a working/progress cursor or concise status such as **Working…**, **Resolving…** or **Saving…**;
-- complete the visible state transition only when the authoritative response arrives.
+**Performance changes must change routing and timing, not game rules or user-visible meaning.**
 
-Examples include resolving an Event, advancing a phase, Knowledge Risk resolution, Final Disruption resolution and facilitator commands.
+### 4.7 Backend authority remains intact
 
-**Performance work must change routing and timing, not game rules or user-visible meaning.**
-
-### 4.7 Server authority remains intact
-
-Optimistic presentation must never create a second set of game rules. The browser may predict deterministic outcomes for responsiveness, but the backend remains the final authority for shared game state.
+Optimistic presentation must never create a second rules engine. The browser may preview safe deterministic outcomes, but the backend remains the final authority for shared game state.
 
 ### 4.8 Avoid accidental complexity
 
-Do not add dashboards, persistent panels, extra navigation levels or technical status indicators unless they materially help the player's decision.
+Do not add dashboards, persistent panels, extra navigation levels or technical status indicators unless they materially improve a player's decision.
 
 ---
 
@@ -146,68 +129,51 @@ The company operates across five knowledge domains:
 - Operations
 - Finance
 
-Newbie mode may hide Finance from player-facing decisions. Finance remains part of the underlying model where required.
+Newbie normally hides Finance from player-facing choices.
 
 Knowledge exists through several mechanisms.
 
-### Team Capability
-
-What a local team can actually do. This is usable local capability, not merely stored information.
-
-### Local Codified Knowledge
-
-Reusable knowledge captured locally in documents or other explicit forms. This is more visible in Expert mode and may be hidden in Newbie mode to reduce cognitive load.
-
-### Corporate Intranet
-
-Knowledge made available corporately. Its value depends on whether the receiving site can actually make use of it; availability and absorptive capability are not treated as identical.
-
-### Experts
-
-Individuals holding deep knowledge in one or more domains. Experts have location, availability/activity state, domain strength and potential Single Point of Failure status.
-
-### Communities of Practice / Network knowledge
-
-Temporary access to useful knowledge outside the immediate local team through active expert networks.
-
-### Automation
-
-Knowledge embedded into systems and processes so capability does not depend solely on a person remembering or being available.
-
-### External expertise
-
-Temporary purchased capability. It can solve an immediate problem but does not automatically create enduring organisational knowledge.
-
-### Reputation / favours
-
-A scarce mechanism for drawing on relationships to guarantee or materially support a Challenge response.
+**Team Capability** — what a local team can actually do.  
+**Local Codified Knowledge** — reusable knowledge captured locally in explicit forms.  
+**Corporate Intranet** — knowledge made available corporately; its usefulness depends on a receiving site's ability to understand and apply it.  
+**Experts** — people holding deep expertise in one or more domains, with location, activity state and possible Single Point of Failure status.  
+**Communities of Practice / network knowledge** — access to useful knowledge beyond the immediate local team.  
+**Automation** — knowledge embedded into systems and processes.  
+**External expertise** — temporary purchased capability that solves an immediate need without automatically creating enduring capability.  
+**Reputation / favours** — a scarce relationship mechanism for guaranteeing or materially supporting a Challenge response.
 
 ---
 
 ## 6. The River Diagram
 
-The **River** is the game's visual model for how knowledge capability is distributed across the company.
+The **River** visualises how knowledge capability is distributed across the company. It exists to show that an organisation does not possess one uniform knowledge level: sites have different strengths, experts are unevenly distributed, and knowledge can be moved or converted into broader capability.
 
-Its purpose is to help players see that the organisation does not possess one uniform knowledge level. Different sites have different strengths, experts are distributed unevenly, and knowledge can be moved or converted into broader capability.
-
-The River should help players identify:
+The River should help players see:
 
 - strong and weak sites by domain;
 - where useful expertise is located;
-- where capability gaps exist;
-- where knowledge transfer may create value;
-- where expertise is concentrated in a small number of people;
-- whether organisational capability is becoming more resilient over time.
+- internal performance/transfer gaps;
+- where Knowledge Transfer may create value;
+- where capability is concentrated in a small number of people;
+- whether resilience is improving over time.
 
-The full River includes site and expert context and may support transfer decisions. A simplified River is also used in AAR/benchmark comparisons.
+### Current River presentation rules
 
-When explaining the River in the KM Manual or other player guidance, use a labelled visual example rather than relying on prose alone.
+- Site capability is shown as small white city dots with city codes.
+- Experts are shown as **yellow circular markers approximately four times the diameter of a city dot**, with a dark-grey person silhouette inside. Expert initials/location remain legible beside the marker.
+- Remaining company Actions are shown at the top right as the same **yellow action dots** used by the game, rather than a separate green visual language.
+- River typography should be deliberately larger than prototype/dashboard text; current chart/support text was increased during playtest polishing.
+- Hovering over the chart provides a circular **2× magnifying lens** centred on the pointer so tightly grouped labels and markers can be inspected without permanently enlarging the chart.
+- The River modal should use its vertical space efficiently. Avoid a large unused black area below the chart and avoid forcing scrolling on an ordinary laptop where the content can fit.
+- The **River** reference button and the **Knowledge Transfer** intervention card during Invest both open this same River decision view. Do not create a second competing Knowledge Transfer configuration screen.
+
+The simplified River used in AAR/benchmarking is intentionally more compact.
 
 ---
 
 ## 7. Core game loop
 
-The principal round loop is:
+The main round loop is:
 
 **Events → Invest → Knowledge Risk → next round**
 
@@ -219,22 +185,20 @@ The company receives business Events representing problems or opportunities. Pla
 
 Typical response choices are:
 
-1. **Use what we already know**
-2. **Ask one of our experts to help**
-3. **Ask our network for help**
-4. **Call in a favour**
-5. **Engage external expertise**
-6. **Accept the risk**
+1. Use what we already know
+2. Ask one of our experts to help
+3. Ask our network for help
+4. Call in a favour
+5. Engage external expertise
+6. Accept the risk
 
-The Event card shows the financial exposure, relevant knowledge domain(s), available knowledge and resulting chance of success.
+The Event card shows financial exposure, relevant domains, available knowledge and the resulting Chance of success.
 
-At 100% probability, the presentation should use plain language rather than making the player perform a meaningless roll.
-
-Otherwise the player sees a transparent relationship between **Chance** and **Roll**.
+At 100% probability, use plain language rather than making the player perform a meaningless roll. Otherwise show the relationship between **Chance** and **Roll** transparently.
 
 ### Invest
 
-After Events, the company gets a limited shared pool of company actions. These are not individual-player action allowances: multiple players acting for the same company consume the same company pool.
+After Events, the company has a limited **shared company Action pool**. Actions are not per-player allowances. If several players each perform an action for the same company, they consume the same pool.
 
 Current intervention families include:
 
@@ -249,82 +213,84 @@ Current intervention families include:
 - Horizon Scan;
 - Automation.
 
-Investment decisions consume company actions and may also consume turnover. Costs and availability are defined by the engine and configuration, not by the presentation layer.
+Investment decisions may consume both an Action and turnover. Exact costs/limits are engine/configuration rules and must not be duplicated independently in presentation code.
 
 ### Knowledge Risk
 
-The game then tests vulnerability in people and sites. This makes invisible concentration risk visible and creates consequences for fragile knowledge structures.
+The game tests vulnerability in people and sites. This makes concentration risk visible and creates consequences for fragile knowledge structures.
 
-The Risk River can visually show site capability loss, expert departure and later expert replacement.
-
-When an expert vacancy is created, the company may choose where the replacement expert will be based. Replacement capability is deliberately not identical to the departed expert's accumulated experience.
+The Risk River can show site capability loss, expert departure and later replacement.
 
 ---
 
 ## 8. Newbie learning path
 
-Newbie mode deliberately teaches concepts through play rather than presenting a large tutorial.
+Newbie teaches concepts through play rather than a large up-front tutorial.
 
-The first round contains a programmed learning failure presented as a credible business problem. The player initially has a restricted response set, including existing local capability and Corporate Intranet, so the failure establishes why merely having knowledge somewhere in the company is insufficient.
+The first round contains a programmed learning failure presented as a credible business problem. The player initially has a restricted response set so the failure establishes why “the company knows” is different from “the affected site can use that knowledge now”.
 
-After the learning Event, the game introduces two distinct transfer mechanisms:
+The tutorial then introduces two distinct mechanisms:
 
 - **Knowledge Transfer** — direct site-to-site sharing of proven know-how;
 - **Local Training** — an expert coaches a local team.
 
-Additional capabilities are progressively unlocked over later rounds.
-
-This progression must remain a learning scaffold rather than an artificial punishment. Underlying mechanics and display logic should continue to identify the programmed tutorial by its explicit tag, not by card position.
+Additional capabilities progressively unlock. The programmed tutorial is identified by its explicit tag, never by card position.
 
 ---
 
 ## 9. Event deck and foresight
 
-Newbie normally presents fewer cards than Expert.
+Newbie normally presents fewer cards than Expert. Cards should feel dealt from a physical deck rather than listed from a database.
 
-The deck is visually represented as physical cards beside the board. Dealt cards should feel like they came from a deck rather than a database list.
-
-**Horizon Scan** allows a company to anticipate knowledge risk by revealing/delaying relevant future Events. Delayed cards persist and are brought forward deliberately rather than silently re-randomised.
+**Horizon Scan** allows a company to anticipate relevant future Events. A delayed Event persists and is deliberately brought back rather than silently re-randomised.
 
 ---
 
-## 10. Experts and SPOF risk
+## 10. Experts, SPOFs, attrition and replacement
 
 Experts are scarce organisational assets, not just bonus points.
 
-Player-facing expert information should show:
+Player-facing expert information should show name, location, activity/state, domain strengths and relevant Single Point of Failure information.
 
-- name;
-- location;
-- current activity/state;
-- domain strengths;
-- relevant Single Point of Failure information.
+SPOF means important capability depends too heavily on one person or a small concentration of people. Affected domains should be visible.
 
-SPOF means that important organisational capability is too dependent on a particular person or small concentration of people. The game should make the affected domains visible and explain the term compactly when necessary.
+### Replacement experts
 
-Expert activity states include availability and work such as supporting Events, travelling, training, knowledge transfer, expertise capture, CoP participation and HQ assignment.
+When an expert resigns:
+
+- the resignation is shown on the relevant **Expert risk** check, not deferred to an unrelated City risk check;
+- the replacement-location decision appears with that resignation;
+- a replacement arrives next round with domain score **4** in the departed role's domains;
+- the replacement receives a **new employee name** rather than reusing the departed person's name;
+- expert names that have been consumed/departed are retained in a company-level retired-name history so later replacements cannot accidentally duplicate them;
+- the replacement prompt identifies both people and the old base, for example: `New Employee is replacing Old Employee in MEL. Do you want to move this role to a new city?`;
+- the city dropdown defaults to the role's existing city;
+- each city option shows the relevant local domain score(s), giving the player enough context to decide whether relocation makes sense;
+- leaving the default selected keeps the role in the same city; choosing another city updates the replacement base.
+
+Replacement location is a strategic placement decision, not a separate Action.
 
 ---
 
 ## 11. Geography and company board
 
-The playable company is represented geographically across Australia. Current operating-site locations include Melbourne, Sydney, Brisbane, Perth, Adelaide and Darwin, with Hobart/Tasmania retained as geographic reference where appropriate.
+The playable company is represented geographically across Australia. Operating sites include Melbourne, Sydney, Brisbane, Perth, Adelaide and Darwin. Hobart/Tasmania remains visible as geographic reference where appropriate.
 
-Each site can display local turnover directly beneath its city name. Expert presence and site context should remain legible without turning the map into a dashboard.
+Each site can display local turnover beneath its city name. Expert presence and site context should remain legible without turning the map into a dashboard.
 
-Corporate HQ is represented separately as an organisational knowledge context rather than just another production site.
+Corporate HQ is represented separately as organisational/corporate knowledge context.
 
 ---
 
-## 12. Money, actions and trade-offs
+## 12. Money, Actions and trade-offs
 
-Turnover represents business performance and provides a common economic language for consequences.
+Turnover represents business performance and gives consequences a common economic language.
 
-Events expose turnover to loss or gain. Investments may reduce turnover now in order to improve future capability and resilience.
+Events expose turnover to loss or gain. Investments may reduce turnover now to improve later capability and resilience.
 
-Where useful, the game should show Event loss/gain as both an amount and a percentage of the relevant site's or company's turnover so players can judge whether accepting risk is rational.
+Where useful, Event exposure should be shown as both an amount and a percentage of relevant turnover.
 
-The limited action pool is intentionally prominent. Actions are a shared company resource and force prioritisation between short-term fixes and long-term capability building.
+The limited Action pool is intentionally prominent and forces prioritisation between immediate response and long-term capability building.
 
 ---
 
@@ -332,129 +298,151 @@ The limited action pool is intentionally prominent. Actions are a shared company
 
 The session culminates in a larger disruption that tests the organisational capability built during play.
 
-The game then supports After Action Review rather than simply declaring a winner.
-
-The AAR should help players discuss:
+The game then supports After Action Review rather than merely declaring a winner. The AAR should help players discuss:
 
 1. What was planned?
 2. What actually happened?
 3. Why was there a difference?
 4. What would we do better?
 
-Benchmarking may compare companies using measures such as final turnover, Challenge success rate and pre-final capability. The visual benchmark includes a compact River for each company so financial outcomes can be interpreted alongside knowledge structure.
-
-The conclusion includes a short invitation to continue learning about KM and DeltaKnowledge rather than abruptly clearing the session.
+Benchmarking may compare companies using final turnover, Challenge success and pre-final capability. A compact River helps interpret financial outcomes alongside knowledge structure.
 
 ---
 
-## 14. Facilitator model
+## 14. Creating, joining and populating games
 
-Creating a game and becoming a facilitator are intentionally separate actions.
+Game creation and facilitator access are separate concepts.
 
-Normal game creation should not ask for a facilitator passcode.
+The Create screen includes game mode, duration, company/action settings and **Max players / company**.
 
-During a current game:
+### Population option A — Fill, then create
 
-**Clock → Facilitator login** opens a small passcode-only login for that current session. After successful authentication the facilitator enters the Facilitator Control Room directly.
+Start with Company 1. Automatically assign players to it until it reaches Max players / company, then create Company 2 and fill it, then Company 3, and so on. In this mode the fixed Companies field is not used for initial team count.
 
-The Control Room supports functions such as:
+Example with a maximum of five: C1 receives players 1–5; C2 receives 6–10; and so on.
 
-- observing team progress;
-- managing the shared timer;
-- moving players between companies;
-- adjusting permitted session settings;
-- viewing breakout/team assignments;
-- returning to the game board.
+### Population option B — Balance across configured companies
 
-Returning to the board should preserve the participant/player identity that was in use before facilitator mode. An authenticated facilitator can reopen the Control Room without re-entering the passcode during that session.
+Create the number of companies selected in the Companies field and assign each auto-joining player to the smallest current team.
+
+Example with three companies: C1 gets players 1 and 4, C2 gets 2 and 5, C3 gets 3.
+
+The Create screen should show small visual examples and an explicit radio-style selection so the consequence is understandable before launch.
+
+### Sharing a newly created game
+
+For the creator, the Round 1 Welcome box displays the game code beneath the title:
+
+`Share this game code with others you wish to join this game. [CODE] (Right click to copy)`
+
+Right-clicking the code copies a complete invitation, not merely the code:
+
+`[Player Name] has invited you to play The Performance Gap game. To get started, open the game at https://performancegapgame.deltaknowledge.net/ then enter your name and the code: [game code]. Have fun!`
+
+This invitation is creator-specific and should not appear as though every joining player created the session.
 
 ---
 
-## 15. Timer and session flow
+## 15. Facilitator model
 
-The game uses a shared session clock. Timing is intended to create decision pressure without cutting off a company in the middle of a round.
+Normal game creation does **not** ask for a facilitator passcode.
 
-Solo launch can start the clock automatically. Solo play also exposes play/pause controls.
+During a current game, **Clock → Facilitator login** opens a small passcode-only dialog for that session. Successful authentication enters the Facilitator Control Room directly.
 
-The clock menu is also a compact access point for session-level functions such as facilitator access, breakout rooms and reset.
+The Control Room supports observing team progress, shared timer control, moving players, permitted session settings, breakout/team assignments, and Return to Game.
 
-Reset for playtesting is a hard reset: a genuinely fresh session is created and cached/local game state is cleared so test results are not contaminated by prior state.
+Returning to the board preserves the player/team identity used before facilitator mode. An authenticated facilitator can reopen the Control Room without repeatedly entering the passcode during that session.
 
 ---
 
-## 16. KM Manual and tutorial guidance
+## 16. Timer, reset and session flow
+
+The game uses a shared session clock to create decision pressure without intentionally cutting a company off mid-round. Solo launch can start the clock automatically and exposes play/pause controls.
+
+The clock menu also provides compact access to facilitator functions, breakout rooms and reset.
+
+### Reset Game
+
+**Reset Game returns the browser to the initial Create/setup screen.** It does not silently create and join a replacement game.
+
+Reset clears local/session `tpg_` state and relevant cached/service-worker state so the next test begins cleanly, then reloads into the Create tab. A fresh game is created only when the user deliberately launches one from that setup screen.
+
+---
+
+## 17. KM Manual and tutorial guidance
 
 The in-game KM Manual explains both:
 
 - **In the game** — what a feature does in the simulation;
 - **In the real world** — the KM principle it represents.
 
-The manual covers domains, Events, the Knowledge Suite, experts/SPOFs, transfer, training, corporate knowledge, automation, Communities of Practice/external knowledge, Horizon Scan, reputation, the River, Knowledge Risk, AAR and valuing KM work.
+It covers domains, Events, the Knowledge Suite, experts/SPOFs, transfer, training, corporate knowledge, automation, Communities of Practice/external expertise, Horizon Scan, reputation, River, Knowledge Risk, AAR and valuing KM work.
 
-The browser can generate a downloadable PDF version from the manual content. A standalone static PDF should only be added when the content has been reviewed and approved.
+The browser can generate a downloadable PDF from current manual content. A standalone static PDF should only be added after content review and approval.
 
-A short optional video tutorial may be added to the opening flow later. It should be skippable and should not block experienced players from starting.
+A short optional video tutorial may be added to the opening flow later. It should be skippable.
 
 ---
 
-## 17. Software architecture
+## 18. Software architecture
 
-The application uses three main runtime layers.
+The application has three runtime layers.
 
 ### Browser frontend
 
-A React/TypeScript application renders the board and player interactions.
+React/TypeScript renders the board and interactions. Primary orchestration is currently in `src/AppBoardV6.tsx`, supported by specialised components for Events, Invest, map, River, Risk, facilitation, AAR and reference material.
 
-Primary orchestration currently lives in `src/AppBoardV6.tsx`, supported by specialised components for Events, Invest, the map, River, Risk, facilitator tools, AAR and reference material.
-
-The browser handles presentation, temporary interaction state and safe deterministic previews.
+The browser handles presentation, tentative state and safe deterministic previews.
 
 ### Render-hosted backend
 
-The Node/TypeScript backend runs as the Render web service. `server-v3.ts` exposes HTTP/SSE endpoints and delegates game behaviour to the server service/engine modules.
+The Node/TypeScript backend runs as the Render web service. `server-v3.ts` exposes HTTP/SSE endpoints and delegates game behaviour through the `src/server/gameService...` chain. The current service routing goes through **`gameServiceV7.ts`**.
 
-The backend is the authoritative source for shared game state and is responsible for validating and applying game-changing actions.
+The backend validates and applies authoritative game-changing actions.
 
 ### Neon PostgreSQL
 
-Neon is the persistence/database layer. The browser should not treat Neon as the game server. The Render backend sits between clients and persistence.
+Neon is persistence, not the browser-facing game server. The Render backend sits between clients and Neon.
 
 Neon stores authoritative snapshots and longitudinal evidence used for AAR and benchmarking.
 
 ### Realtime updates
 
-Clients receive session updates through the server's event stream/SSE path so multiple players can see shared company/session changes.
+Clients receive shared session updates through SSE/event-stream connections.
+
+Conceptually:
+
+**Player browser ⇄ Render Node/TypeScript backend ⇄ Neon PostgreSQL**
+
+GitHub provides source control and CI.
 
 ---
 
-## 18. State and performance architecture
+## 19. State and performance architecture
 
-The system deliberately distinguishes **tentative UI state**, **predictable deterministic state** and **authoritative shared state**.
+The system distinguishes **tentative UI state**, **predictable deterministic state** and **authoritative shared state**.
 
 ### Event selections
 
-Tentative allocation selections are maintained locally so checks, highlighting, Chance percentages and predictable costs can react immediately. Writes are then queued to the backend in click order and reconciled when authoritative state returns.
+Tentative allocations are maintained locally so checks, highlighting, Chance percentages and predictable costs react immediately. Writes are queued to the backend in click order and reconciled to authoritative state.
 
 ### Invest actions
 
-Where an Invest action is deterministic, the same game engine can be run locally against a cloned session to provide an immediate predicted result. The original action request is still sent to the backend. Server writes are serialised and the backend response remains authoritative.
+Where an Invest action is deterministic, the same rules can be run locally on a cloned session to provide an immediate preview. The unchanged action request still goes to the backend. Writes are serialised and the backend response remains authoritative.
 
-### Authoritative/random actions
+### Random/shared actions
 
-Actions involving random outcomes, shared phase transitions or otherwise unsafe prediction remain backend-authoritative. They receive immediate visual acknowledgement but do not pretend to be complete before confirmation.
+Random outcomes, shared phase transitions and other unsafe-to-predict actions remain backend-authoritative. They receive immediate visual acknowledgement but do not pretend to have completed early.
 
 ### Duplicate-write protection
 
-Identical in-flight writes are deduplicated where appropriate to prevent impatient double-clicking from creating repeated actions.
+Identical in-flight writes are deduplicated where appropriate to stop impatient double-clicks creating repeated actions.
 
 ---
 
-## 19. Core code map
-
-Important current files include:
+## 20. Core code map
 
 ### Application and board
-
 - `src/AppBoardV6.tsx`
 - `src/components/AustraliaMap.tsx`
 - `src/components/BoardShell.tsx`
@@ -462,7 +450,6 @@ Important current files include:
 - `src/components/PhaseTrackV1.tsx`
 
 ### Events
-
 - `src/components/EventDeckV1.tsx`
 - `src/components/EventDecisionCardV4.tsx`
 - `src/components/EventDecisionCardPlaytestV1.tsx`
@@ -470,75 +457,60 @@ Important current files include:
 - `src/engine/challengeResponseV2.ts`
 
 ### Investment and knowledge movement
-
 - `src/components/ActionsPanelV5.tsx`
 - `src/components/InvestmentDecisionDockV1.tsx`
 - `src/components/RiverDiagramOverlay.tsx`
 - `src/engine/investmentActionsV4.ts`
 - `src/engine/riverKnowledgeV1.ts`
+- `src/engine/optimisticInvestmentV1.ts`
 
 ### Risk
-
 - `src/components/AttritionModal.tsx`
 - `src/components/RiskRiverDiagram.tsx`
 - `src/engine/riskPhaseV4.ts`
 
-### Facilitation and session tools
-
+### Facilitation/session tools
 - `src/components/SharedGameTimerV2.tsx`
 - `src/components/FacilitatorLoginModal.tsx`
 - `src/components/FacilitatorControlRoomV2.tsx`
 - `src/components/BreakoutRoomsOverlay.tsx`
+- `src/components/SessionJoinModalV2.tsx`
 
-### Learning and reference
-
+### Learning/reference
 - `src/components/NewbieLearningOverlay.tsx`
 - `src/components/NewbieTransferUnlockOverlay.tsx`
 - `src/components/KMManualOverlay.tsx`
 - `src/components/kmManualContent.ts`
 
 ### AAR
-
 - `src/components/AARDebriefView.tsx`
 - `src/components/MiniRiverBenchmark.tsx`
 - `src/components/CompanyChartsOverlay.tsx`
 
 ### Backend
-
 - `server-v3.ts`
-- `src/server/gameServiceV2.ts` through the current service version
+- `src/server/gameServiceV2.ts` through `src/server/gameServiceV7.ts`
 
-### Performance feedback
-
+### Interaction/performance feedback
 - `src/components/NetworkActionFeedback.tsx`
-- `src/engine/optimisticInvestmentV1.ts`
 
 ---
 
-## 20. Persistence and evidence
+## 21. Persistence and evidence
 
-The game maintains current session state and captures longitudinal evidence so the AAR can distinguish business outcome, decision quality and luck.
+The game maintains current session state and captures longitudinal evidence so AAR can distinguish business outcome, decision quality and luck.
 
-Evidence includes items such as:
+Evidence includes strategy choices, turnover over time, capability measures, investment and consultant expenditure, Event exposure, probability at reveal/commitment, expected versus actual successes, and rules/deck/balance version identifiers.
 
-- initial and final strategy choices;
-- turnover over time;
-- Team Capability and corporate capability measures;
-- investment and consultant expenditure;
-- Event exposure;
-- probability at reveal and commitment;
-- expected versus actual successes;
-- rules/deck/balance version identifiers.
-
-Historical benchmarks should only compare runs that are meaningfully compatible.
+Historical benchmarks should only compare meaningfully compatible runs.
 
 ---
 
-## 21. Quality and regression protection
+## 22. Quality and regression protection
 
 The branch quality workflow is `.github/workflows/new-interface-quality.yml`.
 
-The standard quality gate includes:
+The standard gate includes:
 
 - dependency installation;
 - TypeScript/lint checks;
@@ -546,55 +518,51 @@ The standard quality gate includes:
 - core smoke tests;
 - UI-mode smoke tests.
 
-Regression checks exist for critical gameplay transitions such as the Round 1 tutorial and direct transition from completed Events into Invest.
+Regression checks protect critical transitions including the Round 1 tutorial and direct Event → Invest flow.
 
-Do not declare a branch safe because code compiles locally. The workflow result should be checked before describing a change as passed.
-
----
-
-## 22. Deployment model
-
-The repository is hosted in GitHub.
-
-The production application is deployed as a Render web service. Environment configuration, including database and facilitator secrets, is supplied through the hosting environment rather than committed to source control.
-
-Neon provides PostgreSQL persistence.
-
-The deployed architecture is therefore conceptually:
-
-**Player browser ⇄ Render Node/TypeScript backend ⇄ Neon PostgreSQL**
-
-with GitHub as source control and CI.
+Do not describe a branch as passed until the workflow result has actually been checked.
 
 ---
 
-## 23. Change rules for future development
+## 23. Deployment model
 
-Before adding or modifying a feature, check the following:
+The repository is hosted in GitHub. Production is a Render web service. Environment configuration, including database and facilitator secrets, is supplied through hosting configuration rather than committed to source control. Neon provides PostgreSQL persistence.
+
+The public custom game address is intended to be:
+
+`https://performancegapgame.deltaknowledge.net/`
+
+TLS/certificate provisioning for that custom domain is managed by Render after DNS verification.
+
+---
+
+## 24. Change rules for future development
+
+Before adding or modifying a feature, check:
 
 1. Does it reinforce the central learning objective rather than merely add functionality?
 2. Can a business person understand the decision without knowing KM jargon?
-3. Does it preserve the board-game simplicity of the interface?
+3. Does it preserve board-game simplicity?
 4. Is the map still the primary board where appropriate?
-5. Is Newbie kept materially simpler than Expert?
-6. Does it preserve the shared-company nature of decisions and resources?
+5. Is Newbie materially simpler than Expert?
+6. Does it preserve the shared-company nature of decisions/resources?
 7. Does every click/tap receive immediate acknowledgement?
-8. Can predictable work be moved off the critical interaction path without altering the rules?
+8. Can predictable work move off the critical interaction path without altering rules?
 9. Is the backend still authoritative for shared/random/irreversible outcomes?
-10. Does the feature avoid unnecessary panels, dashboards or tiny text?
-11. Does it remain usable on ordinary laptop screens and touch devices?
+10. Does the feature avoid unnecessary panels, dashboards and tiny text?
+11. Does it remain usable on ordinary laptops and touch devices?
 12. Does it preserve cross-browser behaviour, including Safari/iOS considerations?
-13. Are new rules implemented in the engine rather than duplicated in presentation code?
+13. Are new rules implemented in the engine rather than independently duplicated in presentation code?
 14. Are important gameplay regressions covered by smoke tests?
 15. Has the quality workflow passed before the change is treated as complete?
-16. If the feature changes the conceptual game, architecture or enduring design rules, has this file been updated as part of the same change?
+16. If the conceptual game, architecture or enduring design rules changed, was this file updated in the same work?
 
 ---
 
-## 24. What this file is for
+## 25. What this file is for
 
 This document should outlive individual branches and implementation conversations.
 
-It is not intended to duplicate every line of configuration or source code. The source code remains authoritative for exact current constants. This file is authoritative for **intent, concepts, player experience, architecture boundaries and design constraints**.
+It is not intended to duplicate every constant or line of source code. Source code remains authoritative for exact current constants. This file is authoritative for **intent, concepts, player experience, architecture boundaries and enduring design constraints**.
 
-When code and this document diverge because the game has deliberately evolved, update this document as part of the feature work so future development does not accidentally reintroduce superseded designs.
+When the game deliberately evolves, update this document as part of the same feature work so later development does not accidentally reintroduce superseded designs.
