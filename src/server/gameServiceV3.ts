@@ -1,1 +1,1 @@
-export * from './gameServiceV6.ts';
+export * from './gameServiceV7.ts';
