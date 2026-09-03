@@ -9,6 +9,10 @@
   .mode-card small { @apply block text-sm text-slate-400 mt-1; }
 }
 
+:root { --tpg-header-height: 88px; }
+button, [role="button"] { transition-property: transform,filter,background-color,border-color,color,opacity; transition-duration: 120ms; }
+.tpg-click-ack { transform: scale(.965) !important; filter: brightness(1.22) !important; }
+
 /* Playtest polish: decision screens must be readable at normal laptop distance. */
 [aria-label="Investment actions"] {
   overflow: auto !important;
