@@ -26,5 +26,5 @@ export function interventionUnlocked(mode: ExperienceMode, round: number, action
 }
 
 export function chartsUnlocked(mode: ExperienceMode, round: number) {
-  return mode === 'expert' || round >= 3;
+  return mode === 'expert' || round >= 4;
 }
