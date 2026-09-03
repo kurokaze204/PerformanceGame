@@ -15,10 +15,10 @@ export const PhaseTrackV1: React.FC<Props> = ({ phase, eventProgress }) => {
   const active = indexForPhase(phase);
 
   return (
-    <div className="relative w-full px-5 pb-1 pt-[74px]" aria-label={`Current phase: ${labels[active]}`}>
-      <div className="relative grid grid-cols-3 gap-10 rounded-2xl border border-slate-700/80 bg-slate-950/90 px-5 py-2 shadow-xl">
+    <div className="relative w-full px-5 pb-1 pt-[82px]" aria-label={`Current phase: ${labels[active]}`}>
+      <div className="relative grid grid-cols-3 gap-6 rounded-2xl border border-slate-700/80 bg-slate-950/90 px-3 py-2 shadow-xl">
         {labels.map((label, index) => (
-          <div key={label} className="relative min-w-0 text-center">
+          <div key={label} className="relative min-w-0 pl-[82px] pr-2 text-center">
             <div className={`text-[11px] font-black uppercase tracking-[0.16em] ${index === active ? 'text-white' : 'text-slate-500'}`}>
               {label}
             </div>
@@ -29,16 +29,16 @@ export const PhaseTrackV1: React.FC<Props> = ({ phase, eventProgress }) => {
         ))}
 
         <motion.div
-          className="pointer-events-none absolute bottom-[8px] left-0 z-20 w-1/3"
+          className="pointer-events-none absolute bottom-[5px] left-0 z-20 w-1/3"
           animate={{ x: `${active * 100}%` }}
           transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="relative mx-auto h-[104px] w-[92px]">
+          <div className="relative ml-[10px] h-[112px] w-[82px]">
             <img
               src={pawnSrc}
               alt=""
               aria-hidden="true"
-              className="absolute bottom-[-16px] left-1/2 h-[108px] w-auto max-w-none -translate-x-1/2 select-none drop-shadow-[0_10px_9px_rgba(0,0,0,.55)]"
+              className="absolute bottom-[-10px] left-1/2 h-[116px] w-auto max-w-none -translate-x-1/2 select-none drop-shadow-[0_10px_9px_rgba(0,0,0,.55)]"
               draggable={false}
             />
           </div>
