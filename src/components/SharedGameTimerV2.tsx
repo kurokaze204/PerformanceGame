@@ -45,7 +45,7 @@ export const SharedGameTimerV2: React.FC<Props> = ({ session, onResetGame, reset
     try{await fetch(`/api/sessions/${session.id}/timer/${action}`,{method:'POST'});}finally{setTimerBusy(false)}
   };
   const facilitatorGameView=typeof window!=='undefined'&&sessionStorage.getItem('tpg_facilitator_game_view')==='1'&&Boolean(sessionStorage.getItem('tpg_facilitator_participant'));
-  const reopenControlRoom=()=>{const original=sessionStorage.getItem('tpg_facilitator_participant');if(original)localStorage.setItem('tpg_participant',original);sessionStorage.removeItem('tpg_facilitator_game_view');sessionStorage.removeItem('tpg_facilitator_participant');window.location.reload()};
+  const reopenControlRoom=()=>{const currentPlayer=localStorage.getItem('tpg_participant');if(currentPlayer)sessionStorage.setItem('tpg_facilitator_game_player',currentPlayer);const facilitator=sessionStorage.getItem('tpg_facilitator_participant');if(facilitator){localStorage.setItem('tpg_participant',facilitator);try{const parsed=JSON.parse(facilitator);if(parsed.companyId)localStorage.setItem('tpg_company_id',parsed.companyId)}catch{}}sessionStorage.removeItem('tpg_facilitator_game_view');window.location.reload()};
 
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
