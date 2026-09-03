@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Clock, Pause, Play, RotateCcw, Settings2, X } from 'lucide-react';
+import { Clock, LogIn, Pause, Play, RotateCcw, Settings2, Users, X } from 'lucide-react';
 import type { GameSessionV2 } from '../types/gameV2.ts';
 
-interface Props { session: GameSessionV2; onResetGame?: () => void | Promise<void>; resetting?: boolean; }
+interface Props { session: GameSessionV2; onResetGame?: () => void | Promise<void>; resetting?: boolean; onFacilitatorLogin?:()=>void; onBreakoutRooms?:()=>void; }
 
 function secondsFromSession(session: GameSessionV2) {
   if (session.timerEndsAt) return Math.max(0, Math.ceil((new Date(session.timerEndsAt).getTime() - Date.now()) / 1000));
   return session.timerPausedSecondsRemaining ?? session.gameDurationMinutes * 60;
 }
 
-export const SharedGameTimerV2: React.FC<Props> = ({ session, onResetGame, resetting=false }) => {
+export const SharedGameTimerV2: React.FC<Props> = ({ session, onResetGame, resetting=false, onFacilitatorLogin, onBreakoutRooms }) => {
   const [remaining, setRemaining] = useState(() => secondsFromSession(session));
   const [open,setOpen]=useState(false);
   const [timerBusy,setTimerBusy]=useState(false);
@@ -62,7 +62,8 @@ export const SharedGameTimerV2: React.FC<Props> = ({ session, onResetGame, reset
       </button>
       {open&&<div role="menu" className="absolute right-0 top-full mt-2 z-[120] w-56 rounded-2xl border border-slate-700 bg-slate-950/98 p-2 shadow-2xl">
         <div className="flex items-center justify-between px-2 py-1"><div className="text-[10px] uppercase tracking-wider text-slate-500 font-black">Game controls</div><button onClick={()=>setOpen(false)} className="w-7 h-7 rounded-lg grid place-items-center text-slate-500 hover:text-white" aria-label="Close game controls"><X className="w-4 h-4"/></button></div>
-        {facilitatorGameView&&<button role="menuitem" onClick={reopenControlRoom} className="mt-1 w-full rounded-xl border border-violet-800 bg-violet-950/35 px-3 py-2.5 text-xs font-black text-violet-200 flex items-center justify-center gap-2"><Settings2 className="w-4 h-4"/>Control room</button>}
+        {facilitatorGameView?<button role="menuitem" onClick={reopenControlRoom} className="mt-1 w-full rounded-xl border border-violet-800 bg-violet-950/35 px-3 py-2.5 text-xs font-black text-violet-200 flex items-center justify-center gap-2"><Settings2 className="w-4 h-4"/>Control room</button>:onFacilitatorLogin&&<button role="menuitem" onClick={()=>{setOpen(false);onFacilitatorLogin()}} className="mt-1 w-full rounded-xl border border-violet-800 bg-violet-950/35 px-3 py-2.5 text-xs font-black text-violet-200 flex items-center justify-center gap-2"><LogIn className="w-4 h-4"/>Facilitator login</button>}
+        {onBreakoutRooms&&<button role="menuitem" onClick={()=>{setOpen(false);onBreakoutRooms()}} className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs font-black text-slate-200 flex items-center justify-center gap-2"><Users className="w-4 h-4"/>Breakout rooms</button>}
         {isSolo&&<button role="menuitem" disabled={timerBusy} onClick={()=>void timerCommand(isRunning?'pause':'start')} className="mt-1 w-full rounded-xl border border-emerald-800 bg-emerald-950/35 px-3 py-2.5 text-xs font-black text-emerald-200 flex items-center justify-center gap-2 disabled:opacity-50">{isRunning?<Pause className="w-4 h-4"/>:<Play className="w-4 h-4"/>}{isRunning?'Pause clock':'Play clock'}</button>}
         {onResetGame&&<button role="menuitem" disabled={resetting} onClick={()=>void onResetGame()} className="mt-2 w-full rounded-xl border border-amber-700 bg-amber-950/30 px-3 py-2.5 text-xs font-black text-amber-200 flex items-center justify-center gap-2 disabled:opacity-50"><RotateCcw className="w-4 h-4"/>{resetting?'Resetting…':'Reset game'}</button>}
       </div>}
