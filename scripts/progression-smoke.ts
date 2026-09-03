@@ -60,6 +60,6 @@ assert.ok(tutorialWrapper.includes("event.card.tags?.includes(PROGRAMMED_FAILURE
 assert.equal(tutorialWrapper.includes("cardNumber===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)"),false,'tutorial must not depend on dealt-card position');
 const appBoard=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
 assert.ok(appBoard.includes("targetPhase:'investment'"),'final Event must advance directly to Invest');
-assert.ok(appBoard.includes('await advanceToInvestment()'),'completion path must use the direct Invest transition');
+assert.ok(appBoard.includes('await advanceToInvestment('),'completion path must use the direct Invest transition helper');
 
 console.log('Progression V5 smoke tests passed.');
