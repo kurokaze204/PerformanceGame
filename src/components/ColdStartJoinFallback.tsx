@@ -1,0 +1,14 @@
+import React,{useEffect,useState}from'react';
+
+export const ColdStartJoinFallback:React.FC=()=>{
+ const[visible,setVisible]=useState(false),[name,setName]=useState(''),[code,setCode]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{
+  try{setName(localStorage.getItem('tpg_entered_player_name')||'')}catch{}
+  const check=()=>{const loading=document.body.textContent?.includes('Loading The Performance Gap');const normalJoin=Boolean(document.getElementById('join-title'));setVisible(Boolean(loading&&!normalJoin));};
+  const timer=window.setTimeout(check,1400);const observer=new MutationObserver(check);observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+  return()=>{window.clearTimeout(timer);observer.disconnect()};
+ },[]);
+ const join=async()=>{if(!name.trim()||!code.trim()||busy)return;setBusy(true);setError('');try{const id=code.trim().toUpperCase();const g=await fetch(`/api/sessions/${id}`,{cache:'no-store'});if(!g.ok)throw new Error('Game code not found.');const found=await g.json();const r=await fetch(`/api/sessions/${found.id}/join`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),role:'participant'})}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not join this game.');localStorage.setItem('tpg_entered_player_name',name.trim());localStorage.setItem('tpg_session_id',d.session.id);localStorage.setItem('tpg_company_id',d.participant.companyId);localStorage.setItem('tpg_participant',JSON.stringify(d.participant));window.location.reload();}catch(e:any){setError(e.message||'Could not join this game.');setBusy(false)}};
+ if(!visible)return null;
+ return <div className="fixed inset-0 z-[500] grid place-items-center bg-[#080b12]/98 p-4" role="dialog" aria-modal="true" aria-label="Join The Performance Gap"><div className="w-full max-w-md rounded-3xl border border-violet-700 bg-slate-900 p-6 shadow-2xl"><div className="text-xs font-black uppercase tracking-[.18em] text-violet-300">Connection recovery</div><h1 className="mt-1 text-2xl font-black text-white">Join The Performance Gap</h1><p className="mt-2 text-sm text-slate-400">The normal game bootstrap is taking longer than expected. You can still join a known game directly.</p><label className="mt-4 block"><span className="label">Your name</span><input value={name} onChange={e=>setName(e.target.value)} className="control"/></label><label className="mt-3 block"><span className="label">Game code</span><input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} className="control" placeholder="e.g. KM4821"/></label>{error&&<div className="mt-3 text-sm text-rose-300">{error}</div>}<button onClick={()=>void join()} disabled={busy||!name.trim()||!code.trim()} className="primary mt-4 disabled:opacity-40">{busy?'CONNECTING…':'CONNECT TO GAME'}</button></div></div>;
+};
