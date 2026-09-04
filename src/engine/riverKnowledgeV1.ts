@@ -11,8 +11,11 @@ export function riverSiteKnowledgeScore(site:CompanyV2['sites'][number],domain:K
     : Math.max(site.teamCapability[domain]||0,site.codifiedKnowledge[domain]||0);
 }
 
-export function riverTransferTarget(sourceScore:number):number{
-  return Math.max(0,Math.min(6,Math.round(sourceScore*0.8)));
+export function riverTransferTarget(sourceScore:number,currentScore=0):number{
+  const source=Math.max(0,Math.min(6,sourceScore));
+  const current=Math.max(0,Math.min(6,currentScore));
+  if(source<=current)return current;
+  return Math.max(0,Math.min(6,current+Math.ceil((source-current)*0.5)));
 }
 
 export function executeRiverKnowledgeSharing(session:GameSessionV2,company:CompanyV2,payload:any){
@@ -27,8 +30,8 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   const target=company.sites.find(s=>s.id===siteId&&!s.isClosed);
   if(!source||!target)return{success:false,message:'Both sites must be active.',session};
   const sourceScore=riverSiteKnowledgeScore(source,domain,session.experienceMode);
-  const targetScore=riverTransferTarget(sourceScore);
   const before=target.teamCapability[domain]||0;
+  const targetScore=riverTransferTarget(sourceScore,before);
   if(targetScore<=before)return{success:false,message:`${target.name} already has Team Capability ${before}; ${source.name} cannot lift it further through Knowledge Transfer.`,session};
   target.teamCapability[domain]=targetScore;
   recordPublicationEvidenceV4(company,domain,1);
@@ -40,7 +43,7 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   return{
     success:true,
     session,
-    message:`${source.name} transferred ${domain} practice to ${target.name}. ${target.name} Team Capability increased ${before} → ${targetScore}, approximately 80% of ${source.name}'s locally available ${session.experienceMode==='newbie'?'Team Capability':'knowledge score'} ${sourceScore}. Cost $${cost}k.`,
+    message:`${source.name} transferred ${domain} practice to ${target.name}. ${target.name} Team Capability increased ${before} → ${targetScore}, closing half the gap toward ${source.name}'s locally available ${session.experienceMode==='newbie'?'Team Capability':'knowledge score'} ${sourceScore}, rounded up. Cost $${cost}k.`,
     costTurnover:cost,
     investmentAttribution:{siteId:target.id,siteCost:cost,corporateCost:0},
     riverTransfer:{sourceSiteId:source.id,targetSiteId:target.id,domain,sourceScore,targetScore,before},
