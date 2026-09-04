@@ -6,11 +6,12 @@ interface Props{roll:number;threshold:number;sides:number;kind:Kind;isSPOF?:bool
 
 const sleep=(ms:number)=>new Promise<void>(resolve=>window.setTimeout(resolve,ms));
 
-export const RiskRollTrack:React.FC<Props>=({roll,threshold,sides,kind,isSPOF=false,onComplete})=>{
+export const RiskRollTrack:React.FC<Props>=({roll,threshold,sides,kind,isSPOF,onComplete})=>{
  const safeSides=Math.max(2,sides||12),safeRoll=Math.max(1,Math.min(safeSides,roll||1));
+ const spof=isSPOF??(kind==='expert'&&Number(threshold)>=2);
  const[active,setActive]=useState<number|null>(null),[rolling,setRolling]=useState(false),[done,setDone]=useState(false),[started,setStarted]=useState(false);
  const runId=useRef(0);
- useEffect(()=>{runId.current+=1;setActive(null);setRolling(false);setDone(false);setStarted(false);},[roll,threshold,sides,kind,isSPOF]);
+ useEffect(()=>{runId.current+=1;setActive(null);setRolling(false);setDone(false);setStarted(false);},[roll,threshold,sides,kind,spof]);
  const pushToRoll=async()=>{
   if(rolling||done)return;
   const myRun=++runId.current;
@@ -33,7 +34,7 @@ export const RiskRollTrack:React.FC<Props>=({roll,threshold,sides,kind,isSPOF=fa
  const squareBase=(n:number)=>{
   if(kind==='expert'){
    if(n===1)return'border-rose-500 bg-rose-600';
-   if(n===2&&isSPOF)return'border-amber-400 bg-amber-500';
+   if(n===2&&spof)return'border-amber-400 bg-amber-500';
    return'border-sky-700 bg-sky-700';
   }
   if(n<=Math.max(0,Math.min(safeSides,threshold||0)))return'border-rose-500 bg-rose-600';
