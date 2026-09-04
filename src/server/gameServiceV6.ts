@@ -2,6 +2,7 @@ import type { GameSessionV2 } from '../types/gameV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
   getSessionV2 as baseGetSessionV2,
+  knowledgeActionV2 as baseKnowledgeActionV2,
 } from './gameServiceV5.ts';
 
 export * from './gameServiceV5.ts';
@@ -27,4 +28,19 @@ export async function getSessionV2(sessionId: string): Promise<GameSessionV2 | n
   }
 
   return session;
+}
+
+/**
+ * A delayed Event is removed from the current round's active Event list. If that
+ * was the company's last unresolved Event, follow the same player-facing flow as
+ * resolving the last Event and move immediately into Invest.
+ */
+export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
+  const result:any=await baseKnowledgeActionV2(sessionId,companyId,payload);
+  if(!result?.success||payload?.type!=='DELAY_EVENT'||!result.session)return result;
+  const remaining=result.session.activeEvents[companyId]||[];
+  if(remaining.some((event:any)=>!event.isResolved))return result;
+  const advanced:any=await baseAdvancePhaseV2(result.session.id,'investment');
+  if(!advanced?.success||!advanced.session)return result;
+  return{...result,session:advanced.session};
 }
