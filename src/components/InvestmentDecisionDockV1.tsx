@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRightLeft, BarChart3, Building2, MapPin, Users, X } from 'lucide-react';
 import type { Expert, KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
@@ -18,6 +18,7 @@ export const InvestmentDecisionDockV1:React.FC<Props>=({session,company,selected
  const [transferOpen,setTransferOpen]=useState(false);
  const domains=domainsForMode(session.experienceMode),site=company.sites.find(s=>s.id===selectedSiteId)||company.sites[0],delayed=company.delayedEvent;
  const transferUnlocked=useMemo(()=>session.experienceMode==='expert'||session.round>1||(session.activeEvents[company.id]||[]).some(event=>event.isResolved&&event.success===false&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)),[session,company.id]);
+ useEffect(()=>{const openFromTransferCard=(event:MouseEvent)=>{const button=(event.target as HTMLElement|null)?.closest('button');const panel=button?.closest('[aria-label="Investment actions"]');if(panel&&button?.textContent?.includes('Knowledge Transfer')){event.preventDefault();setTransferOpen(true)}};document.addEventListener('click',openFromTransferCard,true);return()=>document.removeEventListener('click',openFromTransferCard,true)},[]);
  const share=async(sourceSiteId:string,targetSiteId:string,domain:KnowledgeDomain)=>{const res=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,actionType:'SITE_KNOWLEDGE_SHARING',params:{sourceSiteId,siteId:targetSiteId,domain}})});const data=await res.json();return{success:res.ok&&data.success!==false,message:data.message||data.error};};
  return <>
  {transferOpen&&<RiverDiagramOverlay company={company} mode={session.experienceMode} phase={session.phase} totalActions={session.config.actions_per_round} onClose={()=>setTransferOpen(false)} onShare={share}/>} 

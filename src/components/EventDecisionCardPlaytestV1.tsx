@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
-import { EventDecisionCardV4 } from './EventDecisionCardV4.tsx';
+import { OptimisticEventDecisionCardV1 } from './OptimisticEventDecisionCardV1.tsx';
 import { NewbieTransferUnlockOverlay } from './NewbieTransferUnlockOverlay.tsx';
 
 interface Props {
@@ -112,5 +112,5 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
     return <NewbieTransferUnlockOverlay session={resolvedSession} company={resolvedCompany} onContinue={finishLesson}/>;
   }
 
-  return <div ref={decisionRootRef}><EventDecisionCardV4 {...props} event={displayEvent} onAcknowledgeResolution={interceptContinue}/></div>;
+  return <div ref={decisionRootRef}><OptimisticEventDecisionCardV1 {...props} event={displayEvent} onAcknowledgeResolution={interceptContinue}/></div>;
 };

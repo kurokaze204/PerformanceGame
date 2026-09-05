@@ -12,6 +12,10 @@
 :root { --tpg-header-height: 88px; }
 button, [role="button"] { transition-property: transform,filter,background-color,border-color,color,opacity; transition-duration: 120ms; }
 .tpg-click-ack { transform: scale(.965) !important; filter: brightness(1.22) !important; }
+html.tpg-network-busy,
+html.tpg-network-busy body,
+html.tpg-network-busy button,
+html.tpg-network-busy [role="button"] { cursor: progress !important; }
 
 /* Playtest polish: decision screens must be readable at normal laptop distance. */
 [aria-label="Investment actions"] {
@@ -129,6 +133,29 @@ div[class*="max-w-[1100px]"] aside > button.relative > svg.absolute {
   border-radius: 9999px;
   background: rgb(6 78 59);
   color: rgb(209 250 229) !important;
+}
+/* Expert selection uses the same circle language even though the selected card turns yellow. */
+div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-left.bg-amber-400 {
+  position: relative;
+  padding-right: 2.65rem !important;
+}
+div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-left.bg-amber-400::after {
+  content: "✓";
+  position: absolute;
+  right: .65rem;
+  top: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  border-radius: 9999px;
+  border: 2px solid rgb(15 23 42);
+  background: rgb(15 23 42);
+  color: white;
+  font-size: .95rem;
+  line-height: 1;
+  font-weight: 900;
 }
 
 /* Desktop Invest is a planning desk with a dedicated right-hand reference lane. */
