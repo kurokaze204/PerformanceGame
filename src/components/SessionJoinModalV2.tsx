@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Building2, Gauge, GraduationCap, Sparkles } from 'lucide-react';
+import { ArrowRight, Building2, Gauge, GraduationCap, Sparkles, UserRound } from 'lucide-react';
 import type { GameEndMode, GameSessionV2, ExperienceMode } from '../types/gameV2.ts';
 import { defaultActionsForMode } from '../engine/learningCurveBalanceV1.ts';
 import { formatCurrency } from '../utils/format.ts';
@@ -13,10 +13,11 @@ interface Props {
 }
 
 export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSession }) => {
-  const [mode, setMode] = useState<'join'|'current'|'create'>('join');
+  const [mode, setMode] = useState<'solo'|'join'|'current'|'create'>('solo');
   const [sessionId, setSessionId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [companyId, setCompanyId] = useState(currentSession?.companies[0]?.id || '');
+
   const [name, setName] = useState('Executive Game 2026');
   const [companyCount, setCompanyCount] = useState(4);
   const [experienceMode, setExperienceMode] = useState<ExperienceMode>('newbie');
@@ -25,17 +26,28 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
   const [actionsPerRound, setActionsPerRound] = useState(defaultActionsForMode('newbie'));
   const [gameEndMode, setGameEndMode] = useState<GameEndMode>('time');
   const [finalRoundCount, setFinalRoundCount] = useState(30);
+
+  const [soloExperienceMode, setSoloExperienceMode] = useState<ExperienceMode>('newbie');
+  const [soloDuration, setSoloDuration] = useState(45);
+  const [soloActionsPerRound, setSoloActionsPerRound] = useState(defaultActionsForMode('newbie'));
+  const [soloGameEndMode, setSoloGameEndMode] = useState<GameEndMode>('time');
+  const [soloFinalRoundCount, setSoloFinalRoundCount] = useState(30);
+
   const [createError, setCreateError] = useState<string|null>(null);
   const [creating, setCreating] = useState(false);
+
   const selectExperienceMode=(next:ExperienceMode)=>{setExperienceMode(next);setActionsPerRound(defaultActionsForMode(next));if(next==='newbie')setGameEndMode('time');};
+  const selectSoloExperienceMode=(next:ExperienceMode)=>{setSoloExperienceMode(next);setSoloActionsPerRound(defaultActionsForMode(next));setSoloDuration(next==='newbie'?45:60);if(next==='newbie')setSoloGameEndMode('time');};
   const options = { experienceMode, gameDurationMinutes: duration, maxPlayersPerCompany: maxPlayers, actionsPerRound, gameEndMode: experienceMode==='expert'?gameEndMode:'time' as GameEndMode, finalRoundCount };
+  const soloOptions = { experienceMode: soloExperienceMode, gameDurationMinutes: soloDuration, maxPlayersPerCompany: 1, actionsPerRound: soloActionsPerRound, gameEndMode: soloExperienceMode==='expert'?soloGameEndMode:'time' as GameEndMode, finalRoundCount: soloFinalRoundCount };
   const hasName = playerName.trim().length > 0;
   const rememberName = () => { try { localStorage.setItem('tpg_entered_player_name', playerName.trim()); } catch { /* ignore */ } };
-  const createAndJoin = async (count:number) => {
+
+  const createAndJoin = async (count:number, gameName=name, selectedOptions:CreateOptions=options) => {
     if (!hasName || creating) return;
     setCreating(true); setCreateError(null); rememberName();
     try {
-      const res=await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,companyCount:count,...options})});
+      const res=await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:gameName,companyCount:count,...selectedOptions})});
       const created=await res.json();
       if(!res.ok) throw new Error(created.error||'Could not create the game.');
       onJoinSession(created.id,created.companies?.[0]?.id||'',playerName.trim());
@@ -44,12 +56,34 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
 
   return <div className="fixed inset-0 z-[250] bg-[#080b12]/95 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="join-title">
     <div className="w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-slate-200 max-h-[95vh] overflow-y-auto">
-      <div className="text-center"><div className="text-[10px] uppercase tracking-[.2em] font-black text-indigo-300">Organisational knowledge & resilience</div><h1 id="join-title" className="text-2xl font-black text-white mt-1">The Performance Gap</h1><p className="text-xs text-slate-500 mt-1">Multiplayer strategic business simulation</p></div>
-      <div className="grid grid-cols-3 gap-1 mt-5 rounded-xl border border-slate-700 bg-slate-950 p-1" role="tablist" aria-label="Game entry options">
+      <div className="text-center"><div className="text-[10px] uppercase tracking-[.2em] font-black text-indigo-300">Organisational knowledge & resilience</div><h1 id="join-title" className="text-2xl font-black text-white mt-1">The Performance Gap</h1><p className="text-xs text-slate-500 mt-1">Strategic business simulation</p></div>
+      <div className="grid grid-cols-4 gap-1 mt-5 rounded-xl border border-slate-700 bg-slate-950 p-1" role="tablist" aria-label="Game entry options">
+        <Tab active={mode==='solo'} onClick={()=>setMode('solo')}>Solo game</Tab>
         <Tab active={mode==='join'} onClick={()=>setMode('join')}>Join by code</Tab>
         <Tab active={mode==='current'} disabled={!currentSession} onClick={()=>setMode('current')}>Current game</Tab>
         <Tab active={mode==='create'} onClick={()=>setMode('create')}>Create game</Tab>
       </div>
+
+      {mode==='solo'&&<div className="mt-5 space-y-4">
+        <div className="rounded-2xl border border-indigo-700 bg-indigo-950/35 p-4">
+          <div className="flex items-start gap-3"><UserRound className="w-6 h-6 text-indigo-300 mt-0.5 shrink-0"/><div><h2 className="font-black text-white">Play by yourself</h2><p className="text-xs text-slate-300 mt-1 leading-relaxed">You will run one company through a series of business Challenges. Each round, decide how to use the knowledge, people and resources you have available. The game will introduce itself as you play — no facilitator briefing is required.</p></div></div>
+        </div>
+        <Field label="Your name"><input required value={playerName} onChange={e=>setPlayerName(e.target.value)} className="control" placeholder="e.g. Sarah Jenkins"/></Field>
+        <div><div className="label">How familiar are you with Knowledge Management?</div><div className="grid grid-cols-2 gap-2 mt-1">
+          <button onClick={()=>selectSoloExperienceMode('newbie')} className={`mode-card ${soloExperienceMode==='newbie'?'selected':''}`}><GraduationCap className="w-5 h-5"/><span><b>Newbie</b><small>Recommended first game. Capabilities are introduced gradually.</small></span></button>
+          <button onClick={()=>selectSoloExperienceMode('expert')} className={`mode-card ${soloExperienceMode==='expert'?'selected':''}`}><Gauge className="w-5 h-5"/><span><b>Expert</b><small>Full KM model and Charts available from the start.</small></span></button>
+        </div></div>
+        {soloExperienceMode==='expert'&&<div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3"><div className="label">End game by</div><div className="grid grid-cols-2 gap-2 mt-1"><button onClick={()=>setSoloGameEndMode('time')} className={`mode-card ${soloGameEndMode==='time'?'selected':''}`}><span><b>Time</b><small>Play against the clock; final Challenge begins at T−10.</small></span></button><button onClick={()=>setSoloGameEndMode('rounds')} className={`mode-card ${soloGameEndMode==='rounds'?'selected':''}`}><span><b>Round count</b><small>Play a fixed number of normal rounds before the final Challenge.</small></span></button></div></div>}
+        <div className="grid grid-cols-2 gap-3">
+          {!(soloExperienceMode==='expert'&&soloGameEndMode==='rounds')&&<Field label="Game length (minutes)"><input type="number" min={20} max={240} step={5} value={soloDuration} onChange={e=>setSoloDuration(Math.max(20,Number(e.target.value)))} className="control"/></Field>}
+          {soloExperienceMode==='expert'&&soloGameEndMode==='rounds'&&<Field label="Rounds before final Challenge"><input type="number" min={1} max={200} value={soloFinalRoundCount} onChange={e=>setSoloFinalRoundCount(Math.max(1,Math.min(200,Number(e.target.value))))} className="control"/></Field>}
+          <Field label="Actions available each round"><input type="number" min={1} max={10} value={soloActionsPerRound} onChange={e=>setSoloActionsPerRound(Math.max(1,Math.min(10,Number(e.target.value))))} className="control"/></Field>
+        </div>
+        <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-3 text-[11px] text-slate-400 leading-relaxed">{soloExperienceMode==='newbie'?`Recommended first-play settings: ${soloDuration} minutes and ${soloActionsPerRound} Actions each round. Start here if you have not seen the simulation before.`:soloGameEndMode==='rounds'?`Expert mode: ${soloFinalRoundCount} normal rounds, then the final Challenge. You have ${soloActionsPerRound} Actions each round.`:`Expert mode: ${soloDuration} minutes, with the final Challenge beginning when 10 minutes remain. You have ${soloActionsPerRound} Actions each round.`}</div>
+        {!hasName&&<p className="text-[11px] text-amber-300">Enter your name to begin.</p>}
+        {createError&&<p className="text-[11px] text-rose-300">{createError}</p>}
+        <button disabled={!hasName||creating} onClick={()=>void createAndJoin(1,'Solo Performance Gap',soloOptions)} className="primary disabled:opacity-40 disabled:cursor-not-allowed"><Sparkles className="w-4 h-4"/>{creating?'STARTING…':'START SOLO GAME'}</button>
+      </div>}
 
       {mode==='join'&&<div className="mt-5 space-y-3">
         <Field label="Your name"><input required value={playerName} onChange={e=>setPlayerName(e.target.value)} className="control" placeholder="e.g. Sarah Jenkins"/></Field>
@@ -79,7 +113,6 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
         {!hasName&&<p className="text-[11px] text-amber-300">Enter your name before starting a game.</p>}
         {createError&&<p className="text-[11px] text-rose-300">{createError}</p>}
         <button disabled={!hasName||creating} onClick={()=>void createAndJoin(companyCount)} className="primary disabled:opacity-40 disabled:cursor-not-allowed"><Sparkles className="w-4 h-4"/>{creating?'CREATING…':'LAUNCH NEW GAME'}</button>
-        <button disabled={!hasName||creating} onClick={()=>void createAndJoin(1)} className="w-full text-xs text-indigo-300 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Launch a 1-company solo game with these settings</button>
       </div>}
     </div>
   </div>;
