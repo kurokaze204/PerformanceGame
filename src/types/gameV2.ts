@@ -26,6 +26,7 @@ export type KnowledgeStrategy =
   | 'no_particular_strategy';
 
 export type ExperienceMode = 'newbie' | 'expert';
+export type GameEndMode = 'time' | 'rounds';
 
 export interface ActiveEventAllocationV2 extends ActiveEventAllocation {
   useTeamCapability?: boolean;
@@ -133,6 +134,8 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   minutesPerMove: number;
   maxPlayersPerCompany: number;
   participants: Participant[];
+  gameEndMode: GameEndMode;
+  finalRoundCount: number;
 }
 
 export interface V2BalanceConfig {
@@ -203,5 +206,7 @@ export function asSessionV2(session: GameSession): GameSessionV2 {
   s.minutesPerMove = Math.max(4, Math.min(20, Number(s.minutesPerMove || 8)));
   s.maxPlayersPerCompany = Math.max(1, Math.min(20, Number(s.maxPlayersPerCompany || 6)));
   s.participants ??= [];
+  s.gameEndMode = s.experienceMode === 'expert' && s.gameEndMode === 'rounds' ? 'rounds' : 'time';
+  s.finalRoundCount = Math.max(1, Math.min(200, Number(s.finalRoundCount || 30)));
   return s;
 }
