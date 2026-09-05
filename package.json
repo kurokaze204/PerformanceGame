@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
-    "test:core": "tsx scripts/core-smoke.ts && tsx scripts/progression-smoke.ts",
+    "test:core": "tsx scripts/core-smoke.ts && tsx scripts/progression-smoke.ts && tsx scripts/final-trigger-smoke.ts",
     "test:ui": "tsx scripts/ui-mode-render-smoke.ts",
     "test:balance": "tsx scripts/balance-study.ts",
     "test:balance:team": "tsx scripts/team-balance-study.ts",
