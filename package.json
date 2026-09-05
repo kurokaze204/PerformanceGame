@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
-    "test:core": "tsx scripts/core-smoke.ts && tsx scripts/progression-smoke.ts",
+    "test:core": "tsx scripts/core-smoke.ts && tsx scripts/progression-smoke.ts && tsx scripts/final-trigger-smoke.ts",
     "test:ui": "tsx scripts/ui-mode-render-smoke.ts",
     "test:balance": "tsx scripts/balance-study.ts",
     "test:balance:team": "tsx scripts/team-balance-study.ts",
@@ -22,7 +22,6 @@
     "@tailwindcss/vite": "^4.1.14",
     "@types/canvas-confetti": "^1.9.0",
     "@types/pg": "^8.23.1",
-    "@vitejs/plugin-react": "^5.0.4",
     "canvas-confetti": "^1.9.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
@@ -41,6 +40,7 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
+    "@vitejs/plugin-react": "^5.0.4",
     "@types/express": "^4.17.21"
   }
 }
