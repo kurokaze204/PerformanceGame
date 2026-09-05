@@ -38,7 +38,7 @@ import {
 import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary } from './src/server/dbV2.ts';
 import { resolveWithReputationV2 } from './src/server/reputationServiceV2.ts';
 import { applyCardDifficultyBumpV2 } from './src/engine/cardBalanceV2.ts';
-import type { BusinessStrategy, ExperienceMode, KnowledgeStrategy } from './src/types/gameV2.ts';
+import type { BusinessStrategy, ExperienceMode, GameEndMode, KnowledgeStrategy } from './src/types/gameV2.ts';
 
 dotenv.config();
 
@@ -56,7 +56,7 @@ async function startServer() {
 
   app.post('/api/sessions', async (req, res) => {
     try {
-      const { sessionId, title, name, companyNames, companyCount, experienceMode, gameDurationMinutes, maxPlayersPerCompany, actionsPerRound } = req.body || {};
+      const { sessionId, title, name, companyNames, companyCount, experienceMode, gameDurationMinutes, maxPlayersPerCompany, actionsPerRound, gameEndMode, finalRoundCount } = req.body || {};
       const code = String(sessionId || `KM${Math.floor(1000 + Math.random() * 9000)}`).toUpperCase();
       let names: string[] = Array.isArray(companyNames) ? companyNames : [];
       if (!names.length) {
@@ -69,6 +69,8 @@ async function startServer() {
         gameDurationMinutes: Number(gameDurationMinutes || 60),
         maxPlayersPerCompany: Number(maxPlayersPerCompany || 6),
         actionsPerRound: Number(actionsPerRound || 5),
+        gameEndMode: gameEndMode as GameEndMode,
+        finalRoundCount: Number(finalRoundCount || 30),
       });
       await captureSessionStart(session);
       res.json(session);
