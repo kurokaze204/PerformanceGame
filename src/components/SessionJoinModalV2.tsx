@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { ArrowRight, Building2, Gauge, GraduationCap, Sparkles } from 'lucide-react';
-import type { GameSessionV2, ExperienceMode } from '../types/gameV2.ts';
+import type { GameEndMode, GameSessionV2, ExperienceMode } from '../types/gameV2.ts';
 import { defaultActionsForMode } from '../engine/learningCurveBalanceV1.ts';
 import { formatCurrency } from '../utils/format.ts';
 
-interface CreateOptions { experienceMode: ExperienceMode; gameDurationMinutes: number; maxPlayersPerCompany: number; actionsPerRound: number; }
+interface CreateOptions { experienceMode: ExperienceMode; gameDurationMinutes: number; maxPlayersPerCompany: number; actionsPerRound: number; gameEndMode: GameEndMode; finalRoundCount: number; }
 interface Props {
   currentSession: GameSessionV2 | null;
   onJoinSession: (sessionId: string, companyId: string, playerName: string) => void;
@@ -23,10 +23,12 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
   const [duration, setDuration] = useState(60);
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [actionsPerRound, setActionsPerRound] = useState(defaultActionsForMode('newbie'));
+  const [gameEndMode, setGameEndMode] = useState<GameEndMode>('time');
+  const [finalRoundCount, setFinalRoundCount] = useState(30);
   const [createError, setCreateError] = useState<string|null>(null);
   const [creating, setCreating] = useState(false);
-  const selectExperienceMode=(next:ExperienceMode)=>{setExperienceMode(next);setActionsPerRound(defaultActionsForMode(next));};
-  const options = { experienceMode, gameDurationMinutes: duration, maxPlayersPerCompany: maxPlayers, actionsPerRound };
+  const selectExperienceMode=(next:ExperienceMode)=>{setExperienceMode(next);setActionsPerRound(defaultActionsForMode(next));if(next==='newbie')setGameEndMode('time');};
+  const options = { experienceMode, gameDurationMinutes: duration, maxPlayersPerCompany: maxPlayers, actionsPerRound, gameEndMode: experienceMode==='expert'?gameEndMode:'time' as GameEndMode, finalRoundCount };
   const hasName = playerName.trim().length > 0;
   const rememberName = () => { try { localStorage.setItem('tpg_entered_player_name', playerName.trim()); } catch { /* ignore */ } };
   const createAndJoin = async (count:number) => {
@@ -41,7 +43,7 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
   };
 
   return <div className="fixed inset-0 z-[250] bg-[#080b12]/95 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="join-title">
-    <div className="w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-slate-200">
+    <div className="w-full max-w-xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-slate-200 max-h-[95vh] overflow-y-auto">
       <div className="text-center"><div className="text-[10px] uppercase tracking-[.2em] font-black text-indigo-300">Organisational knowledge & resilience</div><h1 id="join-title" className="text-2xl font-black text-white mt-1">The Performance Gap</h1><p className="text-xs text-slate-500 mt-1">Multiplayer strategic business simulation</p></div>
       <div className="grid grid-cols-3 gap-1 mt-5 rounded-xl border border-slate-700 bg-slate-950 p-1" role="tablist" aria-label="Game entry options">
         <Tab active={mode==='join'} onClick={()=>setMode('join')}>Join by code</Tab>
@@ -71,8 +73,9 @@ export const SessionJoinModalV2: React.FC<Props> = ({ currentSession, onJoinSess
           <button onClick={()=>selectExperienceMode('newbie')} className={`mode-card ${experienceMode==='newbie'?'selected':''}`}><GraduationCap className="w-5 h-5"/><span><b>Newbie</b><small>Guided reveal; simpler local capability model</small></span></button>
           <button onClick={()=>selectExperienceMode('expert')} className={`mode-card ${experienceMode==='expert'?'selected':''}`}><Gauge className="w-5 h-5"/><span><b>Expert</b><small>Full KM model; default 3 Actions/round</small></span></button>
         </div></div>
-        <div className="grid grid-cols-3 gap-3"><Field label="Game length (minutes)"><input type="number" min={20} max={240} step={5} value={duration} onChange={e=>setDuration(Math.max(20,Number(e.target.value)))} className="control"/></Field><Field label="Max players / company"><input type="number" min={1} max={20} value={maxPlayers} onChange={e=>setMaxPlayers(Math.max(1,Number(e.target.value)))} className="control"/></Field><Field label="Actions / company / round"><input type="number" min={1} max={10} value={actionsPerRound} onChange={e=>setActionsPerRound(Math.max(1,Math.min(10,Number(e.target.value))))} className="control"/></Field></div>
-        <div className="rounded-xl border border-indigo-800 bg-indigo-950/25 p-3 text-xs text-slate-300">Defaults are tuned by mode: Newbie starts at 5 Actions per company per round; Expert starts at 3 to create stronger portfolio trade-offs. The facilitator can override either value here.</div>
+        {experienceMode==='expert'&&<div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3"><div className="label">End game by</div><div className="grid grid-cols-2 gap-2 mt-1"><button onClick={()=>setGameEndMode('time')} className={`mode-card ${gameEndMode==='time'?'selected':''}`}><span><b>Time</b><small>Final Challenge when the timer reaches T−10</small></span></button><button onClick={()=>setGameEndMode('rounds')} className={`mode-card ${gameEndMode==='rounds'?'selected':''}`}><span><b>Round count</b><small>Final Challenge after the chosen round finishes</small></span></button></div>{gameEndMode==='rounds'&&<div className="mt-3"><Field label="Normal rounds before final Challenge"><input type="number" min={1} max={200} value={finalRoundCount} onChange={e=>setFinalRoundCount(Math.max(1,Math.min(200,Number(e.target.value))))} className="control"/></Field></div>}</div>}
+        <div className={`grid ${experienceMode==='expert'&&gameEndMode==='rounds'?'grid-cols-2':'grid-cols-3'} gap-3`}>{!(experienceMode==='expert'&&gameEndMode==='rounds')&&<Field label="Game length (minutes)"><input type="number" min={20} max={240} step={5} value={duration} onChange={e=>setDuration(Math.max(20,Number(e.target.value)))} className="control"/></Field>}<Field label="Max players / company"><input type="number" min={1} max={20} value={maxPlayers} onChange={e=>setMaxPlayers(Math.max(1,Number(e.target.value)))} className="control"/></Field><Field label="Actions / company / round"><input type="number" min={1} max={10} value={actionsPerRound} onChange={e=>setActionsPerRound(Math.max(1,Math.min(10,Number(e.target.value))))} className="control"/></Field></div>
+        <div className="rounded-xl border border-indigo-800 bg-indigo-950/25 p-3 text-xs text-slate-300">{experienceMode==='expert'&&gameEndMode==='rounds'?`This Expert game will play ${finalRoundCount} normal rounds, then enter the final Challenge after Round ${finalRoundCount} is completed.`:'Time-based games enter the final Challenge only after the timer has actually been started and reaches the final 10-minute window. There is no round-count fallback.'}</div>
         {!hasName&&<p className="text-[11px] text-amber-300">Enter your name before starting a game.</p>}
         {createError&&<p className="text-[11px] text-rose-300">{createError}</p>}
         <button disabled={!hasName||creating} onClick={()=>void createAndJoin(companyCount)} className="primary disabled:opacity-40 disabled:cursor-not-allowed"><Sparkles className="w-4 h-4"/>{creating?'CREATING…':'LAUNCH NEW GAME'}</button>
