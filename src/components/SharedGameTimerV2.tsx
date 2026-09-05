@@ -30,15 +30,19 @@ export const SharedGameTimerV2: React.FC<Props> = ({ session }) => {
     return otherTeamsWaiting ? `Waiting on ${otherTeamsWaiting} other team${otherTeamsWaiting === 1 ? '' : 's'}` : 'All teams complete';
   }, [session]);
 
+  const roundMode = session.experienceMode === 'expert' && session.gameEndMode === 'rounds';
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
   const tone = remaining <= 5 * 60 ? 'border-rose-500 bg-rose-950/70' : remaining <= session.finalWindowMinutes * 60 ? 'border-amber-500 bg-amber-950/70' : 'border-emerald-500/70 bg-slate-900/90';
 
   return <div className="flex items-center justify-end gap-2">
     {teamStatus && <div aria-live="polite" className={`rounded-xl border px-3 py-2 text-sm font-black ${teamStatus==='Complete tasks below'?'border-indigo-700 bg-indigo-950/60 text-indigo-200':teamStatus.startsWith('Waiting')?'border-amber-700 bg-amber-950/60 text-amber-200':'border-emerald-700 bg-emerald-950/60 text-emerald-200'}`}>{teamStatus}</div>}
-    <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-2 text-white shadow-lg ${tone}`} role="timer" aria-label={`${mins} minutes ${secs} seconds remaining`}>
+    {roundMode ? <div className="flex items-center gap-3 rounded-2xl border-2 border-indigo-500/70 bg-slate-900/90 px-4 py-2 text-white shadow-lg" aria-label={`Round ${session.round} of ${session.finalRoundCount}`}>
+      <Clock className="w-5 h-5" aria-hidden="true"/>
+      <div className="leading-none"><div className="text-[10px] uppercase tracking-[0.16em] opacity-70 font-bold">Game rounds</div><div className="text-2xl font-black tabular-nums mt-1">{session.round} / {session.finalRoundCount}</div></div>
+    </div> : <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-2 text-white shadow-lg ${tone}`} role="timer" aria-label={`${mins} minutes ${secs} seconds remaining`}>
       <Clock className="w-5 h-5" aria-hidden="true"/>
       <div className="leading-none"><div className="text-[10px] uppercase tracking-[0.16em] opacity-70 font-bold">Game time</div><div className="text-2xl font-black tabular-nums mt-1" aria-live="off">{String(mins).padStart(2,'0')}:{String(secs).padStart(2,'0')}</div></div>
-    </div>
+    </div>}
   </div>;
 };
