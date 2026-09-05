@@ -15,7 +15,7 @@ interface Props{
 }
 
 export const SessionJoinModalV2:React.FC<Props>=({currentSession,onJoinSession,initialMode='solo',onClose})=>{
- const[mode,setMode]=useState<'solo'|'join'|'current'|'create'>(initialMode);
+ const[mode,setMode]=useState<'solo'|'join'|'current'|'create'>(initialMode==='join'?'solo':initialMode);
  const[sessionId,setSessionId]=useState(currentSession?.id||'');
  const[playerName,setPlayerName]=useState(()=>{try{return localStorage.getItem('tpg_entered_player_name')||''}catch{return''}});
  const[companyId,setCompanyId]=useState(currentSession?.companies[0]?.id||'');
