@@ -37,6 +37,7 @@ import {
 } from './src/server/analyticsHooksV2.ts';
 import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary, saveSessionV2 } from './src/server/dbV2.ts';
 import { listPublicSessionsV1, saveSessionAccessV1, verifySessionFacilitatorPasswordV1 } from './src/server/sessionAccessV1.ts';
+import { savePlayerOptInV1 } from './src/server/playerOptInV1.ts';
 import { resolveWithReputationV2 } from './src/server/reputationServiceV2.ts';
 import { applyCardDifficultyBumpV2 } from './src/engine/cardBalanceV2.ts';
 import type { BusinessStrategy, ExperienceMode, GameEndMode, KnowledgeStrategy, PopulationMode } from './src/types/gameV2.ts';
@@ -129,6 +130,19 @@ async function startServer() {
   app.get('/api/sessions/:id/aar', async (req, res) => res.json(await getAARData(req.params.id)));
   app.get('/api/sessions/:id/benchmark/:companyId', async (req, res) => res.json(await getBenchmarkSummary(req.params.id, req.params.companyId)));
   app.get('/api/sessions/:id/logs', async (req, res) => res.json(await getGameEventLogs(req.params.id.toUpperCase())));
+  app.post('/api/player-opt-in',async(req,res)=>{
+    try{
+      const record=await savePlayerOptInV1({
+        sessionId:req.body?.sessionId,
+        companyId:req.body?.companyId,
+        playerName:req.body?.playerName,
+        email:req.body?.email,
+        wantsResults:Boolean(req.body?.wantsResults),
+        wantsUpdates:Boolean(req.body?.wantsUpdates),
+      });
+      res.json({success:true,consentedAt:record.consentedAt});
+    }catch(e:any){res.status(400).json({error:e.message||'Could not save your email preferences.'});}
+  });
   app.get('/api/sessions/:id/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -249,7 +263,7 @@ async function startServer() {
   app.post('/api/sessions/:id/advance', advanceHandler);
   app.post('/api/sessions/:id/advance-phase', advanceHandler);
 
-  const finalHandler = async (req: express.Request, res: express.Response) => {
+  const finalHandler = async (req, res) => {
     try {
       const result = await resolveFinalDisruptionV2(req.params.id);
       await finaliseAnalyticsRun(result.session, result.results || []);
