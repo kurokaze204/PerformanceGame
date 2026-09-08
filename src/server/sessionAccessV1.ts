@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import pg from 'pg';
 
 const { Pool } = pg;
@@ -10,17 +10,17 @@ const pool = process.env.DATABASE_URL ? new Pool({
 interface AccessRecord { isPublic:boolean; passwordHash:string|null; }
 const memory = new Map<string,AccessRecord>();
 
-function hashPassword(password:string,salt=crypto.randomBytes(16).toString('hex')){
-  const hash=crypto.scryptSync(password,salt,64).toString('hex');
+function hashPassword(password:string,salt=randomBytes(16).toString('hex')){
+  const hash=scryptSync(password,salt,64).toString('hex');
   return `${salt}:${hash}`;
 }
 function matchesPassword(password:string,stored:string|null){
   if(!stored)return false;
   const [salt,hash]=stored.split(':');
   if(!salt||!hash)return false;
-  const candidate=crypto.scryptSync(password,salt,64);
+  const candidate=scryptSync(password,salt,64);
   const expected=Buffer.from(hash,'hex');
-  return candidate.length===expected.length&&crypto.timingSafeEqual(candidate,expected);
+  return candidate.length===expected.length&&timingSafeEqual(candidate,expected);
 }
 
 export async function initSessionAccessV1(){
