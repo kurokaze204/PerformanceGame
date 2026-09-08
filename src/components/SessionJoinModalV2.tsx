@@ -10,7 +10,7 @@ interface Props{
  onJoinSession:(sessionId:string,companyId:string,playerName:string)=>void;
  onCreateNewSession:(sessionName:string,companyCount:number,options:CreateOptions)=>void;
  onSoloStart:(options:CreateOptions)=>void;
- initialMode?:'solo'|'join'|'create';
+ initialMode?:'solo'|'join'|'current'|'create';
  onClose?:()=>void;
 }
 
@@ -18,7 +18,8 @@ const makeGameCode=()=>`KM${Math.random().toString(36).slice(2,7).toUpperCase()}
 const ageLabel=(date:string)=>{const ms=Math.max(0,Date.now()-new Date(date).getTime()),hours=Math.floor(ms/3600000);return hours<1?'Started recently':hours<24?`Started ${hours}h ago`:`Started ${Math.floor(hours/24)}d ago`;};
 
 export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,initialMode='solo',onClose})=>{
- const[mode,setMode]=useState<'solo'|'join'|'create'>(initialMode);
+ const resolvedInitialMode:'solo'|'join'|'create'=initialMode==='create'?'create':'solo';
+ const[mode,setMode]=useState<'solo'|'join'|'create'>(resolvedInitialMode);
  const[playerName,setPlayerName]=useState(()=>{try{return localStorage.getItem('tpg_entered_player_name')||''}catch{return''}});
  const[joinCode,setJoinCode]=useState('');
  const[publicGames,setPublicGames]=useState<PublicGame[]>([]);
