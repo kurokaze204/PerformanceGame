@@ -12,12 +12,9 @@ export const FacilitatorLoginModal:React.FC<Props>=({session,playerName,onClose,
   const code=passcode.trim();if(!code||busy)return;
   setBusy(true);setError(null);
   try{
-   const verify=await fetch(`/api/sessions/${session.id}/facilitator/settings`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode:code})});
-   const verified=await verify.json();
-   if(!verify.ok)throw new Error(verified.error||'Incorrect facilitator passcode.');
-   const join=await fetch(`/api/sessions/${session.id}/join`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:playerName?.trim()||'Facilitator',role:'facilitator'})});
-   const joined=await join.json();
-   if(!join.ok)throw new Error(joined.error||'Could not enter the facilitator control room.');
+   const response=await fetch(`/api/sessions/${session.id}/facilitator/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode:code,name:playerName?.trim()||'Facilitator'})});
+   const joined=await response.json();
+   if(!response.ok)throw new Error(joined.error||'Incorrect facilitator password.');
    onEntered(joined.session,joined.participant,code);
   }catch(err:any){setError(err.message||'Could not enter facilitator mode.');setBusy(false)}
  };
@@ -27,8 +24,8 @@ export const FacilitatorLoginModal:React.FC<Props>=({session,playerName,onClose,
    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-700 bg-violet-950/50 text-violet-200"><LockKeyhole className="h-5 w-5"/></div>
    <div className="mt-3 text-[10px] font-black uppercase tracking-[.18em] text-violet-300">Current game · {session.id}</div>
    <h2 id="fac-login-title" className="mt-1 text-xl font-black text-white">Facilitator login</h2>
-   <p className="mt-1 text-sm leading-relaxed text-slate-400">Enter the facilitator passcode to open the control room for this game.</p>
-   <label className="mt-4 block"><span className="label">Facilitator passcode</span><input autoFocus type="password" value={passcode} onChange={e=>setPasscode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void enter()}} className="control" autoComplete="current-password"/></label>
+   <p className="mt-1 text-sm leading-relaxed text-slate-400">Enter this game's facilitator password, or the master facilitator password.</p>
+   <label className="mt-4 block"><span className="label">Facilitator password</span><input autoFocus type="password" value={passcode} onChange={e=>setPasscode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void enter()}} className="control" autoComplete="current-password"/></label>
    {error&&<p className="mt-2 text-xs text-rose-300">{error}</p>}
    <button disabled={!passcode.trim()||busy} onClick={()=>void enter()} className="primary mt-4 disabled:cursor-not-allowed disabled:opacity-40">{busy?'VERIFYING…':'ENTER CONTROL ROOM'}</button>
   </div>
