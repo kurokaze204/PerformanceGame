@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import pg from 'pg';
+import { deleteSessionV2, getSessionV2 } from './dbV2.ts';
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({
@@ -39,7 +40,19 @@ export async function initSessionAccessV1(){
 
 export async function saveSessionAccessV1(sessionId:string,isPublic:boolean,facilitatorPassword?:string){
   const id=sessionId.toUpperCase();
-  const passwordHash=facilitatorPassword?.trim()?hashPassword(facilitatorPassword.trim()):null;
+  const session=await getSessionV2(id);
+  const isSolo=Boolean(
+    session &&
+    session.title==='Solo Performance Gap' &&
+    session.companies.length===1 &&
+    session.maxPlayersPerCompany===1
+  );
+  const password=facilitatorPassword?.trim()||'';
+  if(!password&&!isSolo){
+    if(session)await deleteSessionV2(id);
+    throw new Error('A facilitator password is required to create a multiplayer game.');
+  }
+  const passwordHash=password?hashPassword(password):null;
   memory.set(id,{isPublic,passwordHash});
   if(!pool)return;
   await initSessionAccessV1();
