@@ -46,6 +46,11 @@ export function StrategyPromptV2({ stage, originalKnowledgeStrategy, originalBus
             ? 'Choose the approach your team intends to take. There is no correct answer — this simply records what you planned.'
             : 'At the start you chose the knowledge strategy shown below. Knowing what you know now, what would you choose?' }
         </p>
+        {initial && (
+          <div className="mt-3 rounded-xl border border-emerald-700 bg-emerald-950/35 px-4 py-3 text-sm font-black text-emerald-300">
+            This choice does not change how your game plays.
+          </div>
+        )}
 
         {initial ? (
           <div className="mt-7 space-y-6">
