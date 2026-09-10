@@ -1,5 +1,5 @@
 import type { EventType, GamePhase, GameSession, Participant } from '../types/game.ts';
-import type { ExperienceMode, GameSessionV2 } from '../types/gameV2.ts';
+import type { ExperienceMode, GameEndMode, GameSessionV2 } from '../types/gameV2.ts';
 import { asSessionV2 } from '../types/gameV2.ts';
 import { DEFAULT_CONFIG } from '../engine/config.ts';
 import { FINAL_DISRUPTION_CARDS } from '../engine/cards.ts';
@@ -47,15 +47,19 @@ export interface CreateGameOptions {
   gameDurationMinutes?: number;
   maxPlayersPerCompany?: number;
   actionsPerRound?: number;
+  gameEndMode?: GameEndMode;
+  finalRoundCount?: number;
 }
 
 const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
 function setNextPair(session:GameSessionV2){for(const company of session.companies){const pair:EventType[]=Math.random()<0.5?['problem','opportunity']:['opportunity','problem'];company.eventTypePlan[company.eventsDrawnCount]=pair[0];company.eventTypePlan[company.eventsDrawnCount+1]=pair[1]}}
 function remainingSeconds(session:GameSessionV2){if(session.timerEndsAt)return Math.max(0,Math.ceil((new Date(session.timerEndsAt).getTime()-Date.now())/1000));return session.timerPausedSecondsRemaining??session.gameDurationMinutes*60}
 function timerHasRun(session:GameSessionV2){const full=session.gameDurationMinutes*60;return Boolean(session.timerStartedAt||session.timerEndsAt||(session.timerPausedSecondsRemaining!=null&&session.timerPausedSecondsRemaining<full))}
-function estimatedNormalRounds(session:GameSessionV2){const playable=Math.max(session.minutesPerMove*2,session.gameDurationMinutes-session.finalWindowMinutes);const moves=Math.max(2,Math.floor(playable/session.minutesPerMove));return Math.max(1,Math.floor(moves/2))}
-function finalDue(session:GameSessionV2){return timerHasRun(session)?remainingSeconds(session)<=session.finalWindowMinutes*60:session.round>=estimatedNormalRounds(session)}
-async function startFinal(session:GameSessionV2){session.isFinalDisruptionActive=true;session.finalDisruptionCard=FINAL_DISRUPTION_CARDS[0];session.finalDisruptionResolved=false;session.phase='respond';await saveSessionV2(session);broadcastV2(session,'FINAL_DISRUPTION_STARTED',{reason:'final-window',round:session.round});return{success:true,session}}
+export function finalChallengeDue(session:GameSessionV2){
+ if(session.experienceMode==='expert'&&session.gameEndMode==='rounds')return session.round>=session.finalRoundCount;
+ return timerHasRun(session)&&remainingSeconds(session)<=session.finalWindowMinutes*60;
+}
+async function startFinal(session:GameSessionV2){const reason=session.experienceMode==='expert'&&session.gameEndMode==='rounds'?'round-limit':'final-window';session.isFinalDisruptionActive=true;session.finalDisruptionCard=FINAL_DISRUPTION_CARDS[0];session.finalDisruptionResolved=false;session.phase='respond';await saveSessionV2(session);broadcastV2(session,'FINAL_DISRUPTION_STARTED',{reason,round:session.round});return{success:true,session}}
 
 export async function createNewSessionV2(sessionId:string,title:string,companyNames:string[]=['Apex Technologies'],options:CreateGameOptions={}):Promise<GameSessionV2>{
  const id=sessionId.toUpperCase();
@@ -65,6 +69,8 @@ export async function createNewSessionV2(sessionId:string,title:string,companyNa
  session.experienceMode=options.experienceMode==='expert'?'expert':'newbie';
  session.gameDurationMinutes=clamp(Number(options.gameDurationMinutes||60),20,240);
  session.finalWindowMinutes=10;session.minutesPerMove=8;session.maxPlayersPerCompany=clamp(Number(options.maxPlayersPerCompany||6),1,20);session.participants=[];
+ session.gameEndMode=session.experienceMode==='expert'&&options.gameEndMode==='rounds'?'rounds':'time';
+ session.finalRoundCount=clamp(Number(options.finalRoundCount||30),1,200);
  session.timerStartedAt=null;session.timerEndsAt=null;session.timerPausedSecondsRemaining=session.gameDurationMinutes*60;session.riskResults=null;
  setNextPair(session);for(const company of session.companies)session.activeEvents[company.id]=drawRoundEventsV2(session,company);
  await saveSessionV2(session);return session;
@@ -83,9 +89,9 @@ export async function joinSessionV2(sessionId:string,name:string,companyId?:stri
 
 export async function moveParticipantV3(sessionId:string,participantId:string,companyId:string){const session=await getSessionOrThrow(sessionId);const participant=session.participants.find(p=>p.id===participantId);const target=session.companies.find(c=>c.id===companyId);if(!participant||!target)throw new Error('Player or company not found.');const targetCount=session.participants.filter(p=>p.role==='participant'&&p.companyId===companyId&&p.id!==participantId).length;if(participant.role==='participant'&&targetCount>=session.maxPlayersPerCompany)throw new Error(`${target.name} is already at the player limit.`);participant.companyId=target.id;participant.lastSeen=new Date().toISOString();await saveParticipant(participant);await saveSessionV2(session);broadcastV2(session,'PARTICIPANT_MOVED',{participantId,companyId});return session}
 
-export async function updateGameSettingsV3(sessionId:string,updates:{gameDurationMinutes?:number;maxPlayersPerCompany?:number}){const session=await getSessionOrThrow(sessionId);if(updates.maxPlayersPerCompany!=null)session.maxPlayersPerCompany=clamp(Number(updates.maxPlayersPerCompany),1,20);if(updates.gameDurationMinutes!=null){const oldFull=session.gameDurationMinutes*60;const elapsed=session.timerEndsAt?Math.max(0,oldFull-remainingSeconds(session)):Math.max(0,oldFull-(session.timerPausedSecondsRemaining??oldFull));session.gameDurationMinutes=clamp(Number(updates.gameDurationMinutes),20,240);const next=Math.max(0,session.gameDurationMinutes*60-elapsed);if(session.timerEndsAt)session.timerEndsAt=new Date(Date.now()+next*1000).toISOString();else session.timerPausedSecondsRemaining=next}await saveSessionV2(session);broadcastV2(session,'GAME_SETTINGS_UPDATED');return session}
+export async function updateGameSettingsV3(sessionId:string,updates:{gameDurationMinutes?:number;maxPlayersPerCompany?:number;gameEndMode?:GameEndMode;finalRoundCount?:number}){const session=await getSessionOrThrow(sessionId);if(updates.maxPlayersPerCompany!=null)session.maxPlayersPerCompany=clamp(Number(updates.maxPlayersPerCompany),1,20);if(session.experienceMode==='expert'&&updates.gameEndMode)session.gameEndMode=updates.gameEndMode==='rounds'?'rounds':'time';else if(session.experienceMode!=='expert')session.gameEndMode='time';if(updates.finalRoundCount!=null)session.finalRoundCount=clamp(Number(updates.finalRoundCount),1,200);if(updates.gameDurationMinutes!=null){const oldFull=session.gameDurationMinutes*60;const elapsed=session.timerEndsAt?Math.max(0,oldFull-remainingSeconds(session)):Math.max(0,oldFull-(session.timerPausedSecondsRemaining??oldFull));session.gameDurationMinutes=clamp(Number(updates.gameDurationMinutes),20,240);const next=Math.max(0,session.gameDurationMinutes*60-elapsed);if(session.timerEndsAt)session.timerEndsAt=new Date(Date.now()+next*1000).toISOString();else session.timerPausedSecondsRemaining=next}await saveSessionV2(session);broadcastV2(session,'GAME_SETTINGS_UPDATED');return session}
 
-export async function advancePhaseV2(sessionId:string,requested?:GamePhase){const session=await getSessionOrThrow(sessionId);const leavingRisk=session.phase==='risk'&&(!requested||requested==='respond');if(leavingRisk&&finalDue(session))return startFinal(session);if(leavingRisk){setNextPair(session);await saveSessionV2(session)}return legacyAdvancePhaseV2(sessionId,requested)}
+export async function advancePhaseV2(sessionId:string,requested?:GamePhase){const session=await getSessionOrThrow(sessionId);const leavingRisk=session.phase==='risk'&&(!requested||requested==='respond');if(leavingRisk&&finalChallengeDue(session))return startFinal(session);if(leavingRisk){setNextPair(session);await saveSessionV2(session)}return legacyAdvancePhaseV2(sessionId,requested)}
 
 export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){const session=await getSessionOrThrow(sessionId);if(isInvestmentActionV4(payload?.type)&&!interventionUnlocked(session.experienceMode,session.round,payload.type))return{success:false,message:'This knowledge capability has not been introduced yet in Newbie mode.',session};return legacyKnowledgeActionV2(sessionId,companyId,payload)}
 

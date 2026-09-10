@@ -36,9 +36,11 @@ import {
   setStrategyResponse,
 } from './src/server/analyticsHooksV2.ts';
 import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary, saveSessionV2 } from './src/server/dbV2.ts';
+import { listPublicSessionsV1, saveSessionAccessV1, verifySessionFacilitatorPasswordV1 } from './src/server/sessionAccessV1.ts';
+import { savePlayerOptInV1 } from './src/server/playerOptInV1.ts';
 import { resolveWithReputationV2 } from './src/server/reputationServiceV2.ts';
 import { applyCardDifficultyBumpV2 } from './src/engine/cardBalanceV2.ts';
-import type { BusinessStrategy, ExperienceMode, KnowledgeStrategy, PopulationMode } from './src/types/gameV2.ts';
+import type { BusinessStrategy, ExperienceMode, GameEndMode, KnowledgeStrategy, PopulationMode } from './src/types/gameV2.ts';
 
 dotenv.config();
 
@@ -50,14 +52,23 @@ async function startServer() {
   const defaultSession = await initializeDefaultSessionV2();
   await captureSessionStart(defaultSession);
 
+  const validFacilitatorPasscode = async (sessionId:string, passcode:string) => {
+    const code=String(passcode||'');
+    if(process.env.FACILITATOR_SECRET&&code===process.env.FACILITATOR_SECRET)return true;
+    return verifySessionFacilitatorPasswordV1(sessionId,code);
+  };
+
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', engine: 'core-v2.3', time: new Date().toISOString() }));
   app.get('/api/sessions', async (_req, res) => res.json(await listSessionsV2()));
+  app.get('/api/public-games', async (req,res) => res.json(await listPublicSessionsV1(req.query.archived==='true')));
   app.get('/api/sessions/default', async (_req, res) => res.json(await initializeDefaultSessionV2()));
 
   app.post('/api/sessions', async (req, res) => {
     try {
-      const { sessionId, title, name, companyNames, companyCount, experienceMode, gameDurationMinutes, maxPlayersPerCompany, actionsPerRound, populationMode } = req.body || {};
-      const code = String(sessionId || `KM${Math.floor(1000 + Math.random() * 9000)}`).toUpperCase();
+      const { sessionId, title, name, companyNames, companyCount, experienceMode, gameDurationMinutes, maxPlayersPerCompany, actionsPerRound, populationMode, gameEndMode, finalRoundCount, isPublic, facilitatorPassword } = req.body || {};
+      const code = String(sessionId || `KM${Math.floor(1000 + Math.random() * 9000)}`).toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,16);
+      if(!code)return res.status(400).json({error:'Game code is required.'});
+      if(await getSessionV2(code))return res.status(409).json({error:'That game code is already in use. Please generate another.'});
       let names: string[] = Array.isArray(companyNames) ? companyNames : [];
       if (!names.length) {
         const defaults = ['Apex Technologies', 'Vanguard Systems', 'Horizon BioTech', 'Stratos Engineering', 'Northstar Manufacturing', 'Southern Cross Industries', 'Meridian Group', 'Summit Systems'];
@@ -70,7 +81,10 @@ async function startServer() {
         maxPlayersPerCompany: Number(maxPlayersPerCompany || 6),
         actionsPerRound: Number(actionsPerRound || 5),
         populationMode: populationMode as PopulationMode,
+        gameEndMode: gameEndMode as GameEndMode,
+        finalRoundCount: Number(finalRoundCount || 30),
       });
+      await saveSessionAccessV1(session.id,Boolean(isPublic),String(facilitatorPassword||''));
       await captureSessionStart(session);
       res.json(session);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -83,8 +97,19 @@ async function startServer() {
   });
 
   app.post('/api/sessions/:id/join', async (req, res) => {
-    try { res.json(await joinSessionV2(req.params.id, req.body?.name, req.body?.companyId, req.body?.role)); }
+    try {
+      if(req.body?.role==='facilitator'&&!await validFacilitatorPasscode(req.params.id,req.body?.passcode))return res.status(403).json({error:'Invalid facilitator password.'});
+      res.json(await joinSessionV2(req.params.id, req.body?.name, req.body?.companyId, req.body?.role));
+    }
     catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.post('/api/sessions/:id/facilitator/login',async(req,res)=>{
+    try{
+      const passcode=String(req.body?.passcode||'');
+      if(!await validFacilitatorPasscode(req.params.id,passcode))return res.status(403).json({error:'Incorrect facilitator password.'});
+      res.json(await joinSessionV2(req.params.id,req.body?.name||'Facilitator',undefined,'facilitator'));
+    }catch(e:any){res.status(400).json({error:e.message});}
   });
 
   app.post('/api/sessions/:id/strategy', async (req, res) => {
@@ -105,6 +130,19 @@ async function startServer() {
   app.get('/api/sessions/:id/aar', async (req, res) => res.json(await getAARData(req.params.id)));
   app.get('/api/sessions/:id/benchmark/:companyId', async (req, res) => res.json(await getBenchmarkSummary(req.params.id, req.params.companyId)));
   app.get('/api/sessions/:id/logs', async (req, res) => res.json(await getGameEventLogs(req.params.id.toUpperCase())));
+  app.post('/api/player-opt-in',async(req,res)=>{
+    try{
+      const record=await savePlayerOptInV1({
+        sessionId:req.body?.sessionId,
+        companyId:req.body?.companyId,
+        playerName:req.body?.playerName,
+        email:req.body?.email,
+        wantsResults:Boolean(req.body?.wantsResults),
+        wantsUpdates:Boolean(req.body?.wantsUpdates),
+      });
+      res.json({success:true,consentedAt:record.consentedAt});
+    }catch(e:any){res.status(400).json({error:e.message||'Could not save your email preferences.'});}
+  });
   app.get('/api/sessions/:id/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -225,7 +263,7 @@ async function startServer() {
   app.post('/api/sessions/:id/advance', advanceHandler);
   app.post('/api/sessions/:id/advance-phase', advanceHandler);
 
-  const finalHandler = async (req: express.Request, res: express.Response) => {
+  const finalHandler = async (req, res) => {
     try {
       const result = await resolveFinalDisruptionV2(req.params.id);
       await finaliseAnalyticsRun(result.session, result.results || []);
@@ -239,40 +277,39 @@ async function startServer() {
   app.post('/api/sessions/:id/timer/pause', async (req, res) => res.json(await timerPauseV2(req.params.id)));
   app.post('/api/sessions/:id/timer/reset', async (req, res) => res.json(await timerResetV2(req.params.id)));
 
-  const requireFacilitator = (req: express.Request, res: express.Response) => {
-    const secret = process.env.FACILITATOR_SECRET;
-    if (!secret) { res.status(503).json({ error: 'FACILITATOR_SECRET is not configured.' }); return false; }
-    if (req.body?.passcode !== secret) { res.status(403).json({ error: 'Invalid facilitator passcode.' }); return false; }
-    return true;
+  const requireFacilitator = async (req: express.Request, res: express.Response) => {
+    if(await validFacilitatorPasscode(req.params.id,req.body?.passcode))return true;
+    res.status(403).json({ error: 'Invalid facilitator password.' });
+    return false;
   };
 
   app.post('/api/sessions/:id/facilitator/override', async (req, res) => {
-    if (!requireFacilitator(req, res)) return;
+    if (!await requireFacilitator(req, res)) return;
     try { res.json({ success: true, session: await facilitatorUpdateV2(req.params.id, req.body?.updates || {}) }); }
     catch (e: any) { res.status(400).json({ error: e.message }); }
   });
   app.post('/api/sessions/:id/facilitator-override', async (req, res) => {
-    if (!requireFacilitator(req, res)) return;
+    if (!await requireFacilitator(req, res)) return;
     try { res.json({ success: true, session: await facilitatorUpdateV2(req.params.id, req.body?.updates || {}) }); }
     catch (e: any) { res.status(400).json({ error: e.message }); }
   });
   app.post('/api/sessions/:id/facilitator/settings', async (req, res) => {
-    if (!requireFacilitator(req, res)) return;
+    if (!await requireFacilitator(req, res)) return;
     try { res.json({ success: true, session: await updateGameSettingsV3(req.params.id, req.body || {}) }); }
     catch (e: any) { res.status(400).json({ error: e.message }); }
   });
   app.post('/api/sessions/:id/facilitator/move-player', async (req, res) => {
-    if (!requireFacilitator(req, res)) return;
+    if (!await requireFacilitator(req, res)) return;
     try { res.json({ success: true, session: await moveParticipantV3(req.params.id, req.body?.participantId, req.body?.companyId) }); }
     catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
   app.post('/api/sessions/:id/delete', async (req, res) => {
-    if (!requireFacilitator(req, res)) return;
+    if (!await requireFacilitator(req, res)) return;
     res.json(await deleteSessionAndSelectNextV2(req.params.id));
   });
   app.post('/api/admin/reset-database', async (req, res) => {
-    if (!requireFacilitator(req, res)) return;
+    if (!process.env.FACILITATOR_SECRET||req.body?.passcode!==process.env.FACILITATOR_SECRET)return res.status(403).json({error:'Master facilitator password required.'});
     res.json({ success: true, defaultSession: await resetAllV2() });
   });
 
