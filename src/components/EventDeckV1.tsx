@@ -46,11 +46,10 @@ export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,ca
  const horizonActive=company.horizonScanAvailableRound===session.round&&!company.horizonScanUsedThisRound&&Boolean(company.horizonScanDomain);
  const unresolved=events.map((event,index)=>({event,index})).filter(item=>!item.event.isResolved);
  const delayed=company.delayedEvent;
- const promotedRef=useRef('');
  const pendingDelayRef=useRef('');
  const[showDelayHelp,setShowDelayHelp]=useState(false);
  const sharedId=String((company as any).uiOpenEventInstanceId||'');
- const shared=unresolved.find(item=>item.event.instanceId===sharedId);
+ const shared=events.map((event,index)=>({event,index})).find(item=>item.event.instanceId===sharedId);
  const delayHelpKey='tpg_horizon_delay_help_seen';
  const markSharedOpen=async(index:number)=>{
    const event=events[index];
@@ -60,23 +59,14 @@ export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,ca
      const data=await response.json();
      const winnerId=String(data?.winnerEventInstanceId||'');
      if(winnerId&&winnerId!==event.instanceId){
-       const winnerIndex=events.findIndex(candidate=>candidate.instanceId===winnerId&&!candidate.isResolved);
+       const winnerIndex=events.findIndex(candidate=>candidate.instanceId===winnerId);
        if(winnerIndex>=0)onOpenCard(winnerIndex);
      }
    }catch{}
  };
  useEffect(()=>{
-   if(shared){
-     promotedRef.current='';
-     if(!cardOpen||shared.index!==activeIndex)onOpenCard(shared.index);
-     return;
-   }
-   const active=events[activeIndex];
-   if(cardOpen&&active?.isResolved&&unresolved.length){
-     const next=unresolved[0],key=`${session.id}:${company.id}:${next.event.instanceId}`;
-     if(promotedRef.current!==key){promotedRef.current=key;onOpenCard(next.index);void markSharedOpen(next.index);}
-   }
- },[shared?.event.instanceId,cardOpen,activeIndex,events,unresolved.length,session.id,company.id]);
+   if(shared&&(!cardOpen||shared.index!==activeIndex))onOpenCard(shared.index);
+ },[shared?.event.instanceId,cardOpen,activeIndex]);
  useEffect(()=>{
    if(!delayed||pendingDelayRef.current!==delayed.instanceId)return;
    pendingDelayRef.current='';
@@ -89,10 +79,7 @@ export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,ca
  return <div className="absolute left-4 top-4 z-20 h-[440px] w-[650px] max-w-[calc(100%-24px)] select-none pointer-events-none" aria-label="Event cards">
    <div className="absolute left-0 top-0" style={{width:cardW+16,height:cardH+16}}><div className="absolute inset-0 rounded-[18px] border-[4px] border-dashed border-violet-700/80 bg-transparent grid place-items-center"><span className="text-sm font-black tracking-[.18em] text-violet-700/70">EVENTS</span></div></div>
    <div className="absolute left-[8px] top-[8px] pointer-events-none" style={{width:cardW,height:cardH,transform:'translate(4px,4px)',filter:'drop-shadow(0 13px 12px rgba(0,0,0,.6))'}}/>
-   {Array.from({length:stackCards},(_,index)=>{
-     const offset=stackCards-1-index;
-     return <div key={`deck-${index}`} className="absolute pointer-events-none" style={{left:8-offset,top:8-offset,width:cardW,height:cardH,zIndex:2+index,transform:`rotate(${stackRotation(index)}deg)`,transformOrigin:'center center'}}><CardBack/></div>;
-   })}
+   {Array.from({length:stackCards},(_,index)=>{const offset=stackCards-1-index;return <div key={`deck-${index}`} className="absolute pointer-events-none" style={{left:8-offset,top:8-offset,width:cardW,height:cardH,zIndex:2+index,transform:`rotate(${stackRotation(index)}deg)`,transformOrigin:'center center'}}><CardBack/></div>})}
 
    <AnimatePresence initial>
     {unresolved.map(({event,index},slot)=>{
