@@ -3,7 +3,7 @@ import type { GameSessionV2 } from '../types/gameV2.ts';
 import { executeRiskPhaseV4 } from '../engine/riskPhaseV4.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
-import { claimCompanyOpenEventV1, clearCompanyOpenEventV1 } from '../engine/companyEventOpenV1.ts';
+import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEventOpenV1 } from '../engine/companyEventOpenV1.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
@@ -74,15 +74,6 @@ function serialisePhaseChange<T>(sessionId:string, work:()=>Promise<T>):Promise<
   const prior=phaseQueues.get(key)||Promise.resolve();
   const run=prior.then(work,work);
   phaseQueues.set(key,run.finally(()=>{if(phaseQueues.get(key)===run)phaseQueues.delete(key);}));
-  return run;
-}
-
-const eventOpenQueues=new Map<string,Promise<any>>();
-function serialiseEventOpen<T>(sessionId:string,companyId:string,work:()=>Promise<T>):Promise<T>{
-  const key=`${sessionId.toUpperCase()}:${companyId}`;
-  const prior=eventOpenQueues.get(key)||Promise.resolve();
-  const run=prior.then(work,work);
-  eventOpenQueues.set(key,run.finally(()=>{if(eventOpenQueues.get(key)===run)eventOpenQueues.delete(key);}));
   return run;
 }
 
@@ -176,7 +167,7 @@ async function setReplacementLocation(sessionId:string,companyId:string,payload:
 }
 
 async function openCompanyEventCard(sessionId:string,companyId:string,eventInstanceId:string){
-  return serialiseEventOpen(sessionId,companyId,async()=>{
+  return serialiseCompanyEventOpenV1(sessionId,companyId,async()=>{
     const session=await baseGetSessionV2(sessionId.toUpperCase());
     if(!session)return{success:false,message:'Session not found.'};
     const claim=claimCompanyOpenEventV1(session,companyId,eventInstanceId);
