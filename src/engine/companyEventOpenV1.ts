@@ -7,6 +7,16 @@ export type CompanyEventOpenClaim = {
   message: string;
 };
 
+const openQueues = new Map<string, Promise<any>>();
+
+export function serialiseCompanyEventOpenV1<T>(sessionId:string, companyId:string, work:()=>Promise<T>):Promise<T>{
+  const key=`${sessionId.toUpperCase()}:${companyId}`;
+  const prior=openQueues.get(key)||Promise.resolve();
+  const run=prior.then(work,work);
+  openQueues.set(key,run.finally(()=>{if(openQueues.get(key)===run)openQueues.delete(key);}));
+  return run;
+}
+
 /**
  * Authoritative company-level Event-card claim.
  *
