@@ -3,12 +3,14 @@ import type { GameSessionV2 } from '../types/gameV2.ts';
 import { executeRiskPhaseV4 } from '../engine/riskPhaseV4.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
+import { claimCompanyOpenEventV1, clearCompanyOpenEventV1 } from '../engine/companyEventOpenV1.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
   getSessionV2 as baseGetSessionV2,
   knowledgeActionV2 as baseKnowledgeActionV2,
+  resolveEventV2 as baseResolveEventV2,
 } from './gameServiceV7.ts';
 
 export * from './gameServiceV7.ts';
@@ -75,6 +77,15 @@ function serialisePhaseChange<T>(sessionId:string, work:()=>Promise<T>):Promise<
   return run;
 }
 
+const eventOpenQueues=new Map<string,Promise<any>>();
+function serialiseEventOpen<T>(sessionId:string,companyId:string,work:()=>Promise<T>):Promise<T>{
+  const key=`${sessionId.toUpperCase()}:${companyId}`;
+  const prior=eventOpenQueues.get(key)||Promise.resolve();
+  const run=prior.then(work,work);
+  eventOpenQueues.set(key,run.finally(()=>{if(eventOpenQueues.get(key)===run)eventOpenQueues.delete(key);}));
+  return run;
+}
+
 export async function getSessionV2(sessionId:string):Promise<GameSessionV2|null>{
   const session=await baseGetSessionV2(sessionId.toUpperCase());
   if(session&&ensureRoundPhases(session))await saveSessionV2(session);
@@ -134,10 +145,6 @@ async function finishRisk(sessionId:string,companyId:string){
       return{success:true,message:`Knowledge Risk complete. Waiting for the other companies (${waiting}/${session.companies.length} finished).`,session};
     }
 
-    // The legacy round transition is still authoritative for replacements,
-    // delayed Events, timer/final-challenge checks and round reset. Risk has
-    // already been resolved per company, so put the shared phase at the barrier
-    // only when everyone is ready, then run that transition once.
     session.phase='risk';
     await saveSessionV2(session);
     const advanced:any=await baseAdvancePhaseV2(session.id,'respond');
@@ -168,10 +175,34 @@ async function setReplacementLocation(sessionId:string,companyId:string,payload:
   return{success:true,message:'Replacement base updated.',session,expertId:expert.id,siteId:site.id};
 }
 
+async function openCompanyEventCard(sessionId:string,companyId:string,eventInstanceId:string){
+  return serialiseEventOpen(sessionId,companyId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    const claim=claimCompanyOpenEventV1(session,companyId,eventInstanceId);
+    if(!claim.success)return{...claim,session};
+    if(claim.claimed){
+      await saveSessionV2(session);
+      broadcastV2(session,'COMPANY_EVENT_OPENED',{companyId,eventInstanceId:claim.winnerEventInstanceId});
+    }
+    return{...claim,session};
+  });
+}
+
+export async function resolveEventV2(sessionId:string,companyId:string,eventInstanceId?:string){
+  const result:any=await baseResolveEventV2(sessionId,companyId,eventInstanceId);
+  if(result?.success&&result.session&&eventInstanceId&&clearCompanyOpenEventV1(result.session,companyId,eventInstanceId)){
+    await saveSessionV2(result.session);
+    broadcastV2(result.session,'COMPANY_EVENT_CLOSED',{companyId,eventInstanceId});
+  }
+  return result;
+}
+
 export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
   if(payload?.type==='FINISH_INVESTING')return finishInvesting(sessionId,companyId);
   if(payload?.type==='FINISH_RISK')return finishRisk(sessionId,companyId);
   if(payload?.type==='SET_REPLACEMENT_LOCATION')return setReplacementLocation(sessionId,companyId,payload);
+  if(payload?.type==='OPEN_EVENT_CARD')return openCompanyEventCard(sessionId,companyId,String(payload?.eventInstanceId||''));
 
   const session=await baseGetSessionV2(sessionId.toUpperCase());
   if(session){
