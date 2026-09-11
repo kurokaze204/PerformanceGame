@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import type { GamePhase } from '../types/game.ts';
 import pawnSrc from '../image_ecc870e4.png';
@@ -18,7 +18,17 @@ const indexForPhase = (phase: GamePhase) =>
   phase === 'investment' ? 1 : phase === 'risk' ? 2 : 0;
 
 export const PhaseTrackV1: React.FC<Props> = ({ phase }) => {
-  const active = indexForPhase(phase);
+  const [displayPhase, setDisplayPhase] = useState<GamePhase>(phase);
+  useEffect(() => setDisplayPhase(phase), [phase]);
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const next = (event as CustomEvent<{ phase?: GamePhase }>).detail?.phase;
+      if (next === 'investment' || next === 'risk' || next === 'respond' || next === 'events') setDisplayPhase(next);
+    };
+    window.addEventListener('tpg-company-phase', handler as EventListener);
+    return () => window.removeEventListener('tpg-company-phase', handler as EventListener);
+  }, []);
+  const active = indexForPhase(displayPhase);
 
   return (
     <div
