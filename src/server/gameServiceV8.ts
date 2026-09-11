@@ -4,13 +4,13 @@ import { executeRiskPhaseV4 } from '../engine/riskPhaseV4.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
 import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEventOpenV1 } from '../engine/companyEventOpenV1.ts';
+import { resolveSingleEventExplicitV2 } from '../engine/challengeResponseV2.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
   getSessionV2 as baseGetSessionV2,
   knowledgeActionV2 as baseKnowledgeActionV2,
-  resolveEventV2 as baseResolveEventV2,
 } from './gameServiceV7.ts';
 
 export * from './gameServiceV7.ts';
@@ -75,6 +75,10 @@ function serialisePhaseChange<T>(sessionId:string, work:()=>Promise<T>):Promise<
   const run=prior.then(work,work);
   phaseQueues.set(key,run.finally(()=>{if(phaseQueues.get(key)===run)phaseQueues.delete(key);}));
   return run;
+}
+
+function allCompanyEventsResolved(session:GameSessionV2):boolean{
+  return session.companies.every(company=>(session.activeEvents[company.id]||[]).every(event=>event.isResolved));
 }
 
 export async function getSessionV2(sessionId:string):Promise<GameSessionV2|null>{
@@ -181,12 +185,55 @@ async function openCompanyEventCard(sessionId:string,companyId:string,eventInsta
 }
 
 export async function resolveEventV2(sessionId:string,companyId:string,eventInstanceId?:string){
-  const result:any=await baseResolveEventV2(sessionId,companyId,eventInstanceId);
-  if(result?.success&&result.session&&eventInstanceId&&clearCompanyOpenEventV1(result.session,companyId,eventInstanceId)){
-    await saveSessionV2(result.session);
-    broadcastV2(result.session,'COMPANY_EVENT_CLOSED',{companyId,eventInstanceId});
-  }
-  return result;
+  return serialiseCompanyEventOpenV1(sessionId,companyId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.',session};
+    if(session.phase!=='respond')return{success:false,message:'Challenges can only be resolved during the challenge phase.',session};
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!company)return{success:false,message:'Company not found.',session};
+    const event=(session.activeEvents[company.id]||[]).find(candidate=>candidate.instanceId===eventInstanceId);
+    if(!event)return{success:false,message:'Event not found.',session};
+    const existing=(event as any).uiResolutionData;
+    if(existing)return{success:true,eventSuccess:Boolean(existing.eventSuccess),result:existing.result,session};
+    const openId=String((company as any).uiOpenEventInstanceId||'');
+    if(openId&&openId!==event.instanceId)return{success:false,message:'Another Event is currently open for this company.',session};
+    if(!openId)(company as any).uiOpenEventInstanceId=event.instanceId;
+
+    const result=resolveSingleEventExplicitV2(session,company,event);
+    // Keep the card logically open until someone acknowledges the shared result.
+    // The business impact has already been applied; isResolved becomes true on ACK.
+    event.isResolved=false;
+    (event as any).uiResolutionData={eventSuccess:result.success,result};
+    await saveSessionV2(session);
+    broadcastV2(session,'COMPANY_EVENT_RESOLVED_SHARED',{companyId,eventInstanceId:event.instanceId,result});
+    return{success:true,eventSuccess:result.success,result,session};
+  });
+}
+
+async function acknowledgeEventResolution(sessionId:string,companyId:string,eventInstanceId:string){
+  return serialiseCompanyEventOpenV1(sessionId,companyId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!company)return{success:false,message:'Company not found.',session};
+    const currentId=String((company as any).uiOpenEventInstanceId||'');
+    if(currentId!==eventInstanceId)return{success:false,message:'That Event is no longer the company Event.',session};
+    const event=(session.activeEvents[company.id]||[]).find(candidate=>candidate.instanceId===eventInstanceId);
+    if(!event||(event as any).uiResolutionData==null)return{success:false,message:'There is no resolved Event waiting for acknowledgement.',session};
+
+    event.isResolved=true;
+    clearCompanyOpenEventV1(session,companyId,eventInstanceId);
+    const next=(session.activeEvents[company.id]||[]).find(candidate=>!candidate.isResolved);
+    let winnerEventInstanceId:string|undefined;
+    if(next){
+      const claim=claimCompanyOpenEventV1(session,companyId,next.instanceId);
+      winnerEventInstanceId=claim.winnerEventInstanceId;
+    }
+    if(allCompanyEventsResolved(session))session.phase='consequences';
+    await saveSessionV2(session);
+    broadcastV2(session,'COMPANY_EVENT_ACKNOWLEDGED',{companyId,eventInstanceId,winnerEventInstanceId});
+    return{success:true,message:winnerEventInstanceId?'Next Event opened for the company.':'Event complete.',winnerEventInstanceId,session};
+  });
 }
 
 export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
@@ -194,6 +241,7 @@ export async function knowledgeActionV2(sessionId:string,companyId:string,payloa
   if(payload?.type==='FINISH_RISK')return finishRisk(sessionId,companyId);
   if(payload?.type==='SET_REPLACEMENT_LOCATION')return setReplacementLocation(sessionId,companyId,payload);
   if(payload?.type==='OPEN_EVENT_CARD')return openCompanyEventCard(sessionId,companyId,String(payload?.eventInstanceId||''));
+  if(payload?.type==='ACK_EVENT_RESOLUTION')return acknowledgeEventResolution(sessionId,companyId,String(payload?.eventInstanceId||''));
 
   const session=await baseGetSessionV2(sessionId.toUpperCase());
   if(session){
