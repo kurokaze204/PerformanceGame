@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState}from'react';
-import{CheckCircle2,ExternalLink,Mail,ShieldCheck}from'lucide-react';
+import{CheckCircle2,Coffee,ExternalLink,Mail,ShieldCheck}from'lucide-react';
 
 export const EndGameOptIn:React.FC=()=>{
  const[visible,setVisible]=useState(false);
@@ -52,6 +52,12 @@ export const EndGameOptIn:React.FC=()=>{
    {error&&<div className="mt-2 text-xs font-bold text-rose-300">{error}</div>}
    <button onClick={()=>void submit()} disabled={saving||!email.trim()||(!wantsResults&&!wantsUpdates)} className="mt-3 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">{saving?'SAVING…':'SAVE MY CHOICES'}</button>
   </>}
+
+  <a href="https://ko-fi.com/deltaknowledge" target="_blank" rel="noreferrer" className="mt-4 flex items-center gap-3 rounded-xl border border-emerald-800 bg-emerald-950/25 p-3 group hover:border-emerald-500">
+   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-emerald-700 text-emerald-300"><Coffee className="h-5 w-5"/></div>
+   <span><b className="block text-sm text-white">Buy me a Coffee</b><small className="block text-xs text-slate-400">Support continued development on Ko-fi.</small></span>
+   <ExternalLink className="ml-auto h-4 w-4 text-emerald-300"/>
+  </a>
 
   <div className="mt-4 border-t border-slate-800 pt-4">
    <div className="text-xs font-black text-white">Stuart French · Delta Knowledge</div>
