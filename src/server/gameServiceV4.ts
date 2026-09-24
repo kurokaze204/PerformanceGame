@@ -2,7 +2,7 @@ import type { EventType, GamePhase, GameSession, Participant } from '../types/ga
 import type { ExperienceMode, GameEndMode, GameSessionV2 } from '../types/gameV2.ts';
 import { asSessionV2 } from '../types/gameV2.ts';
 import { DEFAULT_CONFIG } from '../engine/config.ts';
-import { FINAL_DISRUPTION_CARDS } from '../engine/cards.ts';
+import { dealCompanyDisruptionsV1 } from '../engine/disruptionPlusV1.ts';
 import { createInitialCompanyV2, drawRoundEventsV2 } from '../engine/coreV2.ts';
 import { interventionUnlocked } from '../engine/experienceModeV3.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
@@ -59,7 +59,15 @@ export function finalChallengeDue(session:GameSessionV2){
  if(session.experienceMode==='expert'&&session.gameEndMode==='rounds')return session.round>=session.finalRoundCount;
  return timerHasRun(session)&&remainingSeconds(session)<=session.finalWindowMinutes*60;
 }
-async function startFinal(session:GameSessionV2){const reason=session.experienceMode==='expert'&&session.gameEndMode==='rounds'?'round-limit':'final-window';session.isFinalDisruptionActive=true;session.finalDisruptionCard=FINAL_DISRUPTION_CARDS[0];session.finalDisruptionResolved=false;session.phase='respond';await saveSessionV2(session);broadcastV2(session,'FINAL_DISRUPTION_STARTED',{reason,round:session.round});return{success:true,session}}
+async function startFinal(session:GameSessionV2){
+ const reason=session.experienceMode==='expert'&&session.gameEndMode==='rounds'?'round-limit':'final-window';
+ dealCompanyDisruptionsV1(session);
+ session.isFinalDisruptionActive=true;
+ const first=session.companies[0]?.disruptionCard;
+ if(first)session.finalDisruptionCard={id:first.id,title:first.title,description:first.description,type:'problem',scope:'local',domains:first.domains,impact:first.impact,tags:['final-disruption','disruption-plus']};
+ session.finalDisruptionResolved=false;session.phase='respond';
+ await saveSessionV2(session);broadcastV2(session,'FINAL_DISRUPTION_STARTED',{reason,round:session.round});return{success:true,session}
+}
 
 export async function createNewSessionV2(sessionId:string,title:string,companyNames:string[]=['Apex Technologies'],options:CreateGameOptions={}):Promise<GameSessionV2>{
  const id=sessionId.toUpperCase();
@@ -72,11 +80,17 @@ export async function createNewSessionV2(sessionId:string,title:string,companyNa
  session.gameEndMode=session.experienceMode==='expert'&&options.gameEndMode==='rounds'?'rounds':'time';
  session.finalRoundCount=clamp(Number(options.finalRoundCount||30),1,200);
  session.timerStartedAt=null;session.timerEndsAt=null;session.timerPausedSecondsRemaining=session.gameDurationMinutes*60;session.riskResults=null;
+ dealCompanyDisruptionsV1(session);
  setNextPair(session);for(const company of session.companies)session.activeEvents[company.id]=drawRoundEventsV2(session,company);
  await saveSessionV2(session);return session;
 }
 
-export async function initializeDefaultSessionV2():Promise<GameSessionV2>{return asSessionV2(await legacyInitializeDefaultSessionV2())}
+export async function initializeDefaultSessionV2():Promise<GameSessionV2>{
+ const session=asSessionV2(await legacyInitializeDefaultSessionV2());
+ dealCompanyDisruptionsV1(session);
+ await saveSessionV2(session);
+ return session;
+}
 
 function autoCompany(session:GameSessionV2){const counts=new Map(session.companies.map(c=>[c.id,0]));for(const p of session.participants.filter(p=>p.role==='participant'))counts.set(p.companyId,(counts.get(p.companyId)||0)+1);return[...session.companies].filter(c=>(counts.get(c.id)||0)<session.maxPlayersPerCompany).sort((a,b)=>(counts.get(a.id)||0)-(counts.get(b.id)||0))[0]}
 
