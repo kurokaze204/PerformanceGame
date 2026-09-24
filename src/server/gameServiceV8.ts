@@ -5,6 +5,7 @@ import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
 import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEventOpenV1 } from '../engine/companyEventOpenV1.ts';
 import { resolveSingleEventExplicitV2 } from '../engine/challengeResponseV2.ts';
+import { swapDisruptionWithPeerV1 } from '../engine/disruptionPlusV1.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
@@ -199,7 +200,16 @@ export async function resolveEventV2(sessionId:string,companyId:string,eventInst
     if(openId&&openId!==event.instanceId)return{success:false,message:'Another Event is currently open for this company.',session};
     if(!openId)(company as any).uiOpenEventInstanceId=event.instanceId;
 
-    const result=resolveSingleEventExplicitV2(session,company,event);
+    const result:any=resolveSingleEventExplicitV2(session,company,event);
+    if(event.card.tags?.includes('disruption-swap')){
+      const swap=swapDisruptionWithPeerV1(session,company.id);
+      if(swap){
+        result.disruptionSwap=swap;
+        broadcastV2(session,'DISRUPTION_CARDS_SWAPPED',swap);
+      }else{
+        result.disruptionSwapUnavailable=true;
+      }
+    }
     // Keep the card logically open until someone acknowledges the shared result.
     // The business impact has already been applied; isResolved becomes true on ACK.
     event.isResolved=false;
@@ -237,6 +247,16 @@ async function acknowledgeEventResolution(sessionId:string,companyId:string,even
 }
 
 export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
+  if(payload?.type==='ACK_DISRUPTION_SWAP_NOTICE'){
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!company)return{success:false,message:'Company not found.',session};
+    company.disruptionSwapNotice=null;
+    await saveSessionV2(session);
+    broadcastV2(session,'DISRUPTION_SWAP_NOTICE_ACKNOWLEDGED',{companyId});
+    return{success:true,message:'Strategic change acknowledged.',session};
+  }
   if(payload?.type==='FINISH_INVESTING')return finishInvesting(sessionId,companyId);
   if(payload?.type==='FINISH_RISK')return finishRisk(sessionId,companyId);
   if(payload?.type==='SET_REPLACEMENT_LOCATION')return setReplacementLocation(sessionId,companyId,payload);
