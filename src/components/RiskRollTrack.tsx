@@ -56,7 +56,7 @@ export const RiskRollTrack:React.FC<Props>=({roll,threshold,sides,kind,isSPOF,on
   <div className="flex items-center gap-3">
    <img src={d12Src} alt="Twelve-sided die" className="h-[72px] w-[72px] shrink-0 object-contain" draggable={false}/>
    <div className="min-w-0 flex-1">
-    <div className="flex justify-end"><button type="button" onClick={click} disabled={rolling||(done&&nextDisabled)} className={`rounded-lg border px-4 py-2 text-base font-black text-white shadow-md transition active:scale-95 disabled:cursor-default disabled:opacity-60 ${done?'border-slate-200 bg-slate-100 text-slate-950 hover:bg-white':'border-sky-800 bg-sky-700 hover:bg-sky-600'}`}>{buttonLabel}</button></div>
+    <div className="flex justify-end"><button type="button" onClick={click} disabled={rolling||(done&&nextDisabled)} className={`rounded-lg border px-4 py-2 text-base font-black text-white shadow-md transition active:scale-95 disabled:cursor-default disabled:opacity-60 ${done?'border-slate-500 bg-slate-700 text-white hover:bg-slate-600':'border-sky-800 bg-sky-700 hover:bg-sky-600'}`}>{buttonLabel}</button></div>
     <div className="mt-2 flex gap-1" aria-label={`Risk roll ${safeRoll} on a d${safeSides}; threshold ${safeThreshold}`}>
      {Array.from({length:safeSides},(_,i)=>{const n=i+1,isActive=active===n;return <span key={n} className={`h-[18px] min-w-0 flex-1 rounded-[3px] border transition-[filter,box-shadow] duration-75 ${squareBase(n)} ${started&&!isActive?'brightness-50':isActive?'brightness-110 ring-1 ring-sky-200 shadow-[0_0_7px_rgba(125,211,252,.75)]':'brightness-100'}`}/>})}
     </div>
