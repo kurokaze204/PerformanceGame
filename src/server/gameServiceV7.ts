@@ -1,9 +1,10 @@
 import type { KnowledgeDomain, Participant } from '../types/game.ts';
 import type { GameSessionV2, PopulationMode } from '../types/gameV2.ts';
-import { calculateUsableIntranetV2, createInitialCompanyV2, drawRoundEventsV2, recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
+import { createInitialCompanyV2, drawRoundEventsV2, recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { diversifyInitialKnowledge } from '../engine/eventProgressionV5.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
-import { saveSessionV2 } from './dbV2.ts';
+import { dealCompanyDisruptionsV1, evaluateFinalDisruptionV1, type FinalDisruptionSelectionsV1 } from '../engine/disruptionPlusV1.ts';
+import { recordCompanyMetric, saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
@@ -30,9 +31,6 @@ const REPLACEMENT_NAMES = [
   'Lucas Ferreira','Emily Zhao','Jack Wilson','Hannah Singh','Leo Martinez','Zoe Campbell','Arjun Mehta','Isla Roberts',
   'Ben Carter','Amelia Scott','Kai Johnson','Ruby Evans','Thomas Green','Layla Hassan','Max Turner','Ella Foster',
 ];
-
-type FinalKnowledgeSelection={siteId:string;expertId?:string};
-type FinalKnowledgeSelections=Partial<Record<KnowledgeDomain,FinalKnowledgeSelection>>;
 
 function nextReplacementName(session:GameSessionV2,company:GameSessionV2['companies'][number]):string{
   const used=new Set<string>([...company.retiredExpertNames,...company.experts.map(e=>e.name),...company.experts.map(e=>e.replacementName||'').filter(Boolean)]);
@@ -75,6 +73,7 @@ async function addExpansionCompany(session:GameSessionV2){
   diversifyInitialKnowledge(company);
   recalculateCompanySPOFV2(company,session.config);
   session.companies.push(company);
+  dealCompanyDisruptionsV1(session);
   session.activeEvents[company.id]=drawRoundEventsV2(session,company);
   applyInterfaceSimplificationV1(session);
   await saveSessionV2(session);
@@ -129,54 +128,76 @@ function applyFinalCompanyLoss(company:GameSessionV2['companies'][number],amount
   company.turnover=Math.round(company.sites.reduce((sum,site)=>sum+(site.isClosed?0:site.turnover),0));
 }
 
-async function resolveManualFinalDisruption(sessionId:string,companyId:string,selections:FinalKnowledgeSelections){
+async function resolveManualFinalDisruption(sessionId:string,companyId:string,selections:FinalDisruptionSelectionsV1,useConsultant=false){
   const session=await baseGetSessionV2(sessionId.toUpperCase());
-  if(!session||!session.isFinalDisruptionActive||!session.finalDisruptionCard)return{success:false,message:'The final disruption is not active.',session};
+  if(!session||!session.isFinalDisruptionActive)return{success:false,message:'The final disruption is not active.',session};
   const company=session.companies.find(item=>item.id===companyId);
-  if(!company)return{success:false,message:'Company not found.',session};
+  if(!company?.disruptionCard)return{success:false,message:'Company disruption card not found.',session};
   const existing=((session as any).finalDisruptionResults||[]) as any[];
   if(existing.some(result=>result.companyId===company.id))return{success:false,message:'This company has already resolved the final disruption.',session};
 
-  const domainResults:any[]=[];
-  let allSucceeded=true;
-  for(const requirement of session.finalDisruptionCard.domains){
-    const selection=selections?.[requirement.domain];
-    const site=company.sites.find(candidate=>candidate.id===selection?.siteId&&!candidate.isClosed);
-    if(!site)return{success:false,message:`Choose a site for ${requirement.domain} before resolving.`,session};
-    const team=site.teamCapability[requirement.domain]||0;
-    const localCodified=site.codifiedKnowledge[requirement.domain]||0;
-    const usableIntranet=calculateUsableIntranetV2(company,site,requirement.domain,session.config);
-    const baseKnowledge=Math.max(team,localCodified,usableIntranet);
-    let expertBonus=0;let expertId:string|undefined;let expertName:string|undefined;
-    if(selection?.expertId){
-      const expert=company.experts.find(candidate=>candidate.id===selection.expertId&&!candidate.isVacant&&candidate.domains.some(skill=>skill.domain===requirement.domain)&&['Available','HQ Assignment','Supporting Event'].includes(candidate.state));
-      if(!expert)return{success:false,message:`The selected ${requirement.domain} expert is no longer available.`,session};
-      expertBonus=session.config.expert_support_bonus;expertId=expert.id;expertName=expert.name;
-    }
-    const automationBonus=company.automatedDomains.includes(requirement.domain)?session.config.automation_bonus:0;
-    const totalKnowledge=baseKnowledge+expertBonus+automationBonus;
-    const requiredTotal=requirement.difficulty+session.config.resolution_offset;
-    const dieRoll=Math.floor(Math.random()*session.config.event_die)+1;
-    const achievedTotal=totalKnowledge+dieRoll;
-    const domainSuccess=achievedTotal>=requiredTotal;
-    if(!domainSuccess)allSucceeded=false;
-    domainResults.push({domain:requirement.domain,siteId:site.id,siteName:site.name,team,localCodified,usableIntranet,baseKnowledge,expertId,expertName,expertBonus,automationBonus,totalKnowledge,difficulty:requirement.difficulty,dieRoll,requiredTotal,achievedTotal,domainSuccess,explanation:`Selected knowledge ${totalKnowledge}; rolled ${dieRoll}; needed ${requiredTotal}.`});
-  }
+  const evaluation=evaluateFinalDisruptionV1(session,company,selections);
+  if(!evaluation)return{success:false,message:'Could not score the disruption.',session};
+  const turnoverBefore=company.turnover;
+  const consultantCost=useConsultant&&evaluation.gap>0?evaluation.consultantCost:0;
+  const consultantPercent=useConsultant&&evaluation.gap>0?evaluation.consultantPercent:0;
 
-  const turnoverChange=allSucceeded?0:-session.finalDisruptionCard.impact;
-  if(turnoverChange<0)applyFinalCompanyLoss(company,-turnoverChange,session.round);
+  if(consultantCost>0){
+    applyFinalCompanyLoss(company,consultantCost,session.round);
+    company.cumulativeConsultantSpend=(company.cumulativeConsultantSpend||0)+consultantCost;
+    await saveSessionV2(session);
+    await recordCompanyMetric(session,company,'FINAL_CONSULTANT');
+  }
+  const turnoverAfterConsultant=company.turnover;
+
+  const domainResults=evaluation.domainResults.map(domainResult=>{
+    const consultantPoints=useConsultant?domainResult.gap:0;
+    const totalKnowledge=domainResult.totalKnowledge+consultantPoints;
+    const domainSuccess=totalKnowledge>=domainResult.difficulty;
+    return{
+      ...domainResult,
+      consultantPoints,
+      totalKnowledge,
+      requiredTotal:domainResult.difficulty,
+      achievedTotal:totalKnowledge,
+      domainSuccess,
+      explanation:`Knowledge ${domainResult.totalKnowledge}${consultantPoints?` + consultant ${consultantPoints}`:''}; needed ${domainResult.difficulty}.`,
+    };
+  });
+  const allSucceeded=domainResults.every(result=>result.domainSuccess);
+  const disruptionLoss=allSucceeded?0:company.disruptionCard.impact;
+  if(disruptionLoss>0)applyFinalCompanyLoss(company,disruptionLoss,session.round);
   recalculateCompanySPOFV2(company,session.config);
-  const result={companyId:company.id,companyName:company.name,finalTurnover:company.turnover,success:allSucceeded,turnoverChange,interventionCost:0,consultantDetails:[],domainResults};
+
+  const result={
+    companyId:company.id,
+    companyName:company.name,
+    disruptionCardId:company.disruptionCard.id,
+    disruptionTitle:company.disruptionCard.title,
+    siteId:company.disruptionCard.siteId,
+    siteName:company.disruptionCard.siteName,
+    turnoverBefore,
+    turnoverAfterConsultant,
+    finalTurnover:company.turnover,
+    success:allSucceeded,
+    turnoverChange:-disruptionLoss,
+    interventionCost:consultantCost,
+    consultantCost,
+    consultantPercent,
+    consultantDetails:consultantCost?[{cost:consultantCost,percent:consultantPercent,gap:evaluation.gap,required:evaluation.required}]:[],
+    domainResults,
+  };
   const next=[...existing.filter(item=>item.companyId!==company.id),result];
   (session as any).finalDisruptionResults=next;
   session.finalDisruptionResolved=session.companies.every(item=>next.some(resultItem=>resultItem.companyId===item.id));
   applyInterfaceSimplificationV1(session);
   await saveSessionV2(session);
+  await recordCompanyMetric(session,company,'FINAL_DISRUPTION');
   broadcastV2(session,'FINAL_DISRUPTION_COMPANY_RESOLVED',{companyId:company.id,result,allCompaniesResolved:session.finalDisruptionResolved});
-  return{success:true,message:allSucceeded?'Final disruption survived.':'Final disruption resolved.',session,results:next,result};
+  return{success:true,message:allSucceeded?'Disruption survived.':'Disruption resolved.',session,results:next,result};
 }
 
 export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
-  if(payload?.type==='FINAL_DISRUPTION_RESOLVE')return resolveManualFinalDisruption(sessionId,companyId,payload?.selections||{});
+  if(payload?.type==='FINAL_DISRUPTION_RESOLVE')return resolveManualFinalDisruption(sessionId,companyId,payload?.selections||{},Boolean(payload?.useConsultant));
   return baseKnowledgeActionV2(sessionId,companyId,payload);
 }
