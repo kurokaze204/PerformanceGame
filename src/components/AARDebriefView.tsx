@@ -86,7 +86,7 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
 
   const preFinalMetric = useMemo(() => {
     const rows = [...companyMetrics];
-    return rows.reverse().find((row: any) => row.trigger !== 'FINAL_DISRUPTION') || rows[0] || null;
+    return rows.reverse().find((row: any) => !String(row.trigger||'').startsWith('FINAL_') && row.trigger !== 'ACTION_FINAL_DISRUPTION_RESOLVE') || rows[0] || null;
   }, [companyMetrics]);
 
   const events = useMemo(
@@ -114,6 +114,7 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
   const startingTurnover = n(companyAnalytics?.starting_turnover || company.startingTurnover);
   const finalTurnover = n(companyAnalytics?.final_turnover ?? company.turnover);
   const finalSurvived = finalTurnover > 0 && company.sites.some(site => !site.isClosed);
+  const finalResult=((session as any).finalDisruptionResults||[]).find((result:any)=>result.companyId===company.id);
   const showCodified = session.experienceMode === 'expert';
 
   const preFinalTeam = preFinalMetric?.avg_team_capability;
@@ -138,12 +139,13 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
   const whyPrompts = useMemo(() => {
     const prompts: string[] = [];
     if (!finalSurvived) prompts.push('What capability was missing when the final disruption arrived — and could you realistically have built it earlier?');
+    if (Number(finalResult?.consultantCost||0)>0) prompts.push('Your emergency consultant cost '+formatCurrency(Number(finalResult.consultantCost))+' ('+Math.round(Number(finalResult.consultantPercent||0))+'% of turnover). What would earlier knowledge investment have changed?');
     if (events.length && Math.abs(successes - expectedSuccesses) >= 0.75) prompts.push(`Your probabilities suggested about ${expectedSuccesses.toFixed(1)} successes, but ${successes} occurred. Which differences were luck and which came from your choices?`);
     if (preFinalMetric && n(preFinalCorp) > n(preFinalUsable) + 0.25) prompts.push('You had more corporate knowledge than sites could readily use. Where did access exist without enough local capability or context?');
     if (company.knowledgeStrategyInitial && company.knowledgeStrategyFinal && company.knowledgeStrategyInitial !== company.knowledgeStrategyFinal) prompts.push(`Your knowledge strategy changed from “${KNOWLEDGE_LABELS[company.knowledgeStrategyInitial]}” to “${KNOWLEDGE_LABELS[company.knowledgeStrategyFinal]}”. What caused the shift?`);
     if (!prompts.length) prompts.push('Pick the moment that surprised you most. What did you assume beforehand that turned out not to be true?');
     return prompts.slice(0, 3);
-  }, [finalSurvived, events.length, successes, expectedSuccesses, preFinalMetric, preFinalCorp, preFinalUsable, company.knowledgeStrategyInitial, company.knowledgeStrategyFinal]);
+  }, [finalSurvived, events.length, successes, expectedSuccesses, preFinalMetric, preFinalCorp, preFinalUsable, company.knowledgeStrategyInitial, company.knowledgeStrategyFinal, finalResult]);
 
   const qIndex = QUESTIONS.findIndex(q => q.id === question);
   const current = QUESTIONS[qIndex];
@@ -191,6 +193,7 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
 
             {question === 'actual' && <div className="mt-5">
               <div className="grid md:grid-cols-2 gap-3">{actualCards.map(card => <Evidence key={card.title} card={card} toneClass={toneClass}/>)}</div>
+              <TurnoverStory metrics={companyMetrics}/>
               <BenchmarkCharts rows={benchmarks} currentCompanyId={company.id} companies={session.companies} mode={session.experienceMode}/>
             </div>}
 
@@ -205,6 +208,14 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
       </div>
     </div>
   );
+};
+
+const TurnoverStory:React.FC<{metrics:any[]}>=({metrics})=>{
+ const points=metrics.filter(row=>['GAME_START','EVENT_RESOLVED','FINAL_CONSULTANT','FINAL_DISRUPTION','ACTION_FINAL_DISRUPTION_RESOLVE'].includes(String(row.trigger||'')));
+ if(points.length<2)return null;
+ const max=Math.max(1,...points.map(row=>n(row.turnover)));
+ const label=(trigger:string)=>trigger==='FINAL_CONSULTANT'?'CONSULTANT':trigger==='FINAL_DISRUPTION'||trigger==='ACTION_FINAL_DISRUPTION_RESOLVE'?'DISRUPTION':trigger==='GAME_START'?'START':'EVENT';
+ return <div className="mt-5 rounded-2xl border-2 border-amber-800 bg-amber-950/10 p-4"><div className="text-[10px] uppercase tracking-[.16em] text-amber-300 font-black">Turnover story</div><h4 className="mt-1 text-lg font-black text-white">Where did the money move?</h4><div className="mt-4 flex items-end gap-2 overflow-x-auto pb-1 min-h-[180px]">{points.map((row,index)=>{const value=n(row.turnover);const height=Math.max(8,(value/max)*130);const trigger=String(row.trigger||'');const special=trigger==='FINAL_CONSULTANT';return <div key={index} className="min-w-[58px] text-center"><div className="text-[9px] font-black text-slate-400">{formatCurrency(value)}</div><div className={'mx-auto mt-1 w-8 rounded-t '+(special?'bg-rose-500':trigger.includes('FINAL')?'bg-amber-400':'bg-indigo-500')} style={{height:String(height)+'px'}}/><div className={'mt-1 text-[8px] font-black '+(special?'text-rose-300':'text-slate-500')}>{label(trigger)}</div></div>})}</div></div>;
 };
 
 const BenchmarkCharts:React.FC<{rows:BenchmarkRow[];currentCompanyId:string;companies:CompanyV2[];mode:GameSessionV2['experienceMode']}>=({rows,currentCompanyId,companies,mode})=>{
