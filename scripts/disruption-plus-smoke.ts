@@ -28,8 +28,15 @@ assert.equal(firstResult.local,5);
 assert.equal(firstResult.expertScore,6);
 assert.equal(firstResult.totalKnowledge,11,'local 5 + expert 6 must equal 11 before other additive sources');
 
+const peer=session.companies[1];
+const domainsA=new Set(company.experts.flatMap(expert=>expert.domains.map(skill=>skill.domain)));
+const domainsB=new Set(peer.experts.flatMap(expert=>expert.domains.map(skill=>skill.domain)));
+const common=[...domainsA].filter(domain=>domainsB.has(domain)).slice(0,2);
+assert.equal(common.length,2,'test companies should share at least two expert-role domains');
+company.disruptionCard!.domains=common.map((domain,index)=>({domain,difficulty:index===0?9:8}));
+peer.disruptionCard!.domains=common.map((domain,index)=>({domain,difficulty:index===0?8:9}));
 const beforeA=company.disruptionCard!.id;
-const beforeB=session.companies[1].disruptionCard!.id;
+const beforeB=peer.disruptionCard!.id;
 const swap=swapDisruptionWithPeerV1(session,company.id);
 assert.ok(swap,'two-company Newbie game should find a compatible disruption swap when cards are compatible');
 assert.equal(company.disruptionCard!.id,beforeB);
