@@ -90,9 +90,10 @@ function chooseEventType(session: GameSessionV2, company: CompanyV2): EventType 
   return company.eventTypePlan[company.eventsDrawnCount] || (company.problemEventsDrawn <= company.opportunityEventsDrawn ? 'problem' : 'opportunity');
 }
 
-function chooseCard(type: EventType, excludedIds: Set<string>): EventCard {
-  let pool = EVENT_CARDS_DECK.filter((c) => c.type === type && !excludedIds.has(c.id));
-  if (pool.length === 0) pool = EVENT_CARDS_DECK.filter((c) => c.type === type);
+function chooseCard(type: EventType, excludedIds: Set<string>, allowDisruptionSwap = true): EventCard {
+  const allowed = (c: EventCard) => allowDisruptionSwap || !c.tags?.includes('disruption-swap');
+  let pool = EVENT_CARDS_DECK.filter((c) => c.type === type && !excludedIds.has(c.id) && allowed(c));
+  if (pool.length === 0) pool = EVENT_CARDS_DECK.filter((c) => c.type === type && allowed(c));
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -115,7 +116,7 @@ export function drawRoundEventsV2(sessionInput: GameSession, companyInput: Compa
 
   for (let i = 0; i < session.config.events_per_round; i++) {
     const type = chooseEventType(session, company);
-    const card = chooseCard(type, excluded);
+    const card = chooseCard(type, excluded, session.companies.length > 1);
     excluded.add(card.id);
     const target = targetSiteForCard(company, card);
     const allocations: ActiveEventV2['allocations'] = {} as ActiveEventV2['allocations'];
