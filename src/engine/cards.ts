@@ -327,6 +327,13 @@ const EVENT_CARD_TEMPLATES: EventCardTemplate[] = [
     domains: [{ domain: 'operations', difficulty: 8 }, { domain: 'marketing', difficulty: 7 }],
     tags: ['partnership', 'nationwide', 'expansion']
   }
+  {
+    id: 'ENT-PROB-DISRUPTION-SWAP', type: 'problem', scope: 'enterprise',
+    title: 'Strategic Environment Shift',
+    description: 'The assumptions behind your long-range plan change abruptly. After this Event, exchange your known Disruption with another company and reassess the capability you need.',
+    domains: [{ domain: 'operations', difficulty: 5 }, { domain: 'marketing', difficulty: 5 }],
+    tags: ['strategic-change', 'disruption-swap', 'network-opportunity']
+  },
 ];
 
 export const EVENT_CARDS_DECK: EventCard[] = EVENT_CARD_TEMPLATES.map(withCalculatedImpact);
