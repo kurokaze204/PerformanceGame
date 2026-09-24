@@ -326,7 +326,7 @@ const EVENT_CARD_TEMPLATES: EventCardTemplate[] = [
     description: 'A major retail hardware network seeks a single turnkey supplier capable of delivering standardized stock nationwide.',
     domains: [{ domain: 'operations', difficulty: 8 }, { domain: 'marketing', difficulty: 7 }],
     tags: ['partnership', 'nationwide', 'expansion']
-  }
+  },
   {
     id: 'ENT-PROB-DISRUPTION-SWAP', type: 'problem', scope: 'enterprise',
     title: 'Strategic Environment Shift',
