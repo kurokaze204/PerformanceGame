@@ -12,7 +12,7 @@ function hash(text:string):number{
 }
 
 function uniqueExpertDomains(company:CompanyV2):KnowledgeDomain[]{
-  return [...new Set(company.experts.filter(e=>!e.isVacant).flatMap(e=>e.domains.map(d=>d.domain)))];
+  return [...new Set(company.experts.flatMap(e=>e.domains.map(d=>d.domain)))];
 }
 
 function orderedDomains(seed:string, candidates:KnowledgeDomain[]):KnowledgeDomain[]{
