@@ -29,6 +29,29 @@ export type ExperienceMode = 'newbie' | 'expert';
 export type PopulationMode = 'expand' | 'balanced';
 export type GameEndMode = 'time' | 'rounds';
 
+export interface DisruptionAssignmentV1 {
+  id: string;
+  title: string;
+  description: string;
+  siteId: string;
+  siteName: string;
+  domains: { domain: KnowledgeDomain; difficulty: number }[];
+  impact: number;
+  originalCompanyId: string;
+  previousCompanyId?: string;
+  previousCompanyName?: string;
+  swapCount: number;
+}
+
+export interface DisruptionSwapNoticeV1 {
+  fromCompanyId: string;
+  fromCompanyName: string;
+  round: number;
+  cardTitle: string;
+  siteName: string;
+  domains: KnowledgeDomain[];
+}
+
 export interface ActiveEventAllocationV2 extends ActiveEventAllocation {
   useTeamCapability?: boolean;
   useLocalCodified?: boolean;
@@ -81,6 +104,9 @@ export interface CompanyV2 extends Company {
 
   cumulativeCorporateKnowledgeSpend: number;
   cumulativeSiteKnowledgeSpend: Record<string, number>;
+
+  disruptionCard?: DisruptionAssignmentV1;
+  disruptionSwapNotice?: DisruptionSwapNoticeV1 | null;
 }
 
 export interface RiskSummaryV2 {
@@ -193,6 +219,7 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.cumulativeConsultantSpend ??= 0;
   c.cumulativeCorporateKnowledgeSpend ??= 0;
   c.cumulativeSiteKnowledgeSpend ??= {};
+  c.disruptionSwapNotice ??= null;
   for (const site of c.sites || []) c.cumulativeSiteKnowledgeSpend[site.id] ??= 0;
   for (const expert of c.experts || []) expert.replacementName ??= null;
   return c;
