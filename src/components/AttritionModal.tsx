@@ -64,5 +64,5 @@ export const AttritionModal:React.FC<AttritionModalProps>=({session,company,phas
    </div>
    </div>
   </div>
- </div>;
+ </div></div>;
 };
