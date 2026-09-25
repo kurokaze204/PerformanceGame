@@ -131,7 +131,7 @@ export const CompanyChartsOverlay: React.FC<Props> = ({ company, snapshots, onCl
   const [enabled,setEnabled]=useState<Record<string,boolean>>(()=>Object.fromEntries(legendSeries.map((s,i)=>[s.id,i<3])));
   return <div className="fixed inset-0 z-[160] bg-[#080b12]/98 backdrop-blur-sm p-3 md:p-5 overflow-hidden">
     <div className="h-full max-w-[1600px] mx-auto rounded-3xl border border-indigo-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
-      <div className="px-5 pr-32 py-3 border-b border-slate-700 flex items-start justify-between gap-4 shrink-0">
+      <div className="px-5 py-3 border-b border-slate-700 flex items-start justify-between gap-4 shrink-0">
         <div><div className="text-xs uppercase tracking-[0.18em] text-indigo-300 font-black">Company Trends</div><h2 className="text-xl font-black text-white">How your capability is changing round by round</h2><p className="text-xs text-slate-400 mt-1">Each factor uses the same scale across every city, starting at zero unless that factor falls negative. That means relative height is meaningful: a city at half another city's turnover will plot at roughly half the height. Corporate HQ remains a separate company-level view. The shared legend controls every chart.</p></div>
         <button onClick={onClose} className="rounded-xl border border-slate-600 bg-slate-950 p-2 text-white hover:bg-slate-800"><X className="w-5 h-5"/></button>
       </div>
