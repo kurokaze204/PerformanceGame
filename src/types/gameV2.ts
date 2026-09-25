@@ -167,6 +167,7 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   gameEndMode: GameEndMode;
   finalRoundCount: number;
   participants: Participant[];
+  strategicDisruptionDomains?: KnowledgeDomain[];
 }
 
 export interface V2BalanceConfig {
