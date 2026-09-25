@@ -129,11 +129,11 @@ export const CompanyChartsOverlay: React.FC<Props> = ({ company, snapshots, onCl
   },[siteSeries]);
   const legendSeries=commonSeries(activeSites[0]?.id);
   const [enabled,setEnabled]=useState<Record<string,boolean>>(()=>Object.fromEntries(legendSeries.map((s,i)=>[s.id,i<3])));
-  return <div className="fixed inset-0 z-[160] bg-[#080b12]/98 backdrop-blur-sm p-3 md:p-5 overflow-hidden">
-    <div className="h-full max-w-[1600px] mx-auto rounded-3xl border border-indigo-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+  return <div className="fixed left-0 right-0 top-[var(--tpg-header-height)] bottom-0 z-[300] bg-[#080b12]/98 backdrop-blur-sm p-3 md:p-5 overflow-hidden">
+    <div className="relative h-full max-w-[1600px] mx-auto rounded-3xl border border-indigo-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-700 flex items-start justify-between gap-4 shrink-0">
         <div><div className="text-xs uppercase tracking-[0.18em] text-indigo-300 font-black">Company Trends</div><h2 className="text-xl font-black text-white">How your capability is changing round by round</h2><p className="text-xs text-slate-400 mt-1">Each factor uses the same scale across every city, starting at zero unless that factor falls negative. That means relative height is meaningful: a city at half another city's turnover will plot at roughly half the height. Corporate HQ remains a separate company-level view. The shared legend controls every chart.</p></div>
-        <button onClick={onClose} className="tpg-close-button"><X className="w-5 h-5"/></button>
+        <button onClick={onClose} className="tpg-close-button shrink-0" aria-label="Close charts" title="Close charts"><X className="w-5 h-5"/></button>
       </div>
       <div className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_230px] gap-3 p-3">
         <div className="overflow-auto grid grid-cols-2 xl:grid-cols-3 gap-2 content-start">
