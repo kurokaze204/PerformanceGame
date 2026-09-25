@@ -288,16 +288,13 @@ async function acknowledgeEventResolution(sessionId:string,companyId:string,even
 
     event.isResolved=true;
     clearCompanyOpenEventV1(session,companyId,eventInstanceId);
-    const next=(session.activeEvents[company.id]||[]).find(candidate=>!candidate.isResolved);
-    let winnerEventInstanceId:string|undefined;
-    if(next){
-      const claim=claimCompanyOpenEventV1(session,companyId,next.instanceId);
-      winnerEventInstanceId=claim.winnerEventInstanceId;
-    }
+    // Do not claim or open the next Event automatically. The company must
+    // deliberately click a face-down card. OPEN_EVENT_CARD then claims that
+    // card for the whole company so every player sees the same Event.
     if(allCompanyEventsResolved(session))session.phase='consequences';
     await saveSessionV2(session);
-    broadcastV2(session,'COMPANY_EVENT_ACKNOWLEDGED',{companyId,eventInstanceId,winnerEventInstanceId});
-    return{success:true,message:winnerEventInstanceId?'Next Event opened for the company.':'Event complete.',winnerEventInstanceId,session};
+    broadcastV2(session,'COMPANY_EVENT_ACKNOWLEDGED',{companyId,eventInstanceId});
+    return{success:true,message:'Event complete. Choose the next Event card when you are ready.',session};
   });
 }
 
