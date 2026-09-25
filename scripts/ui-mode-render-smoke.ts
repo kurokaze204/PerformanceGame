@@ -40,4 +40,8 @@ assert.equal(appBoardSource.includes("fetch('/api/sessions/default')"),false,'fr
 const joinModalSource=readFileSync(new URL('../src/components/SessionJoinModalV2.tsx',import.meta.url),'utf8');
 assert.ok(joinModalSource.includes('await Promise.resolve(onJoinSession('),'game creation must await the actual join before leaving the setup state');
 
+const chartsSource=readFileSync(new URL('../src/components/CompanyChartsOverlay.tsx',import.meta.url),'utf8');
+assert.ok(chartsSource.includes("top-[var(--tpg-header-height)]"),'Charts overlay must start below the persistent game header');
+assert.ok(chartsSource.includes('aria-label="Close charts"'),'Charts overlay must retain an explicit close control');
+
 console.log('Mode-aware UI render smoke tests passed.');
