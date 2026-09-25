@@ -82,10 +82,48 @@ function allCompanyEventsResolved(session:GameSessionV2):boolean{
   return session.companies.every(company=>(session.activeEvents[company.id]||[]).every(event=>event.isResolved));
 }
 
+function allCompaniesWaiting(session:GameSessionV2):boolean{
+  return session.companies.length>0&&session.companies.every(company=>roundPhase(company,fallbackFromSession(session))==='waiting');
+}
+
+async function advanceAfterKnowledgeRisk(session:GameSessionV2){
+  // Put the shared session into the legacy risk state only for the atomic
+  // hand-off into the next round/final disruption. Company-specific risk
+  // progress remains in roundPhase.
+  session.phase='risk';
+  await saveSessionV2(session);
+  const advanced:any=await baseAdvancePhaseV2(session.id,'respond');
+  if(!advanced?.success||!advanced.session)return advanced;
+  if(!advanced.session.isFinalDisruptionActive){
+    for(const nextCompany of advanced.session.companies)setRoundPhase(nextCompany,'events');
+    await saveSessionV2(advanced.session);
+    broadcastV2(advanced.session,'ALL_COMPANIES_STARTED_NEXT_ROUND',{round:advanced.session.round});
+  }
+  return{
+    ...advanced,
+    message:advanced.session.isFinalDisruptionActive
+      ?'All companies finished Knowledge Risk. Final disruption begins.'
+      :'All companies finished Knowledge Risk. The next Event round has begun.',
+  };
+}
+
 export async function getSessionV2(sessionId:string):Promise<GameSessionV2|null>{
-  const session=await baseGetSessionV2(sessionId.toUpperCase());
-  if(session&&ensureRoundPhases(session))await saveSessionV2(session);
-  return session;
+  const id=sessionId.toUpperCase();
+  const session=await baseGetSessionV2(id);
+  if(!session)return null;
+  if(ensureRoundPhases(session))await saveSessionV2(session);
+  if(session.isFinalDisruptionActive||!allCompaniesWaiting(session))return session;
+
+  // Self-heal a session if the last FINISH_RISK request was interrupted after
+  // everybody had been marked waiting but before the round/final hand-off.
+  return serialisePhaseChange(id,async()=>{
+    const fresh=await baseGetSessionV2(id);
+    if(!fresh)return null;
+    ensureRoundPhases(fresh);
+    if(fresh.isFinalDisruptionActive||!allCompaniesWaiting(fresh))return fresh;
+    const recovered:any=await advanceAfterKnowledgeRisk(fresh);
+    return recovered?.success&&recovered.session?recovered.session:fresh;
+  });
 }
 
 export async function advancePhaseV2(sessionId:string,requested?:any){
@@ -129,28 +167,21 @@ async function finishRisk(sessionId:string,companyId:string){
     ensureRoundPhases(session);
     const company=session.companies.find(candidate=>candidate.id===companyId);
     if(!company)return{success:false,message:'Company not found.',session};
-    if(roundPhase(company,fallbackFromSession(session))==='waiting')return{success:true,message:'Waiting for the other companies to finish Knowledge Risk.',session};
+    if(roundPhase(company,fallbackFromSession(session))==='waiting'){
+      if(allCompaniesWaiting(session))return advanceAfterKnowledgeRisk(session);
+      return{success:true,message:'Waiting for the other companies to finish Knowledge Risk.',session};
+    }
     if(roundPhase(company,fallbackFromSession(session))!=='risk')return{success:false,message:'Finish investing before completing Knowledge Risk.',session};
 
     setRoundPhase(company,'waiting');
-    const allWaiting=session.companies.every(candidate=>roundPhase(candidate,fallbackFromSession(session))==='waiting');
-    if(!allWaiting){
+    if(!allCompaniesWaiting(session)){
       await saveSessionV2(session);
       broadcastV2(session,'COMPANY_WAITING_FOR_NEXT_ROUND',{companyId:company.id,round:session.round});
       const waiting=session.companies.filter(candidate=>roundPhase(candidate,fallbackFromSession(session))==='waiting').length;
       return{success:true,message:`Knowledge Risk complete. Waiting for the other companies (${waiting}/${session.companies.length} finished).`,session};
     }
 
-    session.phase='risk';
-    await saveSessionV2(session);
-    const advanced:any=await baseAdvancePhaseV2(session.id,'respond');
-    if(!advanced?.success||!advanced.session)return advanced;
-    if(!advanced.session.isFinalDisruptionActive){
-      for(const nextCompany of advanced.session.companies)setRoundPhase(nextCompany,'events');
-      await saveSessionV2(advanced.session);
-      broadcastV2(advanced.session,'ALL_COMPANIES_STARTED_NEXT_ROUND',{round:advanced.session.round});
-    }
-    return{...advanced,message:advanced.session.isFinalDisruptionActive?'All companies finished Knowledge Risk. Final disruption begins.':'All companies finished Knowledge Risk. The next Event round has begun.'};
+    return advanceAfterKnowledgeRisk(session);
   });
 }
 
