@@ -61,7 +61,7 @@ export const FinalDisruptionModalV2:React.FC<Props>=({session,company,onOpenAAR}
      <button type="button" onClick={()=>setUseConsultant(value=>!value)} disabled={evaluation.gap===0} className={'w-full rounded-2xl border-2 p-4 text-left disabled:opacity-40 '+(useConsultant?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-900')}>
       <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><BriefcaseBusiness className="h-6 w-6 text-amber-300"/><div><div className="text-sm font-black text-white">Emergency Consultant</div><div className="text-[11px] text-slate-400">{evaluation.gap===0?'No knowledge gap to fill.':'Fills every remaining knowledge gap.'}</div></div></div><div className="text-right"><div className="text-2xl font-black text-amber-200">{formatCurrency(evaluation.consultantCost)}</div><div className="text-[10px] text-slate-400">{evaluation.consultantPercent.toFixed(0)}% of company turnover</div></div></div>
      </button>
-     <button onClick={resolve} disabled={busy} className="w-full rounded-2xl bg-white py-4 text-base font-black text-slate-950 disabled:opacity-50">{busy?'RESOLVING…':useConsultant?'HIRE CONSULTANT & RESOLVE':'RESOLVE DISRUPTION'}</button>
+     <button onClick={resolve} disabled={busy} className="tpg-action tpg-action-primary w-full !h-14 !text-base disabled:opacity-50">{busy?'RESOLVING…':useConsultant?'HIRE CONSULTANT & RESOLVE':'RESOLVE DISRUPTION'}</button>
      {message&&<div className="text-center text-xs font-bold text-amber-200">{message}</div>}
     </section>
    </div>:<div className="mt-8 mx-auto max-w-2xl">
@@ -73,7 +73,7 @@ export const FinalDisruptionModalV2:React.FC<Props>=({session,company,onOpenAAR}
      {companyResult.consultantCost>0&&<div className="mt-4 rounded-xl border border-amber-700 bg-amber-950/30 p-3"><div className="text-[10px] uppercase font-black text-amber-400">Emergency consultant</div><div className="text-2xl font-black text-amber-100">−{formatCurrency(companyResult.consultantCost)}</div></div>}
      <div className="mt-4 grid grid-cols-2 gap-2">{(companyResult.domainResults||[]).map((result:any)=><div key={result.domain} className={'rounded-xl border p-3 '+(result.domainSuccess?'border-emerald-800':'border-rose-800')}><div className="text-xs font-black text-white">{DOMAIN_INFO[result.domain as KnowledgeDomain]?.label||result.domain}</div><div className="mt-1 text-xl font-black text-white">{result.totalKnowledge}/{result.requiredTotal}</div></div>)}</div>
     </div>
-    <button onClick={onOpenAAR} disabled={!session.finalDisruptionResolved} className="mt-4 w-full rounded-xl border border-indigo-500 bg-indigo-600 px-4 py-3.5 font-black text-white flex items-center justify-center gap-2 disabled:opacity-40"><BookOpen className="h-4 w-4"/>{session.finalDisruptionResolved?'START AFTER ACTION REVIEW':'WAITING FOR OTHER COMPANIES'}</button>
+    <button onClick={onOpenAAR} disabled={!session.finalDisruptionResolved} className="tpg-action tpg-action-primary mt-4 w-full !h-14 disabled:opacity-40"><BookOpen className="h-4 w-4"/>{session.finalDisruptionResolved?'START AFTER ACTION REVIEW':'WAITING FOR OTHER COMPANIES'}</button>
    </div>}
   </div>
  </div>;
