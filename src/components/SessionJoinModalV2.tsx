@@ -7,7 +7,7 @@ interface CreateOptions{experienceMode:ExperienceMode;gameDurationMinutes:number
 interface PublicGame{id:string;title:string;round:number;phase:string;companiesCount:number;createdAt:string;updatedAt:string;completed:boolean;}
 interface Props{
  currentSession:GameSessionV2|null;
- onJoinSession:(sessionId:string,companyId:string,playerName:string)=>void;
+ onJoinSession:(sessionId:string,companyId:string,playerName:string)=>Promise<boolean|void>|boolean|void;
  onCreateNewSession:(sessionName:string,companyCount:number,options:CreateOptions)=>void;
  onSoloStart:(options:CreateOptions)=>void;
  initialMode?:'solo'|'join'|'current'|'create';
@@ -69,7 +69,8 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,initialMode='sol
    if(!res.ok)throw new Error(created.error||'Could not create the game.');
    try{localStorage.setItem(`tpg_creator_${created.id}`,playerName.trim())}catch{}
    if(args.autoStart){const timerResponse=await fetch(`/api/sessions/${created.id}/timer/start`,{method:'POST'});if(!timerResponse.ok)throw new Error('The game was created, but its clock could not be started.')}
-   onJoinSession(created.id,created.companies?.[0]?.id||'',playerName.trim());
+   const joined=await Promise.resolve(onJoinSession(created.id,created.companies?.[0]?.id||'',playerName.trim()));
+   if(joined===false)setCreating(false);
   }catch(error:any){setCreateError(error.message||'Could not create the game.');setCreating(false)}
  };
 
