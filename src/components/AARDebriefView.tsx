@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, ExternalLink, Lightbulb, Target } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BarChart3, BookOpen, CheckCircle2, ExternalLink, Lightbulb, Target } from 'lucide-react';
 import type { BusinessStrategy, CompanyV2, GameSessionV2, KnowledgeStrategy } from '../types/gameV2.ts';
 import { formatCurrency } from '../utils/format.ts';
 import { MiniRiverBenchmark } from './MiniRiverBenchmark.tsx';
@@ -59,7 +59,7 @@ const n = (value: any) => Number(value || 0);
 const display1 = (value: any) => value === null || value === undefined ? '—' : Number(value).toFixed(1);
 const pct = (value:number) => `${Math.round(value)}%`;
 
-export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company, onClose }) => {
+export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company, onClose, onOpenCharts }) => {
   const [question, setQuestion] = useState<QuestionId>('plan');
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [note, setNote] = useState('');
@@ -180,7 +180,7 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
         <header className="px-5 py-4 border-b border-slate-700">
           <div className="flex items-start justify-between gap-4">
             <div><div className="text-[10px] uppercase tracking-[0.2em] text-indigo-300 font-black">After Action Review</div><h2 className="text-2xl font-black text-white">Four questions. Keep the conversation simple.</h2><p className="text-xs text-slate-400 mt-1">Use the evidence only when it helps the discussion. The goal is learning, not analysing every metric.</p></div>
-            <div className="flex gap-2 shrink-0"><button onClick={onClose} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-black text-slate-300 flex items-center gap-2"><ArrowLeft className="w-4 h-4"/>Final result</button><button onClick={finishGame} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950 flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/>Finish game</button></div>
+            <div className="flex gap-2 shrink-0">{onOpenCharts&&<button onClick={onOpenCharts} className="rounded-xl border border-indigo-500 bg-indigo-950/60 px-3 py-2 text-xs font-black text-indigo-100 flex items-center gap-2 hover:border-indigo-300"><BarChart3 className="w-4 h-4"/>Charts</button>}<button onClick={onClose} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-black text-slate-300 flex items-center gap-2"><ArrowLeft className="w-4 h-4"/>Final result</button><button onClick={finishGame} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950 flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/>Finish game</button></div>
           </div>
           <nav className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">{QUESTIONS.map(q => <button key={q.id} onClick={() => setQuestion(q.id)} className={`rounded-xl border px-3 py-2 text-left ${question === q.id ? 'border-indigo-400 bg-indigo-950/70' : 'border-slate-700 bg-slate-950/70 hover:border-slate-500'}`}><div className={`text-[10px] font-black uppercase ${question === q.id ? 'text-indigo-300' : 'text-slate-500'}`}>{q.short}</div><div className="text-xs font-bold text-white mt-0.5">{q.question}</div></button>)}</nav>
         </header>
@@ -193,6 +193,7 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
 
             {question === 'actual' && <div className="mt-5">
               <div className="grid md:grid-cols-2 gap-3">{actualCards.map(card => <Evidence key={card.title} card={card} toneClass={toneClass}/>)}</div>
+              {onOpenCharts&&<button onClick={onOpenCharts} className="mt-4 w-full rounded-2xl border-2 border-indigo-600 bg-indigo-950/35 p-4 text-left hover:border-indigo-300"><div className="flex items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-indigo-600 bg-slate-950"><BarChart3 className="h-5 w-5 text-indigo-300"/></div><div><div className="font-black text-white">Explore the charts</div><div className="mt-0.5 text-xs text-slate-400">Compare the trends with what you intended to happen, then return here to discuss why reality differed.</div></div><ArrowRight className="ml-auto h-5 w-5 shrink-0 text-indigo-300"/></div></button>}
               <TurnoverStory metrics={companyMetrics}/>
               <BenchmarkCharts rows={benchmarks} currentCompanyId={company.id} companies={session.companies} mode={session.experienceMode}/>
             </div>}
