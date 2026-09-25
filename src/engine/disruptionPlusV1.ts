@@ -104,6 +104,34 @@ function supportsCard(company:CompanyV2,card:DisruptionAssignmentV1):boolean{
   return card.domains.every(requirement=>expertDomains.has(requirement.domain));
 }
 
+export function swapDisruptionWithPeerV1(session:GameSessionV2,companyId:string){
+  const company=session.companies.find(candidate=>candidate.id===companyId);
+  if(!company?.disruptionCard||session.companies.length<2)return null;
+  const candidates=session.companies.filter(peer=>{
+    if(peer.id===company.id||!peer.disruptionCard)return false;
+    return supportsCard(company,peer.disruptionCard)&&supportsCard(peer,company.disruptionCard!);
+  });
+  if(!candidates.length)return null;
+  const partner=candidates[hash(`${session.id}:${session.round}:${company.id}:swap`)%candidates.length];
+  const companyCard=company.disruptionCard;
+  const partnerCard=partner.disruptionCard!;
+
+  company.disruptionCard={...partnerCard,previousCompanyId:partner.id,previousCompanyName:partner.name,swapCount:(partnerCard.swapCount||0)+1};
+  partner.disruptionCard={...companyCard,previousCompanyId:company.id,previousCompanyName:company.name,swapCount:(companyCard.swapCount||0)+1};
+
+  company.disruptionSwapNotice={
+    fromCompanyId:partner.id,fromCompanyName:partner.name,round:session.round,
+    cardTitle:company.disruptionCard.title,siteName:company.disruptionCard.siteName,
+    domains:company.disruptionCard.domains.map(item=>item.domain),
+  };
+  partner.disruptionSwapNotice={
+    fromCompanyId:company.id,fromCompanyName:company.name,round:session.round,
+    cardTitle:partner.disruptionCard.title,siteName:partner.disruptionCard.siteName,
+    domains:partner.disruptionCard.domains.map(item=>item.domain),
+  };
+  return{companyId:company.id,partnerId:partner.id,companyName:company.name,partnerName:partner.name};
+}
+
 function peerOrganisationalKnowledge(session:GameSessionV2,company:CompanyV2,domain:KnowledgeDomain,preferredCompanyId?:string):{score:number;sourceCompanyName?:string}{
   const scoreFor=(peer:CompanyV2)=>{
     const siteBest=Math.max(0,...peer.sites.filter(site=>!site.isClosed).map(site=>{
