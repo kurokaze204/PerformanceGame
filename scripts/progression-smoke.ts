@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DEFAULT_CONFIG } from '../src/engine/config.ts';
 import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
-import { capProgressedEventImpact, diversifyInitialKnowledge, progressEventCard } from '../src/engine/eventProgressionV5.ts';
+import { PROGRAMMED_FAILURE_TAG, capProgressedEventImpact, diversifyInitialKnowledge, progressEventCard } from '../src/engine/eventProgressionV5.ts';
+import { createNewSessionV2, resolveEventV2 } from '../src/server/gameServiceV3.ts';
 import type { EventCard } from '../src/types/game.ts';
 
 assert.equal(DEFAULT_CONFIG.starting_turnover, 875);
@@ -61,5 +62,17 @@ assert.equal(tutorialWrapper.includes("cardNumber===1&&event.card.tags?.includes
 const appBoard=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
 assert.ok(appBoard.includes("targetPhase:'investment'"),'final Event must advance directly to Invest');
 assert.ok(appBoard.includes('await advanceToInvestment('),'completion path must use the direct Invest transition helper');
+
+const tutorialSession=await createNewSessionV2('TUTORIAL-FAIL-SMOKE','Tutorial Failure Smoke',['Alpha'],{experienceMode:'newbie',gameDurationMinutes:45});
+const tutorialCompany=tutorialSession.companies[0];
+const tutorialEvent=(tutorialSession.activeEvents[tutorialCompany.id]||[]).find(event=>event.card.tags?.includes(PROGRAMMED_FAILURE_TAG));
+assert.ok(tutorialEvent,'a fresh Newbie game must include the opening knowledge-isolation teaching Event');
+const tutorialResolution:any=await resolveEventV2(tutorialSession.id,tutorialCompany.id,tutorialEvent!.instanceId);
+assert.equal(tutorialResolution.success,true,'programmed tutorial Event should resolve through the shared Event path');
+assert.equal(tutorialResolution.eventSuccess,false,'programmed opening knowledge-isolation Event must remain a forced failure');
+assert.equal(Boolean(tutorialResolution.result?.success),false,'programmed opening result must be reported as a failure');
+const resolvedTutorial=(tutorialResolution.session.activeEvents[tutorialCompany.id]||[]).find((event:any)=>event.instanceId===tutorialEvent!.instanceId);
+assert.equal(resolvedTutorial?.isResolved,false,'resolved Event must stay visible until Continue acknowledgement');
+assert.equal(Boolean((resolvedTutorial as any)?.uiResolutionData),true,'shared resolution data must be retained for the visible result screen');
 
 console.log('Progression V5 smoke tests passed.');
