@@ -30,11 +30,12 @@ export const DisruptionDealOverlay:React.FC<{session:GameSessionV2;company:Compa
       <div className="text-[11px] font-black tracking-[.18em] text-amber-200">DISRUPTION</div>
       <h3 className="mt-2 text-xl font-black leading-tight text-white">{card.title}</h3>
       <div className="mt-3 rounded-xl border border-amber-800 bg-black/25 px-3 py-2"><div className="text-[9px] uppercase tracking-wider text-amber-400 font-black">Site</div><div className="text-lg font-black text-white">{card.siteName}</div></div>
-      <div className="mt-3 grid grid-cols-2 gap-2">{card.domains.map(req=><DomainLine key={req.domain} domain={req.domain} difficulty={req.difficulty}/>)}</div>
+      <p className="mt-3 text-xs leading-relaxed text-slate-200">To survive this final challenge you need to increase your knowledge score in these domains:</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">{card.domains.map(req=><DomainLine key={req.domain} domain={req.domain} difficulty={req.difficulty}/>)}</div>
       <p className="mt-3 text-xs leading-relaxed text-slate-400">Build these capabilities deliberately. Your strategic environment may change during the game.</p>
      </div>}
    </div>
-   {revealed&&<button onClick={onContinue} className="mt-2 w-full rounded-xl bg-amber-400 py-3.5 font-black text-slate-950 flex items-center justify-center gap-2">CHOOSE MY STRATEGY <ArrowRight className="h-4 w-4"/></button>}
+   {revealed&&<button onClick={onContinue} className="mt-5 w-full rounded-xl bg-amber-400 py-3.5 font-black text-slate-950 flex items-center justify-center gap-2">CHOOSE MY STRATEGY <ArrowRight className="h-4 w-4"/></button>}
    <div className="mt-3 text-center text-[10px] text-slate-500">{session.experienceMode==='newbie'?'Both domains match expertise already present in your company.':'Expert mode may test capability beyond your current experts.'}</div>
   </div>;
 };
