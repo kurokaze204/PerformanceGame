@@ -36,7 +36,7 @@ export const RiskRiverDiagram:React.FC<Props>=({company,mode,effect,focus=null})
  const domains=mode==='expert'?EXPERT:NEWBIE;
  const sites=company.sites.filter(s=>!s.isClosed);
  const focusExpert=focus?.kind==='expert'?company.experts.find(e=>e.id===focus.expertId):undefined;
- const activeExperts=company.experts.filter(e=>!e.isVacant||e.id===focusExpert?.id);
+ const activeExperts=company.experts.filter(e=>(!e.isVacant||e.id===focusExpert?.id)&&!(effect?.kind==='expert-departed'&&e.id===effect.expertId));
  const departing=effect?.kind==='expert-departed'?company.experts.find(e=>e.id===effect.expertId):undefined;
  const replacement=effect?.kind==='replacement'?company.experts.find(e=>e.id===effect.expertId):undefined;
  const data=useMemo(()=>domains.map(domain=>({domain,scores:sites.map(site=>({site,score:riverSiteKnowledgeScore(site,domain,mode)}))})),[company,mode]);
