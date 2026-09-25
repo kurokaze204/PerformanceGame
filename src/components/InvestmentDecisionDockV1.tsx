@@ -10,16 +10,15 @@ import { KnowledgeHubPanel } from './KnowledgeHubPanel.tsx';
 import { ScorePanelV2 } from './ScorePanelV2.tsx';
 import { RiverDiagramOverlay } from './RiverDiagramOverlay.tsx';
 import { AttritionModal } from './AttritionModal.tsx';
-import { formatCurrency } from '../utils/format.ts';
 
 type Tool='sites'|'experts'|'hq'|'score'|null;
 type IntroStep='invest'|'river'|null;
 type CompanyRoundPhase='events'|'investment'|'risk'|'waiting';
-interface Props{session:GameSessionV2;company:CompanyV2;selectedSiteId:string;tool:Tool;onTool:(tool:Tool)=>void;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;onSelectExpert?:(expert:Expert)=>void;chartsAvailable?:boolean;onOpenCharts?:()=>void;}
+interface Props{session:GameSessionV2;company:CompanyV2;selectedSiteId:string;tool:Tool;onTool:(tool:Tool)=>void;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;onSelectExpert?:(expert:Expert)=>void;onOpenCharts?:()=>void;}
 const tabs=[['sites','Sites',MapPin],['experts','Experts',Users],['hq','HQ',Building2],['score','Score',BarChart3]] as const;
 const short=(text:string,max=100)=>text.length<=max?text:`${text.slice(0,max-1).trim()}…`;
 
-export const InvestmentDecisionDockV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert,chartsAvailable=false,onOpenCharts})=>{
+export const InvestmentDecisionDockV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert,onOpenCharts})=>{
  const [transferOpen,setTransferOpen]=useState(false);
  const [transitioning,setTransitioning]=useState(false);
  const [transitionError,setTransitionError]=useState('');
