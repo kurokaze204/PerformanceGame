@@ -37,7 +37,7 @@ export function StrategyPromptV2({ stage, originalKnowledgeStrategy, originalBus
   const initial = stage === 'initial';
 
   return (
-    <div className="fixed inset-0 z-[190] bg-slate-950/90 backdrop-blur-sm grid place-items-center p-4">
+    <div className="fixed left-0 right-0 top-[var(--tpg-header-height)] bottom-0 z-[190] bg-slate-950/90 backdrop-blur-sm grid place-items-center p-4">
       <div className="w-full max-w-2xl rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl p-6 md:p-8">
         <div className="text-xs uppercase tracking-[0.22em] text-indigo-400 font-black">The Performance Gap</div>
         <h2 className="text-3xl font-black text-white mt-2">{initial ? 'Before we begin…' : 'Having run the company…'}</h2>
