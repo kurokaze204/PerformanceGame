@@ -39,6 +39,14 @@ assert.ok(learning.title.startsWith('LEARNING:'));
 assert.ok(learning.impact<=25,'first move should remain cheap');
 assert.ok(learning.domains.every(d=>d.difficulty<=3),'first move should remain simple');
 
+const brutalFallback:EventCard={id:'BRUTAL',type:'opportunity',scope:'enterprise',title:'Brutal early card',description:'Test',domains:[{domain:'engineering',difficulty:9},{domain:'marketing',difficulty:8}],impact:300,tags:['test']};
+const round2First=progressEventCard(brutalFallback,3,DEFAULT_CONFIG,'newbie');
+const round2Second=progressEventCard(brutalFallback,4,DEFAULT_CONFIG,'newbie');
+assert.ok(round2First.domains.every(d=>d.difficulty<=5),'Round 2 / move 3 material Events must cap knowledge difficulty at 5');
+assert.ok(round2Second.domains.every(d=>d.difficulty<=5),'Round 2 / move 4 material Events must cap knowledge difficulty at 5');
+const highStakesEarly=progressEventCard(brutalFallback,5,DEFAULT_CONFIG,'newbie');
+assert.ok(highStakesEarly.domains.every(d=>d.difficulty<=7),'High-stakes Events must cap knowledge difficulty at 7 before critical play');
+
 const expertMove6=progressEventCard(base,6,DEFAULT_CONFIG,'expert');
 const expertMove7=progressEventCard(base,7,DEFAULT_CONFIG,'expert');
 assert.ok(expertMove7.impact>=expertMove6.impact,'expert pressure should advance in slower steps, never backwards');
