@@ -222,7 +222,10 @@ async function startServer() {
       const result = await knowledgeActionV2(req.params.id, companyId, normalized);
       if (result.success) {
         const company = result.session.companies.find(c => c.id === companyId);
-        if (company) await captureKnowledgeAction(result.session, company, result, normalized.type);
+        if (company) {
+          try { await captureKnowledgeAction(result.session, company, result, normalized.type); }
+          catch (analyticsError) { console.error('Analytics capture failed after successful action', analyticsError); }
+        }
       }
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
@@ -252,10 +255,14 @@ async function startServer() {
     try {
       const result = await advancePhaseV2(req.params.id, req.body?.targetPhase);
       if (result.success) {
-        if (result.session.phase === 'respond' && !result.session.isFinalDisruptionActive) {
-          for (const company of result.session.companies) await captureRoundReveals(result.session, company);
+        try {
+          if (result.session.phase === 'respond' && !result.session.isFinalDisruptionActive) {
+            for (const company of result.session.companies) await captureRoundReveals(result.session, company);
+          }
+          await captureStateMetric(result.session, `PHASE_${result.session.phase.toUpperCase()}`);
+        } catch (analyticsError) {
+          console.error('Analytics capture failed after successful phase advance', analyticsError);
         }
-        await captureStateMetric(result.session, `PHASE_${result.session.phase.toUpperCase()}`);
       }
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
