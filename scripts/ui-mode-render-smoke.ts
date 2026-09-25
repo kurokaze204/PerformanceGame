@@ -44,4 +44,7 @@ const chartsSource=readFileSync(new URL('../src/components/CompanyChartsOverlay.
 assert.ok(chartsSource.includes("top-[var(--tpg-header-height)]"),'Charts overlay must start below the persistent game header');
 assert.ok(chartsSource.includes('aria-label="Close charts"'),'Charts overlay must retain an explicit close control');
 
+const riskSource=readFileSync(new URL('../src/components/AttritionModal.tsx',import.meta.url),'utf8');
+assert.ok(riskSource.includes('title="Single Point of Failure"'),'Knowledge Risk expert checks must visibly mark SPOF experts');
+
 console.log('Mode-aware UI render smoke tests passed.');
