@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import type { GameSessionV2 } from '../src/types/gameV2.ts';
 import {
   claimCompanyOpenEventV1,
@@ -70,5 +71,13 @@ assert.deepEqual(clicks,[
 
 // There must never be a second authoritative open-card field for the company.
 assert.equal(String((session.companies[0] as any).uiOpenEventInstanceId),'event-1');
+
+const serviceSource=readFileSync(new URL('../src/server/gameServiceV8.ts',import.meta.url),'utf8');
+const acknowledgeStart=serviceSource.indexOf('async function acknowledgeEventResolution');
+const acknowledgeEnd=serviceSource.indexOf('export async function knowledgeActionV2',acknowledgeStart);
+const acknowledgeSource=serviceSource.slice(acknowledgeStart,acknowledgeEnd);
+assert.ok(acknowledgeStart>=0&&acknowledgeEnd>acknowledgeStart,'current server must expose acknowledgement flow');
+assert.equal(acknowledgeSource.includes('claimCompanyOpenEventV1('),false,'acknowledging one Event must not auto-claim/open the next Event');
+assert.ok(acknowledgeSource.includes("clearCompanyOpenEventV1(session,companyId,eventInstanceId)"),'acknowledging an Event must clear the shared open-card state');
 
 console.log('Company Event-open synchronisation and race smoke tests passed.');
