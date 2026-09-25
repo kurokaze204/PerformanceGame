@@ -44,11 +44,14 @@ export const AttritionModal:React.FC<AttritionModalProps>=({session,company,phas
  const selectedBase=currentDeparture?(placements[currentDeparture.expertId]||originalSite?.id||activeSites[0]?.id||''):'';
  const hiddenTitle=card.kind.startsWith('expert')?card.title.replace(/\s+(Retained|Retired|Resigned)$/,''):`${card.location||'Site'} Knowledge Risk`;
  const displayTitle=revealed?card.title:hiddenTitle;
- return <div className="w-full min-h-[560px] flex items-start justify-center pt-3 px-3"><div className="w-full max-w-5xl space-y-3">
+ return <div className="fixed left-3 right-3 top-[calc(var(--tpg-header-height)+8px)] bottom-[66px] z-[180] rounded-3xl border border-slate-700 bg-[#080b12]/[0.995] p-3 shadow-2xl overflow-hidden">
+  <div className="grid h-full min-h-0 gap-3 min-[1180px]:grid-cols-[minmax(0,1fr)_minmax(560px,.92fr)]">
+   <div className="min-h-0 overflow-auto rounded-2xl"><RiskRiverDiagram company={company} mode={session.experienceMode} effect={riverEffect} focus={card.focus}/></div>
+   <div className="min-h-0 overflow-y-auto pr-1">
   <div className={`w-full rounded-2xl border-2 shadow-2xl overflow-hidden bg-slate-950 transition-colors duration-300 ${toneClasses.border}`}>
    <div className="px-5 py-3 border-b border-slate-800 bg-slate-900/95 flex items-center justify-between gap-4"><div className="flex items-center gap-2"><ShieldAlert className="w-5 h-5 text-indigo-300"/><div><div className="text-xs uppercase tracking-[0.18em] text-slate-500 font-black">Knowledge Risk</div><div className="text-base font-black text-white">{currentIndex<2?'Expert risk':'City office risk'} · test {currentIndex+1} of {cards.length}</div></div></div><div className="flex items-center gap-1.5">{cards.map((item,index)=><span key={item.id} className={`w-2.5 h-2.5 rounded-full ${index<currentIndex?'bg-emerald-500':index===currentIndex?'bg-indigo-400 ring-2 ring-indigo-300/30':'bg-slate-700'}`}/>)}</div></div>
    <div className="p-5 space-y-4">
-    <div className="flex items-start justify-between gap-5"><div className="flex gap-4 min-w-0 pt-1"><div className={`shrink-0 w-12 h-12 rounded-xl grid place-items-center border transition-colors duration-300 ${toneClasses.icon}`}><Icon className="w-6 h-6"/></div><div className="min-w-0"><h2 className={`text-2xl font-black leading-tight transition-colors duration-300 ${toneClasses.text}`}>{displayTitle}</h2>{card.location&&<div className="text-sm text-slate-400 mt-1">{card.location}</div>}{card.domainLines?.length?<div className="flex flex-wrap gap-2 mt-2">{card.domainLines.map(line=><span key={line} className="rounded-full bg-slate-900 border border-slate-700 px-2.5 py-1 text-xs font-bold text-slate-300">{line}</span>)}</div>:null}</div></div>
+    <div className="grid gap-4 min-[1380px]:grid-cols-[minmax(0,1fr)_350px]"><div className="flex gap-4 min-w-0 pt-1"><div className={`shrink-0 w-12 h-12 rounded-xl grid place-items-center border transition-colors duration-300 ${toneClasses.icon}`}><Icon className="w-6 h-6"/></div><div className="min-w-0"><h2 className={`text-2xl font-black leading-tight transition-colors duration-300 ${toneClasses.text}`}>{displayTitle}</h2>{card.location&&<div className="text-sm text-slate-400 mt-1">{card.location}</div>}{card.domainLines?.length?<div className="flex flex-wrap gap-2 mt-2">{card.domainLines.map(line=><span key={line} className="rounded-full bg-slate-900 border border-slate-700 px-2.5 py-1 text-xs font-bold text-slate-300">{line}</span>)}</div>:null}</div></div>
      {card.roll!=null&&<RiskRollTrack key={card.id} roll={Number(card.roll)} threshold={Number(card.threshold||0)} sides={session.config.event_die} kind={card.kind.startsWith('expert')?'expert':'site'} onComplete={()=>setRollDone(true)} onNext={next} nextLabel={isFinal?'NEXT ROUND':'NEXT'} nextDisabled={Boolean(placing)}/>} 
     </div>
     {revealed&&<>
@@ -59,7 +62,7 @@ export const AttritionModal:React.FC<AttritionModalProps>=({session,company,phas
      {isFinal&&summary.closedSites.length>0&&<div className="rounded-xl border border-rose-700 bg-rose-950/40 p-3 text-sm text-rose-200"><b className="text-rose-300">Site insolvency:</b> {summary.closedSites.join(', ')}.</div>}
     </>}
    </div>
+   </div>
   </div>
-  <RiskRiverDiagram company={company} mode={session.experienceMode} effect={riverEffect} focus={card.focus}/> 
- </div></div>;
+ </div>;
 };
