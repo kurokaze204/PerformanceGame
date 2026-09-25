@@ -64,11 +64,7 @@ function disruptionImpact(requirements:{difficulty:number}[]):number{
 }
 
 export function dealCompanyDisruptionsV1(session:GameSessionV2):void{
-  const alreadyDealt=session.companies.some(company=>Boolean(company.disruptionCard));
-  if(alreadyDealt)return;
-
   const strategic=strategicDomainsForSession(session);
-  for(const company of session.companies)ensureStrategicExpertCoverage(company,strategic);
 
   const pairs:[[KnowledgeDomain,KnowledgeDomain],[KnowledgeDomain,KnowledgeDomain],[KnowledgeDomain,KnowledgeDomain]]=[
     [strategic[0],strategic[1]],
@@ -79,6 +75,8 @@ export function dealCompanyDisruptionsV1(session:GameSessionV2):void{
   const siteIds=rotatedSiteIds(session);
 
   session.companies.forEach((company,index)=>{
+    if(company.disruptionCard)return;
+    ensureStrategicExpertCoverage(company,strategic);
     const siteId=siteIds.length?siteIds[index%siteIds.length]:company.sites[0]?.id;
     const site=company.sites.find(candidate=>candidate.id===siteId&&!candidate.isClosed)||company.sites.find(candidate=>!candidate.isClosed)||company.sites[0];
     const template=FINAL_DISRUPTION_CARDS[(hash(`${session.id}:template`)+index)%FINAL_DISRUPTION_CARDS.length]||FINAL_DISRUPTION_CARDS[0];
