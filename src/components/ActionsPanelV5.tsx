@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Building2, GraduationCap, Handshake, Network, Radar, Sparkles, Users, BriefcaseBusiness, Bot, ArrowRightLeft } from 'lucide-react';
+import { ArrowRight, BookOpen, Building2, GraduationCap, Network, Radar, Sparkles, Users, Bot, ArrowRightLeft } from 'lucide-react';
 import type { KnowledgeDomain } from '../types/game.ts';
 import { DOMAIN_INFO } from '../types/game.ts';
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { INVESTMENT_COSTS_V4, copPeerKnowledgeScoreV4, expertTravelCostV4 } from '../engine/investmentActionsV4.ts';
 import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
-import { capabilityUnlocked, interventionUnlocked } from '../engine/experienceModeV3.ts';
+import { interventionUnlocked } from '../engine/experienceModeV3.ts';
 import { localCodifiedVisible } from '../engine/learningCurveBalanceV1.ts';
 import { riverSiteKnowledgeScore, riverTransferTarget } from '../engine/riverKnowledgeV1.ts';
 import { formatCurrency } from '../utils/format.ts';
@@ -16,14 +16,6 @@ type InterventionId='knowledge-transfer'|'local-training'|'corporate-training'|'
 type AnchorId='existing'|'expert'|'network'|'favour'|'external'|'risk';
 type Intervention={id:InterventionId; title:string; description:string; anchor:AnchorId; icon:React.ElementType; actionType:string};
 const DOMAINS:KnowledgeDomain[]=['engineering','hr','marketing','operations','finance'];
-const ANCHORS:{id:AnchorId;title:string;description:string;disabled?:boolean;icon:React.ElementType}[]=[
- {id:'existing',title:'Use what we already know',description:'Move, build and publish knowledge already inside the company.',icon:Building2},
- {id:'expert',title:'Ask one of our experts to help',description:'Build scarce expertise and make more of it reusable.',icon:Users},
- {id:'network',title:'Ask our network for help',description:'Build access to knowledge beyond the organisation.',icon:Handshake},
- {id:'favour',title:'Call in a favour',description:'Challenge-response mechanism only.',disabled:true,icon:Sparkles},
- {id:'external',title:'Engage external expertise',description:'Non-preferred challenge-response mechanism only.',disabled:true,icon:BriefcaseBusiness},
- {id:'risk',title:'Anticipate knowledge risk',description:'Build foresight so risk can be handled deliberately.',icon:Radar},
-];
 const INTERVENTIONS:Intervention[]=[
  {id:'knowledge-transfer',title:'Knowledge Transfer',description:'Move proven know-how directly from one site to another.',anchor:'existing',icon:ArrowRightLeft,actionType:'SITE_KNOWLEDGE_SHARING'},
  {id:'local-training',title:'Local Training',description:'An expert coaches one local team, increasing Team Capability by +1.',anchor:'existing',icon:Users,actionType:'KNOWLEDGE_TRANSFER'},
@@ -36,7 +28,6 @@ const INTERVENTIONS:Intervention[]=[
  {id:'horizon-scan',title:'Horizon Scan',description:'Scout a domain so matching Events can be anticipated next round.',anchor:'risk',icon:Radar,actionType:'HORIZON_SCAN'},
  {id:'automate',title:'Automation',description:'Embed critical domain knowledge in systems (+2 on future challenges).',anchor:'existing',icon:Bot,actionType:'AUTOMATE'},
 ];
-function anchorVisible(session:GameSessionV2,id:AnchorId){if(session.experienceMode==='expert')return true;if(id==='existing'||id==='favour'||id==='external')return true;if(id==='expert')return capabilityUnlocked(session.experienceMode,session.round,'expert');if(id==='network')return capabilityUnlocked(session.experienceMode,session.round,'network');return capabilityUnlocked(session.experienceMode,session.round,'foresight');}
 function costFor(actionType:string){return INVESTMENT_COSTS_V4[actionType]||0;}
 
 export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,onNextPhase})=>{
@@ -171,8 +162,6 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
        </div>
      </section>
    </div>
-   </div>
  </div>
  </>;
 };
-const Metric:React.FC<{label:string;value:number|string}>=({label,value})=><div className="rounded-lg border border-indigo-900 bg-slate-950 p-2"><div className="text-[10px] uppercase text-slate-500 font-black">{label}</div><div className="text-lg font-black text-white">{value}</div></div>;
