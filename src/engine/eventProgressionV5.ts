@@ -105,19 +105,29 @@ function pickProgressionCard(type:EventType, pressureNumber:number, fallback:Eve
   return cloneCard(fallback);
 }
 
+function difficultyCeilingForPressure(pressureNumber:number, absoluteCap:number):number {
+  // A high-difficulty template can be drawn at any time. Without a tier ceiling,
+  // Round 2 can therefore inherit an 8/9-point challenge even though the player
+  // has only had one Invest phase. Gate the *playable difficulty* by progression,
+  // while still allowing the full card catalogue to provide narrative variety.
+  const tierCap=pressureNumber<=2?3:pressureNumber<=4?5:pressureNumber<=6?7:9;
+  return Math.min(absoluteCap,tierCap);
+}
+
 export function progressEventCard(fallback:EventCard, moveNumber:number, config:SimulationConfig, experienceMode:ExperienceMode='newbie'):EventCard {
   const pressureNumber=pressureMove(moveNumber,config,experienceMode);
   const card=pickProgressionCard(fallback.type,pressureNumber,fallback);
   const growth=config.event_value_growth_factor ?? 1.4;
   const difficultyGrowth=config.event_difficulty_growth_per_move ?? 0.28;
   const difficultyCap=config.event_difficulty_cap ?? 9;
+  const progressiveDifficultyCap=difficultyCeilingForPressure(pressureNumber,difficultyCap);
   const initialMultiplier=config.event_initial_impact_multiplier ?? 0.12;
   const valueFactor=Math.pow(growth,Math.max(0,pressureNumber-1));
   const isLearning=card.tags.includes('learning');
   const isEscalation=card.tags.includes('escalation');
   const startingMultiplier=(isLearning||isEscalation)?1:initialMultiplier;
   card.impact=Math.max(5,Math.round(card.impact*startingMultiplier*valueFactor));
-  card.domains=card.domains.map(req=>({ ...req, difficulty:Math.min(difficultyCap,Math.max(1,Math.round(req.difficulty+(pressureNumber-1)*difficultyGrowth))) }));
+  card.domains=card.domains.map(req=>({ ...req, difficulty:Math.min(progressiveDifficultyCap,Math.max(1,Math.round(req.difficulty+(pressureNumber-1)*difficultyGrowth))) }));
   const tier=pressureNumber<=2?'LEARNING':pressureNumber<=4?'MATERIAL':pressureNumber<=6?'HIGH STAKES':'CRITICAL';
   card.title=`${tier}: ${card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,'')}`;
   card.description=`${card.description} This is move ${moveNumber}; the financial stakes and knowledge difficulty increase as the simulation develops.`;
