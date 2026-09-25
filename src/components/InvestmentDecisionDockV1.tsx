@@ -14,11 +14,11 @@ import { AttritionModal } from './AttritionModal.tsx';
 type Tool='sites'|'experts'|'hq'|'score'|null;
 type IntroStep='invest'|'river'|null;
 type CompanyRoundPhase='events'|'investment'|'risk'|'waiting';
-interface Props{session:GameSessionV2;company:CompanyV2;selectedSiteId:string;tool:Tool;onTool:(tool:Tool)=>void;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;onSelectExpert?:(expert:Expert)=>void;onOpenCharts?:()=>void;}
+interface Props{session:GameSessionV2;company:CompanyV2;selectedSiteId:string;tool:Tool;onTool:(tool:Tool)=>void;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;onSelectExpert?:(expert:Expert)=>void;onOpenCharts?:()=>void;onSessionUpdate?:(session:GameSessionV2)=>void;}
 const tabs=[['sites','Sites',MapPin],['experts','Experts',Users],['hq','HQ',Building2],['score','Score',BarChart3]] as const;
 const short=(text:string,max=100)=>text.length<=max?text:`${text.slice(0,max-1).trim()}…`;
 
-export const InvestmentDecisionDockV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert,onOpenCharts})=>{
+export const InvestmentDecisionDockV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert,onOpenCharts,onSessionUpdate})=>{
  const [transferOpen,setTransferOpen]=useState(false);
  const [transitioning,setTransitioning]=useState(false);
  const [transitionError,setTransitionError]=useState('');
@@ -35,7 +35,21 @@ export const InvestmentDecisionDockV1:React.FC<Props>=({session,company,selected
    const response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,actionType:type,params:{}})});
    const data=await response.json();
    if(!response.ok||data.success===false)throw new Error(data.message||data.error||'Could not advance your company.');
-  }catch(error:any){setTransitionError(error.message||'Could not advance your company.');setTransitioning(false);}
+   if(data.session){
+    onSessionUpdate?.(data.session);
+   }else{
+    const refresh=await fetch(`/api/sessions/${session.id}`);
+    if(refresh.ok)onSessionUpdate?.(await refresh.json());
+   }
+   setTransitioning(false);
+  }catch(error:any){
+   setTransitionError(error.message||'Could not advance your company.');
+   setTransitioning(false);
+   try{
+    const refresh=await fetch(`/api/sessions/${session.id}`);
+    if(refresh.ok)onSessionUpdate?.(await refresh.json());
+   }catch{}
+  }
  };
 
  useEffect(()=>{
