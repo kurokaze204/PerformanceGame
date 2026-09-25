@@ -12,9 +12,9 @@ import { KnowledgeHubPanel } from './KnowledgeHubPanel.tsx';
 import { ScorePanelV2 } from './ScorePanelV2.tsx';
 
 type Tool='sites'|'experts'|'hq'|'score'|null;
-interface Props{session:GameSessionV2;company:CompanyV2;selectedSiteId:string;tool:Tool;onTool:(tool:Tool)=>void;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;onSelectExpert?:(expert:Expert)=>void;chartsAvailable?:boolean;onOpenCharts?:()=>void;}
+interface Props{session:GameSessionV2;company:CompanyV2;selectedSiteId:string;tool:Tool;onTool:(tool:Tool)=>void;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;onSelectExpert?:(expert:Expert)=>void;onOpenCharts?:()=>void;}
 const tabs=[['sites','Sites',MapPin],['experts','Experts',Users],['hq','HQ',Building2],['score','Score',BarChart3]] as const;
-export const BoardToolTabsV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert,chartsAvailable=false,onOpenCharts})=>{
+export const BoardToolTabsV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert,onOpenCharts})=>{
  const [riverOpen,setRiverOpen]=useState(false);
  const transferUnlocked=useMemo(()=>session.experienceMode==='expert'||session.round>1||(session.activeEvents[company.id]||[]).some(event=>event.isResolved&&event.success===false&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)),[session,company.id]);
  const share=async(sourceSiteId:string,targetSiteId:string,domain:KnowledgeDomain)=>{const res=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,actionType:'SITE_KNOWLEDGE_SHARING',params:{sourceSiteId,siteId:targetSiteId,domain}})});const data=await res.json();return{success:res.ok&&data.success!==false,message:data.message||data.error}};
