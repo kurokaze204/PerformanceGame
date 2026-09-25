@@ -2,6 +2,7 @@ import type { KnowledgeDomain } from '../types/game.ts';
 import type { GameSessionV2 } from '../types/gameV2.ts';
 import { executeRiskPhaseV4 } from '../engine/riskPhaseV4.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
+import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
 import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEventOpenV1 } from '../engine/companyEventOpenV1.ts';
 import { resolveSingleEventExplicitV2 } from '../engine/challengeResponseV2.ts';
@@ -12,6 +13,7 @@ import {
   advancePhaseV2 as baseAdvancePhaseV2,
   getSessionV2 as baseGetSessionV2,
   knowledgeActionV2 as baseKnowledgeActionV2,
+  resolveEventV2 as baseResolveEventV2,
 } from './gameServiceV7.ts';
 
 export * from './gameServiceV7.ts';
@@ -231,7 +233,29 @@ export async function resolveEventV2(sessionId:string,companyId:string,eventInst
     if(openId&&openId!==event.instanceId)return{success:false,message:'Another Event is currently open for this company.',session};
     if(!openId)(company as any).uiOpenEventInstanceId=event.instanceId;
 
-    const result:any=resolveSingleEventExplicitV2(session,company,event);
+    const isProgrammedFailure=event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
+    let result:any;
+    let authoritativeSession=session;
+    if(isProgrammedFailure){
+      // Preserve the long-standing Newbie teaching mechanic. The V8 multiplayer
+      // synchronisation layer must not bypass V5's deliberately forced opening
+      // failure by resolving the Event directly.
+      const legacyResult:any=await baseResolveEventV2(sessionId,companyId,event.instanceId);
+      if(!legacyResult?.session)return legacyResult;
+      authoritativeSession=legacyResult.session;
+      const authoritativeCompany=authoritativeSession.companies.find(candidate=>candidate.id===companyId);
+      const authoritativeEvent=authoritativeCompany?(authoritativeSession.activeEvents[authoritativeCompany.id]||[]).find(candidate=>candidate.instanceId===event.instanceId):undefined;
+      if(!authoritativeCompany||!authoritativeEvent)return legacyResult;
+      result=legacyResult.result||{};
+      authoritativeEvent.isResolved=false;
+      (authoritativeEvent as any).uiResolutionData={eventSuccess:false,result};
+      (authoritativeCompany as any).uiOpenEventInstanceId=authoritativeEvent.instanceId;
+      await saveSessionV2(authoritativeSession);
+      broadcastV2(authoritativeSession,'COMPANY_EVENT_RESOLVED_SHARED',{companyId,eventInstanceId:authoritativeEvent.instanceId,result});
+      return{success:true,eventSuccess:false,result,session:authoritativeSession};
+    }
+
+    result=resolveSingleEventExplicitV2(session,company,event);
     if(event.card.tags?.includes('disruption-swap')){
       const swap=swapDisruptionWithPeerV1(session,company.id);
       if(swap){
