@@ -43,7 +43,7 @@ export const DisruptionSwapNotice:React.FC<{company:CompanyV2;onAcknowledge:()=>
  const notice=company.disruptionSwapNotice;
  const card=company.disruptionCard;
  if(!notice||!card)return null;
- return <div className="fixed inset-0 z-[280] grid place-items-center bg-black/70 p-4">
+ return <div className="fixed left-0 right-0 top-[var(--tpg-header-height)] bottom-0 z-[280] grid place-items-center bg-black/70 p-4">
   <div className="w-full max-w-lg rounded-3xl border-2 border-amber-400 bg-slate-950 p-6 shadow-2xl">
    <div className="flex items-center gap-2 text-amber-300"><RefreshCw className="h-5 w-5"/><span className="text-[11px] uppercase tracking-[.18em] font-black">Strategic environment changed</span></div>
    <h2 className="mt-2 text-2xl font-black text-white">Your Disruption has changed.</h2>
