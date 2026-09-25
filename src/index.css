@@ -1,6 +1,21 @@
 @import "tailwindcss";
 
 @layer components {
+
+  /* Shared control language: information is quiet; actions look clickable; destructive actions are unmistakable. */
+  .tpg-info-tile { @apply h-14 min-w-[142px] rounded-xl border border-slate-700 bg-slate-950/75 px-3 py-2 flex flex-col justify-center; }
+  .tpg-info-label { @apply text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 leading-none; }
+  .tpg-info-value { @apply mt-1 text-lg font-black leading-none text-white tabular-nums; }
+  .tpg-status-tile { @apply h-14 rounded-xl border border-slate-700 bg-slate-900/75 px-3 flex items-center gap-2 text-sm font-black text-slate-200; }
+  .tpg-action { @apply h-12 rounded-xl border-2 border-indigo-700 bg-indigo-950/45 px-4 inline-flex items-center justify-center gap-2 text-sm font-black text-indigo-100 shadow-sm hover:border-indigo-400 hover:bg-indigo-950/70 focus:outline-none focus:ring-2 focus:ring-indigo-400/70; }
+  .tpg-action-icon { @apply h-12 w-12 rounded-xl border-2 border-slate-700 bg-slate-950 inline-flex items-center justify-center text-slate-200 shadow-sm hover:border-indigo-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400/70; }
+  .tpg-action-primary { @apply border-indigo-500 bg-indigo-600 text-white hover:border-indigo-300 hover:bg-indigo-500; }
+  .tpg-action-danger { @apply border-rose-700 bg-rose-950/35 text-rose-200 hover:border-rose-400 hover:bg-rose-950/65 hover:text-white focus:ring-rose-400/70; }
+  .tpg-action-muted { @apply border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-500 hover:bg-slate-900 hover:text-white focus:ring-slate-400/70; }
+  .tpg-top-action { @apply h-14 rounded-xl border-2 px-3 inline-flex items-center justify-center gap-2 text-xs font-black shadow-sm focus:outline-none focus:ring-2; }
+  .tpg-tool-button { @apply min-h-14 rounded-xl border-2 border-slate-700 bg-slate-950 px-1.5 py-2 flex flex-col items-center justify-center gap-1 text-[11px] font-black text-slate-200 shadow-sm hover:border-indigo-400 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400/70; }
+  .tpg-tool-button-active { @apply border-indigo-400 bg-indigo-950/70 text-white; }
+  .tpg-close-button { @apply grid h-10 w-10 place-items-center rounded-xl border-2 border-slate-700 bg-slate-950 text-slate-300 hover:border-indigo-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400/70; }
   .control { @apply mt-2 w-full rounded-xl border-2 border-slate-700 bg-slate-950 px-4 py-3 text-base font-semibold text-white outline-none focus:border-indigo-400; }
   .label { @apply text-sm uppercase tracking-wider text-slate-400 font-black; }
   .primary { @apply w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 px-5 py-4 text-base font-black text-white flex items-center justify-center gap-2; }
