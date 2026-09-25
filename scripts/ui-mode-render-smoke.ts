@@ -55,4 +55,12 @@ const disruptionCardSource=readFileSync(new URL('../src/components/DisruptionCar
 assert.ok(disruptionCardSource.includes("aboveOverlay?'z-[38]':'z-[24]'"),'Disruption mini card must be able to rise above the Invest overlay');
 assert.ok(appBoardSource.includes("aboveOverlay={companyRoundPhase==='investment'}"),'Invest phase must render the Disruption card above the investment workspace');
 
+const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
+assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||session"),'Event acknowledgement must prefer the authoritative acknowledged session before selecting the next card');
+const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
+assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
+assert.ok(investPanelSource.includes('Choose an investment'),'Invest must keep investment choices beside the River');
+const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
+for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
+
 console.log('Mode-aware UI render smoke tests passed.');
