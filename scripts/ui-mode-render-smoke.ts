@@ -51,4 +51,8 @@ assert.ok(appBoardSource.includes("actionType:'FINISH_INVESTING'"),'Invest compl
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
 assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
 
+const disruptionCardSource=readFileSync(new URL('../src/components/DisruptionCardV1.tsx',import.meta.url),'utf8');
+assert.ok(disruptionCardSource.includes("aboveOverlay?'z-[38]':'z-[24]'"),'Disruption mini card must be able to rise above the Invest overlay');
+assert.ok(appBoardSource.includes("aboveOverlay={companyRoundPhase==='investment'}"),'Invest phase must render the Disruption card above the investment workspace');
+
 console.log('Mode-aware UI render smoke tests passed.');
