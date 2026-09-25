@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
 import { DEFAULT_CONFIG } from '../src/engine/config.ts';
 import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import { ActionsPanelV5 } from '../src/components/ActionsPanelV5.tsx';
@@ -34,4 +35,9 @@ for(const mode of ['newbie','expert'] as const){
   assert.ok(challenge.includes('Local Codified'),'Expert Challenge UI should retain Local Codified Knowledge');
  }
 }
+const appBoardSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
+assert.equal(appBoardSource.includes("fetch('/api/sessions/default')"),false,'fresh startup must not replace the setup form with a default-session bootstrap');
+const joinModalSource=readFileSync(new URL('../src/components/SessionJoinModalV2.tsx',import.meta.url),'utf8');
+assert.ok(joinModalSource.includes('await Promise.resolve(onJoinSession('),'game creation must await the actual join before leaving the setup state');
+
 console.log('Mode-aware UI render smoke tests passed.');
