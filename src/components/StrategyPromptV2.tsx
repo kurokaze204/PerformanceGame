@@ -88,7 +88,7 @@ export function StrategyPromptV2({ stage, originalKnowledgeStrategy, originalBus
         <button
           disabled={saving}
           onClick={async () => { setSaving(true); try { await onSubmit(initial ? business : (originalBusinessStrategy || business), knowledge); } finally { setSaving(false); } }}
-          className="mt-8 w-full rounded-2xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white py-4 font-black text-lg"
+          className="tpg-action tpg-action-primary mt-8 w-full !h-14 !text-lg disabled:opacity-50"
         >
           {saving ? 'Saving…' : initial ? 'Lock in our starting strategy' : 'Record our new choice'}
         </button>
