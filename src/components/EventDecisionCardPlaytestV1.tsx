@@ -72,7 +72,23 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
     setAckBusy(true);
     try{
       const response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,actionType:'ACK_EVENT_RESOLUTION',params:{eventInstanceId:event.instanceId}})});
-      const authoritative=await response.json();
+      const raw=await response.text();
+      let authoritative:any=null;
+      if(raw){try{authoritative=JSON.parse(raw)}catch{}}
+      if(!authoritative){
+        // A proxy/restart can occasionally return an empty body after the server
+        // has already committed the acknowledgement. Re-read authoritative state
+        // instead of trapping the player on a JSON parser error.
+        const refresh=await fetch(`/api/sessions/${session.id}`,{cache:'no-store'});
+        if(refresh.ok){
+          const refreshed=await refresh.json();
+          const refreshedCompany=refreshed.companies?.find((candidate:any)=>candidate.id===company.id);
+          const refreshedEvent=(refreshed.activeEvents?.[company.id]||[]).find((candidate:any)=>candidate.instanceId===event.instanceId);
+          const noLongerCurrent=String(refreshedCompany?.uiOpenEventInstanceId||'')!==event.instanceId;
+          if(refreshedEvent?.isResolved||noLongerCurrent){await onAcknowledgeResolution({success:true,session:refreshed});return;}
+        }
+        throw new Error(response.ok?'The server did not return a response. Please try Continue again.':'Could not continue.');
+      }
       if(!response.ok||authoritative.success===false)throw new Error(authoritative.message||authoritative.error||'Could not continue.');
       await onAcknowledgeResolution(authoritative);
     }finally{setAckBusy(false);}
