@@ -156,7 +156,7 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
 
   const toneClass = (tone?: EvidenceCard['tone']) => tone === 'warn' ? 'border-rose-800 bg-rose-950/20' : tone === 'good' ? 'border-emerald-800 bg-emerald-950/20' : 'border-slate-700 bg-slate-950/70';
 
-  if(finished)return <div className="fixed inset-0 z-[240] bg-[#080b12] text-slate-200 p-4 overflow-auto grid place-items-center">
+  if(finished)return <div className="fixed left-0 right-0 top-[var(--tpg-header-height)] bottom-0 z-[240] bg-[#080b12] text-slate-200 p-4 overflow-auto grid place-items-center">
     <div className="w-full max-w-3xl rounded-3xl border-2 border-emerald-700 bg-slate-900 p-7 md:p-10 shadow-2xl text-center">
       <div className="mx-auto w-14 h-14 rounded-2xl border border-emerald-700 bg-emerald-950 grid place-items-center"><CheckCircle2 className="w-8 h-8 text-emerald-300"/></div>
       <div className="mt-5 text-xs uppercase tracking-[0.22em] text-emerald-300 font-black">The Performance Gap</div>
@@ -175,9 +175,9 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
   </div>;
 
   return (
-    <div className="fixed inset-0 z-[220] bg-[#080b12]/[0.995] text-slate-200 p-3 md:p-5 overflow-auto">
+    <div className="fixed left-0 right-0 top-[var(--tpg-header-height)] bottom-0 z-[220] bg-[#080b12]/[0.995] text-slate-200 p-3 md:p-5 overflow-auto">
       <div className="max-w-5xl mx-auto rounded-3xl border border-indigo-700 bg-slate-900 shadow-2xl overflow-hidden">
-        <header className="px-5 pr-32 py-4 border-b border-slate-700">
+        <header className="px-5 py-4 border-b border-slate-700">
           <div className="flex items-start justify-between gap-4">
             <div><div className="text-[10px] uppercase tracking-[0.2em] text-indigo-300 font-black">After Action Review</div><h2 className="text-2xl font-black text-white">Four questions. Keep the conversation simple.</h2><p className="text-xs text-slate-400 mt-1">Use the evidence only when it helps the discussion. The goal is learning, not analysing every metric.</p></div>
             <div className="flex gap-2 shrink-0">{onOpenCharts&&<button onClick={onOpenCharts} className="rounded-xl border border-indigo-500 bg-indigo-950/60 px-3 py-2 text-xs font-black text-indigo-100 flex items-center gap-2 hover:border-indigo-300"><BarChart3 className="w-4 h-4"/>Charts</button>}<button onClick={onClose} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-black text-slate-300 flex items-center gap-2"><ArrowLeft className="w-4 h-4"/>Final result</button><button onClick={finishGame} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950 flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/>Finish game</button></div>
