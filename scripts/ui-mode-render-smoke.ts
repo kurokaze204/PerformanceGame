@@ -69,7 +69,7 @@ assert.ok(investPanelSource.includes('grid-cols-[minmax(0,1fr)_300px]'),'River a
 assert.equal(investPanelSource.includes('overflow-y-auto'),false,'Core Invest workspace must not introduce internal scrollbars');
 assert.ok(investPanelSource.includes("showSiteLabels={selectedId==='knowledge-transfer'}"),'Knowledge Transfer must label all site values on the River');
 assert.ok(investPanelSource.includes('· available {riverSiteKnowledgeScore(s,domain,session.experienceMode)}'),'Teaching-site choices must show available knowledge');
-assert.ok(investPanelSource.includes("' · team '+(s.teamCapability[domain]||0)"),'Receiving-site choices must show current team capability');
+assert.ok(investPanelSource.includes(' · team {s.teamCapability[domain]||0}'),'Receiving-site choices must show current team capability');
 assert.ok(investPanelSource.includes("selectedId==='knowledge-transfer'?<div className=\"space-y-2\">"),'Knowledge Transfer must use its dedicated stacked control layout');
 assert.ok(investPanelSource.indexOf('>Domain<select')<investPanelSource.indexOf('>Teaching site<select'),'Knowledge Transfer must place Domain above Teaching Site');
 assert.ok(investPanelSource.includes('grid grid-cols-2 gap-2'),'Teaching and Receiving Site controls must share the full row');
