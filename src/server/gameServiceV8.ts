@@ -311,6 +311,7 @@ export async function knowledgeActionV2(sessionId:string,companyId:string,payloa
   }
   if(payload?.type==='FINISH_INVESTING')return finishInvesting(sessionId,companyId);
   if(payload?.type==='FINISH_RISK')return finishRisk(sessionId,companyId);
+  if(payload?.type==='SITE_KNOWLEDGE_SHARING')return serialisePhaseChange(sessionId,()=>baseKnowledgeActionV2(sessionId,companyId,payload));
   if(payload?.type==='SET_REPLACEMENT_LOCATION')return setReplacementLocation(sessionId,companyId,payload);
   if(payload?.type==='OPEN_EVENT_CARD')return openCompanyEventCard(sessionId,companyId,String(payload?.eventInstanceId||''));
   if(payload?.type==='ACK_EVENT_RESOLUTION')return acknowledgeEventResolution(sessionId,companyId,String(payload?.eventInstanceId||''));
