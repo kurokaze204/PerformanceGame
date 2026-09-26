@@ -107,6 +107,7 @@ export interface CompanyV2 extends Company {
 
   disruptionCard?: DisruptionAssignmentV1;
   disruptionSwapNotice?: DisruptionSwapNoticeV1 | null;
+  riverTeachingUse?: { round: number; siteIds: string[] };
 }
 
 export interface RiskSummaryV2 {

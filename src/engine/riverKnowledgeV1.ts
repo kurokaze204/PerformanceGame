@@ -11,6 +11,15 @@ export function riverSiteKnowledgeScore(site:CompanyV2['sites'][number],domain:K
     : Math.max(site.teamCapability[domain]||0,site.codifiedKnowledge[domain]||0);
 }
 
+export function riverTeachingSitesUsedThisRound(company:CompanyV2,round:number):string[]{
+  return company.riverTeachingUse?.round===round?[...company.riverTeachingUse.siteIds]:[];
+}
+
+function markRiverTeachingSiteUsed(company:CompanyV2,round:number,siteId:string){
+  if(company.riverTeachingUse?.round!==round)company.riverTeachingUse={round,siteIds:[]};
+  if(!company.riverTeachingUse.siteIds.includes(siteId))company.riverTeachingUse.siteIds.push(siteId);
+}
+
 export function riverTransferTarget(sourceScore:number,currentScore=0):number{
   const source=Math.max(0,Math.min(6,sourceScore));
   const current=Math.max(0,Math.min(6,currentScore));
@@ -29,11 +38,13 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   const source=company.sites.find(s=>s.id===sourceSiteId&&!s.isClosed);
   const target=company.sites.find(s=>s.id===siteId&&!s.isClosed);
   if(!source||!target)return{success:false,message:'Both sites must be active.',session};
+  if(riverTeachingSitesUsedThisRound(company,session.round).includes(source.id))return{success:false,message:`${source.name} has already been used as a teaching site this round. Choose another teaching site.`,session};
   const sourceScore=riverSiteKnowledgeScore(source,domain,session.experienceMode);
   const before=target.teamCapability[domain]||0;
   const targetScore=riverTransferTarget(sourceScore,before);
   if(targetScore<=before)return{success:false,message:`${target.name} already has Team Capability ${before}; ${source.name} cannot lift it further through Knowledge Transfer.`,session};
   target.teamCapability[domain]=targetScore;
+  markRiverTeachingSiteUsed(company,session.round,source.id);
   recordPublicationEvidenceV4(company,domain,1);
   const cost=INVESTMENT_COSTS_V4.SITE_KNOWLEDGE_SHARING;
   target.turnover=Math.max(0,target.turnover-cost);

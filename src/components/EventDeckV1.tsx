@@ -50,6 +50,7 @@ export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,ca
  const[showDelayHelp,setShowDelayHelp]=useState(false);
  const sharedId=String((company as any).uiOpenEventInstanceId||'');
  const shared=events.map((event,index)=>({event,index})).find(item=>item.event.instanceId===sharedId);
+ const lastSharedOpenIdRef=useRef('');
  const delayHelpKey='tpg_horizon_delay_help_seen';
  const markSharedOpen=async(index:number)=>{
    const event=events[index];
@@ -65,8 +66,15 @@ export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,ca
    }catch{}
  };
  useEffect(()=>{
-   if(shared&&(!cardOpen||shared.index!==activeIndex))onOpenCard(shared.index);
- },[shared?.event.instanceId,cardOpen,activeIndex]);
+   const nextSharedId=shared?.event.instanceId||'';
+   if(!nextSharedId){
+     lastSharedOpenIdRef.current='';
+     return;
+   }
+   if(lastSharedOpenIdRef.current===nextSharedId)return;
+   lastSharedOpenIdRef.current=nextSharedId;
+   if(!cardOpen||shared!.index!==activeIndex)onOpenCard(shared!.index);
+ },[shared?.event.instanceId]);
  useEffect(()=>{
    if(!delayed||pendingDelayRef.current!==delayed.instanceId)return;
    pendingDelayRef.current='';

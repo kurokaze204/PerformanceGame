@@ -52,7 +52,35 @@ assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk co
 assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
 
 const disruptionCardSource=readFileSync(new URL('../src/components/DisruptionCardV1.tsx',import.meta.url),'utf8');
-assert.ok(disruptionCardSource.includes("aboveOverlay?'z-[38]':'z-[24]'"),'Disruption mini card must be able to rise above the Invest overlay');
-assert.ok(appBoardSource.includes("aboveOverlay={companyRoundPhase==='investment'}"),'Invest phase must render the Disruption card above the investment workspace');
+assert.ok(disruptionCardSource.includes('wide?:boolean'),'Disruption mini card must support the wide Invest layout');
+assert.ok(disruptionCardSource.includes("min-h-[54px]"),'Wide Disruption domain rows must reserve space for long labels such as Human Resources');
+assert.ok(disruptionCardSource.includes("w-[240px]"),'Wide Disruption card must reserve enough width for full domain names');
+assert.ok(disruptionCardSource.includes("[overflow-wrap:normal]"),'Disruption domain names must not split inside words');
+assert.ok(appBoardSource.includes("companyRoundPhase!=='investment'"),'Board-level Disruption card must be suppressed during Invest to avoid duplication');
+
+const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
+assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||session"),'Event acknowledgement must prefer the authoritative acknowledged session before selecting the next card');
+const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
+assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
+assert.ok(investPanelSource.includes('Choose an investment'),'Invest must keep investment choices beside the River');
+assert.ok(investPanelSource.includes('<DisruptionMiniCard company={company} wide/>'),'Invest footer must contain the wide Disruption goal card');
+assert.ok(investPanelSource.includes('bottom-[72px]'),'Invest workspace must clear the phase track');
+assert.ok(investPanelSource.includes('grid-cols-[minmax(0,1fr)_300px]'),'River and investment choices must share a stable top-row layout');
+assert.equal(investPanelSource.includes('overflow-y-auto'),false,'Core Invest workspace must not introduce internal scrollbars');
+assert.ok(investPanelSource.includes("showSiteLabels={selectedId==='knowledge-transfer'}"),'Knowledge Transfer must label all site values on the River');
+assert.ok(investPanelSource.includes('· available {riverSiteKnowledgeScore(s,domain,session.experienceMode)}'),'Teaching-site choices must show available knowledge');
+assert.ok(investPanelSource.includes(' · team {s.teamCapability[domain]||0}'),'Receiving-site choices must show current team capability');
+assert.ok(investPanelSource.includes("selectedId==='knowledge-transfer'?<div className=\"space-y-2\">"),'Knowledge Transfer must use its dedicated stacked control layout');
+assert.ok(investPanelSource.indexOf('>Domain<select')<investPanelSource.indexOf('>Teaching site<select'),'Knowledge Transfer must place Domain above Teaching Site');
+assert.ok(investPanelSource.includes('grid grid-cols-2 gap-2'),'Teaching and Receiving Site controls must share the full row');
+assert.ok(investPanelSource.includes("selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${riverTargetBefore} → ${Math.max(riverTargetBefore,riverTargetAfter)}`:'Choose a receiving site'"),'Knowledge Transfer outcome must describe only the receiving-site change');
+assert.equal(investPanelSource.includes('embedded/>'),false,'Disruption card must not remain embedded in the investment chooser');
+const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
+for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
+
+const eventDeckSource=readFileSync(new URL('../src/components/EventDeckV1.tsx',import.meta.url),'utf8');
+assert.ok(eventDeckSource.includes("const lastSharedOpenIdRef=useRef('')"),'Event deck must remember the last shared-open Event id');
+assert.ok(eventDeckSource.includes("if(lastSharedOpenIdRef.current===nextSharedId)return"),'Closing an Event must not reopen the same shared Event');
+assert.equal(eventDeckSource.includes("},[shared?.event.instanceId,cardOpen,activeIndex]);"),false,'Shared Event synchronisation must not re-fire merely because the local card was closed');
 
 console.log('Mode-aware UI render smoke tests passed.');
