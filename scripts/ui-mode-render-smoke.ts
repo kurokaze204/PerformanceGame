@@ -52,14 +52,18 @@ assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk co
 assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
 
 const disruptionCardSource=readFileSync(new URL('../src/components/DisruptionCardV1.tsx',import.meta.url),'utf8');
-assert.ok(disruptionCardSource.includes("aboveOverlay?'z-[38]':'z-[24]'"),'Disruption mini card must be able to rise above the Invest overlay');
-assert.ok(appBoardSource.includes("aboveOverlay={companyRoundPhase==='investment'}"),'Invest phase must render the Disruption card above the investment workspace');
+assert.ok(disruptionCardSource.includes('embedded?:boolean'),'Disruption mini card must support an embedded Invest layout');
+assert.ok(disruptionCardSource.includes("min-h-[39px]"),'Disruption domain rows must reserve space for long labels such as Human Resources');
+assert.ok(appBoardSource.includes("companyRoundPhase!=='investment'"),'Board-level Disruption card must be suppressed during Invest to avoid duplication');
 
 const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
 assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||session"),'Event acknowledgement must prefer the authoritative acknowledged session before selecting the next card');
 const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
 assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
 assert.ok(investPanelSource.includes('Choose an investment'),'Invest must keep investment choices beside the River');
+assert.ok(investPanelSource.includes('<DisruptionMiniCard company={company} embedded/>'),'Invest chooser must contain the Disruption goal card');
+assert.ok(investPanelSource.includes('bottom-[72px]'),'Invest workspace must clear the phase track');
+assert.ok(investPanelSource.includes('-bottom-4 left-1/2'),'Investment chooser must visually point toward the details panel');
 const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
 for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
 
