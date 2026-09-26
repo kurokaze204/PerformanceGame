@@ -7,7 +7,7 @@ import { INVESTMENT_COSTS_V4, copPeerKnowledgeScoreV4, expertTravelCostV4 } from
 import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { interventionUnlocked } from '../engine/experienceModeV3.ts';
 import { localCodifiedVisible } from '../engine/learningCurveBalanceV1.ts';
-import { riverSiteKnowledgeScore, riverTransferTarget } from '../engine/riverKnowledgeV1.ts';
+import { riverSiteKnowledgeScore, riverTeachingSitesUsedThisRound, riverTransferTarget } from '../engine/riverKnowledgeV1.ts';
 import { formatCurrency } from '../utils/format.ts';
 import { InvestmentRiverView } from './InvestmentRiverView.tsx';
 import { DisruptionMiniCard } from './DisruptionCardV1.tsx';
@@ -44,6 +44,8 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
    &&(item.actionType!=='SITE_KNOWLEDGE_SHARING'||transferUnlocked));
  const [selectedId,setSelectedId]=useState<InterventionId>(visibleInterventions[0]?.id||'local-training');
  const activeSites=company.sites.filter(s=>!s.isClosed);
+ const usedTeachingSiteIds=riverTeachingSitesUsedThisRound(company,session.round);
+ const availableTeachingSites=activeSites.filter(s=>!usedTeachingSiteIds.includes(s.id));
  const activeExperts=company.experts.filter(e=>!e.isVacant);
  const [siteId,setSiteId]=useState(activeSites[0]?.id||'');
  const [sourceSiteId,setSourceSiteId]=useState(activeSites[1]?.id||activeSites[0]?.id||'');
@@ -54,7 +56,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const selected=visibleInterventions.find(i=>i.id===selectedId)||visibleInterventions[0];
  const selectedAarEvent=resolvedEvents.find(e=>e.instanceId===aarEventId)||resolvedEvents[0];
  const selectedSite=activeSites.find(s=>s.id===siteId)||activeSites[0];
- const sourceSite=activeSites.find(s=>s.id===sourceSiteId)||activeSites.find(s=>s.id!==selectedSite?.id)||activeSites[0];
+ const sourceSite=availableTeachingSites.find(s=>s.id===sourceSiteId)||availableTeachingSites.find(s=>s.id!==selectedSite?.id)||availableTeachingSites[0];
  const selectedExpert=activeExperts.find(e=>e.id===expertId)||activeExperts[0];
  useEffect(()=>{if(tutorialComplete&&!localStorage.getItem(lessonKey))setShowIntranetLesson(true)},[tutorialComplete,lessonKey]);
  useEffect(()=>{if(!visibleInterventions.some(i=>i.id===selectedId)&&visibleInterventions[0])setSelectedId(visibleInterventions[0].id)},[session.round,session.experienceMode,selectedId,tutorialComplete]);
@@ -128,7 +130,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const actionTotal=session.config.actions_per_round;
  const expertLocation=selectedExpert?(selectedExpert.location==='HQ'?'Corporate HQ':activeSites.find(s=>s.id===selectedExpert.location)?.name||selectedExpert.location):'';
  const aarSiteLocked=selectedId==='aar'&&selectedAarEvent?.card.scope==='local';
- const invalidRiver=selectedId==='knowledge-transfer'&&(!sourceSite||!selectedSite||sourceSite.id===selectedSite.id||riverTargetAfter<=riverTargetBefore);
+ const invalidRiver=selectedId==='knowledge-transfer'&&(!sourceSite||!selectedSite||sourceSite.id===selectedSite.id||usedTeachingSiteIds.includes(sourceSite.id)||riverTargetAfter<=riverTargetBefore);
  const riverTargetSiteId=needsTargetSite?selectedSite?.id:undefined;
  const riverSourceSiteId=needsSourceSite?sourceSite?.id:undefined;
  const riverExpertId=needsExpert?selectedExpert?.id:undefined;
@@ -156,7 +158,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
          <div className="mt-2 flex items-end gap-3">
           <div className="grid min-w-0 flex-[1.2] grid-cols-3 gap-2">
            {selectedId==='aar'&&<label className="block text-[10px] uppercase text-slate-500 font-black">Recent challenge<select value={selectedAarEvent?.instanceId||''} onChange={e=>setAarEventId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{resolvedEvents.map(e=><option key={e.instanceId} value={e.instanceId}>{e.success===false?'FAIL':'SUCCESS'} · {e.card.title}</option>)}</select></label>}
-           {needsSourceSite&&<label className="block text-[10px] uppercase text-slate-500 font-black">Teaching site<select value={sourceSiteId} onChange={e=>setSourceSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{activeSites.map(s=><option key={s.id} value={s.id}>{s.name} · available {riverSiteKnowledgeScore(s,domain,session.experienceMode)}</option>)}</select></label>}
+           {needsSourceSite&&<label className="block text-[10px] uppercase text-slate-500 font-black">Teaching site<select value={sourceSite?.id||''} onChange={e=>setSourceSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case" disabled={!availableTeachingSites.length}>{activeSites.map(s=>{const used=usedTeachingSiteIds.includes(s.id);return <option key={s.id} value={s.id} disabled={used}>{s.name} · available {riverSiteKnowledgeScore(s,domain,session.experienceMode)}{used?' · used this round':''}</option>})}</select>{!availableTeachingSites.length&&<div className="mt-1 text-[10px] font-bold normal-case text-amber-300">All teaching sites have been used this round.</div>}</label>}
            {needsTargetSite&&<label className="block text-[10px] uppercase text-slate-500 font-black">{needsSourceSite?'Receiving site':'Site'}<select value={siteId} disabled={aarSiteLocked} onChange={e=>setSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case disabled:opacity-60">{activeSites.map(s=><option key={s.id} value={s.id}>{s.name}{selectedId==='knowledge-transfer'?' · team '+(s.teamCapability[domain]||0):''}</option>)}</select></label>}
            {needsExpert&&<label className="block text-[10px] uppercase text-slate-500 font-black">Expert<select value={expertId} onChange={e=>setExpertId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{activeExperts.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
            <label className="block text-[10px] uppercase text-slate-500 font-black">Domain<select value={domain} onChange={e=>setDomain(e.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{relevantDomains.map(d=><option key={d} value={d}>{DOMAIN_INFO[d].label}</option>)}</select></label>
