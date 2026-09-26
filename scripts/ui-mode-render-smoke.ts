@@ -70,6 +70,10 @@ assert.equal(investPanelSource.includes('overflow-y-auto'),false,'Core Invest wo
 assert.ok(investPanelSource.includes("showSiteLabels={selectedId==='knowledge-transfer'}"),'Knowledge Transfer must label all site values on the River');
 assert.ok(investPanelSource.includes('· available {riverSiteKnowledgeScore(s,domain,session.experienceMode)}'),'Teaching-site choices must show available knowledge');
 assert.ok(investPanelSource.includes("' · team '+(s.teamCapability[domain]||0)"),'Receiving-site choices must show current team capability');
+assert.ok(investPanelSource.includes("selectedId==='knowledge-transfer'?<div className=\"space-y-2\">"),'Knowledge Transfer must use its dedicated stacked control layout');
+assert.ok(investPanelSource.indexOf('>Domain<select')<investPanelSource.indexOf('>Teaching site<select'),'Knowledge Transfer must place Domain above Teaching Site');
+assert.ok(investPanelSource.includes('grid grid-cols-2 gap-2'),'Teaching and Receiving Site controls must share the full row');
+assert.ok(investPanelSource.includes("selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${riverTargetBefore} → ${Math.max(riverTargetBefore,riverTargetAfter)}`:'Choose a receiving site'"),'Knowledge Transfer outcome must describe only the receiving-site change');
 assert.equal(investPanelSource.includes('embedded/>'),false,'Disruption card must not remain embedded in the investment chooser');
 const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
 for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
