@@ -150,7 +150,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
        </aside>
      </div>
      <div className="flex shrink-0 items-start gap-3">
-       <div className="w-[218px] shrink-0"><DisruptionMiniCard company={company} wide/></div>
+       <div className="w-[240px] shrink-0"><DisruptionMiniCard company={company} wide/></div>
        <section className="min-w-0 flex-1 rounded-2xl border border-slate-600 bg-slate-900/95 p-3">
          <div className="flex items-center justify-between gap-3"><div><div className="text-[10px] font-black uppercase tracking-[.16em] text-indigo-300">Selected investment</div><h3 className="text-lg font-black text-white">{selected.title}</h3></div><div className="text-sm font-black text-amber-300">{formatCurrency(totalCost)} · 1 Action</div></div>
          <div className="mt-2 flex items-end gap-3">
