@@ -6,13 +6,16 @@ import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 
 const DomainLine:React.FC<{domain:KnowledgeDomain;difficulty:number}>=({domain,difficulty})=><div className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2"><div className="flex items-center gap-2 min-w-0"><span className="h-3 w-3 rounded-full shrink-0" style={{backgroundColor:DOMAIN_INFO[domain].color}}/><b className="text-xs text-white truncate">{DOMAIN_INFO[domain].label}</b></div><span className="text-lg font-black text-white">{difficulty}</span></div>;
 
-export const DisruptionMiniCard:React.FC<{company:CompanyV2;aboveOverlay?:boolean}>=({company,aboveOverlay=false})=>{
+export const DisruptionMiniCard:React.FC<{company:CompanyV2;aboveOverlay?:boolean;embedded?:boolean}>=({company,aboveOverlay=false,embedded=false})=>{
  const card=company.disruptionCard;
  if(!card)return null;
- return <div className={`absolute left-4 bottom-[76px] ${aboveOverlay?'z-[38]':'z-[24]'} w-[132px] h-[168px] rounded-[15px] border-[4px] border-amber-300 bg-[#171109] p-2.5 shadow-[0_12px_24px_rgba(0,0,0,.55)] pointer-events-auto`} aria-label="Known disruption card">
-  <div className="text-[10px] font-black tracking-[.15em] text-amber-200">DISRUPTION</div>
-  <div className="mt-1 text-[10px] font-black leading-tight text-white">{card.siteName}</div>
-  <div className="mt-2 space-y-1.5">{card.domains.map(req=><div key={req.domain} className="rounded-md border border-amber-900/70 bg-black/25 p-1.5"><div className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{backgroundColor:DOMAIN_INFO[req.domain].color}}/><span className="text-[9px] font-black text-slate-200">{DOMAIN_INFO[req.domain].label}</span></div><div className="mt-0.5 text-right text-lg leading-none font-black text-amber-100">{req.difficulty}</div></div>)}</div>
+ const shell=embedded
+  ?'relative w-[108px] min-h-[142px] rounded-[13px] border-[3px] border-amber-300 bg-[#171109] p-2 shadow-[0_8px_18px_rgba(0,0,0,.45)] pointer-events-auto'
+  :`absolute left-4 bottom-[76px] ${aboveOverlay?'z-[38]':'z-[24]'} w-[132px] min-h-[176px] rounded-[15px] border-[4px] border-amber-300 bg-[#171109] p-2.5 shadow-[0_12px_24px_rgba(0,0,0,.55)] pointer-events-auto`;
+ return <div className={shell} aria-label="Known disruption card">
+  <div className={`${embedded?'text-[8px]':'text-[10px]'} font-black tracking-[.15em] text-amber-200`}>DISRUPTION</div>
+  <div className={`mt-1 ${embedded?'text-[8px]':'text-[10px]'} font-black leading-tight text-white`}>{card.siteName}</div>
+  <div className={`${embedded?'mt-1.5 space-y-1':'mt-2 space-y-1.5'}`}>{card.domains.map(req=><div key={req.domain} className={`rounded-md border border-amber-900/70 bg-black/25 ${embedded?'min-h-[39px] px-1.5 py-1':'min-h-[44px] p-1.5'}`}><div className="flex items-start gap-1"><span className="mt-0.5 h-2 w-2 shrink-0 rounded-full" style={{backgroundColor:DOMAIN_INFO[req.domain].color}}/><span className={`min-w-0 flex-1 break-words font-black leading-[1.05] text-slate-200 ${embedded?'text-[7px]':'text-[9px]'}`}>{DOMAIN_INFO[req.domain].label}</span></div><div className={`${embedded?'mt-0 text-sm':'mt-0.5 text-lg'} text-right leading-none font-black text-amber-100`}>{req.difficulty}</div></div>)}</div>
  </div>;
 };
 
