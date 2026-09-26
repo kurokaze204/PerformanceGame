@@ -14,6 +14,7 @@ interface Props{
  highlightHQ?:boolean;
  highlightAllSites?:boolean;
  highlightDomain?:boolean;
+ showSiteLabels?:boolean;
 }
 
 const NEWBIE:KnowledgeDomain[]=['engineering','hr','marketing','operations'];
@@ -21,7 +22,7 @@ const EXPERT:KnowledgeDomain[]=[...NEWBIE,'finance'];
 const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW'};
 const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false})=>{
  const domains=mode==='expert'?EXPERT:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
  const experts=company.experts.filter(expert=>!expert.isVacant);
@@ -53,13 +54,16 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
     return <g key={item.domain}>
      <text x={x(di)} y={H-12} textAnchor="middle" fill={domainSelected?'#fde047':'#cbd5e1'} fontSize="13" fontWeight={domainSelected?'900':'700'}>{DOMAIN_INFO[item.domain].label}</text>
      {item.scores.map(({site,score},si)=>{
-       const jitter=(si-(item.scores.length-1)/2)*7,px=x(di)+jitter;
+       const spread=showSiteLabels&&domainSelected?18:7;
+       const jitter=(si-(item.scores.length-1)/2)*spread,px=x(di)+jitter;
        const target=domainSelected&&(site.id===selectedSiteId||highlightAllSites);
        const source=domainSelected&&site.id===sourceSiteId;
+       const labelVisible=domainSelected&&(showSiteLabels||target||source);
+       const labelY=y(score)+(si%2===0?-10:15);
        return <g key={site.id}>
         {(target||source)&&<circle cx={px} cy={y(score)} r="12" fill={source?'#10b981':'#facc15'} fillOpacity=".15" stroke={source?'#34d399':'#fde047'} strokeWidth="3"/>}
         <circle cx={px} cy={y(score)} r={target||source?5.5:4} fill="#f8fafc" stroke={source?'#34d399':target?'#fde047':'#0f172a'} strokeWidth={target||source?2.5:1.5}/>
-        {(target||source)&&<text x={px+8} y={y(score)-9} fill={source?'#6ee7b7':'#fde047'} fontSize="10" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">{ABBR[site.id]||site.name.slice(0,3).toUpperCase()} · {score}</text>}
+        {labelVisible&&<text x={px} y={labelY} textAnchor="middle" fill={source?'#6ee7b7':target?'#fde047':'#e2e8f0'} fontSize="9" fontWeight={target||source?'900':'700'} paintOrder="stroke" stroke="#020617" strokeWidth="3">{showSiteLabels?`${site.name} · ${score}`:`${ABBR[site.id]||site.name.slice(0,3).toUpperCase()} · ${score}`}</text>}
        </g>
      })}
      {(()=>{
