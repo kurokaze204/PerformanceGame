@@ -38,12 +38,12 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const southPath=data.map((item,index)=>`${index?'L':'M'} ${x(index)} ${y(item.south)}`).join(' ');
  const fill=`${northPath} ${[...data].reverse().map((item,reverseIndex)=>`L ${x(data.length-1-reverseIndex)} ${y(item.south)}`).join(' ')} Z`;
  const domainIndex=domains.indexOf(selectedDomain);
- return <div className="h-full min-h-[360px] rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-inner">
+ return <div className="h-full min-h-[260px] rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-inner">
   <div className="flex items-center justify-between gap-3 px-1">
    <div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>
    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span>● Site</span><span className="text-sky-300">◆ HQ</span><span className="text-amber-300">● Expert</span></div>
   </div>
-  <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[300px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
+  <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[220px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
    {[0,2,4,6,8].filter(value=>value<=maxY).map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="10">{value}</text></g>)}
    {highlightDomain&&domainIndex>=0&&<rect x={Math.max(padL-42,x(domainIndex)-72)} y={padT-12} width="144" height={H-padT-padB+28} rx="16" fill="#facc15" fillOpacity=".06" stroke="#facc15" strokeOpacity=".38" strokeWidth="2"/>}
    <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>
