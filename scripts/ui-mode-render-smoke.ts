@@ -54,6 +54,8 @@ assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),fals
 const disruptionCardSource=readFileSync(new URL('../src/components/DisruptionCardV1.tsx',import.meta.url),'utf8');
 assert.ok(disruptionCardSource.includes('wide?:boolean'),'Disruption mini card must support the wide Invest layout');
 assert.ok(disruptionCardSource.includes("min-h-[54px]"),'Wide Disruption domain rows must reserve space for long labels such as Human Resources');
+assert.ok(disruptionCardSource.includes("w-[240px]"),'Wide Disruption card must reserve enough width for full domain names');
+assert.ok(disruptionCardSource.includes("[overflow-wrap:normal]"),'Disruption domain names must not split inside words');
 assert.ok(appBoardSource.includes("companyRoundPhase!=='investment'"),'Board-level Disruption card must be suppressed during Invest to avoid duplication');
 
 const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
@@ -65,6 +67,9 @@ assert.ok(investPanelSource.includes('<DisruptionMiniCard company={company} wide
 assert.ok(investPanelSource.includes('bottom-[72px]'),'Invest workspace must clear the phase track');
 assert.ok(investPanelSource.includes('grid-cols-[minmax(0,1fr)_300px]'),'River and investment choices must share a stable top-row layout');
 assert.equal(investPanelSource.includes('overflow-y-auto'),false,'Core Invest workspace must not introduce internal scrollbars');
+assert.ok(investPanelSource.includes("showSiteLabels={selectedId==='knowledge-transfer'}"),'Knowledge Transfer must label all site values on the River');
+assert.ok(investPanelSource.includes('· available {riverSiteKnowledgeScore(s,domain,session.experienceMode)}'),'Teaching-site choices must show available knowledge');
+assert.ok(investPanelSource.includes("' · team '+(s.teamCapability[domain]||0)"),'Receiving-site choices must show current team capability');
 assert.equal(investPanelSource.includes('embedded/>'),false,'Disruption card must not remain embedded in the investment chooser');
 const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
 for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
