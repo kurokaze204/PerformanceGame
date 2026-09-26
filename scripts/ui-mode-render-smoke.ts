@@ -63,4 +63,9 @@ assert.ok(investPanelSource.includes('Choose an investment'),'Invest must keep i
 const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
 for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
 
+const eventDeckSource=readFileSync(new URL('../src/components/EventDeckV1.tsx',import.meta.url),'utf8');
+assert.ok(eventDeckSource.includes("const lastSharedOpenIdRef=useRef('')"),'Event deck must remember the last shared-open Event id');
+assert.ok(eventDeckSource.includes("if(lastSharedOpenIdRef.current===nextSharedId)return"),'Closing an Event must not reopen the same shared Event');
+assert.equal(eventDeckSource.includes("},[shared?.event.instanceId,cardOpen,activeIndex]);"),false,'Shared Event synchronisation must not re-fire merely because the local card was closed');
+
 console.log('Mode-aware UI render smoke tests passed.');
