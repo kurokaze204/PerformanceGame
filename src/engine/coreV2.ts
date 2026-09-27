@@ -108,13 +108,18 @@ function targetSiteForCard(company: CompanyV2, card: EventCard): Site | undefine
   return active[Math.floor(Math.random() * active.length)];
 }
 
-export function drawRoundEventsV2(sessionInput: GameSession, companyInput: Company): ActiveEventV2[] {
+export function drawRoundEventsV2(
+  sessionInput: GameSession,
+  companyInput: Company,
+  options: { count?: number; excludedCardIds?: Iterable<string> } = {},
+): ActiveEventV2[] {
   const session = asSessionV2(sessionInput);
   const company = asCompanyV2(companyInput);
-  const excluded = new Set<string>();
+  const excluded = new Set<string>(options.excludedCardIds ?? []);
   const events: ActiveEventV2[] = [];
+  const count = Math.max(0, Math.floor(options.count ?? session.config.events_per_round));
 
-  for (let i = 0; i < session.config.events_per_round; i++) {
+  for (let i = 0; i < count; i++) {
     const type = chooseEventType(session, company);
     const card = chooseCard(type, excluded, session.companies.length > 1);
     excluded.add(card.id);

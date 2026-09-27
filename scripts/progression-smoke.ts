@@ -4,6 +4,8 @@ import { DEFAULT_CONFIG } from '../src/engine/config.ts';
 import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import { PROGRAMMED_FAILURE_TAG, capProgressedEventImpact, diversifyInitialKnowledge, progressEventCard } from '../src/engine/eventProgressionV5.ts';
 import { createNewSessionV2, resolveEventV2 } from '../src/server/gameServiceV3.ts';
+import { delayEventV2 } from '../src/server/gameServiceV5.ts';
+import { saveSessionV2 } from '../src/server/dbV2.ts';
 import type { EventCard } from '../src/types/game.ts';
 
 assert.equal(DEFAULT_CONFIG.starting_turnover, 875);
@@ -82,5 +84,31 @@ assert.equal(Boolean(tutorialResolution.result?.success),false,'programmed openi
 const resolvedTutorial=(tutorialResolution.session.activeEvents[tutorialCompany.id]||[]).find((event:any)=>event.instanceId===tutorialEvent!.instanceId);
 assert.equal(resolvedTutorial?.isResolved,false,'resolved Event must stay visible until Continue acknowledgement');
 assert.equal(Boolean((resolvedTutorial as any)?.uiResolutionData),true,'shared resolution data must be retained for the visible result screen');
+
+// Horizon Scan regression: delaying an Event must defer that specific card, not
+// reduce the number of Events the player still has to navigate this round.
+const delaySession=await createNewSessionV2('HORIZON-DELAY-REPLACEMENT','Horizon Delay Replacement',['Alpha'],{experienceMode:'newbie',gameDurationMinutes:45});
+const delayCompany=delaySession.companies[0];
+const delayEvents=delaySession.activeEvents[delayCompany.id]||[];
+assert.ok(delayEvents.length>=2,'Newbie round should have at least two Events for delay replacement regression');
+const delayedCandidate=delayEvents.find(event=>!event.card.tags?.includes(PROGRAMMED_FAILURE_TAG))||delayEvents[delayEvents.length-1];
+const originalCount=delayEvents.length;
+const originalIds=new Set(delayEvents.map(event=>event.instanceId));
+const drawnBefore=delayCompany.eventsDrawnCount;
+delayCompany.horizonScanDomain='operations';
+delayCompany.horizonScanAvailableRound=delaySession.round;
+delayCompany.horizonScanUsedThisRound=false;
+await saveSessionV2(delaySession);
+const delayResult:any=await delayEventV2(delaySession.id,delayCompany.id,delayedCandidate.instanceId);
+assert.equal(delayResult.success,true,'eligible Horizon Scan Event should delay successfully');
+const afterDelay=delayResult.session.activeEvents[delayCompany.id]||[];
+assert.equal(afterDelay.length,originalCount,'delaying an Event must immediately draw a replacement so current-round Event count is unchanged');
+assert.equal(afterDelay.some((event:any)=>event.instanceId===delayedCandidate.instanceId),false,'the delayed Event must leave the current-round deck');
+assert.equal(delayResult.session.companies[0].delayedEvent?.instanceId,delayedCandidate.instanceId,'the selected Event must be stored for next round');
+const fresh=afterDelay.find((event:any)=>!originalIds.has(event.instanceId));
+assert.ok(fresh,'a genuinely new replacement Event must be drawn');
+assert.notEqual(fresh?.card.id,delayedCandidate.card.id,'replacement must not simply redraw the delayed card');
+assert.equal(delayResult.session.companies[0].eventsDrawnCount,drawnBefore+1,'replacement must count as a newly drawn Event');
+assert.equal(delayResult.session.companies[0].horizonScanUsedThisRound,true,'delay must consume the Horizon Scan');
 
 console.log('Progression V5 smoke tests passed.');
