@@ -1,7 +1,7 @@
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, DisruptionAssignmentV1, GameSessionV2 } from '../types/gameV2.ts';
 import { FINAL_DISRUPTION_CARDS } from './cards.ts';
-import { copMembershipActiveV4 } from './investmentActionsV4.ts';
+import { copMembershipActiveV4, copPeerKnowledgeScoreV4 } from './investmentActionsV4.ts';
 import { calculateUsableIntranetV2 } from './coreV2.ts';
 import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 
@@ -144,7 +144,7 @@ function peerOrganisationalKnowledge(session:GameSessionV2,company:CompanyV2,dom
   const preferred=preferredCompanyId?session.companies.find(peer=>peer.id===preferredCompanyId&&peer.id!==company.id):undefined;
   if(preferred)return{score:scoreFor(preferred),sourceCompanyName:preferred.name};
   const peers=session.companies.filter(peer=>peer.id!==company.id);
-  if(!peers.length)return{score:0};
+  if(!peers.length)return{score:copPeerKnowledgeScoreV4(session,company,domain),sourceCompanyName:'External Community of Practice'};
   const ranked=peers.map(peer=>({peer,score:scoreFor(peer)})).sort((a,b)=>b.score-a.score);
   return{score:ranked[0]?.score||0,sourceCompanyName:ranked[0]?.peer.name};
 }
