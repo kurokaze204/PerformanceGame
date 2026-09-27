@@ -48,14 +48,18 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span>● Site</span><span className="text-sky-300">◆ HQ</span><span className="text-amber-300">● Expert</span></div>
   </div>
   <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[220px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
-   {[0,2,4,6,8].filter(value=>value<=maxY).map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="10">{value}</text></g>)}
+   {[0,2,4,6,8].filter(value=>value<=maxY).map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
    {highlightDomain&&domainIndex>=0&&<rect x={Math.max(padL-42,x(domainIndex)-72)} y={padT-12} width="144" height={H-padT-padB+28} rx="16" fill="#facc15" fillOpacity=".06" stroke="#facc15" strokeOpacity=".38" strokeWidth="2"/>}
    <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>
    {data.map((item,di)=>{
     const domainExperts=expertMarks.filter(mark=>mark.domain===item.domain);
     const domainSelected=item.domain===selectedDomain;
+    const siteSpread=showSiteLabels&&domainSelected?18:9;
+    const sitePoints=item.scores.map(({score},si)=>({px:clamp(x(di)+(si-(item.scores.length-1)/2)*siteSpread,padL+6,W-padR-6),py:y(score)}));
+    const expertPoints=domainExperts.map((mark,ei)=>({px:clamp(x(di)+(ei-(domainExperts.length-1)/2)*54,padL+26,W-padR-26),py:y(mark.score)}));
+    const labelYs=spreadLabelYs([...sitePoints.map(point=>point.py-10),...expertPoints.map(point=>point.py-4)]);
     return <g key={item.domain}>
-     <text x={x(di)} y={H-12} textAnchor="middle" fill={domainSelected?'#fde047':'#cbd5e1'} fontSize="13" fontWeight={domainSelected?'900':'700'}>{DOMAIN_INFO[item.domain].label}</text>
+     <text x={x(di)} y={H-12} textAnchor="middle" fill={domainSelected?'#fde047':'#cbd5e1'} fontSize="15" fontWeight={domainSelected?'900':'800'}>{DOMAIN_INFO[item.domain].label}</text>
      {item.scores.map(({site,score},si)=>{
        const spread=showSiteLabels&&domainSelected?18:7;
        const jitter=(si-(item.scores.length-1)/2)*spread,px=x(di)+jitter;
