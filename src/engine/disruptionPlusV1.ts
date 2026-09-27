@@ -2,6 +2,8 @@ import type { KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, DisruptionAssignmentV1, GameSessionV2 } from '../types/gameV2.ts';
 import { FINAL_DISRUPTION_CARDS } from './cards.ts';
 import { copMembershipActiveV4 } from './investmentActionsV4.ts';
+import { calculateUsableIntranetV2 } from './coreV2.ts';
+import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 
 const DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations','finance'];
 const NEWBIE_DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations'];
@@ -156,20 +158,44 @@ export function evaluateFinalDisruptionV1(session:GameSessionV2,company:CompanyV
   const site=company.sites.find(candidate=>candidate.id===card.siteId);
   const domainResults=card.domains.map(requirement=>{
     const domain=requirement.domain;
-    const local=site&&!site.isClosed?(site.teamCapability[domain]||0):0;
-    const corporate=company.intranet[domain]||0;
+    const team=site&&!site.isClosed?(site.teamCapability[domain]||0):0;
     const localCodified=session.experienceMode==='expert'&&site&&!site.isClosed?(site.codifiedKnowledge[domain]||0):0;
+    const siteKnowledge=session.experienceMode==='expert'?Math.max(team,localCodified):team;
     const selectedExpertId=selections[domain]?.expertId;
     const expert=selectedExpertId?company.experts.find(candidate=>!candidate.isVacant&&candidate.id===selectedExpertId&&candidate.domains.some(skill=>skill.domain===domain)):undefined;
     const expertScore=expert?.domains.find(skill=>skill.domain===domain)?.score||0;
+    const corporateRaw=company.intranet[domain]||0;
+    const corporate=site&&!site.isClosed
+      ?calculateUsableIntranetV2(company,site,domain,session.config,Boolean(expert))
+      :(expert?corporateRaw:0);
+    const composed=composeKnowledgeSources([siteKnowledge,corporate,expertScore]);
     const copActive=copMembershipActiveV4(session,company.id,domain);
     const peer=copActive?peerOrganisationalKnowledge(session,company,domain,card.previousCompanyId):{score:0,sourceCompanyName:undefined};
-    const totalKnowledge=local+corporate+localCodified+expertScore+peer.score;
+    const copBonus=copActive&&peer.score>0?Math.min(2,session.config.cop_support_bonus):0;
+    const totalKnowledge=composed.total+copBonus;
     const gap=Math.max(0,requirement.difficulty-totalKnowledge);
     return{
-      domain,difficulty:requirement.difficulty,siteId:card.siteId,siteName:card.siteName,
-      local,corporate,localCodified,expertId:expert?.id,expertName:expert?.name,expertScore,
-      copScore:peer.score,copSourceCompanyName:peer.sourceCompanyName,totalKnowledge,gap,
+      domain,
+      difficulty:requirement.difficulty,
+      siteId:card.siteId,
+      siteName:card.siteName,
+      local:siteKnowledge,
+      team,
+      localCodified,
+      corporate,
+      corporateRaw,
+      expertId:expert?.id,
+      expertName:expert?.name,
+      expertScore,
+      expertTranslator:Boolean(expert),
+      depthKnowledge:composed.depth,
+      breadthBonus:composed.breadth,
+      sourceCount:composed.sourceCount,
+      copScore:copBonus,
+      copPeerKnowledge:peer.score,
+      copSourceCompanyName:peer.sourceCompanyName,
+      totalKnowledge,
+      gap,
     };
   });
   const required=domainResults.reduce((sum,result)=>sum+result.difficulty,0);
