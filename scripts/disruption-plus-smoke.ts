@@ -43,6 +43,11 @@ assert.equal(firstResult.expertScore,6);
 assert.equal(firstResult.depthKnowledge,6,'the strongest source should set disruption depth');
 assert.equal(firstResult.breadthBonus,1,'the second independent source should add one breadth point');
 assert.equal(firstResult.totalKnowledge,7,'local 5 plus expert 6 should compose as depth 6 + breadth 1, not 11');
+session.copMemberships.push({companyId:company.id,domain:first.domain,expertId:expert.id,activeRound:session.round+2});
+const withCop=evaluateFinalDisruptionV1(session,company,{[first.domain]:{expertId:expert.id}})!;
+const withCopResult=withCop.domainResults.find(result=>result.domain===first.domain)!;
+assert.equal(withCopResult.copScore,2,'an active CoP may add up to two breadth points');
+assert.equal(withCopResult.totalKnowledge,9,'CoP support must add two points on top of depth and breadth, not another full peer score');
 
 const beforeA=company.disruptionCard!.id;
 const peer=session.companies[1];
