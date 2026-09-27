@@ -1,9 +1,9 @@
 import React,{useMemo,useState}from'react';
-import{BookOpen,BriefcaseBusiness,CheckCircle2,XCircle}from'lucide-react';
+import{BookOpen,BriefcaseBusiness,Check,CheckCircle2,XCircle}from'lucide-react';
 import type{KnowledgeDomain}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
-import{evaluateFinalDisruptionV1,type FinalDisruptionSelectionsV1}from'../engine/disruptionPlusV1.ts';
+import{evaluateFinalDisruptionV1,finalDisruptionChanceV1,type FinalDisruptionSelectionsV1}from'../engine/disruptionPlusV1.ts';
 import{formatCurrency}from'../utils/format.ts';
 
 interface Props{session:GameSessionV2;company:CompanyV2;onResolveFinalDisruption:()=>Promise<void>|void;onOpenAAR:()=>void;}
@@ -14,12 +14,14 @@ export const FinalDisruptionModalV2:React.FC<Props>=({session,company,onOpenAAR}
  const card=company.disruptionCard;
  const stored=((session as any).finalDisruptionResults||[]) as any[];
  const companyResult=stored.find(result=>result.companyId===company.id);
- const[selections,setSelections]=useState<FinalDisruptionSelectionsV1>({});
+ const[selections,setSelections]=useState<FinalDisruptionSelectionsV1>(()=>Object.fromEntries((card?.domains||[]).map(req=>{const experts=company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>skill.domain===req.domain));const best=[...experts].sort((a,b)=>(b.domains.find(skill=>skill.domain===req.domain)?.score||0)-(a.domains.find(skill=>skill.domain===req.domain)?.score||0))[0];return[req.domain,{expertId:best?.id}]})));
  const[useConsultant,setUseConsultant]=useState(false);
  const[busy,setBusy]=useState(false);
  const[message,setMessage]=useState('');
  const evaluation=useMemo(()=>evaluateFinalDisruptionV1(session,company,selections),[session,company,selections]);
  if(!card||!evaluation)return null;
+ const chanceWithoutConsultant=finalDisruptionChanceV1(evaluation.gap);
+ const knowledgeComplete=evaluation.gap===0;
  const resolved=Boolean(companyResult);
  const expertsFor=(domain:KnowledgeDomain)=>company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>skill.domain===domain));
  const chooseExpert=(domain:KnowledgeDomain,expertId:string)=>setSelections(current=>({...current,[domain]:{expertId:expertId||undefined}}));
@@ -52,16 +54,17 @@ export const FinalDisruptionModalV2:React.FC<Props>=({session,company,onOpenAAR}
       const experts=expertsFor(result.domain);
       const selected=selections[result.domain]?.expertId||'';
       const enough=result.totalKnowledge>=result.difficulty;
-      return <div key={result.domain} className={'rounded-2xl border-2 p-4 '+(enough?'border-emerald-700 bg-emerald-950/20':'border-slate-700 bg-slate-900')}>
+      return <div key={result.domain} className="rounded-2xl border-2 bg-[#0b0d12] p-4" style={{borderColor:DOMAIN_INFO[result.domain].color,boxShadow:`inset 0 0 0 1px ${DOMAIN_INFO[result.domain].color}22`}}>
        <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:DOMAIN_INFO[result.domain].color}}/><b className="text-base text-white">{DOMAIN_INFO[result.domain].label}</b></div><div className={'text-3xl font-black '+(enough?'text-emerald-300':'text-white')}>{result.totalKnowledge}<span className="text-slate-600">/</span>{result.difficulty}</div></div>
-       <div className={'mt-3 grid gap-1.5 '+(session.experienceMode==='expert'?'grid-cols-5':'grid-cols-4')}><ScoreChip label="Local" value={result.local}/><ScoreChip label="Corporate" value={result.corporate}/>{session.experienceMode==='expert'&&<ScoreChip label="Codified" value={result.localCodified}/>}<ScoreChip label="Expert" value={result.expertScore}/><ScoreChip label="CoP" value={result.copScore} muted={!result.copScore}/></div>
-       <label className="mt-3 block text-[9px] uppercase tracking-wide text-slate-500 font-black">Expert<select value={selected} onChange={event=>chooseExpert(result.domain,event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm normal-case text-white"><option value="">No expert</option>{experts.map(expert=>{const score=expert.domains.find(skill=>skill.domain===result.domain)?.score||0;return <option key={expert.id} value={expert.id}>{expert.name} · +{score}</option>})}</select></label>
+       <div className="mt-3 grid grid-cols-4 gap-1.5"><ScoreChip label="Site" value={result.local}/><ScoreChip label="Corporate" value={result.corporate}/><ScoreChip label="Expert" value={result.expertScore}/><ScoreChip label="CoP breadth" value={result.copScore} muted={!result.copScore}/></div><div className="mt-2 text-[10px] text-slate-400">Depth {result.depthKnowledge} + breadth {result.breadthBonus}{result.copScore?` + CoP ${result.copScore}`:''} = {result.totalKnowledge}</div>
+       <label className="mt-3 block text-[9px] uppercase tracking-wide text-slate-500 font-black">Expert translator<select value={selected} onChange={event=>chooseExpert(result.domain,event.target.value)} disabled={!experts.length} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm normal-case text-white disabled:opacity-50">{!experts.length&&<option value="">No relevant expert available</option>}{experts.map(expert=>{const score=expert.domains.find(skill=>skill.domain===result.domain)?.score||0;return <option key={expert.id} value={expert.id}>{expert.name} · knowledge {score}</option>})}</select></label>
        {result.copScore>0&&<div className="mt-2 text-[10px] text-emerald-300">CoP access: +{result.copScore}{result.copSourceCompanyName?' from '+result.copSourceCompanyName:''}</div>}
       </div>})}</div>
-     <button type="button" onClick={()=>setUseConsultant(value=>!value)} disabled={evaluation.gap===0} className={'w-full rounded-2xl border-2 p-4 text-left disabled:opacity-40 '+(useConsultant?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-900')}>
-      <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><BriefcaseBusiness className="h-6 w-6 text-amber-300"/><div><div className="text-sm font-black text-white">Emergency Consultant</div><div className="text-[11px] text-slate-400">{evaluation.gap===0?'No knowledge gap to fill.':'Fills every remaining knowledge gap.'}</div></div></div><div className="text-right"><div className="text-2xl font-black text-amber-200">{formatCurrency(evaluation.consultantCost)}</div><div className="text-[10px] text-slate-400">{evaluation.consultantPercent.toFixed(0)}% of company turnover</div></div></div>
+     <button type="button" aria-pressed={useConsultant} onClick={()=>setUseConsultant(value=>!value)} disabled={knowledgeComplete} className={'w-full rounded-2xl border-2 p-4 text-left disabled:opacity-40 '+(useConsultant?'border-amber-300 bg-amber-950/35':'border-amber-800 bg-[#171109]')}>
+      <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><span aria-hidden="true" className={'grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 '+(useConsultant?'border-amber-200 bg-amber-300 text-slate-950':'border-slate-500 bg-slate-950')}>{useConsultant&&<Check className="h-4 w-4" strokeWidth={4}/>}</span><BriefcaseBusiness className="h-6 w-6 text-amber-300"/><div><div className="text-sm font-black text-white">Emergency Consultant</div><div className="text-[11px] text-slate-400">{knowledgeComplete?'No knowledge gap to fill.':'Fills every remaining knowledge gap.'}</div></div></div><div className="text-right"><div className="text-2xl font-black text-amber-200">{formatCurrency(evaluation.consultantCost)}</div><div className="text-[10px] text-slate-400">{evaluation.consultantPercent.toFixed(0)}% of company turnover</div></div></div>
      </button>
-     <button onClick={resolve} disabled={busy} className="tpg-action tpg-action-primary w-full !h-14 !text-base disabled:opacity-50">{busy?'RESOLVING…':useConsultant?'HIRE CONSULTANT & RESOLVE':'RESOLVE DISRUPTION'}</button>
+     {!knowledgeComplete&&<div className={'rounded-xl border px-4 py-2 text-center text-sm font-black '+(useConsultant?'border-emerald-700 bg-emerald-950/25 text-emerald-300':'border-violet-800 bg-violet-950/25 text-violet-200')}>{useConsultant?'Consultant fills the gap · 100% chance to resolve':`Chance without external help: ${chanceWithoutConsultant}%`}</div>}
+     <button onClick={resolve} disabled={busy} className="tpg-action tpg-action-primary w-full !h-14 !text-base disabled:opacity-50">{busy?'RESOLVING…':useConsultant||knowledgeComplete?'RESOLVE DISRUPTION':'TRY YOUR LUCK WITHOUT EXTERNAL HELP'}</button>
      {message&&<div className="text-center text-xs font-bold text-amber-200">{message}</div>}
     </section>
    </div>:<div className="mt-8 mx-auto max-w-2xl">

@@ -43,7 +43,7 @@ export const RiskRollTrack:React.FC<Props>=({roll,threshold,sides,kind,isSPOF,on
  const squareBase=(n:number)=>{
   if(kind==='expert'){
    if(n===1)return'border-rose-500 bg-rose-600';
-   if(n===2&&spof)return'border-amber-400 bg-amber-500';
+   if(n>=2&&n<=3&&spof)return'border-amber-400 bg-amber-500';
    return'border-sky-700 bg-sky-700';
   }
   if(n<=safeThreshold)return'border-rose-500 bg-rose-600';

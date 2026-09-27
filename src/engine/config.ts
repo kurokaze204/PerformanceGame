@@ -32,9 +32,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   cop_support_bonus: 2,
   automation_bonus: 2,
 
-  spof_gap: 3,
+  spof_gap: 4,
   normal_leave_threshold: 1,
-  spof_leave_threshold: 2,
+  spof_leave_threshold: 3,
 
   normal_intranet_increment: 1,
   hq_expert_intranet_increment: 2,

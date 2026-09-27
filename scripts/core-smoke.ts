@@ -13,6 +13,7 @@ import {
   evaluateEventDomainKnowledgeExplicitV2,
   resolveSingleEventExplicitV2,
 } from '../src/engine/challengeResponseV2.ts';
+import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -34,6 +35,42 @@ function makeSession(mode:'newbie'|'expert'='newbie') {
   } as GameSession);
   session.experienceMode=mode;
   return { session, company };
+}
+
+
+assert.equal(DEFAULT_CONFIG.spof_gap,4,'SPOF must require a four-point depth gap');
+assert.equal(DEFAULT_CONFIG.normal_leave_threshold,1,'ordinary experts only retire on roll 1');
+assert.equal(DEFAULT_CONFIG.spof_leave_threshold,3,'SPOF experts leave on rolls 1-3: retire on 1, resign on 2-3');
+assert.deepEqual({
+  KNOWLEDGE_TRANSFER:INVESTMENT_COSTS_V4.KNOWLEDGE_TRANSFER,
+  SITE_KNOWLEDGE_SHARING:INVESTMENT_COSTS_V4.SITE_KNOWLEDGE_SHARING,
+  CORPORATE_TRAINING:INVESTMENT_COSTS_V4.CORPORATE_TRAINING,
+  CODIFY_SITE:INVESTMENT_COSTS_V4.CODIFY_SITE,
+  TRAIN_EXPERT:INVESTMENT_COSTS_V4.TRAIN_EXPERT,
+  UPDATE_INTRANET:INVESTMENT_COSTS_V4.UPDATE_INTRANET,
+  LESSONS_LEARNED:INVESTMENT_COSTS_V4.LESSONS_LEARNED,
+  JOIN_COP:INVESTMENT_COSTS_V4.JOIN_COP,
+  HORIZON_SCAN:INVESTMENT_COSTS_V4.HORIZON_SCAN,
+  AUTOMATE:INVESTMENT_COSTS_V4.AUTOMATE,
+},{
+  KNOWLEDGE_TRANSFER:18,
+  SITE_KNOWLEDGE_SHARING:5,
+  CORPORATE_TRAINING:60,
+  CODIFY_SITE:20,
+  TRAIN_EXPERT:20,
+  UPDATE_INTRANET:30,
+  LESSONS_LEARNED:20,
+  JOIN_COP:20,
+  HORIZON_SCAN:40,
+  AUTOMATE:80,
+},'investment costs must match the rebalanced economy');
+assert.equal(expertTravelCostV4('melbourne','melbourne'),0,'same-city expert use should not add travel cost');
+for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin']){
+  for(const to of ['melbourne','sydney','brisbane','adelaide','perth','darwin']){
+    const travel=expertTravelCostV4(from,to);
+    assert.ok(travel>=0&&travel<=20,'expert travel must stay between $0k and $20k');
+    assert.equal(travel%5,0,'expert travel must use $5k increments');
+  }
 }
 
 // 1. Planned game has an equal event mix.
@@ -185,6 +222,54 @@ function makeSession(mode:'newbie'|'expert'='newbie') {
   const value=evaluateEventDomainKnowledgeExplicitV2(session,company,event,'finance',session.config);
   assert.equal(value.localCodified,0);
   assert.equal(value.baseKnowledge,0);
+}
+
+
+// 10. Knowledge combines as depth plus breadth, and an expert unlocks the full Intranet.
+{
+  const { session, company } = makeSession('expert');
+  session.phase='respond';
+  const site=company.sites.find(candidate=>!candidate.isClosed)!;
+  const expert=company.experts.find(candidate=>!candidate.isVacant)!;
+  const domain=expert.domains[0].domain;
+  site.teamCapability[domain]=4;
+  site.codifiedKnowledge[domain]=2;
+  company.intranet[domain]=7;
+  expert.domains.find(skill=>skill.domain===domain)!.score=6;
+  const card:EventCard={id:'DEPTH-BREADTH',type:'problem',scope:'local',title:'Depth breadth',description:'Smoke test',domains:[{domain,difficulty:10}],impact:10,tags:['test']};
+  const event:ActiveEvent={instanceId:'DEPTH-BREADTH',card,targetSiteId:site.id,allocations:{[domain]:{useTeamCapability:true,useCorporateIntranet:true}} as any,isResolved:false};
+  const noExpert=evaluateEventDomainKnowledgeExplicitV2(session,company,event,domain,session.config);
+  assert.equal(noExpert.usableIntranet,6,'without an expert, Intranet use must remain limited by absorptive capacity');
+  assert.equal(noExpert.depthKnowledge,6);
+  assert.equal(noExpert.breadthBonus,1);
+  assert.equal(noExpert.totalKnowledge,7);
+
+  (event.allocations as any)[domain].expertId=expert.id;
+  const withExpert=evaluateEventDomainKnowledgeExplicitV2(session,company,event,domain,session.config);
+  assert.equal(withExpert.usableIntranet,7,'a relevant expert acts as translator and unlocks the full Intranet');
+  assert.equal(withExpert.depthKnowledge,7);
+  assert.equal(withExpert.breadthBonus,2);
+  assert.equal(withExpert.totalKnowledge,9,'best source sets depth; site and expert each add breadth');
+}
+
+// 11. AAR creates local, expert and corporate knowledge together without arbitrary score ceilings.
+{
+  const { session, company } = makeSession('newbie');
+  session.phase='investment';
+  company.actionsRemaining=5;
+  const site=company.sites.find(candidate=>!candidate.isClosed)!;
+  const expert=company.experts.find(candidate=>!candidate.isVacant)!;
+  const domain=expert.domains[0].domain;
+  site.teamCapability[domain]=8;
+  expert.domains.find(skill=>skill.domain===domain)!.score=8;
+  company.intranet[domain]=8;
+  const event:ActiveEvent={instanceId:'AAR-LEARNING',card:{id:'AAR-LEARNING',type:'problem',scope:'local',title:'AAR learning',description:'Smoke test',domains:[{domain,difficulty:5}],impact:10,tags:['test']},targetSiteId:site.id,allocations:{[domain]:{}} as any,isResolved:true,success:true};
+  session.activeEvents[company.id]=[event as any];
+  const result=executeInvestmentActionV4(session,company,{type:'LESSONS_LEARNED',companyId:company.id,siteId:site.id,expertId:expert.id,domain,eventInstanceId:event.instanceId});
+  assert.equal(result.success,true);
+  assert.equal(site.teamCapability[domain],9);
+  assert.equal(expert.domains.find(skill=>skill.domain===domain)!.score,9);
+  assert.equal(company.intranet[domain],9);
 }
 
 console.log('Core V2 smoke tests passed.');

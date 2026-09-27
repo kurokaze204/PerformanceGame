@@ -1,10 +1,41 @@
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, DisruptionAssignmentV1, GameSessionV2 } from '../types/gameV2.ts';
 import { FINAL_DISRUPTION_CARDS } from './cards.ts';
-import { copMembershipActiveV4 } from './investmentActionsV4.ts';
+import { copMembershipActiveV4, copPeerKnowledgeScoreV4 } from './investmentActionsV4.ts';
+import { calculateUsableIntranetV2 } from './coreV2.ts';
+import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 
 const DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations','finance'];
 const NEWBIE_DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations'];
+
+const ROUND_MINUTES=[10,9,8,7,6,5,4];
+const MIN_ROUND_MINUTES=3;
+
+export function estimatedDisruptionRoundsForTimedGameV1(session:GameSessionV2):number{
+  const availableMinutes=Math.max(1,(session.gameDurationMinutes||60)-Math.max(0,session.finalWindowMinutes||0));
+  let elapsed=0;
+  for(let round=1;round<=200;round++){
+    elapsed+=round<=ROUND_MINUTES.length?ROUND_MINUTES[round-1]:MIN_ROUND_MINUTES;
+    // The Final Challenge is checked at a round boundary, so if the timer enters
+    // its final window during a round, that round still completes.
+    if(elapsed>=availableMinutes)return Math.max(3,round);
+  }
+  return 200;
+}
+
+export function disruptionStrengthForRoundsV1(rounds:number):{rounds:number;high:number;low:number}{
+  const calibratedRounds=Math.max(1,Math.round(rounds));
+  const high=Math.max(3,Math.round(9.45+0.385*calibratedRounds));
+  return{rounds:calibratedRounds,high,low:Math.max(2,high-1)};
+}
+
+export function disruptionStrengthForSessionV1(session:GameSessionV2){
+  const rounds=session.experienceMode==='expert'&&session.gameEndMode==='rounds'
+    ?Math.max(1,session.finalRoundCount||1)
+    :estimatedDisruptionRoundsForTimedGameV1(session);
+  return disruptionStrengthForRoundsV1(rounds);
+}
+
 
 function hash(text:string):number{
   let value=0;
@@ -65,6 +96,7 @@ function disruptionImpact(requirements:{difficulty:number}[]):number{
 
 export function dealCompanyDisruptionsV1(session:GameSessionV2):void{
   const strategic=strategicDomainsForSession(session);
+  const strength=disruptionStrengthForSessionV1(session);
 
   const pairs:[[KnowledgeDomain,KnowledgeDomain],[KnowledgeDomain,KnowledgeDomain],[KnowledgeDomain,KnowledgeDomain]]=[
     [strategic[0],strategic[1]],
@@ -81,7 +113,7 @@ export function dealCompanyDisruptionsV1(session:GameSessionV2):void{
     const site=company.sites.find(candidate=>candidate.id===siteId&&!candidate.isClosed)||company.sites.find(candidate=>!candidate.isClosed)||company.sites[0];
     const template=FINAL_DISRUPTION_CARDS[(hash(`${session.id}:template`)+index)%FINAL_DISRUPTION_CARDS.length]||FINAL_DISRUPTION_CARDS[0];
     const domains=pairs[(pairStart+index)%pairs.length];
-    const requirements=domains.map((domain,i)=>({domain,difficulty:i===0?9:8}));
+    const requirements=domains.map((domain,i)=>({domain,difficulty:i===0?strength.high:strength.low}));
     company.disruptionCard={
       id:`${template.id}-${company.id}`,
       title:template.title,
@@ -95,6 +127,18 @@ export function dealCompanyDisruptionsV1(session:GameSessionV2):void{
     };
     company.disruptionSwapNotice=null;
   });
+}
+
+export function refreshCompanyDisruptionStrengthV1(session:GameSessionV2):void{
+  const strength=disruptionStrengthForSessionV1(session);
+  for(const company of session.companies){
+    if(!company.disruptionCard)continue;
+    company.disruptionCard.domains=company.disruptionCard.domains.map((requirement,index)=>({
+      ...requirement,
+      difficulty:index===0?strength.high:strength.low,
+    }));
+    company.disruptionCard.impact=disruptionImpact(company.disruptionCard.domains);
+  }
 }
 
 function supportsCard(company:CompanyV2,card:DisruptionAssignmentV1):boolean{
@@ -142,9 +186,13 @@ function peerOrganisationalKnowledge(session:GameSessionV2,company:CompanyV2,dom
   const preferred=preferredCompanyId?session.companies.find(peer=>peer.id===preferredCompanyId&&peer.id!==company.id):undefined;
   if(preferred)return{score:scoreFor(preferred),sourceCompanyName:preferred.name};
   const peers=session.companies.filter(peer=>peer.id!==company.id);
-  if(!peers.length)return{score:0};
+  if(!peers.length)return{score:copPeerKnowledgeScoreV4(session,company,domain),sourceCompanyName:'External Community of Practice'};
   const ranked=peers.map(peer=>({peer,score:scoreFor(peer)})).sort((a,b)=>b.score-a.score);
   return{score:ranked[0]?.score||0,sourceCompanyName:ranked[0]?.peer.name};
+}
+
+export function finalDisruptionChanceV1(missingPoints:number):number{
+  return Math.max(0,Math.min(100,100-23*Math.max(0,Math.floor(missingPoints))));
 }
 
 export interface FinalDisruptionSelectionV1{expertId?:string}
@@ -156,20 +204,44 @@ export function evaluateFinalDisruptionV1(session:GameSessionV2,company:CompanyV
   const site=company.sites.find(candidate=>candidate.id===card.siteId);
   const domainResults=card.domains.map(requirement=>{
     const domain=requirement.domain;
-    const local=site&&!site.isClosed?(site.teamCapability[domain]||0):0;
-    const corporate=company.intranet[domain]||0;
+    const team=site&&!site.isClosed?(site.teamCapability[domain]||0):0;
     const localCodified=session.experienceMode==='expert'&&site&&!site.isClosed?(site.codifiedKnowledge[domain]||0):0;
+    const siteKnowledge=session.experienceMode==='expert'?Math.max(team,localCodified):team;
     const selectedExpertId=selections[domain]?.expertId;
     const expert=selectedExpertId?company.experts.find(candidate=>!candidate.isVacant&&candidate.id===selectedExpertId&&candidate.domains.some(skill=>skill.domain===domain)):undefined;
     const expertScore=expert?.domains.find(skill=>skill.domain===domain)?.score||0;
+    const corporateRaw=company.intranet[domain]||0;
+    const corporate=site&&!site.isClosed
+      ?calculateUsableIntranetV2(company,site,domain,session.config,Boolean(expert))
+      :(expert?corporateRaw:0);
+    const composed=composeKnowledgeSources([siteKnowledge,corporate,expertScore]);
     const copActive=copMembershipActiveV4(session,company.id,domain);
     const peer=copActive?peerOrganisationalKnowledge(session,company,domain,card.previousCompanyId):{score:0,sourceCompanyName:undefined};
-    const totalKnowledge=local+corporate+localCodified+expertScore+peer.score;
+    const copBonus=copActive&&peer.score>0?Math.min(2,session.config.cop_support_bonus):0;
+    const totalKnowledge=composed.total+copBonus;
     const gap=Math.max(0,requirement.difficulty-totalKnowledge);
     return{
-      domain,difficulty:requirement.difficulty,siteId:card.siteId,siteName:card.siteName,
-      local,corporate,localCodified,expertId:expert?.id,expertName:expert?.name,expertScore,
-      copScore:peer.score,copSourceCompanyName:peer.sourceCompanyName,totalKnowledge,gap,
+      domain,
+      difficulty:requirement.difficulty,
+      siteId:card.siteId,
+      siteName:card.siteName,
+      local:siteKnowledge,
+      team,
+      localCodified,
+      corporate,
+      corporateRaw,
+      expertId:expert?.id,
+      expertName:expert?.name,
+      expertScore,
+      expertTranslator:Boolean(expert),
+      depthKnowledge:composed.depth,
+      breadthBonus:composed.breadth,
+      sourceCount:composed.sourceCount,
+      copScore:copBonus,
+      copPeerKnowledge:peer.score,
+      copSourceCompanyName:peer.sourceCompanyName,
+      totalKnowledge,
+      gap,
     };
   });
   const required=domainResults.reduce((sum,result)=>sum+result.difficulty,0);

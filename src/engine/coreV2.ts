@@ -136,8 +136,9 @@ export function drawRoundEventsV2(sessionInput: GameSession, companyInput: Compa
   return events;
 }
 
-export function calculateUsableIntranetV2(company: Company, site: Site, domain: KnowledgeDomain, config: SimulationConfig = DEFAULT_CONFIG): number {
-  return Math.min(company.intranet[domain] || 0, (site.teamCapability[domain] || 0) + config.absorptive_capacity_bonus);
+export function calculateUsableIntranetV2(company: Company, site: Site, domain: KnowledgeDomain, config: SimulationConfig = DEFAULT_CONFIG, expertTranslator = false): number {
+  const corporate=company.intranet[domain] || 0;
+  return expertTranslator ? corporate : Math.min(corporate, (site.teamCapability[domain] || 0) + config.absorptive_capacity_bonus);
 }
 
 export function recalculateCompanySPOFV2(companyInput: Company, config: SimulationConfig = DEFAULT_CONFIG): void {
@@ -464,7 +465,7 @@ export function executeKnowledgeActionV2(sessionInput: GameSession, companyInput
     const expert = findExpert(); if (!expert || !expertCanDoKnowledgeWork(expert)) return { success: false, message: 'Expert is unavailable.' };
     const skill = expert.domains.find((x) => x.domain === domain); if (!skill) return { success: false, message: 'Domain not held by expert.' };
     const cost = (d(session.config.cost_die) + d(session.config.cost_die)) * 10;
-    spendCompanyCost(company, cost); skill.score = Math.min(8, skill.score + 1); expert.state = 'Training'; consume();
+    spendCompanyCost(company, cost); skill.score += 1; expert.state = 'Training'; consume();
     return { success: true, message: `${expert.name} increased ${domain} expertise to ${skill.score}. Cost $${cost}k.`, costTurnover: cost };
   }
 
@@ -525,8 +526,8 @@ export function executeKnowledgeActionV2(sessionInput: GameSession, companyInput
     const site = findSite(); if (!site) return { success: false, message: 'Site not found.' };
     const relevant = (session.activeEvents[company.id] || []).some((e) => e.isResolved && e.card.domains.some((r) => r.domain === domain) && (e.card.scope === 'enterprise' || e.targetSiteId === site.id));
     if (!relevant) return { success: false, message: 'Lessons Learned requires a relevant event from this round.' };
-    if (learningTarget === 'team') site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
-    else site.codifiedKnowledge[domain] = Math.min(6, site.codifiedKnowledge[domain] + 1);
+    if (learningTarget === 'team') site.teamCapability[domain] += 1;
+    else site.codifiedKnowledge[domain] += 1;
     consume(); return { success: true, message: `Lessons Learned increased ${site.name} ${domain} ${learningTarget === 'team' ? 'Team Capability' : 'Codified Knowledge'} +1.` };
   }
 
@@ -553,10 +554,10 @@ export function executeKnowledgeActionV2(sessionInput: GameSession, companyInput
     if (!active.some((m) => m.companyId === company.id) || new Set(active.map((m) => m.companyId)).size < 2) return { success: false, message: 'An active multi-company CoP is required.' };
     if (learningTarget === 'codified' && siteId) {
       const site = findSite(); if (!site) return { success: false, message: 'Site not found.' };
-      site.codifiedKnowledge[domain] = Math.min(6, site.codifiedKnowledge[domain] + 1);
+      site.codifiedKnowledge[domain] += 1;
     } else {
       if (company.intranetRoundGrowth[domain] >= session.config.max_intranet_domain_growth_per_round) return { success: false, message: 'Intranet growth limit reached.' };
-      company.intranet[domain] = Math.min(6, company.intranet[domain] + 1); company.intranetRoundGrowth[domain] += 1;
+      company.intranet[domain] += 1; company.intranetRoundGrowth[domain] += 1;
     }
     consume(); return { success: true, message: `Captured ${domain} learning from the active Community of Practice.` };
   }
@@ -697,13 +698,13 @@ export function applyExperientialLearningV2(sessionInput: GameSession, companyIn
     if (!expert || !expert.domains.some((x) => x.domain === domain)) return { success: false, message: 'Expert must already hold this domain.' };
     const participated = Object.values(event.allocations).some((a) => a?.expertId === expert.id);
     if (!participated) return { success: false, message: 'Expert must have participated in this opportunity to learn from it.' };
-    const skill = expert.domains.find((x) => x.domain === domain)!; skill.score = Math.min(8, skill.score + 1);
+    const skill = expert.domains.find((x) => x.domain === domain)!; skill.score += 1;
   } else {
     const siteId = targetId || event.targetSiteId;
     const site = company.sites.find((s) => s.id === siteId && !s.isClosed);
     if (!site) return { success: false, message: 'Choose an active site that participated in the opportunity.' };
     if (event.card.scope === 'local' && event.targetSiteId !== site.id) return { success: false, message: 'Local opportunity learning belongs to the affected site.' };
-    site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
+    site.teamCapability[domain] += 1;
   }
   event.experientialLearningAwarded = true; recalculateCompanySPOFV2(company, session.config);
   return { success: true, message: `Experiential learning increased ${domain} ${target} capability by 1.` };
