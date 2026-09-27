@@ -19,8 +19,9 @@ interface Props{
 
 const NEWBIE:KnowledgeDomain[]=['engineering','hr','marketing','operations'];
 const EXPERT:KnowledgeDomain[]=[...NEWBIE,'finance'];
-const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW'};
-const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
+const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW',HQ:'HQ'};
+const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
+const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
 export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false})=>{
  const domains=mode==='expert'?EXPERT:NEWBIE;
@@ -32,12 +33,14 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  }),[company,mode]);
  const expertMarks=useMemo(()=>experts.flatMap(expert=>expert.domains.filter(skill=>domains.includes(skill.domain)).map(skill=>({expert,domain:skill.domain,score:skill.score}))),[company,mode]);
  const maxY=Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0));
- const W=900,H=335,padL=56,padR=44,padT=30,padB=52;
+ const W=920,H=350,padL=64,padR=92,padT=34,padB=58;
  const x=(index:number)=>padL+index*((W-padL-padR)/Math.max(1,domains.length-1));
  const y=(value:number)=>padT+(maxY-value)*((H-padT-padB)/maxY);
  const northPath=data.map((item,index)=>`${index?'L':'M'} ${x(index)} ${y(item.north)}`).join(' ');
  const southPath=data.map((item,index)=>`${index?'L':'M'} ${x(index)} ${y(item.south)}`).join(' ');
  const fill=`${northPath} ${[...data].reverse().map((item,reverseIndex)=>`L ${x(data.length-1-reverseIndex)} ${y(item.south)}`).join(' ')} Z`;
+ const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
+ const spreadLabelYs=(preferred:number[],gap=17)=>{if(!preferred.length)return[] as number[];const min=padT+10,max=H-padB-8;const ordered=preferred.map((value,index)=>({value,index})).sort((a,b)=>a.value-b.value);const placed=ordered.map(item=>item.value);for(let i=0;i<placed.length;i++)placed[i]=Math.max(i?placed[i-1]+gap:min,Math.max(min,placed[i]));if(placed[placed.length-1]>max){placed[placed.length-1]=max;for(let i=placed.length-2;i>=0;i--)placed[i]=Math.min(placed[i],placed[i+1]-gap)}const result=Array(preferred.length).fill(0);ordered.forEach((item,index)=>{result[item.index]=placed[index]});return result};
  const domainIndex=domains.indexOf(selectedDomain);
  return <div className="h-full min-h-[260px] rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-inner">
   <div className="flex items-center justify-between gap-3 px-1">
