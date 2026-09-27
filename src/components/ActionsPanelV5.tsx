@@ -25,7 +25,7 @@ const INTERVENTIONS:Intervention[]=[
  {id:'train-expert',title:'Train Expert',description:'Deepen one expert domain by +1.',anchor:'expert',icon:GraduationCap,actionType:'TRAIN_EXPERT'},
  {id:'update-intranet',title:'Update Corporate Intranet',description:'Publish stronger organisational knowledge into the corporate knowledge base.',anchor:'existing',icon:Building2,actionType:'UPDATE_INTRANET'},
  {id:'join-cop',title:'Join Community of Practice',description:'Connect an expert to external peers and gain network support for two future rounds.',anchor:'network',icon:Network,actionType:'JOIN_COP'},
- {id:'aar',title:'Lessons Learned / AAR',description:'Turn one completed challenge into +1 local capability.',anchor:'existing',icon:Sparkles,actionType:'LESSONS_LEARNED'},
+ {id:'aar',title:'Lessons Learned / AAR',description:'Turn experience into local, expert and corporate knowledge.',anchor:'existing',icon:Sparkles,actionType:'LESSONS_LEARNED'},
  {id:'horizon-scan',title:'Horizon Scan',description:'Scout a domain so matching Events can be anticipated next round.',anchor:'risk',icon:Radar,actionType:'HORIZON_SCAN'},
  {id:'automate',title:'Automation',description:'Embed critical domain knowledge in systems (+2 on future challenges).',anchor:'existing',icon:Bot,actionType:'AUTOMATE'},
 ];
@@ -57,7 +57,8 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const selectedAarEvent=resolvedEvents.find(e=>e.instanceId===aarEventId)||resolvedEvents[0];
  const selectedSite=activeSites.find(s=>s.id===siteId)||activeSites[0];
  const sourceSite=availableTeachingSites.find(s=>s.id===sourceSiteId)||availableTeachingSites.find(s=>s.id!==selectedSite?.id)||availableTeachingSites[0];
- const selectedExpert=activeExperts.find(e=>e.id===expertId)||activeExperts[0];
+ const expertChoices=selectedId==='aar'?activeExperts.filter(e=>e.domains.some(skill=>skill.domain===domain)):activeExperts;
+ const selectedExpert=expertChoices.find(e=>e.id===expertId)||expertChoices[0];
  useEffect(()=>{if(tutorialComplete&&!localStorage.getItem(lessonKey))setShowIntranetLesson(true)},[tutorialComplete,lessonKey]);
  useEffect(()=>{if(!visibleInterventions.some(i=>i.id===selectedId)&&visibleInterventions[0])setSelectedId(visibleInterventions[0].id)},[session.round,session.experienceMode,selectedId,tutorialComplete]);
  useEffect(()=>{if(selectedSite&&selectedSite.id!==siteId)setSiteId(selectedSite.id)},[selectedSite?.id]);
@@ -76,7 +77,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const tutorialTargetScore=tutorialDomain&&tutorialTarget?riverSiteKnowledgeScore(tutorialTarget,tutorialDomain,session.experienceMode):0;
  const needsTargetSite=['knowledge-transfer','local-training','codify-site','aar'].includes(selectedId);
  const needsSourceSite=selectedId==='knowledge-transfer';
- const needsExpert=['local-training','train-expert','join-cop'].includes(selectedId);
+ const needsExpert=['local-training','train-expert','join-cop','aar'].includes(selectedId);
  const relevantDomains=useMemo(()=>{
    if(selectedId==='aar')return selectedAarEvent?.card.domains.map(r=>r.domain)||[];
    if(selectedId==='train-expert'&&selectedExpert)return selectedExpert.domains.map(d=>d.domain);
@@ -100,18 +101,17 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const riverTargetAfter=riverTransferTarget(riverSourceScore);
  const expected=useMemo(()=>{
    if(selectedId==='knowledge-transfer')return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${riverTargetBefore} → ${Math.max(riverTargetBefore,riverTargetAfter)}`:'Choose a receiving site';
-   if(selectedId==='local-training'){const b=selectedSite?.teamCapability[domain]??0;return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${b} → ${Math.min(6,b+1)}`:'Choose a site';}
+   if(selectedId==='local-training'){const b=selectedSite?.teamCapability[domain]??0;return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${b} → ${b+1}`:'Choose a site';}
    if(selectedId==='corporate-training')return `${activeSites.filter(s=>s.teamCapability[domain]<company.intranet[domain]).length} site(s) can gain +1 Team Capability`;
-   if(selectedId==='codify-site'){const b=selectedSite?.codifiedKnowledge[domain]??0;return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Docs ${b} → ${Math.min(6,b+1)}`:'Choose a site';}
-   if(selectedId==='train-expert')return selectedExpertSkill!=null?`${selectedExpert?.name} ${DOMAIN_INFO[domain].label} ${selectedExpertSkill} → ${Math.min(8,selectedExpertSkill+1)}`:'Choose a domain held by the expert';
+   if(selectedId==='codify-site'){const b=selectedSite?.codifiedKnowledge[domain]??0;return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Docs ${b} → ${b+1}`:'Choose a site';}
+   if(selectedId==='train-expert')return selectedExpertSkill!=null?`${selectedExpert?.name} ${DOMAIN_INFO[domain].label} ${selectedExpertSkill} → ${selectedExpertSkill+1}`:'Choose a domain held by the expert';
    if(selectedId==='update-intranet')return `${DOMAIN_INFO[domain].label} Corporate ${company.intranet[domain]} → higher if stronger source knowledge exists`;
-   if(selectedId==='aar'){const target=showLocalCodified?learningTarget:'team';const b=target==='team'?(selectedSite?.teamCapability[domain]??0):(selectedSite?.codifiedKnowledge[domain]??0);return selectedAarEvent&&selectedSite?`AAR on “${selectedAarEvent.card.title}” → ${selectedSite.name} ${target==='team'?'Team Capability':'Docs'} ${b} → ${Math.min(6,b+1)}`:'Choose a completed challenge';}
+   if(selectedId==='aar'){const siteBefore=selectedSite?.teamCapability[domain]??0;const expertBefore=selectedExpertSkill??0;const hqBefore=company.intranet[domain]||0;return selectedAarEvent&&selectedSite&&selectedExpert?`AAR on “${selectedAarEvent.card.title}” → ${selectedSite.name} Team ${siteBefore} → ${siteBefore+1} · ${selectedExpert.name} ${expertBefore} → ${expertBefore+1} · HQ ${hqBefore} → ${hqBefore+1}`:'Choose a completed challenge and expert facilitator';}
    if(selectedId==='join-cop')return `Network support +${session.config.cop_support_bonus} for the next two rounds`;
    if(selectedId==='automate')return company.automatedDomains.includes(domain)?`${DOMAIN_INFO[domain].label} is already automated`:`Add +${session.config.automation_bonus} embedded knowledge to future ${DOMAIN_INFO[domain].label} challenges`;
    return `Arm ${DOMAIN_INFO[domain].label} Horizon Scan for round ${session.round+1}`;
- },[selectedId,selectedSite,sourceSite,selectedExpert,selectedExpertSkill,selectedAarEvent,domain,learningTarget,activeSites,company.intranet,company.automatedDomains,session.round,session.config,showLocalCodified,riverSourceScore,riverTargetBefore,riverTargetAfter]);
+ },[selectedId,selectedSite,sourceSite,selectedExpert,selectedExpertSkill,selectedAarEvent,domain,activeSites,company.intranet,company.automatedDomains,session.round,session.config,riverSourceScore,riverTargetBefore,riverTargetAfter]);
  const commit=()=>{
-   const aarTarget=showLocalCodified?learningTarget:'team';
    const map:Record<InterventionId,[string,any]>={
     'knowledge-transfer':['SITE_KNOWLEDGE_SHARING',{sourceSiteId,siteId,domain}],
     'local-training':['KNOWLEDGE_TRANSFER',{siteId,expertId,domain}],
@@ -119,7 +119,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
     'codify-site':['CODIFY_SITE',{siteId,domain}],
     'train-expert':['TRAIN_EXPERT',{expertId,domain}],
     'update-intranet':['UPDATE_INTRANET',{domain}],
-    'aar':['LESSONS_LEARNED',{siteId,domain,learningTarget:aarTarget,eventInstanceId:selectedAarEvent?.instanceId}],
+    'aar':['LESSONS_LEARNED',{siteId,expertId,domain,eventInstanceId:selectedAarEvent?.instanceId}],
     'join-cop':['JOIN_COP',{expertId,domain}],
     'horizon-scan':['HORIZON_SCAN',{domain}],
     'automate':['AUTOMATE',{domain}],
@@ -134,7 +134,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const riverTargetSiteId=needsTargetSite?selectedSite?.id:undefined;
  const riverSourceSiteId=needsSourceSite?sourceSite?.id:undefined;
  const riverExpertId=needsExpert?selectedExpert?.id:undefined;
- const riverHighlightHQ=selectedId==='update-intranet'||selectedId==='corporate-training';
+ const riverHighlightHQ=selectedId==='update-intranet'||selectedId==='corporate-training'||selectedId==='aar';
  const riverHighlightAllSites=selectedId==='corporate-training';
 
  return <>
@@ -144,7 +144,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
    <div className="mt-3 flex min-h-0 flex-col gap-3">
      <div className="grid grid-cols-[minmax(0,1fr)_300px] items-stretch gap-3">
        <div className="min-h-[320px] min-w-0">
-         <InvestmentRiverView company={company} mode={session.experienceMode} selectedDomain={domain} selectedSiteId={riverTargetSiteId} sourceSiteId={riverSourceSiteId} selectedExpertId={riverExpertId} highlightHQ={riverHighlightHQ} highlightAllSites={riverHighlightAllSites} highlightDomain showSiteLabels={selectedId==='knowledge-transfer'}/>
+         <InvestmentRiverView company={company} mode={session.experienceMode} selectedDomain={domain} selectedSiteId={riverTargetSiteId} sourceSiteId={riverSourceSiteId} selectedExpertId={riverExpertId} highlightHQ={riverHighlightHQ} highlightAllSites={riverHighlightAllSites} highlightDomain showSiteLabels={selectedId==='knowledge-transfer'} previewSiteDelta={selectedId==='aar'?1:0} previewExpertDelta={selectedId==='aar'?1:0} previewHQDelta={selectedId==='aar'?1:0}/>
        </div>
        <aside className="relative w-[300px] shrink-0 rounded-2xl border border-slate-700 bg-slate-950/95 p-3 pb-4">
          <div className="mb-2 text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Choose an investment</div>
@@ -169,13 +169,12 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
            </div>:<div className="grid grid-cols-3 gap-2">
             {selectedId==='aar'&&<label className="block text-[10px] uppercase text-slate-500 font-black">Recent challenge<select value={selectedAarEvent?.instanceId||''} onChange={e=>setAarEventId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{resolvedEvents.map(e=><option key={e.instanceId} value={e.instanceId}>{e.success===false?'FAIL':'SUCCESS'} · {e.card.title}</option>)}</select></label>}
             {needsTargetSite&&<label className="block text-[10px] uppercase text-slate-500 font-black">Site<select value={siteId} disabled={aarSiteLocked} onChange={e=>setSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case disabled:opacity-60">{activeSites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
-            {needsExpert&&<label className="block text-[10px] uppercase text-slate-500 font-black">Expert<select value={expertId} onChange={e=>setExpertId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{activeExperts.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+            {needsExpert&&<label className="block text-[10px] uppercase text-slate-500 font-black">{selectedId==='aar'?'AAR facilitator':'Expert'}<select value={selectedExpert?.id||''} onChange={e=>setExpertId(e.target.value)} disabled={!expertChoices.length} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case disabled:opacity-50">{!expertChoices.length&&<option value="">No expert in this domain</option>}{expertChoices.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
             <label className="block text-[10px] uppercase text-slate-500 font-black">Domain<select value={domain} onChange={e=>setDomain(e.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{relevantDomains.map(d=><option key={d} value={d}>{DOMAIN_INFO[d].label}</option>)}</select></label>
-            {selectedId==='aar'&&showLocalCodified&&<label className="block text-[10px] uppercase text-slate-500 font-black">Capture as<select value={learningTarget} onChange={e=>setLearningTarget(e.target.value as 'team'|'codified')} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case"><option value="team">Team Capability</option><option value="codified">Local Codified Knowledge</option></select></label>}
            </div>}
           </div>
           <div className="min-w-[250px] flex-1 rounded-xl border border-slate-700 bg-slate-950/75 p-3"><div className="text-[10px] font-black uppercase tracking-wide text-slate-500">What changes</div><div className="mt-1 text-sm font-bold leading-snug text-slate-200">{expected}</div>{needsExpert&&selectedExpert&&<div className="mt-1 text-xs text-slate-500">{selectedExpert.name} · {expertLocation}{selectedExpert.isSPOF&&<span className="ml-1 font-black text-rose-300">SPOF</span>}</div>}{selectedId==='update-intranet'&&<div className="mt-1 text-xs text-slate-500">Corporate {company.intranet[domain]} · best local {bestLocal} · best expert {bestExpert}</div>}{selectedId==='join-cop'&&<div className="mt-1 text-xs text-slate-500">Our expert {selectedExpertSkill??0} · network {peerScore}</div>}</div>
-          <div className="w-[210px] shrink-0"><button onClick={commit} disabled={company.actionsRemaining<=0||(needsExpert&&!selectedExpert)||(needsTargetSite&&!selectedSite)||invalidRiver||(selectedId==='aar'&&!selectedAarEvent)||(selectedId==='aar'&&relevantDomains.length===0)||(selectedId==='automate'&&company.automatedDomains.includes(domain))} className="w-full rounded-xl bg-amber-400 px-3 py-3 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">RUN · {formatCurrency(totalCost)}</button>{invalidRiver&&<div className="mt-1 text-[11px] font-bold text-rose-300">Choose a stronger teaching site and a different receiving site.</div>}{investmentSite&&<div className="mt-1 text-[10px] text-slate-500">{investmentSite.name}: {formatCurrency(investmentSite.turnover)} → {formatCurrency(siteTurnoverAfter??investmentSite.turnover)}</div>}</div>
+          <div className="w-[210px] shrink-0"><button onClick={commit} disabled={company.actionsRemaining<=0||(needsExpert&&!selectedExpert)||(needsTargetSite&&!selectedSite)||invalidRiver||(selectedId==='aar'&&!selectedAarEvent)||(selectedId==='aar'&&relevantDomains.length===0)||(selectedId==='aar'&&!expertChoices.length)||(selectedId==='automate'&&company.automatedDomains.includes(domain))} className="w-full rounded-xl bg-amber-400 px-3 py-3 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">RUN · {formatCurrency(totalCost)}</button>{invalidRiver&&<div className="mt-1 text-[11px] font-bold text-rose-300">Choose a stronger teaching site and a different receiving site.</div>}{investmentSite&&<div className="mt-1 text-[10px] text-slate-500">{investmentSite.name}: {formatCurrency(investmentSite.turnover)} → {formatCurrency(siteTurnoverAfter??investmentSite.turnover)}</div>}</div>
          </div>
        </section>
      </div>
