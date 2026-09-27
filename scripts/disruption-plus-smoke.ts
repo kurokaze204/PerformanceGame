@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { createNewSessionV2 } from '../src/server/gameServiceV4.ts';
-import { evaluateFinalDisruptionV1, swapDisruptionWithPeerV1 } from '../src/engine/disruptionPlusV1.ts';
+import { evaluateFinalDisruptionV1, finalDisruptionChanceV1, swapDisruptionWithPeerV1 } from '../src/engine/disruptionPlusV1.ts';
+
+assert.equal(finalDisruptionChanceV1(0),100,'no final knowledge gap must be certain');
+assert.equal(finalDisruptionChanceV1(2),54,'two missing points must leave a 54% chance');
+assert.equal(finalDisruptionChanceV1(5),0,'large gaps must clamp at zero chance');
 
 const names=['Alpha','Beta','Gamma','Delta','Epsilon','Zeta'];
 const session=await createNewSessionV2('DISRUPTION-SMOKE','Disruption Smoke',names,{experienceMode:'newbie',gameDurationMinutes:60});
