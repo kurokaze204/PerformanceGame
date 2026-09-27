@@ -46,6 +46,10 @@ assert.ok(chartsSource.includes('aria-label="Close charts"'),'Charts overlay mus
 
 const riskSource=readFileSync(new URL('../src/components/AttritionModal.tsx',import.meta.url),'utf8');
 assert.ok(riskSource.includes('title="Single Point of Failure"'),'Knowledge Risk expert checks must visibly mark SPOF experts');
+const riskRollSource=readFileSync(new URL('../src/components/RiskRollTrack.tsx',import.meta.url),'utf8');
+assert.ok(riskRollSource.includes("n>=2&&n<=3&&spof"),'SPOF risk track must show two resignation outcomes in addition to retirement');
+const firstLessonSource=readFileSync(new URL('../src/components/NewbieTransferUnlockOverlay.tsx',import.meta.url),'utf8');
+assert.ok(firstLessonSource.includes('Your best source sets the depth; additional independent sources add breadth; consultants can fill specific gaps.'),'first Newbie Event lesson must explain the shared knowledge composition rule');
 
 assert.ok(appBoardSource.includes("actionType:'FINISH_INVESTING'"),'Invest completion must use the dedicated per-company FINISH_INVESTING action');
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
@@ -62,6 +66,10 @@ const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.u
 assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||session"),'Event acknowledgement must prefer the authoritative acknowledged session before selecting the next card');
 const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
 assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
+assert.ok(investPanelSource.includes("'aar':['LESSONS_LEARNED',{siteId,expertId,domain,eventInstanceId:selectedAarEvent?.instanceId}]"),'AAR must submit one expert facilitator');
+assert.ok(investPanelSource.includes("previewSiteDelta={selectedId==='aar'?1:0}"),'AAR must preview its site learning on the River');
+assert.ok(investPanelSource.includes("previewExpertDelta={selectedId==='aar'?1:0}"),'AAR must preview facilitator learning on the River');
+assert.ok(investPanelSource.includes("previewHQDelta={selectedId==='aar'?1:0}"),'AAR must preview corporate learning on the River');
 const investmentRiverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
 assert.ok(investmentRiverSource.includes('{abbrev(site.id)}'),'Invest River site labels must use three-letter site abbreviations');
 assert.ok(investmentRiverSource.includes('{firstName(mark.expert.name)} · {loc}'),'Invest River expert labels must show first name and city abbreviation');
