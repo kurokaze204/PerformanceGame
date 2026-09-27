@@ -18,6 +18,7 @@ export const NewbieTransferUnlockOverlay:React.FC<Props>=({session,company,onCon
    <div className="text-xs uppercase tracking-[.18em] text-emerald-300 font-black">A knowledge gap is not always a knowledge shortage</div>
    <h2 id="transfer-unlock-title" className="mt-2 text-3xl font-black text-white">The company knew. {target?.name||'This site'} didn’t.</h2>
    <p className="mt-3 max-w-3xl text-base leading-relaxed text-slate-300">{source?.name||'Another site'} already had stronger {domainLabel} capability. The failure was not caused by the company knowing nothing — the knowledge was in the wrong place when it was needed.</p>
+   <div className="mt-4 rounded-2xl border border-sky-700 bg-sky-950/30 px-4 py-3"><div className="text-xs font-black uppercase tracking-[.14em] text-sky-300">How knowledge combines</div><p className="mt-1 text-sm leading-relaxed text-slate-200"><b className="text-white">Your best source sets the depth; additional independent sources add breadth; consultants can fill specific gaps.</b> An expert can also act as a translator, helping a local team use deeper Corporate Intranet knowledge than it could apply alone.</p></div>
    <div className="mt-5 text-sm font-black uppercase tracking-[.14em] text-violet-200">Two ways to move knowledge are now available</div>
    <div className="mt-3 grid gap-4 md:grid-cols-2">
      <section className="rounded-2xl border-2 border-emerald-600 bg-emerald-950/35 p-5">
