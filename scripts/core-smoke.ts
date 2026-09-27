@@ -13,7 +13,7 @@ import {
   evaluateEventDomainKnowledgeExplicitV2,
   resolveSingleEventExplicitV2,
 } from '../src/engine/challengeResponseV2.ts';
-import { executeInvestmentActionV4 } from '../src/engine/investmentActionsV4.ts';
+import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -41,6 +41,37 @@ function makeSession(mode:'newbie'|'expert'='newbie') {
 assert.equal(DEFAULT_CONFIG.spof_gap,4,'SPOF must require a four-point depth gap');
 assert.equal(DEFAULT_CONFIG.normal_leave_threshold,1,'ordinary experts only retire on roll 1');
 assert.equal(DEFAULT_CONFIG.spof_leave_threshold,3,'SPOF experts leave on rolls 1-3: retire on 1, resign on 2-3');
+assert.deepEqual({
+  KNOWLEDGE_TRANSFER:INVESTMENT_COSTS_V4.KNOWLEDGE_TRANSFER,
+  SITE_KNOWLEDGE_SHARING:INVESTMENT_COSTS_V4.SITE_KNOWLEDGE_SHARING,
+  CORPORATE_TRAINING:INVESTMENT_COSTS_V4.CORPORATE_TRAINING,
+  CODIFY_SITE:INVESTMENT_COSTS_V4.CODIFY_SITE,
+  TRAIN_EXPERT:INVESTMENT_COSTS_V4.TRAIN_EXPERT,
+  UPDATE_INTRANET:INVESTMENT_COSTS_V4.UPDATE_INTRANET,
+  LESSONS_LEARNED:INVESTMENT_COSTS_V4.LESSONS_LEARNED,
+  JOIN_COP:INVESTMENT_COSTS_V4.JOIN_COP,
+  HORIZON_SCAN:INVESTMENT_COSTS_V4.HORIZON_SCAN,
+  AUTOMATE:INVESTMENT_COSTS_V4.AUTOMATE,
+},{
+  KNOWLEDGE_TRANSFER:18,
+  SITE_KNOWLEDGE_SHARING:5,
+  CORPORATE_TRAINING:60,
+  CODIFY_SITE:20,
+  TRAIN_EXPERT:20,
+  UPDATE_INTRANET:30,
+  LESSONS_LEARNED:20,
+  JOIN_COP:20,
+  HORIZON_SCAN:40,
+  AUTOMATE:80,
+},'investment costs must match the rebalanced economy');
+assert.equal(expertTravelCostV4('melbourne','melbourne'),0,'same-city expert use should not add travel cost');
+for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin']){
+  for(const to of ['melbourne','sydney','brisbane','adelaide','perth','darwin']){
+    const travel=expertTravelCostV4(from,to);
+    assert.ok(travel>=0&&travel<=20,'expert travel must stay between $0k and $20k');
+    assert.equal(travel%5,0,'expert travel must use $5k increments');
+  }
+}
 
 // 1. Planned game has an equal event mix.
 {
