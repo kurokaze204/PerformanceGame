@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { createNewSessionV2 } from '../src/server/gameServiceV4.ts';
+import { createNewSessionV2 as createServiceSessionV2, knowledgeActionV2 as serviceKnowledgeActionV2 } from '../src/server/gameServiceV8.ts';
+import { saveSessionV2 } from '../src/server/dbV2.ts';
 import { disruptionStrengthForRoundsV1, estimatedDisruptionRoundsForTimedGameV1, evaluateFinalDisruptionV1, finalDisruptionChanceV1, swapDisruptionWithPeerV1 } from '../src/engine/disruptionPlusV1.ts';
 
 assert.equal(finalDisruptionChanceV1(0),100,'no final knowledge gap must be certain');
@@ -91,6 +93,40 @@ for(const companyItem of large.companies){
   const expertDomains=new Set(companyItem.experts.flatMap(item=>item.domains.map(skill=>skill.domain)));
   for(const domain of large.strategicDisruptionDomains!)assert.ok(expertDomains.has(domain),'Expert mode companies also need all three strategic expert domains');
   for(const requirement of companyItem.disruptionCard!.domains)assert.ok(expertDomains.has(requirement.domain),'Expert mode disruption cards must stay expert-compatible');
+}
+
+// Legacy/persisted cards must still resolve deterministically with a consultant,
+// and duplicate/concurrent clicks must not charge the consultant twice.
+{
+  const legacy=await createServiceSessionV2('DISRUPTION-LEGACY-CONSULTANT','Legacy Consultant',['Legacy Co'],{experienceMode:'newbie',gameDurationMinutes:30});
+  const legacyCompany=legacy.companies[0];
+  legacy.isFinalDisruptionActive=true;
+  legacy.finalDisruptionResolved=false;
+  (legacy as any).finalDisruptionResults=[];
+  legacyCompany.disruptionCard!.domains=legacyCompany.disruptionCard!.domains.map((requirement,index)=>({...requirement,difficulty:index===0?9:8}));
+  const target=legacyCompany.sites.find(site=>site.id===legacyCompany.disruptionCard!.siteId)!;
+  for(const requirement of legacyCompany.disruptionCard!.domains){
+    target.teamCapability[requirement.domain]=0;
+    legacyCompany.intranet[requirement.domain]=0;
+  }
+  const turnoverBefore=legacyCompany.turnover;
+  const consultantBefore=legacyCompany.cumulativeConsultantSpend||0;
+  await saveSessionV2(legacy);
+
+  const payload={type:'FINAL_DISRUPTION_RESOLVE',selections:{},useConsultant:true};
+  const [firstResolve,duplicateResolve]=await Promise.all([
+    serviceKnowledgeActionV2(legacy.id,legacyCompany.id,payload),
+    serviceKnowledgeActionV2(legacy.id,legacyCompany.id,payload),
+  ]);
+  assert.equal(firstResolve.success,true,'a consultant-backed legacy 9/8 disruption must resolve successfully');
+  assert.equal(firstResolve.result?.success,true,'consultant must make the final disruption outcome certain');
+  assert.ok((firstResolve.result?.consultantCost||0)>0,'legacy gap should require a real consultant cost');
+  assert.equal(duplicateResolve.success,true,'a duplicate final-resolution request must be idempotent');
+  assert.equal(duplicateResolve.alreadyResolved,true,'duplicate request should return the stored result instead of failing');
+
+  const after=duplicateResolve.session.companies.find(item=>item.id===legacyCompany.id)!;
+  assert.equal(after.cumulativeConsultantSpend,consultantBefore+firstResolve.result.consultantCost,'consultant spend must be charged exactly once');
+  assert.equal(after.turnover,turnoverBefore-firstResolve.result.consultantCost,'turnover must be debited exactly once');
 }
 
 console.log('Disruption Plus smoke tests passed.');
