@@ -370,6 +370,15 @@ for(const rounds of CONFIRMATION_ROUNDS){
   }
 }
 
+function balancedCandidateHigh(rounds:number):number{
+  // First 100-game confirmation showed that using a per-domain P60 makes a
+  // two-domain challenge progressively too harsh: both domains must clear their
+  // thresholds at once. Fit a simple monotonic line through the card strengths
+  // that produced roughly 40% outright success and ~60% mean no-consultant
+  // resolution chance at the confirmation breakpoints.
+  return Math.max(3,Math.round(9.45+0.385*rounds));
+}
+
 const confirmation=CONFIRMATION_ROUNDS.map(rounds=>{
   const r=confirmationRows.filter(row=>row.rounds===rounds);
   const candidate=candidateTable.find(row=>row.rounds===rounds)!;
@@ -394,8 +403,55 @@ const confirmation=CONFIRMATION_ROUNDS.map(rounds=>{
   };
 });
 
+const adjustedConfirmationRows:ConfirmationRow[]=[];
+for(const rounds of CONFIRMATION_ROUNDS){
+  const high=balancedCandidateHigh(rounds),low=Math.max(3,high-1);
+  for(let run=1;run<=CONFIRMATION_RUNS;run++){
+    const row=await simulate(rounds,run,4000000);
+    const gapA=Math.max(0,high-row.scoreA);
+    const gapB=Math.max(0,low-row.scoreB);
+    const totalGap=gapA+gapB;
+    const required=high+low;
+    adjustedConfirmationRows.push({
+      ...row,
+      targetHigh:high,
+      targetLow:low,
+      gapA,
+      gapB,
+      totalGap,
+      chanceWithoutConsultant:Math.max(0,100-23*totalGap),
+      consultantPercent:required>0?80*(totalGap/required):0,
+      outright:totalGap===0,
+    });
+  }
+}
+
+const adjustedConfirmation=CONFIRMATION_ROUNDS.map(rounds=>{
+  const r=adjustedConfirmationRows.filter(row=>row.rounds===rounds);
+  const high=balancedCandidateHigh(rounds),low=Math.max(3,high-1);
+  return{
+    rounds,
+    modeledMinutes:roundMinutes(rounds),
+    targetHigh:high,
+    targetLow:low,
+    games:r.length,
+    outrightRate:r.filter(row=>row.outright).length/r.length,
+    gap1Rate:r.filter(row=>row.totalGap===1).length/r.length,
+    gap2Rate:r.filter(row=>row.totalGap===2).length/r.length,
+    gap3PlusRate:r.filter(row=>row.totalGap>=3).length/r.length,
+    meanGap:mean(r.map(row=>row.totalGap)),
+    meanChanceWithoutConsultant:mean(r.map(row=>row.chanceWithoutConsultant)),
+    consultantNeededRate:r.filter(row=>row.totalGap>0).length/r.length,
+    meanConsultantPercent:mean(r.map(row=>row.consultantPercent)),
+    meanExpertDepartures:mean(r.map(row=>row.expertDepartures)),
+    meanSiteLosses:mean(r.map(row=>row.siteLosses)),
+    meanScoreA:mean(r.map(row=>row.scoreA)),
+    meanScoreB:mean(r.map(row=>row.scoreB)),
+  };
+});
+
 mkdirSync('balance-results',{recursive:true});
-writeFileSync('balance-results/disruption-calibration.json',JSON.stringify({meta:{generatedAt:new Date().toISOString(),mode:'newbie',runsPerLength:RUNS_PER_LENGTH,confirmationRuns:CONFIRMATION_RUNS,confirmationRounds:CONFIRMATION_ROUNDS,minRounds:MIN_ROUNDS,maxRounds:MAX_ROUNDS,roundCadenceMinutes:[10,9,8,7,6,5,4,3],profiles:PROFILES,notes:'Knowledge-only calibration using the current production starting state, event/domain stream, depth+breadth scoring, facilitator AAR, SPOF/risk and investment mechanics. Five Actions remain available each round, but the four player profiles devote 1, 2, 3 or 4 of them to the known Disruption; the remaining Actions are assumed to serve other business priorities. Investment and Event financial effects are excluded so long-horizon scores measure knowledge growth rather than compounding turnover. Candidate card strengths are derived by isotonic smoothing of the 60th percentile domain score, rounding the stronger requirement up and setting the second domain one point lower.'},summary,candidateTable,confirmation,rows,confirmationRows},null,2));
+writeFileSync('balance-results/disruption-calibration.json',JSON.stringify({meta:{generatedAt:new Date().toISOString(),mode:'newbie',runsPerLength:RUNS_PER_LENGTH,confirmationRuns:CONFIRMATION_RUNS,confirmationRounds:CONFIRMATION_ROUNDS,minRounds:MIN_ROUNDS,maxRounds:MAX_ROUNDS,roundCadenceMinutes:[10,9,8,7,6,5,4,3],profiles:PROFILES,notes:'Knowledge-only calibration using the current production starting state, event/domain stream, depth+breadth scoring, facilitator AAR, SPOF/risk and investment mechanics. Five Actions remain available each round, but the four player profiles devote 1, 2, 3 or 4 of them to the known Disruption; the remaining Actions are assumed to serve other business priorities. Investment and Event financial effects are excluded so long-horizon scores measure knowledge growth rather than compounding turnover. Candidate card strengths are derived by isotonic smoothing of the 60th percentile domain score, rounding the stronger requirement up and setting the second domain one point lower.'},summary,candidateTable,confirmation,adjustedConfirmation,rows,confirmationRows,adjustedConfirmationRows},null,2));
 
 const columns=Object.keys(rows[0]) as (keyof RunRow)[];
 const csv=[columns.join(','),...rows.map(row=>columns.map(key=>JSON.stringify(row[key])).join(','))].join('\n');
@@ -407,7 +463,11 @@ const confirmationColumns=Object.keys(confirmation[0]) as (keyof typeof confirma
 writeFileSync('balance-results/disruption-confirmation-summary.csv',[confirmationColumns.join(','),...confirmation.map(row=>confirmationColumns.map(key=>String(row[key])).join(','))].join('\n'));
 const confirmationRunColumns=Object.keys(confirmationRows[0]) as (keyof ConfirmationRow)[];
 writeFileSync('balance-results/disruption-confirmation-runs.csv',[confirmationRunColumns.join(','),...confirmationRows.map(row=>confirmationRunColumns.map(key=>JSON.stringify(row[key])).join(','))].join('\n'));
+const adjustedColumns=Object.keys(adjustedConfirmation[0]) as (keyof typeof adjustedConfirmation[0])[];
+writeFileSync('balance-results/disruption-adjusted-confirmation-summary.csv',[adjustedColumns.join(','),...adjustedConfirmation.map(row=>adjustedColumns.map(key=>String(row[key])).join(','))].join('\n'));
+const adjustedRunColumns=Object.keys(adjustedConfirmationRows[0]) as (keyof ConfirmationRow)[];
+writeFileSync('balance-results/disruption-adjusted-confirmation-runs.csv',[adjustedRunColumns.join(','),...adjustedConfirmationRows.map(row=>adjustedRunColumns.map(key=>JSON.stringify(row[key])).join(','))].join('\n'));
 
-const md=['# Disruption calibration study','',`660 Newbie knowledge-calibration simulations: 20 games for every round count from 3 to 35. Round cadence is 10, 9, 8, 7, 6, 5, 4, then 3 minutes per round thereafter. Across the 20 games, five players devote 1, 2, 3 or 4 of their five Actions each round to their known Disruption. Event and investment financial effects are excluded so this study isolates knowledge growth and Knowledge Risk.`,'','## Calibration curve','','| Rounds | Model min | P60 raw | P60 smoothed | Candidate |','|---:|---:|---:|---:|:---|',...summary.map((row:any)=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.p60DomainScore.toFixed(2)} | ${row.smoothedP60DomainScore.toFixed(2)} | ${row.candidateHigh}/${row.candidateLow} |`),'','## 100-game confirmation at key breakpoints','','| Rounds | Min | Card | Outright | Gap 1 | Gap 2 | Gap 3+ | Mean luck chance | Mean consultant % |','|---:|---:|:---|---:|---:|---:|---:|---:|---:|',...confirmation.map(row=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.targetHigh}/${row.targetLow} | ${(row.outrightRate*100).toFixed(0)}% | ${(row.gap1Rate*100).toFixed(0)}% | ${(row.gap2Rate*100).toFixed(0)}% | ${(row.gap3PlusRate*100).toFixed(0)}% | ${row.meanChanceWithoutConsultant.toFixed(1)}% | ${row.meanConsultantPercent.toFixed(1)}% |`),''].join('\n');
+const md=['# Disruption calibration study','',`660 Newbie knowledge-calibration simulations: 20 games for every round count from 3 to 35. Round cadence is 10, 9, 8, 7, 6, 5, 4, then 3 minutes per round thereafter. Across the 20 games, five players devote 1, 2, 3 or 4 of their five Actions each round to their known Disruption. Event and investment financial effects are excluded so this study isolates knowledge growth and Knowledge Risk.`,'','## Calibration curve','','| Rounds | Model min | P60 raw | P60 smoothed | Candidate |','|---:|---:|---:|---:|:---|',...summary.map((row:any)=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.p60DomainScore.toFixed(2)} | ${row.smoothedP60DomainScore.toFixed(2)} | ${row.candidateHigh}/${row.candidateLow} |`),'','## 100-game confirmation at key breakpoints','','| Rounds | Min | Card | Outright | Gap 1 | Gap 2 | Gap 3+ | Mean luck chance | Mean consultant % |','|---:|---:|:---|---:|---:|---:|---:|---:|---:|',...confirmation.map(row=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.targetHigh}/${row.targetLow} | ${(row.outrightRate*100).toFixed(0)}% | ${(row.gap1Rate*100).toFixed(0)}% | ${(row.gap2Rate*100).toFixed(0)}% | ${(row.gap3PlusRate*100).toFixed(0)}% | ${row.meanChanceWithoutConsultant.toFixed(1)}% | ${row.meanConsultantPercent.toFixed(1)}% |`),'','## Adjusted curve — independent 100-game confirmation','','The first confirmation showed that a per-domain P60 compounds into an overly harsh two-domain final test. The adjusted curve uses a simple monotonic fit, high = round(9.45 + 0.385 × rounds), with the second domain one point lower. The games below use a fresh random seed set.','','| Rounds | Min | Card | Outright | Gap 1 | Gap 2 | Gap 3+ | Mean luck chance | Mean consultant % |','|---:|---:|:---|---:|---:|---:|---:|---:|---:|',...adjustedConfirmation.map(row=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.targetHigh}/${row.targetLow} | ${(row.outrightRate*100).toFixed(0)}% | ${(row.gap1Rate*100).toFixed(0)}% | ${(row.gap2Rate*100).toFixed(0)}% | ${(row.gap3PlusRate*100).toFixed(0)}% | ${row.meanChanceWithoutConsultant.toFixed(1)}% | ${row.meanConsultantPercent.toFixed(1)}% |`),''].join('\n');
 writeFileSync('balance-results/disruption-calibration.md',md);
 console.log('\n'+md);
