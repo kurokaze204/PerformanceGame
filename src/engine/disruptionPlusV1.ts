@@ -8,6 +8,35 @@ import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 const DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations','finance'];
 const NEWBIE_DOMAINS: KnowledgeDomain[] = ['engineering','hr','marketing','operations'];
 
+const ROUND_MINUTES=[10,9,8,7,6,5,4];
+const MIN_ROUND_MINUTES=3;
+
+export function estimatedDisruptionRoundsForTimedGameV1(session:GameSessionV2):number{
+  const availableMinutes=Math.max(1,(session.gameDurationMinutes||60)-Math.max(0,session.finalWindowMinutes||0));
+  let elapsed=0;
+  for(let round=1;round<=200;round++){
+    elapsed+=round<=ROUND_MINUTES.length?ROUND_MINUTES[round-1]:MIN_ROUND_MINUTES;
+    // The Final Challenge is checked at a round boundary, so if the timer enters
+    // its final window during a round, that round still completes.
+    if(elapsed>=availableMinutes)return Math.max(3,round);
+  }
+  return 200;
+}
+
+export function disruptionStrengthForRoundsV1(rounds:number):{rounds:number;high:number;low:number}{
+  const calibratedRounds=Math.max(1,Math.round(rounds));
+  const high=Math.max(3,Math.round(9.45+0.385*calibratedRounds));
+  return{rounds:calibratedRounds,high,low:Math.max(2,high-1)};
+}
+
+export function disruptionStrengthForSessionV1(session:GameSessionV2){
+  const rounds=session.experienceMode==='expert'&&session.gameEndMode==='rounds'
+    ?Math.max(1,session.finalRoundCount||1)
+    :estimatedDisruptionRoundsForTimedGameV1(session);
+  return disruptionStrengthForRoundsV1(rounds);
+}
+
+
 function hash(text:string):number{
   let value=0;
   for(let i=0;i<text.length;i++)value=((value<<5)-value+text.charCodeAt(i))|0;
@@ -67,6 +96,7 @@ function disruptionImpact(requirements:{difficulty:number}[]):number{
 
 export function dealCompanyDisruptionsV1(session:GameSessionV2):void{
   const strategic=strategicDomainsForSession(session);
+  const strength=disruptionStrengthForSessionV1(session);
 
   const pairs:[[KnowledgeDomain,KnowledgeDomain],[KnowledgeDomain,KnowledgeDomain],[KnowledgeDomain,KnowledgeDomain]]=[
     [strategic[0],strategic[1]],
@@ -83,7 +113,7 @@ export function dealCompanyDisruptionsV1(session:GameSessionV2):void{
     const site=company.sites.find(candidate=>candidate.id===siteId&&!candidate.isClosed)||company.sites.find(candidate=>!candidate.isClosed)||company.sites[0];
     const template=FINAL_DISRUPTION_CARDS[(hash(`${session.id}:template`)+index)%FINAL_DISRUPTION_CARDS.length]||FINAL_DISRUPTION_CARDS[0];
     const domains=pairs[(pairStart+index)%pairs.length];
-    const requirements=domains.map((domain,i)=>({domain,difficulty:i===0?9:8}));
+    const requirements=domains.map((domain,i)=>({domain,difficulty:i===0?strength.high:strength.low}));
     company.disruptionCard={
       id:`${template.id}-${company.id}`,
       title:template.title,
@@ -97,6 +127,18 @@ export function dealCompanyDisruptionsV1(session:GameSessionV2):void{
     };
     company.disruptionSwapNotice=null;
   });
+}
+
+export function refreshCompanyDisruptionStrengthV1(session:GameSessionV2):void{
+  const strength=disruptionStrengthForSessionV1(session);
+  for(const company of session.companies){
+    if(!company.disruptionCard)continue;
+    company.disruptionCard.domains=company.disruptionCard.domains.map((requirement,index)=>({
+      ...requirement,
+      difficulty:index===0?strength.high:strength.low,
+    }));
+    company.disruptionCard.impact=disruptionImpact(company.disruptionCard.domains);
+  }
 }
 
 function supportsCard(company:CompanyV2,card:DisruptionAssignmentV1):boolean{
