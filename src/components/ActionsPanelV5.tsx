@@ -146,9 +146,10 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
        <div className="min-h-[320px] min-w-0">
          <InvestmentRiverView company={company} mode={session.experienceMode} selectedDomain={domain} selectedSiteId={riverTargetSiteId} sourceSiteId={riverSourceSiteId} selectedExpertId={riverExpertId} highlightHQ={riverHighlightHQ} highlightAllSites={riverHighlightAllSites} highlightDomain showSiteLabels={selectedId==='knowledge-transfer'}/>
        </div>
-       <aside className="w-[300px] shrink-0 rounded-2xl border border-slate-700 bg-slate-950/95 p-3">
+       <aside className="relative w-[300px] shrink-0 rounded-2xl border border-slate-700 bg-slate-950/95 p-3 pb-4">
          <div className="mb-2 text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Choose an investment</div>
          <div className="space-y-1.5">{visibleInterventions.map(item=>{const Icon=item.icon;const active=item.id===selectedId;const cost=costFor(item.actionType);return <button key={item.id} onClick={()=>setSelectedId(item.id)} className={`w-full rounded-xl border-2 px-3 py-1.5 text-left transition ${active?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-900 hover:border-emerald-500'}`}><div className="flex items-center gap-2"><Icon className={`h-4 w-4 shrink-0 ${active?'text-amber-300':'text-emerald-300'}`}/><b className="min-w-0 flex-1 text-[13px] leading-tight text-white">{item.title}</b><span className="text-[11px] font-black text-amber-300">{formatCurrency(cost)}</span></div></button>})}</div>
+         <div aria-hidden="true" data-investment-arrow className="absolute -bottom-3 left-1/2 h-6 w-6 -translate-x-1/2 rotate-45 border-r border-b border-slate-700 bg-slate-950"/>
        </aside>
      </div>
      <div className="flex shrink-0 items-start gap-3">
@@ -157,8 +158,10 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
          <div className="flex items-center justify-between gap-3"><div><div className="text-[10px] font-black uppercase tracking-[.16em] text-indigo-300">Selected investment</div><h3 className="text-lg font-black text-white">{selected.title}</h3></div><div className="text-sm font-black text-amber-300">{formatCurrency(totalCost)} · 1 Action</div></div>
          <div className="mt-2 flex items-end gap-3">
           <div className="min-w-0 flex-[1.2]">
-           {selectedId==='knowledge-transfer'?<div className="space-y-2">
-            <label className="block text-[10px] uppercase text-slate-500 font-black">Domain<select value={domain} onChange={e=>setDomain(e.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{relevantDomains.map(d=><option key={d} value={d}>{DOMAIN_INFO[d].label}</option>)}</select></label>
+           {selectedId==='knowledge-transfer'?<div data-knowledge-transfer-controls className="space-y-2">
+            <div className="w-[180px] max-w-full">
+             <label className="block text-[10px] uppercase text-slate-500 font-black">Domain<select value={domain} onChange={e=>setDomain(e.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{relevantDomains.map(d=><option key={d} value={d}>{DOMAIN_INFO[d].label}</option>)}</select></label>
+            </div>
             <div className="grid grid-cols-2 gap-2">
              <label className="block text-[10px] uppercase text-slate-500 font-black">Teaching site<select value={sourceSite?.id||''} onChange={e=>setSourceSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case" disabled={!availableTeachingSites.length}>{activeSites.map(s=>{const used=usedTeachingSiteIds.includes(s.id);return <option key={s.id} value={s.id} disabled={used}>{s.name} · available {riverSiteKnowledgeScore(s,domain,session.experienceMode)}{used?' · used this round':''}</option>})}</select>{!availableTeachingSites.length&&<div className="mt-1 text-[10px] font-bold normal-case text-amber-300">All teaching sites have been used this round.</div>}</label>
              <label className="block text-[10px] uppercase text-slate-500 font-black">Receiving site<select value={siteId} onChange={e=>setSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{activeSites.map(s=><option key={s.id} value={s.id}>{s.name} · team {s.teamCapability[domain]||0}</option>)}</select></label>
