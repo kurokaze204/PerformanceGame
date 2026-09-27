@@ -43,9 +43,23 @@ export async function delayEventV2(sessionId:string,companyId:string,eventInstan
  const matches=event.card.domains.some(req=>req.domain===company.horizonScanDomain);
  if(session.experienceMode==='expert'&&!matches)return{success:false,message:`Expert mode can only delay an Event matching the scanned ${company.horizonScanDomain} domain.`,session};
  company.delayedEvent={...event,delayedFromRound:session.round,isResolved:false,allocations:freshAllocations(event)};
- events.splice(index,1);company.horizonScanUsedThisRound=true;
- applyInterfaceSimplificationV1(session);await saveSessionV2(session);broadcastV2(session,'HORIZON_SCAN_EVENT_DELAYED',{companyId,eventInstanceId,cardTitle:event.card.title,returnRound:session.round+1});
- return{success:true,message:`“${event.card.title}” delayed until next round.`,session};
+ events.splice(index,1);
+
+ // Delaying changes *which* Event the company faces this round, not how many.
+ // Draw a fresh replacement immediately, excluding the delayed card and every
+ // card still on the table, then progress only that new draw as the next move.
+ const excludedCardIds=[event.card.id,...events.map(active=>active.card.id)];
+ const replacement=drawRoundEventsV2(session,company,{count:1,excludedCardIds})[0];
+ if(replacement){
+  const moveNumber=Math.max(1,company.eventsDrawnCount);
+  replacement.card=progressEventCard(replacement.card,moveNumber,session.config,session.experienceMode);
+  replacement.card=capProgressedEventImpact(replacement.card,company,replacement.targetSiteId,session.config);
+  replacement.allocations=freshAllocations(replacement);
+  events.splice(index,0,replacement);
+ }
+ company.horizonScanUsedThisRound=true;
+ applyInterfaceSimplificationV1(session);await saveSessionV2(session);broadcastV2(session,'HORIZON_SCAN_EVENT_DELAYED',{companyId,eventInstanceId,cardTitle:event.card.title,returnRound:session.round+1,replacementEventInstanceId:replacement?.instanceId,replacementCardTitle:replacement?.card.title});
+ return{success:true,message:`“${event.card.title}” delayed until next round. A new Event has been drawn for this round.`,session,replacementEvent:replacement};
 }
 
 export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
