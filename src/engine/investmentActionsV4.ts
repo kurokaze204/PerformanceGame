@@ -63,7 +63,7 @@ export function copPeerKnowledgeScoreV4(session: GameSessionV2, company: Company
   const others = session.companies.filter((c) => c.id !== company.id);
   if (others.length) return Math.max(0, ...others.map((c) => companyBestKnowledge(c, domain)));
   const strong = (hash(`${session.id}:${domain}`) % 5) < 3;
-  return strong ? Math.min(8, own + 2) : own;
+  return strong ? own + 2 : own;
 }
 
 export function copMembershipActiveV4(session: GameSessionV2, companyId: string, domain: KnowledgeDomain): boolean {
@@ -126,7 +126,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (site.teamCapability[domain] >= skill.score) return { success: false, message: 'Team capability is already at the expert ceiling.' };
     const travelCost = expertTravelCostV4(expert.location, site.id);
     const totalCost = baseCost + travelCost;
-    site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
+    site.teamCapability[domain] += 1;
     recordPublicationEvidenceV4(company, domain, 1);
     const investmentAttribution = finish(totalCost, site.id);
     return { success: true, message: `${site.name} ${domain} Team Capability increased to ${site.teamCapability[domain]}. Cost $${totalCost}k${travelCost ? ` including $${travelCost}k travel` : ''}.`, costTurnover: totalCost, travelCost, investmentAttribution };
@@ -136,7 +136,6 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (!expertId || !domain) return { success: false, message: 'Choose an expert and domain.' };
     const expert = findExpert(); if (!expert || !expertAvailable(expert)) return { success: false, message: 'Expert is unavailable.' };
     const skill = expert.domains.find((x) => x.domain === domain); if (!skill) return { success: false, message: 'Domain not held by expert.' };
-    if (skill.score >= 8) return { success: false, message: 'This expert is already at the maximum score.' };
     skill.score += 1;
     const directSiteId = expert.location === 'HQ' ? undefined : expert.location;
     const investmentAttribution = finish(baseCost, directSiteId);
@@ -180,19 +179,30 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
   }
 
   if (type === 'LESSONS_LEARNED') {
-    if (!siteId || !domain || !learningTarget || !eventInstanceId) return { success: false, message: 'Choose a recent challenge, site, domain and learning target.' };
+    if (!siteId || !domain || !expertId || !eventInstanceId) return { success: false, message: 'Choose a recent challenge, site, domain and expert facilitator.' };
     const site = findSite(); if (!site) return { success: false, message: 'Site not found.' };
+    const facilitator = findExpert(); if (!facilitator) return { success: false, message: 'Choose an employed expert facilitator.' };
+    const facilitatorSkill = facilitator.domains.find((skill) => skill.domain === domain);
+    if (!facilitatorSkill) return { success: false, message: 'The AAR facilitator must hold the selected domain.' };
     const event = (session.activeEvents[company.id] || []).find((e) => e.instanceId === eventInstanceId && e.isResolved);
     if (!event) return { success: false, message: 'Lessons Learned can only use one of this round’s completed challenges.' };
     if (event.experientialLearningAwarded) return { success: false, message: 'An AAR has already been completed for this challenge. Each challenge can only be used once for Lessons Learned.' };
     if (!event.card.domains.some((r) => r.domain === domain)) return { success: false, message: 'Choose a domain that was part of the selected challenge.' };
     if (event.card.scope === 'local' && event.targetSiteId !== site.id) return { success: false, message: 'A local challenge can only generate Lessons Learned at the site where it occurred.' };
-    if (learningTarget === 'team') site.teamCapability[domain] = Math.min(6, site.teamCapability[domain] + 1);
-    else site.codifiedKnowledge[domain] = Math.min(6, site.codifiedKnowledge[domain] + 1);
+    site.teamCapability[domain] += 1;
+    facilitatorSkill.score += 1;
+    company.intranet[domain] += 1;
     recordPublicationEvidenceV4(company, domain, 2);
     event.experientialLearningAwarded = true;
     const investmentAttribution = finish(baseCost, site.id);
-    return { success: true, message: `AAR on “${event.card.title}” increased ${site.name} ${domain} ${learningTarget === 'team' ? 'Team Capability' : 'Codified Knowledge'} +1. Cost $${baseCost}k.`, costTurnover: baseCost, investmentAttribution, eventInstanceId };
+    return {
+      success: true,
+      message: `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost ${baseCost}k.`,
+      costTurnover: baseCost,
+      investmentAttribution,
+      eventInstanceId,
+      aarLearning: { siteId: site.id, expertId: facilitator.id, domain, siteDelta: 1, expertDelta: 1, intranetDelta: 1 },
+    };
   }
 
   if (type === 'JOIN_COP') {
