@@ -149,6 +149,10 @@ function peerOrganisationalKnowledge(session:GameSessionV2,company:CompanyV2,dom
   return{score:ranked[0]?.score||0,sourceCompanyName:ranked[0]?.peer.name};
 }
 
+export function finalDisruptionChanceV1(missingPoints:number):number{
+  return Math.max(0,Math.min(100,100-23*Math.max(0,Math.floor(missingPoints))));
+}
+
 export interface FinalDisruptionSelectionV1{expertId?:string}
 export type FinalDisruptionSelectionsV1=Partial<Record<KnowledgeDomain,FinalDisruptionSelectionV1>>;
 
