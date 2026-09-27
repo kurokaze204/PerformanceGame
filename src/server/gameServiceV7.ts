@@ -134,7 +134,17 @@ async function resolveManualFinalDisruption(sessionId:string,companyId:string,se
   const company=session.companies.find(item=>item.id===companyId);
   if(!company?.disruptionCard)return{success:false,message:'Company disruption card not found.',session};
   const existing=((session as any).finalDisruptionResults||[]) as any[];
-  if(existing.some(result=>result.companyId===company.id))return{success:false,message:'This company has already resolved the final disruption.',session};
+  const existingResult=existing.find(result=>result.companyId===company.id);
+  if(existingResult){
+    return{
+      success:true,
+      alreadyResolved:true,
+      message:existingResult.success?'Disruption survived.':'Disruption resolved.',
+      session,
+      results:existing,
+      result:existingResult,
+    };
+  }
 
   const evaluation=evaluateFinalDisruptionV1(session,company,selections);
   if(!evaluation)return{success:false,message:'Could not score the disruption.',session};
@@ -145,8 +155,6 @@ async function resolveManualFinalDisruption(sessionId:string,companyId:string,se
   if(consultantCost>0){
     applyFinalCompanyLoss(company,consultantCost,session.round);
     company.cumulativeConsultantSpend=(company.cumulativeConsultantSpend||0)+consultantCost;
-    await saveSessionV2(session);
-    await recordCompanyMetric(session,company,'FINAL_CONSULTANT');
   }
   const turnoverAfterConsultant=company.turnover;
 
@@ -199,9 +207,20 @@ async function resolveManualFinalDisruption(sessionId:string,companyId:string,se
   (session as any).finalDisruptionResults=next;
   session.finalDisruptionResolved=session.companies.every(item=>next.some(resultItem=>resultItem.companyId===item.id));
   applyInterfaceSimplificationV1(session);
+
+  // Commit the gameplay state once. Analytics is deliberately best-effort:
+  // a telemetry/database failure must never turn a 100% gameplay outcome into
+  // an API failure or leave a consultant debit without a recorded resolution.
   await saveSessionV2(session);
-  await recordCompanyMetric(session,company,'FINAL_DISRUPTION');
   broadcastV2(session,'FINAL_DISRUPTION_COMPANY_RESOLVED',{companyId:company.id,result,allCompaniesResolved:session.finalDisruptionResolved});
+
+  if(consultantCost>0){
+    try{await recordCompanyMetric(session,company,'FINAL_CONSULTANT')}
+    catch(error){console.error('Analytics capture failed after final consultant resolution',error)}
+  }
+  try{await recordCompanyMetric(session,company,'FINAL_DISRUPTION')}
+  catch(error){console.error('Analytics capture failed after final disruption resolution',error)}
+
   return{success:true,message:allSucceeded?'Disruption survived.':'Disruption resolved.',session,results:next,result};
 }
 
