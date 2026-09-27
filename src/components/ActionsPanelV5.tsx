@@ -51,7 +51,6 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const [sourceSiteId,setSourceSiteId]=useState(activeSites[1]?.id||activeSites[0]?.id||'');
  const [expertId,setExpertId]=useState(activeExperts[0]?.id||'');
  const [domain,setDomain]=useState<KnowledgeDomain>('engineering');
- const [learningTarget,setLearningTarget]=useState<'team'|'codified'>('team');
  const [aarEventId,setAarEventId]=useState(resolvedEvents[0]?.instanceId||'');
  const selected=visibleInterventions.find(i=>i.id===selectedId)||visibleInterventions[0];
  const selectedAarEvent=resolvedEvents.find(e=>e.instanceId===aarEventId)||resolvedEvents[0];
@@ -66,7 +65,6 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  useEffect(()=>{if(selectedExpert&&selectedExpert.id!==expertId)setExpertId(selectedExpert.id)},[selectedExpert?.id]);
  useEffect(()=>{if(resolvedEvents.length&&!resolvedEvents.some(e=>e.instanceId===aarEventId))setAarEventId(resolvedEvents[0].instanceId)},[aarEventId,resolvedEvents]);
  useEffect(()=>{if(selectedId==='aar'&&selectedAarEvent?.card.scope==='local'&&selectedAarEvent.targetSiteId)setSiteId(selectedAarEvent.targetSiteId)},[selectedId,selectedAarEvent?.instanceId]);
- useEffect(()=>{if(!showLocalCodified&&learningTarget!=='team')setLearningTarget('team')},[showLocalCodified,learningTarget]);
  if(!selected)return null;
  const tutorialDomain=tutorialEvent?.card.domains[0]?.domain;
  const tutorialSourceId=tutorialEvent?.card.tags?.find(tag=>tag.startsWith('tutorial-source:'))?.slice('tutorial-source:'.length);
