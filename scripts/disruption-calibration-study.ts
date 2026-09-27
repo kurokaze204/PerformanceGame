@@ -4,9 +4,8 @@ import type { KnowledgeDomain } from '../src/types/game.ts';
 import { createNewSessionV2 } from '../src/server/gameServiceV5.ts';
 import { drawRoundEventsV2, prepareNextRoundV2, recalculateCompanySPOFV2 } from '../src/engine/coreV2.ts';
 import { applyProgressionToCurrentEvents, PROGRAMMED_FAILURE_TAG } from '../src/engine/eventProgressionV5.ts';
-import { evaluateEventDomainKnowledgeExplicitV2, resolveSingleEventExplicitV2 } from '../src/engine/challengeResponseV2.ts';
 import { evaluateFinalDisruptionV1 } from '../src/engine/disruptionPlusV1.ts';
-import { executeInvestmentActionV4, expertTravelCostV4, copMembershipActiveV4 } from '../src/engine/investmentActionsV4.ts';
+import { executeInvestmentActionV4, recordPublicationEvidenceV4 } from '../src/engine/investmentActionsV4.ts';
 import { executeRiverKnowledgeSharing } from '../src/engine/riverKnowledgeV1.ts';
 import { executeRiskPhaseV4 } from '../src/engine/riskPhaseV4.ts';
 import { interventionUnlocked } from '../src/engine/experienceModeV3.ts';
@@ -23,12 +22,12 @@ class RNG {
   next(){this.state=(this.state*1664525+1013904223)>>>0;return this.state/4294967296}
 }
 
-interface Profile { name:string; reserve:number; }
+interface Profile { name:string; disruptionActionsPerRound:number; }
 const PROFILES:Profile[]=[
-  {name:'focused',reserve:.12},
-  {name:'balanced',reserve:.18},
-  {name:'cautious',reserve:.25},
-  {name:'conservative',reserve:.32},
+  {name:'light-focus',disruptionActionsPerRound:1},
+  {name:'moderate-focus',disruptionActionsPerRound:2},
+  {name:'strong-focus',disruptionActionsPerRound:3},
+  {name:'very-strong-focus',disruptionActionsPerRound:4},
 ];
 
 type Candidate={type:string;params:any;label:string};
@@ -114,7 +113,7 @@ function rawDepthAssets(session:GameSessionV2){
   });
 }
 
-function scoreUtility(before:GameSessionV2,after:GameSessionV2,finalRound:number,cost:number){
+function scoreUtility(before:GameSessionV2,after:GameSessionV2,finalRound:number){
   const b=finalState(before,finalRound).domainResults;
   const a=finalState(after,finalRound).domainResults;
   const bScores=b.map(x=>x.totalKnowledge),aScores=a.map(x=>x.totalKnowledge);
@@ -128,15 +127,23 @@ function scoreUtility(before:GameSessionV2,after:GameSessionV2,finalRound:number
     rawGain+=delta;
     if(i===weakIndex)weakGain+=delta;
   }
-  return lowerGain*120+totalGain*35+weakGain*4+rawGain-cost*.025;
+  return lowerGain*120+totalGain*35+weakGain*4+rawGain;
 }
 
 function cloneSession(session:GameSessionV2):GameSessionV2{return structuredClone(session);}
 
 function applyCandidate(session:GameSessionV2,candidate:Candidate){
   const company=companyOf(session);
-  if(candidate.type==='SITE_KNOWLEDGE_SHARING')return executeRiverKnowledgeSharing(session,company,{type:candidate.type,companyId:company.id,...candidate.params});
-  return executeInvestmentActionV4(session,company,{type:candidate.type,companyId:company.id,...candidate.params} as any);
+  const turnover=company.turnover;
+  const siteTurnovers=new Map(company.sites.map(site=>[site.id,site.turnover]));
+  const result=candidate.type==='SITE_KNOWLEDGE_SHARING'
+    ?executeRiverKnowledgeSharing(session,company,{type:candidate.type,companyId:company.id,...candidate.params})
+    :executeInvestmentActionV4(session,company,{type:candidate.type,companyId:company.id,...candidate.params} as any);
+  // This rig calibrates attainable knowledge, not economic survivability. Reimburse
+  // investment spend so long-horizon results are not dominated by event/turnover compounding.
+  company.turnover=turnover;
+  company.sites.forEach(site=>{site.turnover=siteTurnovers.get(site.id)??site.turnover});
+  return result;
 }
 
 function candidatesFor(session:GameSessionV2,totalRounds:number):Candidate[]{
@@ -171,69 +178,30 @@ function candidatesFor(session:GameSessionV2,totalRounds:number):Candidate[]{
   return candidates;
 }
 
-function chooseAndApplyInvestment(session:GameSessionV2,totalRounds:number,initialTurnover:number,profile:Profile){
-  const company=companyOf(session);
-  const beforeTurnover=company.turnover;
-  const reserve=initialTurnover*profile.reserve;
+function chooseAndApplyInvestment(session:GameSessionV2,totalRounds:number){
   const candidates=candidatesFor(session,totalRounds);
-  let best:{candidate:Candidate;utility:number;trial:GameSessionV2}|null=null;
+  let best:{candidate:Candidate;utility:number}|null=null;
   for(const candidate of candidates){
     const trial=cloneSession(session);
-    const trialCompany=companyOf(trial);
     const result:any=applyCandidate(trial,candidate);
     if(!result?.success)continue;
-    const cost=Math.max(0,beforeTurnover-trialCompany.turnover);
-    if(trialCompany.turnover<reserve)continue;
-    const utility=scoreUtility(session,trial,totalRounds,cost);
+    const utility=scoreUtility(session,trial,totalRounds);
     if(utility<=0)continue;
-    if(!best||utility>best.utility+1e-9)best={candidate,utility,trial};
+    if(!best||utility>best.utility+1e-9)best={candidate,utility};
   }
   if(!best)return false;
   const result:any=applyCandidate(session,best.candidate);
   return Boolean(result?.success);
 }
 
-function allocateEvent(session:GameSessionV2,event:ActiveEventV2,usedExperts:Set<string>){
-  const company=companyOf(session);
-  for(const req of event.card.domains){
-    const allocation:any={useTeamCapability:true,useCorporateIntranet:true,consultantPoints:0};
-    const tutorial=event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
-    if(!tutorial){
-      const expert=company.experts
-        .filter(item=>!item.isVacant&&!usedExperts.has(item.id))
-        .map(item=>({expert:item,score:item.domains.find(skill=>skill.domain===req.domain)?.score||0}))
-        .filter(item=>item.score>0)
-        .sort((a,b)=>b.score-a.score)[0]?.expert;
-      if(expert){
-        allocation.expertId=expert.id;
-        if(event.card.scope==='local'&&event.targetSiteId)allocation.expertTravelCost=expertTravelCostV4(expert.location,event.targetSiteId);
-        usedExperts.add(expert.id);
-      }
-      if(copMembershipActiveV4(session,company.id,req.domain))allocation.useCoPSupport=true;
-    }
-    event.allocations[req.domain]=allocation;
-  }
-}
-
 function resolveRoundEvents(session:GameSessionV2){
   const company=companyOf(session);
   session.phase='respond';
-  const usedExperts=new Set<string>();
   for(const event of (session.activeEvents[company.id]||[]) as ActiveEventV2[]){
-    allocateEvent(session,event,usedExperts);
-    const tutorial=event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
-    let originals:number[]|null=null;
-    if(tutorial){
-      originals=event.card.domains.map(req=>req.difficulty);
-      event.card.domains.forEach(req=>{req.difficulty=99});
-    }
-    resolveSingleEventExplicitV2(session,company,event);
-    if(tutorial&&originals){
-      event.card.domains.forEach((req,index)=>{req.difficulty=originals![index]});
-      event.success=false;
-      if(event.domainResults)event.domainResults.forEach((result:any)=>{result.domainSuccess=false});
-    }
     event.isResolved=true;
+    event.success=!event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
+    const evidence=event.card.tags?.some(tag=>['critical','safety','site-threatening','specialist','novel'].includes(tag))?2:1;
+    for(const req of event.card.domains)recordPublicationEvidenceV4(company,req.domain,evidence);
   }
 }
 
@@ -255,8 +223,8 @@ async function simulate(rounds:number,run:number):Promise<RunRow>{
 
       session.phase='investment';
       company.actionsRemaining=session.config.actions_per_round;
-      for(let slot=0;slot<session.config.actions_per_round;slot++){
-        if(!chooseAndApplyInvestment(session,rounds,initialTurnover,profile))break;
+      for(let slot=0;slot<profile.disruptionActionsPerRound;slot++){
+        if(!chooseAndApplyInvestment(session,rounds))break;
         actionsUsed++;
       }
 
@@ -341,7 +309,7 @@ const summary=Array.from({length:MAX_ROUNDS-MIN_ROUNDS+1},(_,i)=>MIN_ROUNDS+i).m
 });
 
 mkdirSync('balance-results',{recursive:true});
-writeFileSync('balance-results/disruption-calibration.json',JSON.stringify({meta:{generatedAt:new Date().toISOString(),mode:'newbie',runsPerLength:RUNS_PER_LENGTH,minRounds:MIN_ROUNDS,maxRounds:MAX_ROUNDS,roundCadenceMinutes:[10,9,8,7,6,5,4,3],profiles:PROFILES,notes:'Current production engine setup, event progression, depth+breadth scoring, facilitator AAR, SPOF/risk and investment actions. Agent knows its revealed Disruption from the start and prioritises improving the weaker of the two final domains while preserving a strategy-dependent turnover reserve.'},summary,rows},null,2));
+writeFileSync('balance-results/disruption-calibration.json',JSON.stringify({meta:{generatedAt:new Date().toISOString(),mode:'newbie',runsPerLength:RUNS_PER_LENGTH,minRounds:MIN_ROUNDS,maxRounds:MAX_ROUNDS,roundCadenceMinutes:[10,9,8,7,6,5,4,3],profiles:PROFILES,notes:'Knowledge-only calibration using the current production starting state, event/domain stream, depth+breadth scoring, facilitator AAR, SPOF/risk and investment mechanics. Five Actions remain available each round, but the four player profiles devote 1, 2, 3 or 4 of them to the known Disruption; the remaining Actions are assumed to serve other business priorities. Investment and Event financial effects are excluded so long-horizon scores measure knowledge growth rather than compounding turnover.'},summary,rows},null,2));
 
 const columns=Object.keys(rows[0]) as (keyof RunRow)[];
 const csv=[columns.join(','),...rows.map(row=>columns.map(key=>JSON.stringify(row[key])).join(','))].join('\n');
@@ -350,6 +318,6 @@ writeFileSync('balance-results/disruption-calibration-runs.csv',csv);
 const summaryColumns=Object.keys(summary[0]) as (keyof typeof summary[0])[];
 writeFileSync('balance-results/disruption-calibration-summary.csv',[summaryColumns.join(','),...summary.map(row=>summaryColumns.map(key=>String(row[key])).join(','))].join('\n'));
 
-const md=['# Disruption calibration study','',`660 Newbie simulations: 20 games for every round count from 3 to 35. Round cadence is 10, 9, 8, 7, 6, 5, 4, then 3 minutes per round thereafter. The player agent knows its Disruption from the start and deliberately builds capability toward it, while retaining a turnover reserve.`,'','| Rounds | Model min | Mean domain | P60 domain | Mean low | P60 low | Mean high | P60 high |','|---:|---:|---:|---:|---:|---:|---:|---:|',...summary.map(row=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.meanDomainScore.toFixed(2)} | ${row.p60DomainScore.toFixed(2)} | ${row.meanLowScore.toFixed(2)} | ${row.p60LowScore.toFixed(2)} | ${row.meanHighScore.toFixed(2)} | ${row.p60HighScore.toFixed(2)} |`),''].join('\n');
+const md=['# Disruption calibration study','',`660 Newbie knowledge-calibration simulations: 20 games for every round count from 3 to 35. Round cadence is 10, 9, 8, 7, 6, 5, 4, then 3 minutes per round thereafter. Across the 20 games, five players devote 1, 2, 3 or 4 of their five Actions each round to their known Disruption. Event and investment financial effects are excluded so this study isolates knowledge growth and Knowledge Risk.`,'','| Rounds | Model min | Mean domain | P60 domain | Mean low | P60 low | Mean high | P60 high |','|---:|---:|---:|---:|---:|---:|---:|---:|',...summary.map(row=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.meanDomainScore.toFixed(2)} | ${row.p60DomainScore.toFixed(2)} | ${row.meanLowScore.toFixed(2)} | ${row.p60LowScore.toFixed(2)} | ${row.meanHighScore.toFixed(2)} | ${row.p60HighScore.toFixed(2)} |`),''].join('\n');
 writeFileSync('balance-results/disruption-calibration.md',md);
 console.log('\n'+md);
