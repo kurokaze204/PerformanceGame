@@ -6,14 +6,14 @@ import { recalculateCompanySPOFV2 } from './coreV2.ts';
 export const INVESTMENT_COSTS_V4: Record<string, number> = {
   KNOWLEDGE_TRANSFER: 18,
   SITE_KNOWLEDGE_SHARING: 5,
-  CORPORATE_TRAINING: 95,
+  CORPORATE_TRAINING: 60,
   CODIFY_SITE: 20,
   TRAIN_EXPERT: 20,
-  UPDATE_INTRANET: 35,
-  LESSONS_LEARNED: 15,
-  JOIN_COP: 25,
-  HORIZON_SCAN: 80,
-  AUTOMATE: 150,
+  UPDATE_INTRANET: 30,
+  LESSONS_LEARNED: 20,
+  JOIN_COP: 20,
+  HORIZON_SCAN: 40,
+  AUTOMATE: 80,
 };
 
 const DOMAIN_ORDER: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
@@ -43,7 +43,7 @@ export function expertTravelCostV4(from: string, target?: string): number {
   if (!a || !b) return 0;
   const distance = Math.hypot(a.x - b.x, a.y - b.y);
   const scaled = Math.max(0, Math.min(1, (distance - minCityDistance) / Math.max(0.001, maxCityDistance - minCityDistance)));
-  return Math.round((25 + scaled * 50) / 5) * 5;
+  return Math.round((5 + scaled * 15) / 5) * 5;
 }
 
 function companyBestKnowledge(company: CompanyV2, domain: KnowledgeDomain): number {
