@@ -15,6 +15,9 @@ interface Props{
  highlightAllSites?:boolean;
  highlightDomain?:boolean;
  showSiteLabels?:boolean;
+ previewSiteDelta?:number;
+ previewExpertDelta?:number;
+ previewHQDelta?:number;
 }
 
 const NEWBIE:KnowledgeDomain[]=['engineering','hr','marketing','operations'];
@@ -23,7 +26,7 @@ const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',ad
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0})=>{
  const domains=mode==='expert'?EXPERT:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
  const experts=company.experts.filter(expert=>!expert.isVacant);
@@ -32,7 +35,13 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
    return{domain,scores,north:Math.max(0,...scores.map(item=>item.score)),south:Math.min(...scores.map(item=>item.score))};
  }),[company,mode]);
  const expertMarks=useMemo(()=>experts.flatMap(expert=>expert.domains.filter(skill=>domains.includes(skill.domain)).map(skill=>({expert,domain:skill.domain,score:skill.score}))),[company,mode]);
- const maxY=Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0));
+ const selectedSitePreview=selectedSiteId?sites.find(site=>site.id===selectedSiteId)?.teamCapability[selectedDomain]||0:0;
+ const selectedExpertPreview=selectedExpertId?expertMarks.find(mark=>mark.expert.id===selectedExpertId&&mark.domain===selectedDomain)?.score||0:0;
+ const selectedHQPreview=company.intranet[selectedDomain]||0;
+ const rawMax=Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0),selectedSitePreview+previewSiteDelta,selectedExpertPreview+previewExpertDelta,selectedHQPreview+previewHQDelta);
+ const niceStep=(max:number)=>{const raw=Math.max(1,max/4),power=Math.pow(10,Math.floor(Math.log10(raw))),scaled=raw/power;return(scaled<=1?1:scaled<=2?2:scaled<=5?5:10)*power};
+ const tickStep=niceStep(rawMax),maxY=Math.max(tickStep,Math.ceil(rawMax/tickStep)*tickStep);
+ const ticks=Array.from({length:Math.floor(maxY/tickStep)+1},(_,index)=>index*tickStep);
  const W=920,H=350,padL=64,padR=92,padT=34,padB=58;
  const x=(index:number)=>padL+index*((W-padL-padR)/Math.max(1,domains.length-1));
  const y=(value:number)=>padT+(maxY-value)*((H-padT-padB)/maxY);
@@ -48,7 +57,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span>● Site</span><span className="text-sky-300">◆ HQ</span><span className="text-amber-300">● Expert</span></div>
   </div>
   <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[220px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
-   {[0,2,4,6,8].filter(value=>value<=maxY).map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
+   {ticks.map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
    {highlightDomain&&domainIndex>=0&&<rect x={Math.max(padL-42,x(domainIndex)-72)} y={padT-12} width="144" height={H-padT-padB+28} rx="16" fill="#facc15" fillOpacity=".06" stroke="#facc15" strokeOpacity=".38" strokeWidth="2"/>}
    <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>
    {data.map((item,di)=>{
@@ -69,6 +78,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const labelAnchor=rightEdge?'end':'start';
        return <g key={site.id}>
         {(target||source)&&<circle cx={px} cy={py} r="12" fill={source?'#10b981':'#facc15'} fillOpacity=".15" stroke={source?'#34d399':'#fde047'} strokeWidth="3"/>}
+        {target&&previewSiteDelta>0&&<><line x1={px} y1={py} x2={px} y2={y(score+previewSiteDelta)} stroke="#fde047" strokeWidth="2" strokeDasharray="4 3"/><circle cx={px} cy={y(score+previewSiteDelta)} r="7" fill="#0f172a" stroke="#fde047" strokeWidth="2" strokeDasharray="3 2"/><text x={px+10} y={y(score+previewSiteDelta)-5} fill="#fde047" fontSize="12" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">+{previewSiteDelta}</text></>}
         <circle cx={px} cy={py} r={target||source?6:5} fill="#f8fafc" stroke={source?'#34d399':target?'#fde047':'#0f172a'} strokeWidth={target||source?2.5:1.8}/>
         <text x={labelX} y={labelYs[si]} textAnchor={labelAnchor} fill={source?'#6ee7b7':target?'#fde047':'#f8fafc'} fontSize="13" fontWeight={target||source?'900':'800'} paintOrder="stroke" stroke="#020617" strokeWidth="3" strokeLinejoin="round">{abbrev(site.id)}</text>
        </g>
@@ -80,6 +90,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const py=y(hqScore);
        return <g>
         {hqSelected&&<circle cx={px} cy={py} r="13" fill="#38bdf8" fillOpacity=".15" stroke="#7dd3fc" strokeWidth="3"/>}
+        {hqSelected&&previewHQDelta>0&&<><line x1={px} y1={py} x2={px} y2={y(hqScore+previewHQDelta)} stroke="#7dd3fc" strokeWidth="2" strokeDasharray="4 3"/><rect x={px-6} y={y(hqScore+previewHQDelta)-6} width="12" height="12" transform={`rotate(45 ${px} ${y(hqScore+previewHQDelta)})`} fill="#0f172a" stroke="#7dd3fc" strokeWidth="2" strokeDasharray="3 2"/><text x={px+13} y={y(hqScore+previewHQDelta)-6} fill="#7dd3fc" fontSize="12" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">+{previewHQDelta}</text></>}
         <rect x={px-5} y={py-5} width="10" height="10" transform={`rotate(45 ${px} ${py})`} fill="#38bdf8" stroke={hqSelected?'#e0f2fe':'#075985'} strokeWidth="2"/>
         {hqSelected&&<text x={px+10} y={py-8} fill="#7dd3fc" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">HQ · {hqScore}</text>}
        </g>
@@ -93,6 +104,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const loc=abbrev(mark.expert.location);
        return <g key={`${mark.expert.id}-${item.domain}`}>
         {selected&&<circle cx={px} cy={py} r="25" fill="#facc15" fillOpacity=".12" stroke="#fde047" strokeWidth="3.5"/>}
+        {selected&&previewExpertDelta>0&&<><line x1={px} y1={py} x2={px} y2={y(mark.score+previewExpertDelta)} stroke="#fde047" strokeWidth="2" strokeDasharray="4 3"/><circle cx={px} cy={y(mark.score+previewExpertDelta)} r="17" fill="#0f172a" stroke="#fde047" strokeWidth="2" strokeDasharray="3 2"/><text x={px+22} y={y(mark.score+previewExpertDelta)-7} fill="#fde047" fontSize="12" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">+{previewExpertDelta}</text></>}
         <circle cx={px} cy={py} r="16" fill="#facc15" stroke="#713f12" strokeWidth="1.5"/>
         <circle cx={px} cy={py-5} r="4" fill="#374151"/><path d={`M ${px-7} ${py+9} Q ${px-6} ${py-1} ${px} ${py-1} Q ${px+6} ${py-1} ${px+7} ${py+9} Z`} fill="#374151"/>
         <text x={labelX} y={labelYs[item.scores.length+ei]} textAnchor={labelAnchor} fill="#fde047" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3" strokeLinejoin="round">{firstName(mark.expert.name)} · {loc}</text>
