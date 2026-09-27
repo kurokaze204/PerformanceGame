@@ -101,7 +101,7 @@ const finalDisruptionSource=readFileSync(new URL('../src/components/FinalDisrupt
 assert.ok(finalDisruptionSource.includes('TRY YOUR LUCK WITHOUT EXTERNAL HELP'),'Final Disruption must clearly label an under-strength no-consultant attempt');
 assert.ok(finalDisruptionSource.includes('Chance without external help'),'Final Disruption must show the gap-based chance');
 assert.ok(finalDisruptionSource.includes('aria-pressed={useConsultant}'),'Emergency Consultant control must expose a visible selected state');
-assert.ok(finalDisruptionSource.includes('backgroundColor:\'#0b0d12\''),'Disruption domain cards must use a distinct neutral surface from the consultant and resolve controls');
+assert.ok(finalDisruptionSource.includes('bg-[#0b0d12]'),'Disruption domain cards must use a distinct neutral surface from the consultant and resolve controls');
 
 const eventDeckSource=readFileSync(new URL('../src/components/EventDeckV1.tsx',import.meta.url),'utf8');
 assert.ok(eventDeckSource.includes("const lastSharedOpenIdRef=useRef('')"),'Event deck must remember the last shared-open Event id');
