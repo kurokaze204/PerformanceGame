@@ -40,7 +40,9 @@ assert.ok(evaluation);
 const firstResult=evaluation!.domainResults.find(result=>result.domain===first.domain)!;
 assert.equal(firstResult.local,5);
 assert.equal(firstResult.expertScore,6);
-assert.equal(firstResult.totalKnowledge,11,'local 5 + expert 6 must equal 11 before other additive sources');
+assert.equal(firstResult.depthKnowledge,6,'the strongest source should set disruption depth');
+assert.equal(firstResult.breadthBonus,1,'the second independent source should add one breadth point');
+assert.equal(firstResult.totalKnowledge,7,'local 5 plus expert 6 should compose as depth 6 + breadth 1, not 11');
 
 const beforeA=company.disruptionCard!.id;
 const peer=session.companies[1];
