@@ -62,6 +62,10 @@ const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.u
 assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||session"),'Event acknowledgement must prefer the authoritative acknowledged session before selecting the next card');
 const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
 assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
+const investmentRiverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
+assert.ok(investmentRiverSource.includes('{abbrev(site.id)}'),'Invest River site labels must use three-letter site abbreviations');
+assert.ok(investmentRiverSource.includes('{firstName(mark.expert.name)} · {loc}'),'Invest River expert labels must show first name and city abbreviation');
+assert.ok(investmentRiverSource.includes('fontSize="13"'),'Invest River labels must remain readable at the central workspace size');
 assert.ok(investPanelSource.includes('Choose an investment'),'Invest must keep investment choices beside the River');
 assert.ok(investPanelSource.includes('data-investment-arrow'),'Choose an investment panel must retain its bottom pointer');
 assert.ok(investPanelSource.includes('data-knowledge-transfer-controls'),'Knowledge Transfer controls must use the dedicated vertical hierarchy');
