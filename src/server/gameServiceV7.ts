@@ -3,7 +3,7 @@ import type { GameSessionV2, PopulationMode } from '../types/gameV2.ts';
 import { createInitialCompanyV2, drawRoundEventsV2, recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { diversifyInitialKnowledge } from '../engine/eventProgressionV5.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
-import { dealCompanyDisruptionsV1, evaluateFinalDisruptionV1, type FinalDisruptionSelectionsV1 } from '../engine/disruptionPlusV1.ts';
+import { dealCompanyDisruptionsV1, evaluateFinalDisruptionV1, finalDisruptionChanceV1, type FinalDisruptionSelectionsV1 } from '../engine/disruptionPlusV1.ts';
 import { recordCompanyMetric, saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
@@ -150,10 +150,13 @@ async function resolveManualFinalDisruption(sessionId:string,companyId:string,se
   }
   const turnoverAfterConsultant=company.turnover;
 
+  const chanceWithoutConsultant=finalDisruptionChanceV1(evaluation.gap);
+  const resolutionRoll=!useConsultant&&evaluation.gap>0?Math.floor(Math.random()*100)+1:null;
+  const allSucceeded=useConsultant||evaluation.gap===0||(resolutionRoll!=null&&resolutionRoll<=chanceWithoutConsultant);
   const domainResults=evaluation.domainResults.map(domainResult=>{
     const consultantPoints=useConsultant?domainResult.gap:0;
     const totalKnowledge=domainResult.totalKnowledge+consultantPoints;
-    const domainSuccess=totalKnowledge>=domainResult.difficulty;
+    const domainSuccess=allSucceeded||totalKnowledge>=domainResult.difficulty;
     return{
       ...domainResult,
       consultantPoints,
@@ -161,10 +164,13 @@ async function resolveManualFinalDisruption(sessionId:string,companyId:string,se
       requiredTotal:domainResult.difficulty,
       achievedTotal:totalKnowledge,
       domainSuccess,
-      explanation:`Knowledge ${domainResult.totalKnowledge}${consultantPoints?` + consultant ${consultantPoints}`:''}; needed ${domainResult.difficulty}.`,
+      explanation:useConsultant
+        ?`Knowledge ${domainResult.totalKnowledge} + consultant ${consultantPoints}; needed ${domainResult.difficulty}.`
+        :evaluation.gap===0
+          ?`Knowledge ${domainResult.totalKnowledge}; requirement met.`
+          :`Knowledge ${domainResult.totalKnowledge}; overall disruption chance ${chanceWithoutConsultant}%${resolutionRoll!=null?`; rolled ${resolutionRoll}`:''}.`,
     };
   });
-  const allSucceeded=domainResults.every(result=>result.domainSuccess);
   const disruptionLoss=allSucceeded?0:company.disruptionCard.impact;
   if(disruptionLoss>0)applyFinalCompanyLoss(company,disruptionLoss,session.round);
   recalculateCompanySPOFV2(company,session.config);
@@ -184,6 +190,8 @@ async function resolveManualFinalDisruption(sessionId:string,companyId:string,se
     interventionCost:consultantCost,
     consultantCost,
     consultantPercent,
+    chanceWithoutConsultant,
+    resolutionRoll,
     consultantDetails:consultantCost?[{cost:consultantCost,percent:consultantPercent,gap:evaluation.gap,required:evaluation.required}]:[],
     domainResults,
   };
