@@ -13,6 +13,8 @@ import { interventionUnlocked } from '../src/engine/experienceModeV3.ts';
 const RUNS_PER_LENGTH=20;
 const MIN_ROUNDS=3;
 const MAX_ROUNDS=35;
+const CONFIRMATION_ROUNDS=[3,6,10,15,20,25,30,35];
+const CONFIRMATION_RUNS=100;
 const STARTING_ROUND_MINUTES=[10,9,8,7,6,5,4];
 const MIN_ROUND_MINUTES=3;
 const DISRUPTION_DOMAINS:KnowledgeDomain[]=['engineering','hr','marketing','operations'];
@@ -205,14 +207,14 @@ function resolveRoundEvents(session:GameSessionV2){
   }
 }
 
-async function simulate(rounds:number,run:number):Promise<RunRow>{
-  const seed=7300000+rounds*1000+run;
+async function simulate(rounds:number,run:number,seedOffset=0):Promise<RunRow>{
+  const seed=7300000+seedOffset+rounds*1000+run;
   const rng=new RNG(seed);
   const realRandom=Math.random;
   Math.random=()=>rng.next();
   try{
     const profile=PROFILES[(run-1)%PROFILES.length];
-    const session=await createNewSessionV2(`CAL-${rounds}-${run}`,'Disruption calibration',['Calibration Co'],{experienceMode:'newbie',gameDurationMinutes:60,actionsPerRound:5});
+    const session=await createNewSessionV2(`CAL-${seedOffset}-${rounds}-${run}`,'Disruption calibration',['Calibration Co'],{experienceMode:'newbie',gameDurationMinutes:60,actionsPerRound:5});
     const company=companyOf(session);
     const initialTurnover=company.turnover;
     let actionsUsed=0,expertDepartures=0,siteLosses=0;
@@ -280,6 +282,19 @@ for(let rounds=MIN_ROUNDS;rounds<=MAX_ROUNDS;rounds++){
   console.log(`rounds=${rounds} minutes=${roundMinutes(rounds)} meanLow=${mean(current.map(x=>x.lowScore)).toFixed(2)} meanHigh=${mean(current.map(x=>x.highScore)).toFixed(2)} p60Low=${percentile(current.map(x=>x.lowScore),.60).toFixed(2)} p60High=${percentile(current.map(x=>x.highScore),.60).toFixed(2)}`);
 }
 
+function isotonicNonDecreasing(values:number[]):number[]{
+  const blocks=values.map((value,index)=>({start:index,end:index,weight:1,value}));
+  for(let i=0;i<blocks.length-1;){
+    if(blocks[i].value<=blocks[i+1].value+1e-9){i++;continue}
+    const left=blocks[i],right=blocks[i+1],weight=left.weight+right.weight;
+    blocks.splice(i,2,{start:left.start,end:right.end,weight,value:(left.value*left.weight+right.value*right.weight)/weight});
+    if(i>0)i--;
+  }
+  const result=Array(values.length).fill(0);
+  for(const block of blocks)for(let i=block.start;i<=block.end;i++)result[i]=block.value;
+  return result;
+}
+
 const summary=Array.from({length:MAX_ROUNDS-MIN_ROUNDS+1},(_,i)=>MIN_ROUNDS+i).map(rounds=>{
   const r=rows.filter(row=>row.rounds===rounds);
   const domainScores=r.flatMap(row=>[row.scoreA,row.scoreB]);
@@ -308,8 +323,79 @@ const summary=Array.from({length:MAX_ROUNDS-MIN_ROUNDS+1},(_,i)=>MIN_ROUNDS+i).m
   };
 });
 
+const smoothedP60=isotonicNonDecreasing(summary.map(row=>row.p60DomainScore));
+const candidateTable=summary.map((row,index)=>{
+  const smoothed=smoothedP60[index];
+  const high=Math.max(3,Math.ceil(smoothed));
+  const low=Math.max(3,high-1);
+  return{rounds:row.rounds,modeledMinutes:row.modeledMinutes,smoothedP60:smoothed,high,low};
+});
+for(let i=0;i<summary.length;i++)Object.assign(summary[i],{
+  smoothedP60DomainScore:candidateTable[i].smoothedP60,
+  candidateHigh:candidateTable[i].high,
+  candidateLow:candidateTable[i].low,
+});
+
+interface ConfirmationRow extends RunRow {
+  targetHigh:number;
+  targetLow:number;
+  gapA:number;
+  gapB:number;
+  totalGap:number;
+  chanceWithoutConsultant:number;
+  consultantPercent:number;
+  outright:boolean;
+}
+
+const confirmationRows:ConfirmationRow[]=[];
+for(const rounds of CONFIRMATION_ROUNDS){
+  const candidate=candidateTable.find(row=>row.rounds===rounds)!;
+  for(let run=1;run<=CONFIRMATION_RUNS;run++){
+    const row=await simulate(rounds,run,2000000);
+    const gapA=Math.max(0,candidate.high-row.scoreA);
+    const gapB=Math.max(0,candidate.low-row.scoreB);
+    const totalGap=gapA+gapB;
+    const required=candidate.high+candidate.low;
+    confirmationRows.push({
+      ...row,
+      targetHigh:candidate.high,
+      targetLow:candidate.low,
+      gapA,
+      gapB,
+      totalGap,
+      chanceWithoutConsultant:Math.max(0,100-23*totalGap),
+      consultantPercent:required>0?80*(totalGap/required):0,
+      outright:totalGap===0,
+    });
+  }
+}
+
+const confirmation=CONFIRMATION_ROUNDS.map(rounds=>{
+  const r=confirmationRows.filter(row=>row.rounds===rounds);
+  const candidate=candidateTable.find(row=>row.rounds===rounds)!;
+  return{
+    rounds,
+    modeledMinutes:roundMinutes(rounds),
+    targetHigh:candidate.high,
+    targetLow:candidate.low,
+    games:r.length,
+    outrightRate:r.filter(row=>row.outright).length/r.length,
+    gap1Rate:r.filter(row=>row.totalGap===1).length/r.length,
+    gap2Rate:r.filter(row=>row.totalGap===2).length/r.length,
+    gap3PlusRate:r.filter(row=>row.totalGap>=3).length/r.length,
+    meanGap:mean(r.map(row=>row.totalGap)),
+    meanChanceWithoutConsultant:mean(r.map(row=>row.chanceWithoutConsultant)),
+    consultantNeededRate:r.filter(row=>row.totalGap>0).length/r.length,
+    meanConsultantPercent:mean(r.map(row=>row.consultantPercent)),
+    meanExpertDepartures:mean(r.map(row=>row.expertDepartures)),
+    meanSiteLosses:mean(r.map(row=>row.siteLosses)),
+    meanScoreA:mean(r.map(row=>row.scoreA)),
+    meanScoreB:mean(r.map(row=>row.scoreB)),
+  };
+});
+
 mkdirSync('balance-results',{recursive:true});
-writeFileSync('balance-results/disruption-calibration.json',JSON.stringify({meta:{generatedAt:new Date().toISOString(),mode:'newbie',runsPerLength:RUNS_PER_LENGTH,minRounds:MIN_ROUNDS,maxRounds:MAX_ROUNDS,roundCadenceMinutes:[10,9,8,7,6,5,4,3],profiles:PROFILES,notes:'Knowledge-only calibration using the current production starting state, event/domain stream, depth+breadth scoring, facilitator AAR, SPOF/risk and investment mechanics. Five Actions remain available each round, but the four player profiles devote 1, 2, 3 or 4 of them to the known Disruption; the remaining Actions are assumed to serve other business priorities. Investment and Event financial effects are excluded so long-horizon scores measure knowledge growth rather than compounding turnover.'},summary,rows},null,2));
+writeFileSync('balance-results/disruption-calibration.json',JSON.stringify({meta:{generatedAt:new Date().toISOString(),mode:'newbie',runsPerLength:RUNS_PER_LENGTH,confirmationRuns:CONFIRMATION_RUNS,confirmationRounds:CONFIRMATION_ROUNDS,minRounds:MIN_ROUNDS,maxRounds:MAX_ROUNDS,roundCadenceMinutes:[10,9,8,7,6,5,4,3],profiles:PROFILES,notes:'Knowledge-only calibration using the current production starting state, event/domain stream, depth+breadth scoring, facilitator AAR, SPOF/risk and investment mechanics. Five Actions remain available each round, but the four player profiles devote 1, 2, 3 or 4 of them to the known Disruption; the remaining Actions are assumed to serve other business priorities. Investment and Event financial effects are excluded so long-horizon scores measure knowledge growth rather than compounding turnover. Candidate card strengths are derived by isotonic smoothing of the 60th percentile domain score, rounding the stronger requirement up and setting the second domain one point lower.'},summary,candidateTable,confirmation,rows,confirmationRows},null,2));
 
 const columns=Object.keys(rows[0]) as (keyof RunRow)[];
 const csv=[columns.join(','),...rows.map(row=>columns.map(key=>JSON.stringify(row[key])).join(','))].join('\n');
@@ -317,7 +403,11 @@ writeFileSync('balance-results/disruption-calibration-runs.csv',csv);
 
 const summaryColumns=Object.keys(summary[0]) as (keyof typeof summary[0])[];
 writeFileSync('balance-results/disruption-calibration-summary.csv',[summaryColumns.join(','),...summary.map(row=>summaryColumns.map(key=>String(row[key])).join(','))].join('\n'));
+const confirmationColumns=Object.keys(confirmation[0]) as (keyof typeof confirmation[0])[];
+writeFileSync('balance-results/disruption-confirmation-summary.csv',[confirmationColumns.join(','),...confirmation.map(row=>confirmationColumns.map(key=>String(row[key])).join(','))].join('\n'));
+const confirmationRunColumns=Object.keys(confirmationRows[0]) as (keyof ConfirmationRow)[];
+writeFileSync('balance-results/disruption-confirmation-runs.csv',[confirmationRunColumns.join(','),...confirmationRows.map(row=>confirmationRunColumns.map(key=>JSON.stringify(row[key])).join(','))].join('\n'));
 
-const md=['# Disruption calibration study','',`660 Newbie knowledge-calibration simulations: 20 games for every round count from 3 to 35. Round cadence is 10, 9, 8, 7, 6, 5, 4, then 3 minutes per round thereafter. Across the 20 games, five players devote 1, 2, 3 or 4 of their five Actions each round to their known Disruption. Event and investment financial effects are excluded so this study isolates knowledge growth and Knowledge Risk.`,'','| Rounds | Model min | Mean domain | P60 domain | Mean low | P60 low | Mean high | P60 high |','|---:|---:|---:|---:|---:|---:|---:|---:|',...summary.map(row=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.meanDomainScore.toFixed(2)} | ${row.p60DomainScore.toFixed(2)} | ${row.meanLowScore.toFixed(2)} | ${row.p60LowScore.toFixed(2)} | ${row.meanHighScore.toFixed(2)} | ${row.p60HighScore.toFixed(2)} |`),''].join('\n');
+const md=['# Disruption calibration study','',`660 Newbie knowledge-calibration simulations: 20 games for every round count from 3 to 35. Round cadence is 10, 9, 8, 7, 6, 5, 4, then 3 minutes per round thereafter. Across the 20 games, five players devote 1, 2, 3 or 4 of their five Actions each round to their known Disruption. Event and investment financial effects are excluded so this study isolates knowledge growth and Knowledge Risk.`,'','## Calibration curve','','| Rounds | Model min | P60 raw | P60 smoothed | Candidate |','|---:|---:|---:|---:|:---|',...summary.map((row:any)=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.p60DomainScore.toFixed(2)} | ${row.smoothedP60DomainScore.toFixed(2)} | ${row.candidateHigh}/${row.candidateLow} |`),'','## 100-game confirmation at key breakpoints','','| Rounds | Min | Card | Outright | Gap 1 | Gap 2 | Gap 3+ | Mean luck chance | Mean consultant % |','|---:|---:|:---|---:|---:|---:|---:|---:|---:|',...confirmation.map(row=>`| ${row.rounds} | ${row.modeledMinutes} | ${row.targetHigh}/${row.targetLow} | ${(row.outrightRate*100).toFixed(0)}% | ${(row.gap1Rate*100).toFixed(0)}% | ${(row.gap2Rate*100).toFixed(0)}% | ${(row.gap3PlusRate*100).toFixed(0)}% | ${row.meanChanceWithoutConsultant.toFixed(1)}% | ${row.meanConsultantPercent.toFixed(1)}% |`),''].join('\n');
 writeFileSync('balance-results/disruption-calibration.md',md);
 console.log('\n'+md);
