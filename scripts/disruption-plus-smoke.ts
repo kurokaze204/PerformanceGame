@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
 import { createNewSessionV2 } from '../src/server/gameServiceV4.ts';
-import { evaluateFinalDisruptionV1, finalDisruptionChanceV1, swapDisruptionWithPeerV1 } from '../src/engine/disruptionPlusV1.ts';
+import { disruptionStrengthForRoundsV1, estimatedDisruptionRoundsForTimedGameV1, evaluateFinalDisruptionV1, finalDisruptionChanceV1, swapDisruptionWithPeerV1 } from '../src/engine/disruptionPlusV1.ts';
 
 assert.equal(finalDisruptionChanceV1(0),100,'no final knowledge gap must be certain');
 assert.equal(finalDisruptionChanceV1(2),54,'two missing points must leave a 54% chance');
 assert.equal(finalDisruptionChanceV1(5),0,'large gaps must clamp at zero chance');
+assert.deepEqual(disruptionStrengthForRoundsV1(3),{rounds:3,high:11,low:10});
+assert.deepEqual(disruptionStrengthForRoundsV1(10),{rounds:10,high:13,low:12});
+assert.deepEqual(disruptionStrengthForRoundsV1(35),{rounds:35,high:23,low:22});
+assert.deepEqual(disruptionStrengthForRoundsV1(40),{rounds:40,high:25,low:24},'calibrated line must continue beyond the 35-round test horizon');
 
 const names=['Alpha','Beta','Gamma','Delta','Epsilon','Zeta'];
 const session=await createNewSessionV2('DISRUPTION-SMOKE','Disruption Smoke',names,{experienceMode:'newbie',gameDurationMinutes:60});
+assert.equal(estimatedDisruptionRoundsForTimedGameV1(session),8,'a 60-minute timed game leaves about 50 minutes before the final window, completing round 8');
+assert.deepEqual(session.companies[0].disruptionCard!.domains.map(item=>item.difficulty),[13,12],'60-minute Newbie game should use the calibrated 8-round card strength');
 assert.equal(session.companies.length,6);
 assert.equal(session.strategicDisruptionDomains?.length,3,'game should choose exactly three shared strategic disruption domains');
 const strategic=new Set(session.strategicDisruptionDomains);
@@ -64,6 +70,17 @@ for(const receivingCompany of [company,peer]){
   const expertDomains=new Set(receivingCompany.experts.flatMap(item=>item.domains.map(skill=>skill.domain)));
   for(const requirement of receivingCompany.disruptionCard!.domains)assert.ok(expertDomains.has(requirement.domain),'a swapped disruption must remain expert-compatible');
 }
+
+const shortTimed=await createNewSessionV2('DISRUPTION-30','Disruption 30',['A'],{experienceMode:'newbie',gameDurationMinutes:30});
+assert.equal(estimatedDisruptionRoundsForTimedGameV1(shortTimed),3);
+assert.deepEqual(shortTimed.companies[0].disruptionCard!.domains.map(item=>item.difficulty),[11,10]);
+
+const longTimed=await createNewSessionV2('DISRUPTION-90','Disruption 90',['A'],{experienceMode:'newbie',gameDurationMinutes:90});
+assert.equal(estimatedDisruptionRoundsForTimedGameV1(longTimed),18);
+assert.deepEqual(longTimed.companies[0].disruptionCard!.domains.map(item=>item.difficulty),[16,15]);
+
+const roundExpert=await createNewSessionV2('DISRUPTION-35R','Disruption 35R',['A'],{experienceMode:'expert',gameEndMode:'rounds',finalRoundCount:35});
+assert.deepEqual(roundExpert.companies[0].disruptionCard!.domains.map(item=>item.difficulty),[23,22]);
 
 const large=await createNewSessionV2('DISRUPTION-CITY-ROTATE','Disruption City Rotate',['A','B','C','D','E','F','G'],{experienceMode:'expert',gameDurationMinutes:60});
 assert.equal(large.strategicDisruptionDomains?.length,3);
