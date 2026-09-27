@@ -61,16 +61,16 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
     return <g key={item.domain}>
      <text x={x(di)} y={H-12} textAnchor="middle" fill={domainSelected?'#fde047':'#cbd5e1'} fontSize="15" fontWeight={domainSelected?'900':'800'}>{DOMAIN_INFO[item.domain].label}</text>
      {item.scores.map(({site,score},si)=>{
-       const spread=showSiteLabels&&domainSelected?18:7;
-       const jitter=(si-(item.scores.length-1)/2)*spread,px=x(di)+jitter;
+       const {px,py}=sitePoints[si];
        const target=domainSelected&&(site.id===selectedSiteId||highlightAllSites);
        const source=domainSelected&&site.id===sourceSiteId;
-       const labelVisible=domainSelected&&(showSiteLabels||target||source);
-       const labelY=y(score)+(si%2===0?-10:15);
+       const rightEdge=px>W-padR-58;
+       const labelX=rightEdge?px-10:px+10;
+       const labelAnchor=rightEdge?'end':'start';
        return <g key={site.id}>
-        {(target||source)&&<circle cx={px} cy={y(score)} r="12" fill={source?'#10b981':'#facc15'} fillOpacity=".15" stroke={source?'#34d399':'#fde047'} strokeWidth="3"/>}
-        <circle cx={px} cy={y(score)} r={target||source?5.5:4} fill="#f8fafc" stroke={source?'#34d399':target?'#fde047':'#0f172a'} strokeWidth={target||source?2.5:1.5}/>
-        {labelVisible&&<text x={px} y={labelY} textAnchor="middle" fill={source?'#6ee7b7':target?'#fde047':'#e2e8f0'} fontSize="9" fontWeight={target||source?'900':'700'} paintOrder="stroke" stroke="#020617" strokeWidth="3">{showSiteLabels?`${site.name} · ${score}`:`${ABBR[site.id]||site.name.slice(0,3).toUpperCase()} · ${score}`}</text>}
+        {(target||source)&&<circle cx={px} cy={py} r="12" fill={source?'#10b981':'#facc15'} fillOpacity=".15" stroke={source?'#34d399':'#fde047'} strokeWidth="3"/>}
+        <circle cx={px} cy={py} r={target||source?6:5} fill="#f8fafc" stroke={source?'#34d399':target?'#fde047':'#0f172a'} strokeWidth={target||source?2.5:1.8}/>
+        <text x={labelX} y={labelYs[si]} textAnchor={labelAnchor} fill={source?'#6ee7b7':target?'#fde047':'#f8fafc'} fontSize="13" fontWeight={target||source?'900':'800'} paintOrder="stroke" stroke="#020617" strokeWidth="3" strokeLinejoin="round">{abbrev(site.id)}</text>
        </g>
      })}
      {(()=>{
@@ -81,22 +81,26 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        return <g>
         {hqSelected&&<circle cx={px} cy={py} r="13" fill="#38bdf8" fillOpacity=".15" stroke="#7dd3fc" strokeWidth="3"/>}
         <rect x={px-5} y={py-5} width="10" height="10" transform={`rotate(45 ${px} ${py})`} fill="#38bdf8" stroke={hqSelected?'#e0f2fe':'#075985'} strokeWidth="2"/>
-        {hqSelected&&<text x={px+10} y={py-8} fill="#7dd3fc" fontSize="10" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">HQ · {hqScore}</text>}
+        {hqSelected&&<text x={px+10} y={py-8} fill="#7dd3fc" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">HQ · {hqScore}</text>}
        </g>
      })()}
      {domainExperts.map((mark,ei)=>{
-       const px=x(di)+(ei-(domainExperts.length-1)/2)*42,py=y(mark.score);
+       const {px,py}=expertPoints[ei];
        const selected=domainSelected&&mark.expert.id===selectedExpertId;
+       const rightEdge=px>W-padR-120;
+       const labelX=rightEdge?px-26:px+26;
+       const labelAnchor=rightEdge?'end':'start';
+       const loc=abbrev(mark.expert.location);
        return <g key={`${mark.expert.id}-${item.domain}`}>
         {selected&&<circle cx={px} cy={py} r="25" fill="#facc15" fillOpacity=".12" stroke="#fde047" strokeWidth="3.5"/>}
-        <circle cx={px} cy={py} r="15" fill="#facc15" stroke="#713f12" strokeWidth="1.5"/>
-        <circle cx={px} cy={py-5} r="3.7" fill="#374151"/><path d={`M ${px-7} ${py+8} Q ${px-6} ${py} ${px} ${py} Q ${px+6} ${py} ${px+7} ${py+8} Z`} fill="#374151"/>
-        {selected&&<text x={px+21} y={py-7} fill="#fde047" fontSize="10" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">{initials(mark.expert.name)} · {mark.score}</text>}
+        <circle cx={px} cy={py} r="16" fill="#facc15" stroke="#713f12" strokeWidth="1.5"/>
+        <circle cx={px} cy={py-5} r="4" fill="#374151"/><path d={`M ${px-7} ${py+9} Q ${px-6} ${py-1} ${px} ${py-1} Q ${px+6} ${py-1} ${px+7} ${py+9} Z`} fill="#374151"/>
+        <text x={labelX} y={labelYs[item.scores.length+ei]} textAnchor={labelAnchor} fill="#fde047" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3" strokeLinejoin="round">{firstName(mark.expert.name)} · {loc}</text>
        </g>
      })}
     </g>
    })}
-   <text x="18" y={H/2} textAnchor="middle" fill="#64748b" fontSize="11" transform={`rotate(-90 18 ${H/2})`}>Knowledge level</text>
+   <text x="18" y={H/2} textAnchor="middle" fill="#64748b" fontSize="14" fontWeight="700" transform={`rotate(-90 18 ${H/2})`}>Knowledge level</text>
   </svg>
  </div>;
 };
