@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Building2, MapPin, Users, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { BarChart3, Building2, Clock3, MapPin, Users, X } from 'lucide-react';
 import type { Expert } from '../types/game.ts';
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { BoardSidePanelV2 } from './BoardSidePanelV2.tsx';
@@ -14,15 +15,22 @@ type IntroStep='invest'|'river'|null;
 type CompanyRoundPhase='events'|'investment'|'risk'|'waiting';
 interface Props{session:GameSessionV2;company:CompanyV2;selectedSiteId:string;tool:Tool;onTool:(tool:Tool)=>void;onSelectSite:(id:string)=>void;onSelectHQ:()=>void;onSelectExpert?:(expert:Expert)=>void;onOpenCharts?:()=>void;onSessionUpdate?:(session:GameSessionV2)=>void;}
 const tabs=[['sites','Sites',MapPin],['experts','Experts',Users],['hq','HQ',Building2],['score','Score',BarChart3]] as const;
-const short=(text:string,max=100)=>text.length<=max?text:`${text.slice(0,max-1).trim()}…`;
 
 export const InvestmentDecisionDockV1:React.FC<Props>=({session,company,selectedSiteId,tool,onTool,onSelectSite,onSelectHQ,onSelectExpert,onOpenCharts,onSessionUpdate})=>{
  const [transitioning,setTransitioning]=useState(false);
  const [transitionError,setTransitionError]=useState('');
+ const [delayedOpen,setDelayedOpen]=useState(()=>Boolean(company.delayedEvent));
  const introKey=`tpg_first_invest_intro_${session.id}`;
  const [introStep,setIntroStep]=useState<IntroStep>(()=>{try{return localStorage.getItem(introKey)?null:'invest'}catch{return'invest'}});
  const companyRoundPhase=((company as any).roundPhase as CompanyRoundPhase|undefined)||'investment';
  const domains=domainsForMode(session.experienceMode),site=company.sites.find(s=>s.id===selectedSiteId)||company.sites[0],delayed=company.delayedEvent;
+
+ useEffect(()=>{
+  setDelayedOpen(Boolean(delayed));
+ },[delayed?.instanceId,session.round]);
+
+ const toggleTool=(id:Exclude<Tool,null>)=>{setDelayedOpen(false);onTool(tool===id?null:id)};
+ const toggleDelayed=()=>{const next=!delayedOpen;setDelayedOpen(next);if(next)onTool(null)};
 
  const runRoundAction=async(type:'FINISH_INVESTING'|'FINISH_RISK')=>{
   if(transitioning)return;
@@ -83,11 +91,16 @@ export const InvestmentDecisionDockV1:React.FC<Props>=({session,company,selected
 
  return <>
  {introStep&&<div className="fixed inset-0 z-[190] grid place-items-center bg-black/75 p-5" role="dialog" aria-modal="true" aria-labelledby="invest-intro-title"><div className="w-full max-w-xl rounded-3xl border-2 border-violet-500 bg-[#0b0f18] p-6 shadow-2xl">{introStep==='invest'?<><div className="text-xs font-black uppercase tracking-[.18em] text-emerald-300">Invest phase</div><h2 id="invest-intro-title" className="mt-2 text-3xl font-black text-white">Build the knowledge you will need.</h2><p className="mt-3 text-base text-slate-300">You have a limited number of Actions. Choose where they will make the biggest difference.</p><button onClick={()=>setIntroStep('river')} className="mt-5 w-full rounded-xl bg-violet-600 py-3.5 text-sm font-black text-white">SHOW ME HOW</button></>:<><div className="text-xs font-black uppercase tracking-[.18em] text-emerald-300">Knowledge River</div><h2 id="invest-intro-title" className="mt-2 text-3xl font-black text-white">See the gap. Choose an investment.</h2><p className="mt-3 text-base text-slate-300">The River stays visible while you invest. Your selections will light up the knowledge they affect.</p><button onClick={finishIntro} className="mt-5 w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-black text-white">START INVESTING</button></>}</div></div>}
- <div className="fixed right-3 top-[104px] z-[145] hidden min-[1100px]:flex flex-col items-end gap-2" aria-label="Investment decision support">
-  {delayed&&<div className="w-[420px] rounded-2xl border-[3px] border-violet-500 bg-[#0b0f18]/[0.99] p-3 shadow-2xl"><div className="flex items-center justify-between gap-3"><div className="text-[11px] font-black uppercase tracking-[.16em] text-violet-300">Delayed · first Event next round</div><div className="flex gap-1">{delayed.card.domains.slice(0,3).map(req=><DomainBadge key={req.domain} domain={req.domain}/>)}</div></div><div className="mt-2 text-base font-black leading-tight text-white">{short(delayed.card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,''),64)}</div><p className="mt-1.5 text-xs leading-relaxed text-slate-400">{short(delayed.card.description,120)}</p></div>}
-  <div className="flex items-start gap-2">{tool&&<aside className={`${delayed?'max-h-[calc(100vh-270px)]':'max-h-[calc(100vh-122px)]'} w-[420px] overflow-y-auto rounded-2xl border-2 border-violet-500 bg-[#0b0f18]/[0.99] p-4 shadow-2xl backdrop-blur-lg`}><div className="sticky top-0 z-10 -mx-1 -mt-1 mb-4 flex items-center justify-between bg-[#0b0f18]/95 px-1 py-1 backdrop-blur-md"><div><div className="text-xs font-black uppercase tracking-[.16em] text-emerald-300">Decision support</div><div className="text-lg font-black text-white">{tool==='sites'?'Site capability':tool==='experts'?'Expert capability':tool==='hq'?'Corporate knowledge':'Company position'}</div></div><button onClick={()=>onTool(null)} className="tpg-close-button"><X className="h-5 w-5"/></button></div>{tool==='sites'&&<BoardSidePanelV2 session={session} company={company} selectedSiteId={selectedSiteId} isHQSelected={false} onSelectSite={onSelectSite} onSelectHQ={onSelectHQ}/>} {tool==='experts'&&<ExpertReferenceList company={company} domains={domains} onSelectExpert={onSelectExpert}/>} {tool==='hq'&&<KnowledgeHubPanel company={company} experienceMode={session.experienceMode}/>}{tool==='score'&&<ScorePanelV2 session={session} company={company} selectedSiteName={site?.name} onOpenCharts={onOpenCharts}/>}</aside>}
-   <div className="w-[82px] rounded-2xl border-2 border-violet-700 bg-[#0b0f18]/95 p-2 shadow-2xl backdrop-blur-md"><div className="pb-2 text-center text-[10px] font-black uppercase tracking-[.12em] text-emerald-300">Reference</div><nav className="flex flex-col gap-2">{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>onTool(tool===id?null:id)} className={`tpg-tool-button ${tool===id?'tpg-tool-button-active':''}`}><Icon className="h-5 w-5"/><span>{label}</span></button>)}</nav></div>
-  </div>
+ <div className="fixed right-3 top-[104px] z-[145] hidden min-[1100px]:flex items-start gap-2" aria-label="Investment decision support">
+  <AnimatePresence initial={false}>
+   {delayed&&delayedOpen&&<motion.aside key={delayed.instanceId} initial={{opacity:0,x:34}} animate={{opacity:1,x:0}} exit={{opacity:0,x:34}} transition={{duration:.24,ease:'easeOut'}} className="max-h-[calc(100vh-122px)] w-[420px] overflow-y-auto rounded-2xl border-[3px] border-violet-500 bg-[#0b0f18]/[0.99] p-4 shadow-2xl backdrop-blur-lg">
+    <div className="flex items-start justify-between gap-3"><div><div className="text-[11px] font-black uppercase tracking-[.16em] text-violet-300">Delayed · first Event next round</div><div className="mt-2 text-xl font-black leading-tight text-white">{delayed.card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,'')}</div></div><button type="button" onClick={()=>setDelayedOpen(false)} className="tpg-close-button shrink-0" aria-label="Hide delayed Event"><X className="h-5 w-5"/></button></div>
+    <p className="mt-3 text-sm leading-relaxed text-slate-300">{delayed.card.description}</p>
+    <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/70 p-3"><div className="mb-2 text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Required knowledge scores</div><div className="space-y-2">{delayed.card.domains.map(req=><div key={req.domain} className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-[#0b0f18] px-3 py-2"><DomainBadge domain={req.domain}/><div className="text-right"><div className="text-[9px] font-black uppercase tracking-[.12em] text-slate-500">Score required</div><div className="text-2xl font-black leading-none text-white">{req.difficulty}</div></div></div>)}</div></div>
+   </motion.aside>}
+  </AnimatePresence>
+  {tool&&!delayedOpen&&<aside className="max-h-[calc(100vh-122px)] w-[420px] overflow-y-auto rounded-2xl border-2 border-violet-500 bg-[#0b0f18]/[0.99] p-4 shadow-2xl backdrop-blur-lg"><div className="sticky top-0 z-10 -mx-1 -mt-1 mb-4 flex items-center justify-between bg-[#0b0f18]/95 px-1 py-1 backdrop-blur-md"><div><div className="text-xs font-black uppercase tracking-[.16em] text-emerald-300">Decision support</div><div className="text-lg font-black text-white">{tool==='sites'?'Site capability':tool==='experts'?'Expert capability':tool==='hq'?'Corporate knowledge':'Company position'}</div></div><button onClick={()=>onTool(null)} className="tpg-close-button"><X className="h-5 w-5"/></button></div>{tool==='sites'&&<BoardSidePanelV2 session={session} company={company} selectedSiteId={selectedSiteId} isHQSelected={false} onSelectSite={onSelectSite} onSelectHQ={onSelectHQ}/>} {tool==='experts'&&<ExpertReferenceList company={company} domains={domains} onSelectExpert={onSelectExpert}/>} {tool==='hq'&&<KnowledgeHubPanel company={company} experienceMode={session.experienceMode}/>}{tool==='score'&&<ScorePanelV2 session={session} company={company} selectedSiteName={site?.name} onOpenCharts={onOpenCharts}/>}</aside>}
+  <div className="w-[82px] rounded-2xl border-2 border-violet-700 bg-[#0b0f18]/95 p-2 shadow-2xl backdrop-blur-md"><div className="pb-2 text-center text-[10px] font-black uppercase tracking-[.12em] text-emerald-300">Reference</div><nav className="flex flex-col gap-2">{delayed&&<button type="button" onClick={toggleDelayed} className={`tpg-tool-button ${delayedOpen?'tpg-tool-button-active':''}`} title="Show delayed Event"><Clock3 className="h-5 w-5"/><span>Delayed</span></button>}{tabs.map(([id,label,Icon])=><button key={id} onClick={()=>toggleTool(id)} className={`tpg-tool-button ${!delayedOpen&&tool===id?'tpg-tool-button-active':''}`}><Icon className="h-5 w-5"/><span>{label}</span></button>)}</nav></div>
  </div>
  {transitioning&&<div className="fixed bottom-5 right-5 z-[260] rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-950">Preparing Knowledge Risk…</div>}
  {transitionError&&<div className="fixed bottom-5 right-5 z-[260] rounded-xl bg-rose-100 px-4 py-3 text-sm font-bold text-rose-950">{transitionError}</div>}
