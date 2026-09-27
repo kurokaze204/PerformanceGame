@@ -21,10 +21,10 @@ function markRiverTeachingSiteUsed(company:CompanyV2,round:number,siteId:string)
 }
 
 export function riverTransferTarget(sourceScore:number,currentScore=0):number{
-  const source=Math.max(0,Math.min(6,sourceScore));
-  const current=Math.max(0,Math.min(6,currentScore));
+  const source=Math.max(0,sourceScore);
+  const current=Math.max(0,currentScore);
   if(source<=current)return current;
-  return Math.max(0,Math.min(6,current+Math.ceil((source-current)*0.5)));
+  return current+Math.ceil((source-current)*0.5);
 }
 
 export function executeRiverKnowledgeSharing(session:GameSessionV2,company:CompanyV2,payload:any){
