@@ -12,7 +12,7 @@ import { formatCurrency } from '../utils/format.ts';
 import { InvestmentRiverView } from './InvestmentRiverView.tsx';
 import { DisruptionMiniCard } from './DisruptionCardV1.tsx';
 
-interface Props { session: GameSessionV2; company: CompanyV2; onPerformAction: (type:string, params:any)=>void; onNextPhase:()=>void; }
+interface Props { session: GameSessionV2; company: CompanyV2; onPerformAction: (type:string, params:any)=>void; onNextPhase:()=>void; referenceSiteId?:string; referenceHQ?:boolean; }
 type InterventionId='knowledge-transfer'|'local-training'|'corporate-training'|'codify-site'|'train-expert'|'update-intranet'|'aar'|'join-cop'|'horizon-scan'|'automate';
 type AnchorId='existing'|'expert'|'network'|'favour'|'external'|'risk';
 type Intervention={id:InterventionId; title:string; description:string; anchor:AnchorId; icon:React.ElementType; actionType:string};
@@ -31,7 +31,7 @@ const INTERVENTIONS:Intervention[]=[
 ];
 function costFor(actionType:string){return INVESTMENT_COSTS_V4[actionType]||0;}
 
-export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,onNextPhase})=>{
+export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,onNextPhase,referenceSiteId,referenceHQ=false})=>{
  const showLocalCodified=localCodifiedVisible(session.experienceMode);
  const resolvedEvents=(session.activeEvents[company.id]||[]).filter(e=>e.isResolved);
  const tutorialEvent=resolvedEvents.find(e=>e.card.tags?.includes(PROGRAMMED_FAILURE_TAG));
@@ -142,7 +142,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
    <div className="mt-3 flex min-h-0 flex-col gap-3">
      <div className="grid grid-cols-[minmax(0,1fr)_300px] items-stretch gap-3">
        <div className="min-h-[384px] min-w-0">
-         <InvestmentRiverView company={company} mode={session.experienceMode} selectedDomain={domain} selectedSiteId={riverTargetSiteId} sourceSiteId={riverSourceSiteId} selectedExpertId={riverExpertId} highlightHQ={riverHighlightHQ} highlightAllSites={riverHighlightAllSites} highlightDomain showSiteLabels={selectedId==='knowledge-transfer'} previewSiteDelta={selectedId==='aar'?1:0} previewExpertDelta={selectedId==='aar'?1:0} previewHQDelta={selectedId==='aar'?1:0}/>
+         <InvestmentRiverView company={company} mode={session.experienceMode} selectedDomain={domain} selectedSiteId={riverTargetSiteId} sourceSiteId={riverSourceSiteId} selectedExpertId={riverExpertId} highlightHQ={riverHighlightHQ} highlightAllSites={riverHighlightAllSites} highlightDomain showSiteLabels={selectedId==='knowledge-transfer'} referenceSiteId={referenceSiteId} referenceHQ={referenceHQ} previewSiteDelta={selectedId==='aar'?1:0} previewExpertDelta={selectedId==='aar'?1:0} previewHQDelta={selectedId==='aar'?1:0}/>
        </div>
        <aside className="relative w-[300px] shrink-0 rounded-2xl border border-slate-700 bg-slate-950/95 p-3 pb-4">
          <div className="mb-2 text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Choose an investment</div>
