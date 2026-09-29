@@ -15,6 +15,8 @@ interface Props{
  highlightAllSites?:boolean;
  highlightDomain?:boolean;
  showSiteLabels?:boolean;
+ referenceSiteId?:string;
+ referenceHQ?:boolean;
  previewSiteDelta?:number;
  previewExpertDelta?:number;
  previewHQDelta?:number;
@@ -26,7 +28,7 @@ const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',ad
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0})=>{
  const domains=mode==='expert'?EXPERT:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
  const experts=company.experts.filter(expert=>!expert.isVacant);
@@ -51,6 +53,8 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
  const spreadLabelYs=(preferred:number[],gap=17)=>{if(!preferred.length)return[] as number[];const min=padT+10,max=H-padB-8;const ordered=preferred.map((value,index)=>({value,index})).sort((a,b)=>a.value-b.value);const placed=ordered.map(item=>item.value);for(let i=0;i<placed.length;i++)placed[i]=Math.max(i?placed[i-1]+gap:min,Math.max(min,placed[i]));if(placed[placed.length-1]>max){placed[placed.length-1]=max;for(let i=placed.length-2;i>=0;i--)placed[i]=Math.min(placed[i],placed[i+1]-gap)}const result=Array(preferred.length).fill(0);ordered.forEach((item,index)=>{result[item.index]=placed[index]});return result};
  const domainIndex=domains.indexOf(selectedDomain);
+ const referenceSite=referenceSiteId?sites.find(site=>site.id===referenceSiteId):undefined;
+ const referencePath=referenceHQ?data.map((item,di)=>`${di?'L':'M'} ${x(di)+28} ${y(company.intranet[item.domain]||0)}`).join(' '):referenceSite?data.map((item,di)=>{const si=item.scores.findIndex(entry=>entry.site.id===referenceSite.id);if(si<0)return'';const domainSelected=item.domain===selectedDomain;const siteSpread=showSiteLabels&&domainSelected?18:9;const px=clamp(x(di)+(si-(item.scores.length-1)/2)*siteSpread,padL+6,W-padR-6);return `${di?'L':'M'} ${px} ${y(item.scores[si].score)}`}).filter(Boolean).join(' '):'';
  return <div className="h-full min-h-[260px] rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-inner">
   <div className="flex items-center justify-between gap-3 px-1">
    <div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>
@@ -59,7 +63,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
   <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[220px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
    {ticks.map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
    {highlightDomain&&domainIndex>=0&&<rect x={Math.max(padL-42,x(domainIndex)-72)} y={padT-12} width="144" height={H-padT-padB+28} rx="16" fill="#facc15" fillOpacity=".06" stroke="#facc15" strokeOpacity=".38" strokeWidth="2"/>}
-   <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>
+   <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>{referencePath&&<><path d={referencePath} fill="none" stroke="#fde047" strokeWidth="9" strokeOpacity=".12" strokeLinecap="round" strokeLinejoin="round"/><path d={referencePath} fill="none" stroke="#fde047" strokeWidth="2.5" strokeDasharray="7 6" strokeLinecap="round" strokeLinejoin="round"/></>}
    {data.map((item,di)=>{
     const domainExperts=expertMarks.filter(mark=>mark.domain===item.domain);
     const domainSelected=item.domain===selectedDomain;
@@ -73,25 +77,27 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const {px,py}=sitePoints[si];
        const target=domainSelected&&(site.id===selectedSiteId||highlightAllSites);
        const source=domainSelected&&site.id===sourceSiteId;
+       const reference=!referenceHQ&&site.id===referenceSiteId;
        const rightEdge=px>W-padR-58;
        const labelX=rightEdge?px-10:px+10;
        const labelAnchor=rightEdge?'end':'start';
        return <g key={site.id}>
-        {(target||source)&&<circle cx={px} cy={py} r="12" fill={source?'#10b981':'#facc15'} fillOpacity=".15" stroke={source?'#34d399':'#fde047'} strokeWidth="3"/>}
+        {(target||source||reference)&&<circle cx={px} cy={py} r="12" fill={source?'#10b981':'#facc15'} fillOpacity=".15" stroke={source?'#34d399':'#fde047'} strokeWidth="3"/>}
         {target&&previewSiteDelta>0&&<><line x1={px} y1={py} x2={px} y2={y(score+previewSiteDelta)} stroke="#fde047" strokeWidth="2" strokeDasharray="4 3"/><circle cx={px} cy={y(score+previewSiteDelta)} r="7" fill="#0f172a" stroke="#fde047" strokeWidth="2" strokeDasharray="3 2"/><text x={px+10} y={y(score+previewSiteDelta)-5} fill="#fde047" fontSize="12" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">+{previewSiteDelta}</text></>}
-        <circle cx={px} cy={py} r={target||source?6:5} fill="#f8fafc" stroke={source?'#34d399':target?'#fde047':'#0f172a'} strokeWidth={target||source?2.5:1.8}/>
+        <circle cx={px} cy={py} r={target||source||reference?6:5} fill="#f8fafc" stroke={source?'#34d399':target||reference?'#fde047':'#0f172a'} strokeWidth={target||source||reference?2.5:1.8}/>
         <text x={labelX} y={labelYs[si]} textAnchor={labelAnchor} fill={source?'#6ee7b7':target?'#fde047':'#f8fafc'} fontSize="13" fontWeight={target||source?'900':'800'} paintOrder="stroke" stroke="#020617" strokeWidth="3" strokeLinejoin="round">{abbrev(site.id)}</text>
        </g>
      })}
      {(()=>{
        const hqScore=company.intranet[item.domain]||0;
        const hqSelected=domainSelected&&highlightHQ;
+       const hqReference=referenceHQ;
        const px=x(di)+28;
        const py=y(hqScore);
        return <g>
-        {hqSelected&&<circle cx={px} cy={py} r="13" fill="#38bdf8" fillOpacity=".15" stroke="#7dd3fc" strokeWidth="3"/>}
+        {(hqSelected||hqReference)&&<circle cx={px} cy={py} r="13" fill={hqReference?'#facc15':'#38bdf8'} fillOpacity=".15" stroke={hqReference?'#fde047':'#7dd3fc'} strokeWidth="3"/>}
         {hqSelected&&previewHQDelta>0&&<><line x1={px} y1={py} x2={px} y2={y(hqScore+previewHQDelta)} stroke="#7dd3fc" strokeWidth="2" strokeDasharray="4 3"/><rect x={px-6} y={y(hqScore+previewHQDelta)-6} width="12" height="12" transform={`rotate(45 ${px} ${y(hqScore+previewHQDelta)})`} fill="#0f172a" stroke="#7dd3fc" strokeWidth="2" strokeDasharray="3 2"/><text x={px+13} y={y(hqScore+previewHQDelta)-6} fill="#7dd3fc" fontSize="12" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">+{previewHQDelta}</text></>}
-        <rect x={px-5} y={py-5} width="10" height="10" transform={`rotate(45 ${px} ${py})`} fill="#38bdf8" stroke={hqSelected?'#e0f2fe':'#075985'} strokeWidth="2"/>
+        <rect x={px-5} y={py-5} width="10" height="10" transform={`rotate(45 ${px} ${py})`} fill="#38bdf8" stroke={hqReference?'#fde047':hqSelected?'#e0f2fe':'#075985'} strokeWidth={hqReference?2.5:2}/>
         {hqSelected&&<text x={px+10} y={py-8} fill="#7dd3fc" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">HQ · {hqScore}</text>}
        </g>
      })()}
