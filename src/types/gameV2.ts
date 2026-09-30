@@ -2,6 +2,7 @@ import {
   ActiveEvent,
   ActiveEventAllocation,
   Company,
+  DomainScoreMap,
   EventType,
   Expert,
   GameSession,
