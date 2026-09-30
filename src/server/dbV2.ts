@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { GameSession, KnowledgeDomain } from '../types/game.ts';
 import { CompanyV2, GameSessionV2, asSessionV2 } from '../types/gameV2.ts';
-import { deleteGameSession, getGameEventLogs, initDatabase, logGameEvent, resetAllDatabaseData, saveParticipant } from './db.ts';
+import { deleteGameSession, getGameEventLogs, getParticipantsForSession, initDatabase, logGameEvent, resetAllDatabaseData, saveParticipant } from './db.ts';
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({
@@ -22,6 +22,15 @@ export interface CompanyMetricSnapshot {
 }
 
 function round2(n: number): number { return Math.round(n * 100) / 100; }
+
+async function mergeAuthoritativeParticipants(session: GameSessionV2): Promise<GameSessionV2> {
+  const persisted = await getParticipantsForSession(session.id);
+  if (!persisted.length) return session;
+  const merged = new Map((session.participants || []).map((participant) => [participant.id, participant]));
+  for (const participant of persisted) merged.set(participant.id, participant);
+  session.participants = [...merged.values()];
+  return session;
+}
 
 export function calculateCompanyMetrics(company: CompanyV2, session: GameSessionV2): CompanyMetricSnapshot {
   const activeSites = company.sites.filter((s) => !s.isClosed);
@@ -167,7 +176,7 @@ export async function initDatabaseV2(): Promise<void> {
 }
 
 export async function saveSessionV2(sessionInput: GameSession): Promise<void> {
-  const session = asSessionV2(sessionInput);
+  const session = await mergeAuthoritativeParticipants(asSessionV2(sessionInput));
   session.updatedAt = new Date().toISOString();
   memory.set(session.id, structuredClone(session));
   if (!pool) return;
@@ -307,11 +316,15 @@ export async function getBenchmarkSummary(sessionId: string, companyId: string):
 export async function getSessionV2(id: string): Promise<GameSessionV2 | null> {
   const key = id.toUpperCase();
   const cached = memory.get(key);
-  if (cached) return asSessionV2(structuredClone(cached));
+  if (cached) {
+    const session = await mergeAuthoritativeParticipants(asSessionV2(structuredClone(cached)));
+    memory.set(key, structuredClone(session));
+    return session;
+  }
   if (!pool) return null;
   const result = await pool.query('SELECT state FROM performance_gap.session_snapshots_v2 WHERE id = $1', [key]);
   if (!result.rows.length) return null;
-  const session = asSessionV2(result.rows[0].state as GameSession);
+  const session = await mergeAuthoritativeParticipants(asSessionV2(result.rows[0].state as GameSession));
   memory.set(key, structuredClone(session));
   return session;
 }
