@@ -175,23 +175,6 @@ export function swapDisruptionWithPeerV1(session:GameSessionV2,companyId:string)
   return{companyId:company.id,partnerId:partner.id,companyName:company.name,partnerName:partner.name};
 }
 
-function peerOrganisationalKnowledge(session:GameSessionV2,company:CompanyV2,domain:KnowledgeDomain,preferredCompanyId?:string):{score:number;sourceCompanyName?:string}{
-  const scoreFor=(peer:CompanyV2)=>{
-    const siteBest=Math.max(0,...peer.sites.filter(site=>!site.isClosed).map(site=>{
-      const team=site.teamCapability[domain]||0;
-      const codified=session.experienceMode==='expert'?(site.codifiedKnowledge[domain]||0):0;
-      return Math.max(team,codified);
-    }));
-    return Math.max(peer.intranet[domain]||0,siteBest);
-  };
-  const preferred=preferredCompanyId?session.companies.find(peer=>peer.id===preferredCompanyId&&peer.id!==company.id):undefined;
-  if(preferred)return{score:scoreFor(preferred),sourceCompanyName:preferred.name};
-  const peers=session.companies.filter(peer=>peer.id!==company.id);
-  if(!peers.length)return{score:copPeerKnowledgeScoreV4(session,company,domain),sourceCompanyName:'External Community of Practice'};
-  const ranked=peers.map(peer=>({peer,score:scoreFor(peer)})).sort((a,b)=>b.score-a.score);
-  return{score:ranked[0]?.score||0,sourceCompanyName:ranked[0]?.peer.name};
-}
-
 export function finalDisruptionChanceV1(missingPoints:number):number{
   return Math.max(0,Math.min(100,100-23*Math.max(0,Math.floor(missingPoints))));
 }
