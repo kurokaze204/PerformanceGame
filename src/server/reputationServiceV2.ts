@@ -1,4 +1,5 @@
 import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
+import { anyReciprocalCopV5 } from '../engine/copNetworkV5.ts';
 import { captureResolvedEvent } from './analyticsHooksV2.ts';
 import { getSessionV2, logGameEvent, saveSessionV2 } from './dbV2.ts';
 
@@ -7,7 +8,14 @@ const FAVOUR_MESSAGES = [
   'Your contact took care of it for you but was very clear you owed him one very soon.',
   'Your cousin knew a guy and the deal is done but your Aunty won’t be sending you any presents this Christmas.',
 ];
-const pickFavourMessage=()=>FAVOUR_MESSAGES[Math.floor(Math.random()*FAVOUR_MESSAGES.length)];
+const COP_FAVOUR_MESSAGES = [
+  'A friend from the Community of Practice had some pull with a local contractor.',
+  'A friend from the Community of Practice called in an IOU on your behalf.',
+];
+const pickFavourMessage=(hasCoP:boolean)=>{
+  const pool=hasCoP?COP_FAVOUR_MESSAGES:FAVOUR_MESSAGES;
+  return pool[Math.floor(Math.random()*pool.length)];
+};
 
 function recalcCompanyTurnover(company: any): void {
   company.turnover = Math.round(company.sites.reduce((sum: number, s: any) => sum + (s.isClosed ? 0 : s.turnover), 0));
@@ -31,7 +39,7 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
   if (event.isResolved) return { success: false, message: 'This event is already resolved.', session };
   if (event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)) return { success: false, message: 'This opening learning challenge is intentionally limited to knowledge already accessible at the site. Other rescue routes become part of play after this learning step.', session };
 
-  const flavourText=pickFavourMessage();
+  const flavourText=pickFavourMessage(anyReciprocalCopV5(session,company.id));
   company.reputationPoints -= 1; event.reputationUsed = true; event.isResolved = true; event.success = true; event.committedProbabilityPercent = 100; event.resolvedAt = new Date().toISOString(); event.experientialLearningAwarded = true;
   let turnoverChange = event.card.type === 'opportunity' ? event.card.impact : 0;
   if (turnoverChange !== 0) { if (event.card.scope === 'local' && event.targetSiteId) { const target = company.sites.find((s) => s.id === event.targetSiteId); if (target) applySiteDelta(company, target, turnoverChange); } else applyCompanyDelta(company, turnoverChange); }
