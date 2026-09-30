@@ -264,6 +264,7 @@ async function sendCopMessage(sessionId:string,companyId:string,payload:any){
       message,
       round:session.round,
       createdAt:now,
+      kind:'request',
     });
     if(soloTarget){
       session.copMessages.push({
@@ -274,6 +275,8 @@ async function sendCopMessage(sessionId:string,companyId:string,payload:any){
         message:soloPeerAutoReplyV5(session,domain),
         round:session.round,
         createdAt:new Date(Date.now()+1).toISOString(),
+        kind:'response',
+        response:'accepted',
       });
     }
     await saveSessionV2(session);
@@ -282,6 +285,41 @@ async function sendCopMessage(sessionId:string,companyId:string,payload:any){
   });
 }
 
+async function respondCopMessage(sessionId:string,companyId:string,payload:any){
+  return serialisePhaseChange(sessionId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!company)return{success:false,message:'Company not found.',session};
+    const requestId=String(payload?.messageId||'');
+    const request=(session.copMessages||[]).find(message=>message.id===requestId&&message.toCompanyId===company.id);
+    if(!request)return{success:false,message:'That CoP request is no longer available.',session};
+    const response=payload?.response==='accepted'?'accepted':payload?.response==='declined'?'declined':null;
+    if(!response)return{success:false,message:'Choose whether your company is willing to join.',session};
+    const already=(session.copMessages||[]).some(message=>message.replyToId===request.id&&message.fromCompanyId===company.id&&message.kind==='response');
+    if(already)return{success:false,message:'Your company has already answered this request.',session};
+    const other=session.companies.find(candidate=>candidate.id===request.fromCompanyId);
+    const domainLabel=request.domain?request.domain:'general business';
+    const message=response==='accepted'
+      ?`Yes — we are willing to join the ${domainLabel} Community of Practice and share what we know. We still need to register our membership in Invest.`
+      :`Not this round — we are not joining the ${domainLabel} Community of Practice.`;
+    session.copMessages.push({
+      id:`cop-msg-${Date.now()}-${Math.random().toString(36).slice(2,7)}-response`,
+      fromCompanyId:company.id,
+      toCompanyId:request.fromCompanyId,
+      domain:request.domain,
+      message,
+      round:session.round,
+      createdAt:new Date().toISOString(),
+      kind:'response',
+      response,
+      replyToId:request.id,
+    });
+    await saveSessionV2(session);
+    broadcastV2(session,'COP_MESSAGE_RESPONSE',{fromCompanyId:company.id,toCompanyId:request.fromCompanyId,response,domain:request.domain});
+    return{success:true,message:response==='accepted'?`You told ${other?.name||'the other company'} you are willing to join.`:`You declined the request from ${other?.name||'the other company'}.`,session};
+  });
+}
 async function openCompanyEventCard(sessionId:string,companyId:string,eventInstanceId:string){
   return serialiseCompanyEventOpenV1(sessionId,companyId,async()=>{
     const session=await baseGetSessionV2(sessionId.toUpperCase());
@@ -393,6 +431,7 @@ export async function knowledgeActionV2(sessionId:string,companyId:string,payloa
   if(payload?.type==='SITE_KNOWLEDGE_SHARING')return serialisePhaseChange(sessionId,()=>baseKnowledgeActionV2(sessionId,companyId,payload));
   if(payload?.type==='MOVE_EXPERT')return moveExpertPermanently(sessionId,companyId,payload);
   if(payload?.type==='COP_MESSAGE')return sendCopMessage(sessionId,companyId,payload);
+  if(payload?.type==='COP_RESPONSE')return respondCopMessage(sessionId,companyId,payload);
   if(payload?.type==='SET_REPLACEMENT_LOCATION')return setReplacementLocation(sessionId,companyId,payload);
   if(payload?.type==='OPEN_EVENT_CARD')return openCompanyEventCard(sessionId,companyId,String(payload?.eventInstanceId||''));
   if(payload?.type==='ACK_EVENT_RESOLUTION')return acknowledgeEventResolution(sessionId,companyId,String(payload?.eventInstanceId||''));
