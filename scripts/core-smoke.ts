@@ -16,6 +16,7 @@ import {
 } from '../src/engine/challengeResponseV2.ts';
 import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
 import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, siteKnowledgePointsV1, siteTurnoverGrowthPercentV1 } from '../src/engine/investmentCapacityV1.ts';
+import { COP_GENERAL_DOMAIN_V5, companyHasCopMembershipV5, reciprocalCopPeersV5 } from '../src/engine/copNetworkV5.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -62,7 +63,7 @@ assert.deepEqual({
   TRAIN_EXPERT:20,
   UPDATE_INTRANET:30,
   LESSONS_LEARNED:20,
-  JOIN_COP:20,
+  JOIN_COP:5,
   HORIZON_SCAN:40,
   AUTOMATE:80,
 },'investment costs must match the rebalanced economy');
@@ -350,6 +351,43 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   assert.equal(company.intranet[domain],intranetBefore+1);
   assert.deepEqual(facilitator.domains.map(skill=>skill.score),beforeFacilitatorScores,'non-domain facilitator expertise must not increase');
   assert.equal(result.aarLearning?.expertDelta,0);
+}
+
+// 13. CoP support is reciprocal: Newbie membership is general; Expert membership is domain-specific.
+{
+  const a=createInitialCompanyV2('Alpha','cop-alpha',DEFAULT_CONFIG);
+  const b=createInitialCompanyV2('Beta','cop-beta',DEFAULT_CONFIG);
+  const session=asSessionV2({
+    id:'COP-SMOKE',title:'CoP smoke',round:2,phase:'investment',isPaused:false,isFinalDisruptionActive:false,
+    companies:[a,b],activeEvents:{[a.id]:[],[b.id]:[]},copMemberships:[],config:{...DEFAULT_CONFIG},
+    createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+  } as GameSession);
+  session.experienceMode='newbie';
+  a.actionsRemaining=5;b.actionsRemaining=5;
+  const aExpert=a.experts.find(expert=>!expert.isVacant)!;
+  const bExpert=b.experts.find(expert=>!expert.isVacant)!;
+  const aJoin=executeInvestmentActionV4(session,a,{type:'JOIN_COP',companyId:a.id,expertId:aExpert.id,domain:aExpert.domains[0].domain});
+  assert.equal(aJoin.success,true);
+  assert.equal(a.actionsRemaining,4,'joining a CoP costs one Action');
+  assert.equal(session.copMemberships[0].domain,COP_GENERAL_DOMAIN_V5);
+  assert.equal(companyHasCopMembershipV5(session,a.id,'operations'),true,'Newbie CoP must cover every Newbie domain');
+  assert.equal(reciprocalCopPeersV5(session,a.id,'operations').length,0,'one company alone must not activate CoP support');
+  const bJoin=executeInvestmentActionV4(session,b,{type:'JOIN_COP',companyId:b.id,expertId:bExpert.id,domain:bExpert.domains[0].domain});
+  assert.equal(bJoin.success,true);
+  assert.equal(reciprocalCopPeersV5(session,a.id,'operations').length,1,'two joined companies activate the Newbie general CoP');
+
+  session.experienceMode='expert';
+  session.round=3;
+  session.copMemberships=[];
+  a.actionsRemaining=5;b.actionsRemaining=5;
+  const sharedDomain=aExpert.domains.find(skill=>bExpert.domains.some(other=>other.domain===skill.domain))?.domain;
+  if(sharedDomain){
+    assert.equal(executeInvestmentActionV4(session,a,{type:'JOIN_COP',companyId:a.id,expertId:aExpert.id,domain:sharedDomain}).success,true);
+    assert.equal(executeInvestmentActionV4(session,b,{type:'JOIN_COP',companyId:b.id,expertId:bExpert.id,domain:sharedDomain}).success,true);
+    assert.equal(reciprocalCopPeersV5(session,a.id,sharedDomain).length,1);
+    const otherDomain=(['engineering','hr','marketing','operations','finance'] as const).find(domain=>domain!==sharedDomain)!;
+    assert.equal(reciprocalCopPeersV5(session,a.id,otherDomain).length,0,'Expert CoP must not spill into unregistered domains');
+  }
 }
 
 console.log('Core V2 smoke tests passed.');
