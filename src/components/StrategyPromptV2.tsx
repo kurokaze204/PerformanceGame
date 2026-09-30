@@ -16,6 +16,7 @@ const KNOWLEDGE_OPTIONS: { value: KnowledgeStrategy; label: string; hint: string
   { value: 'build_networks', label: 'Build networks', hint: 'Use relationships and communities to access expertise.' },
   { value: 'automate_critical_knowledge', label: 'Automate critical knowledge', hint: 'Embed important know-how into systems and processes.' },
   { value: 'buy_expertise', label: 'Buy expertise when needed', hint: 'Use external specialists rather than build everything internally.' },
+  { value: 'transfer_best_practice', label: 'Transfer Best Practice around the organisation', hint: 'Move proven practice from stronger parts of the organisation to places that need it.' },
   { value: 'no_particular_strategy', label: 'No particular knowledge strategy', hint: 'Respond to knowledge needs as they arise.' },
 ];
 
