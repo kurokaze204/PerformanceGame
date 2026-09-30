@@ -8,9 +8,9 @@ const EXPERT_DOMAINS:KnowledgeDomain[]=[...NEWBIE_DOMAINS,'finance'];
 const DOMAIN_ABBR:Record<KnowledgeDomain,string>={engineering:'ENG',hr:'HR',marketing:'MKT',operations:'OPS',finance:'FIN'};
 const initials=(name:string)=>name.replace(/\s\([A-Z]{2,3}\)$/,'').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
 
-interface Props{company:CompanyV2;mode:ExperienceMode;highlight?:boolean;}
+interface Props{company:CompanyV2;mode:ExperienceMode;highlight?:boolean;label?:string;}
 
-export const MiniRiverBenchmark:React.FC<Props>=({company,mode,highlight=false})=>{
+export const MiniRiverBenchmark:React.FC<Props>=({company,mode,highlight=false,label})=>{
  const domains=mode==='expert'?EXPERT_DOMAINS:NEWBIE_DOMAINS;
  const openSites=company.sites.filter(site=>!site.isClosed);
  const sites=openSites.length?openSites:company.sites;
@@ -28,7 +28,7 @@ export const MiniRiverBenchmark:React.FC<Props>=({company,mode,highlight=false})
  const southPath=data.map((item,index)=>`${index?'L':'M'} ${x(index)} ${y(item.south)}`).join(' ');
  const fillPath=`${northPath} ${[...data].reverse().map((item,reverseIndex)=>`L ${x(data.length-1-reverseIndex)} ${y(item.south)}`).join(' ')} Z`;
  return <div className={`rounded-xl border p-3 ${highlight?'border-emerald-700 bg-emerald-950/10':'border-slate-700 bg-slate-950/70'}`}>
-   <div className="flex items-center justify-between gap-3"><div><div className={`text-xs font-black ${highlight?'text-emerald-300':'text-white'}`}>{company.name}{highlight?' · YOU':''}</div><div className="text-[9px] text-slate-500 mt-0.5">White = sites · yellow = experts</div></div></div>
+   <div className="flex items-center justify-between gap-3"><div><div className={`text-xs font-black ${highlight?'text-emerald-300':'text-white'}`}>{company.name}{highlight?' · YOU':''}{label?<span className="ml-2 text-[9px] uppercase tracking-[.12em] text-slate-500">· {label}</span>:null}</div><div className="text-[9px] text-slate-500 mt-0.5">White = sites · yellow = experts</div></div></div>
    <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full h-auto" role="img" aria-label={`${company.name} knowledge River benchmark`}>
      {[0,2,4,6,8].filter(value=>value<=maxY).map(value=><g key={value}><line x1={padL} y1={y(value)} x2={W-padR} y2={y(value)} stroke="#263247" strokeWidth="1"/><text x={padL-6} y={y(value)+3} textAnchor="end" fill="#64748b" fontSize="8">{value}</text></g>)}
      <path d={fillPath} fill="#0c4a6e" fillOpacity="0.68"/>
