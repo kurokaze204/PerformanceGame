@@ -22,6 +22,7 @@ import {
 import { DEFAULT_CONFIG } from './config.ts';
 import { EVENT_CARDS_DECK } from './cards.ts';
 import { createInitialCompany as createLegacyInitialCompany } from './rules.ts';
+import { roundInvestmentMoneyV1, strategicInvestmentContributionV1 } from './investmentCapacityV1.ts';
 
 export const CORE_V2_VERSION = '0.2.0';
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
@@ -668,6 +669,7 @@ export function prepareNextRoundV2(sessionInput: GameSession): void {
       } else if (!expert.isVacant) expert.state = expert.location === 'HQ' ? 'HQ Assignment' : 'Available';
     });
     company.actionsRemaining = session.config.actions_per_round;
+    company.strategicInvestmentFund = roundInvestmentMoneyV1(company.strategicInvestmentFund + strategicInvestmentContributionV1(company));
     company.intranetRoundGrowth = emptyScores(0);
     company.auditedSiteId = null;
     if (company.horizonScanAvailableRound != null && session.round > company.horizonScanAvailableRound) {
