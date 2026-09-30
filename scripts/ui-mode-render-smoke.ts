@@ -102,6 +102,12 @@ assert.ok(investPanelSource.indexOf('>Domain<select')<investPanelSource.indexOf(
 assert.ok(investPanelSource.includes('grid grid-cols-2 gap-2'),'Teaching and Receiving Site controls must share the full row');
 assert.ok(investPanelSource.includes("selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${riverTargetBefore} → ${Math.max(riverTargetBefore,riverTargetAfter)}`:'Choose a receiving site'"),'Knowledge Transfer outcome must describe only the receiving-site change');
 assert.equal(investPanelSource.includes('embedded/>'),false,'Disruption card must not remain embedded in the investment chooser');
+const facilitatorSource=readFileSync(new URL('../src/components/FacilitatorControlRoomV2.tsx',import.meta.url),'utf8');
+assert.ok(facilitatorSource.includes('Finish round now'),'Facilitator control room must allow a company round to be finished early');
+assert.ok(facilitatorSource.includes("'remove-company'"),'Facilitator control room must allow an empty company to be removed');
+assert.ok(facilitatorSource.includes('autopilot will keep this company moving'),'Facilitator control room must explain empty-company autopilot');
+assert.ok(facilitatorSource.includes('team.length>0'),'Company removal must be disabled while players are still assigned');
+
 const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
 for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
 
