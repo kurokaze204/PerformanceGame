@@ -4,7 +4,6 @@ import{CheckCircle2,Coffee,ExternalLink,Mail,ShieldCheck}from'lucide-react';
 export const EndGameOptIn:React.FC=()=>{
  const[visible,setVisible]=useState(false);
  const[email,setEmail]=useState('');
- const[wantsResults,setWantsResults]=useState(false);
  const[wantsUpdates,setWantsUpdates]=useState(false);
  const[saving,setSaving]=useState(false);
  const[saved,setSaved]=useState(false);
@@ -29,10 +28,10 @@ export const EndGameOptIn:React.FC=()=>{
   };
  },[visible]);
  const submit=async()=>{
-  if(saved||saving||(!wantsResults&&!wantsUpdates))return;
+  if(saved||saving||!wantsUpdates)return;
   setSaving(true);setError('');
   try{
-   const r=await fetch('/api/player-opt-in',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...context,email,wantsResults,wantsUpdates})});
+   const r=await fetch('/api/player-opt-in',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...context,email,wantsResults:false,wantsUpdates})});
    const data=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(data.error||'Could not save your preferences.');
    setSaved(true);
@@ -47,10 +46,9 @@ export const EndGameOptIn:React.FC=()=>{
 
   {saved?<div className="mt-4 rounded-xl border border-emerald-700 bg-emerald-950/30 p-4 text-sm text-emerald-200"><div className="flex items-center gap-2 font-black"><CheckCircle2 className="h-4 w-4"/>Preferences saved</div><p className="mt-1 text-xs text-emerald-300/80">Thank you. Your choices and email address have been recorded.</p></div>:<>
    <label className="mt-4 block"><span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Email address</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-400"/></label>
-   <label className={`mt-3 flex cursor-pointer gap-3 rounded-xl border p-3 ${wantsResults?'border-indigo-500 bg-indigo-950/35':'border-slate-700 bg-slate-900'}`}><input type="checkbox" checked={wantsResults} onChange={e=>setWantsResults(e.target.checked)} className="mt-1"/><span><b className="block text-sm text-white">Email me a copy of my game results</b><small className="mt-0.5 block text-xs leading-relaxed text-slate-400">This choice is only for your game results and does not subscribe you to marketing.</small></span></label>
    <label className={`mt-2 flex cursor-pointer gap-3 rounded-xl border p-3 ${wantsUpdates?'border-emerald-600 bg-emerald-950/25':'border-slate-700 bg-slate-900'}`}><input type="checkbox" checked={wantsUpdates} onChange={e=>setWantsUpdates(e.target.checked)} className="mt-1"/><span><b className="block text-sm text-white">Send me occasional KM insights and Delta Knowledge updates</b><small className="mt-0.5 block text-xs leading-relaxed text-slate-400">Separate, optional marketing consent. You can unsubscribe later.</small></span></label>
    {error&&<div className="mt-2 text-xs font-bold text-rose-300">{error}</div>}
-   <button onClick={()=>void submit()} disabled={saving||!email.trim()||(!wantsResults&&!wantsUpdates)} className="tpg-action tpg-action-primary mt-3 w-full disabled:opacity-40">{saving?'SAVING…':'SAVE MY CHOICES'}</button>
+   <button onClick={()=>void submit()} disabled={saving||!email.trim()||!wantsUpdates} className="tpg-action tpg-action-primary mt-3 w-full disabled:opacity-40">{saving?'SAVING…':'SAVE MY CHOICES'}</button>
   </>}
 
   <a href="https://ko-fi.com/deltaknowledge" target="_blank" rel="noreferrer" className="mt-4 flex items-center gap-3 rounded-xl border border-emerald-800 bg-emerald-950/25 p-3 group hover:border-emerald-500">
