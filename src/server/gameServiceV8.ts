@@ -127,10 +127,8 @@ function repairMixedCompanyPhases(session:GameSessionV2):boolean{
       changed=true;
     }
   }
-  if(session.phase!=='respond'){
-    session.phase='respond';
-    changed=true;
-  }
+  session.phase='respond';
+  changed=true;
   return changed;
 }
 
