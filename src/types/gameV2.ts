@@ -30,6 +30,24 @@ export type ExperienceMode = 'newbie' | 'expert';
 export type PopulationMode = 'expand' | 'balanced';
 export type GameEndMode = 'time' | 'rounds';
 
+export interface CoPMessageV1 {
+  id:string;
+  fromCompanyId:string;
+  toCompanyId:string;
+  domain?:KnowledgeDomain;
+  message:string;
+  round:number;
+  createdAt:string;
+}
+
+export interface SoloCoPPeerV1 {
+  id:string;
+  name:string;
+  scores:DomainScoreMap;
+  disruptionDomains:KnowledgeDomain[];
+  lastGrowthRound:number;
+}
+
 export interface DisruptionAssignmentV1 {
   id: string;
   title: string;
@@ -176,6 +194,9 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   finalRoundCount: number;
   participants: Participant[];
   strategicDisruptionDomains?: KnowledgeDomain[];
+  soloMode: boolean;
+  copMessages: CoPMessageV1[];
+  soloCopPeer: SoloCoPPeerV1 | null;
 }
 
 export interface V2BalanceConfig {
@@ -255,5 +276,8 @@ export function asSessionV2(session: GameSession): GameSessionV2 {
   s.gameEndMode = s.experienceMode === 'expert' && s.gameEndMode === 'rounds' ? 'rounds' : 'time';
   s.finalRoundCount = Math.max(1, Math.min(200, Number(s.finalRoundCount || 30)));
   s.participants ??= [];
+  s.soloMode ??= false;
+  s.copMessages ??= [];
+  s.soloCopPeer ??= null;
   return s;
 }
