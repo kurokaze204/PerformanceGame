@@ -16,6 +16,8 @@ interface Props {
   onAcknowledgeResolution: (data:any)=>Promise<void>|void;
   onRedrawEvent?: (eventId:string)=>Promise<void>|void;
   canHorizonRedraw?: boolean;
+  participantId?: string;
+  readOnly?: boolean;
 }
 
 const ROUND_ONE_DISABLED_LABELS = [
@@ -34,7 +36,7 @@ const OPENING_PROBLEMS:Record<KnowledgeDomain,{title:string;description:(site:st
 };
 
 export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
-  const {session,company,event,onAcknowledgeResolution}=props;
+  const {session,company,event,onAcknowledgeResolution,participantId,readOnly=false}=props;
   const [pendingContinue,setPendingContinue]=useState<any|null>(null);
   const [ackBusy,setAckBusy]=useState(false);
   const decisionRootRef=useRef<HTMLDivElement|null>(null);
@@ -68,7 +70,7 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   },[simplifyRoundOne,event.instanceId]);
 
   const acknowledgeCompanyResolution=async(data:any)=>{
-    if(ackBusy)return;
+    if(ackBusy||readOnly)return;
     setAckBusy(true);
     const recoverFromAuthoritativeState=async()=>{
       const refresh=await fetch(`/api/sessions/${session.id}`,{cache:'no-store'});
@@ -87,7 +89,7 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
       const timeout=window.setTimeout(()=>controller.abort(),7000);
       let response:Response;
       try{
-        response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,actionType:'ACK_EVENT_RESOLUTION',params:{eventInstanceId:event.instanceId}}),signal:controller.signal});
+        response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,participantId,actionType:'ACK_EVENT_RESOLUTION',params:{eventInstanceId:event.instanceId}}),signal:controller.signal});
       }catch(error){
         window.clearTimeout(timeout);
         if(await recoverFromAuthoritativeState())return;
@@ -136,5 +138,5 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
     return <SharedEventResolutionV1 session={session} company={company} event={displayEvent} onContinue={()=>acknowledgeCompanyResolution({session})}/>;
   }
 
-  return <div ref={decisionRootRef}><OptimisticEventDecisionCardV1 {...props} event={displayEvent} onAcknowledgeResolution={interceptContinue}/></div>;
+  return <div ref={decisionRootRef}>{readOnly&&<div className="mb-2 rounded-xl border border-amber-700 bg-amber-950/35 px-3 py-2 text-center text-xs font-black text-amber-200">READ ONLY · Your CEO controls this company</div>}<OptimisticEventDecisionCardV1 {...props} event={displayEvent} onAcknowledgeResolution={interceptContinue}/></div>;
 };
