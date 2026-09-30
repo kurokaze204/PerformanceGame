@@ -8,6 +8,7 @@ import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { interventionUnlocked } from '../engine/experienceModeV3.ts';
 import { localCodifiedVisible } from '../engine/learningCurveBalanceV1.ts';
 import { riverSiteKnowledgeScore, riverTeachingSitesUsedThisRound, riverTransferTarget } from '../engine/riverKnowledgeV1.ts';
+import { SITE_KM_ACTIVITY_LIMIT_V1, roundInvestmentMoneyV1, siteKmActivitiesUsedThisRoundV1 } from '../engine/investmentCapacityV1.ts';
 import { formatCurrency } from '../utils/format.ts';
 import { InvestmentRiverView } from './InvestmentRiverView.tsx';
 import { DisruptionMiniCard } from './DisruptionCardV1.tsx';
@@ -52,6 +53,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const [expertId,setExpertId]=useState(activeExperts[0]?.id||'');
  const [domain,setDomain]=useState<KnowledgeDomain>('engineering');
  const [aarEventId,setAarEventId]=useState(resolvedEvents[0]?.instanceId||'');
+ const [useSIF,setUseSIF]=useState(false);
  const selected=visibleInterventions.find(i=>i.id===selectedId)||visibleInterventions[0];
  const selectedAarEvent=resolvedEvents.find(e=>e.instanceId===aarEventId)||resolvedEvents[0];
  const selectedSite=activeSites.find(s=>s.id===siteId)||activeSites[0];
@@ -87,13 +89,18 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const selectedExpertSkill=selectedExpert?.domains.find(x=>x.domain===domain)?.score;
  const travelCost=selectedId==='local-training'&&selectedExpert&&selectedSite?expertTravelCostV4(selectedExpert.location,selectedSite.id):0;
  const baseCost=costFor(selected.actionType);
- const totalCost=baseCost+travelCost;
+ const totalCost=roundInvestmentMoneyV1(baseCost+travelCost);
  const bestSiteTeam=Math.max(0,...activeSites.map(s=>s.teamCapability[domain]||0));
  const bestSiteDocs=Math.max(0,...activeSites.map(s=>s.codifiedKnowledge[domain]||0));
  const bestLocal=showLocalCodified?Math.max(bestSiteTeam,bestSiteDocs):bestSiteTeam;
  const bestExpert=Math.max(0,...company.experts.filter(e=>!e.isVacant).flatMap(e=>e.domains.filter(d=>d.domain===domain).map(d=>d.score)));
  const investmentSite=needsTargetSite?selectedSite:(selectedId==='train-expert'&&selectedExpert?.location!=='HQ'?activeSites.find(s=>s.id===selectedExpert.location):undefined);
- const siteTurnoverAfter=investmentSite?Math.max(0,investmentSite.turnover-totalCost):null;
+ const siteTurnoverAfter=investmentSite?(useSIF?investmentSite.turnover:Math.max(0,roundInvestmentMoneyV1(investmentSite.turnover-totalCost))):null;
+ const sifAvailable=company.strategicInvestmentFund||0;
+ const sifAfter=Math.max(0,roundInvestmentMoneyV1(sifAvailable-totalCost));
+ const sifInsufficient=useSIF&&sifAvailable+0.0001<totalCost;
+ const siteKmUsed=investmentSite?siteKmActivitiesUsedThisRoundV1(company,session.round,investmentSite.id):0;
+ const siteTooBusy=Boolean(investmentSite&&siteKmUsed>=SITE_KM_ACTIVITY_LIMIT_V1);
  const riverSourceScore=sourceSite?riverSiteKnowledgeScore(sourceSite,domain,session.experienceMode):0;
  const riverTargetBefore=selectedSite?.teamCapability[domain]||0;
  const riverTargetAfter=riverTransferTarget(riverSourceScore);
@@ -122,7 +129,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
     'horizon-scan':['HORIZON_SCAN',{domain}],
     'automate':['AUTOMATE',{domain}],
    };
-   const [type,params]=map[selectedId];onPerformAction(type,params);
+   const [type,params]=map[selectedId];onPerformAction(type,{...params,useSIF});
  };
  const openTransfer=(id:'knowledge-transfer'|'update-intranet')=>{localStorage.setItem(lessonKey,'1');setShowIntranetLesson(false);setSelectedId(id);if(tutorialDomain)setDomain(tutorialDomain);if(tutorialSource)setSourceSiteId(tutorialSource.id);if(tutorialTarget)setSiteId(tutorialTarget.id)};
  const actionTotal=session.config.actions_per_round;
@@ -134,6 +141,11 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const riverExpertId=needsExpert?selectedExpert?.id:undefined;
  const riverHighlightHQ=selectedId==='update-intranet'||selectedId==='corporate-training'||selectedId==='aar';
  const riverHighlightAllSites=selectedId==='corporate-training';
+ const whatChanges=siteTooBusy&&investmentSite
+   ? session.experienceMode==='newbie'
+     ? `${investmentSite.name} is too busy for more KM work this round. Choose another site or wait until next round.`
+     : `${investmentSite.name} has reached its local KM work limit (${siteKmUsed}/${SITE_KM_ACTIVITY_LIMIT_V1}) for this round.`
+   : expected;
 
  return <>
  {showIntranetLesson&&<div className="fixed inset-0 z-[150] bg-black/70 grid place-items-center p-6" role="dialog" aria-modal="true" aria-labelledby="intranet-unlock-title"><div className="w-full max-w-3xl rounded-3xl border-2 border-indigo-400 bg-slate-950 p-7 shadow-2xl"><div className="text-xs uppercase tracking-[0.2em] text-indigo-300 font-black">A knowledge gap is not always a knowledge shortage</div><h2 id="intranet-unlock-title" className="mt-2 text-3xl font-black text-white">The company knew. {tutorialTarget?.name||'This site'} didn’t.</h2><p className="mt-4 text-base leading-relaxed text-slate-300">{tutorialTarget?.name||'The affected site'} could reach about <b className="text-white">{tutorialTargetScore}</b> in {tutorialDomain?DOMAIN_INFO[tutorialDomain].label:'the required domain'}, while {tutorialSource?.name||'another site'} already held capability around <b className="text-white">{tutorialSourceScore}</b>. The knowledge existed inside the organisation; it was stranded in another place when the decision had to be made.</p><p className="mt-3 text-base leading-relaxed text-slate-300">You now have two different ways to move that knowledge around the company.</p><div className="mt-5 grid gap-4 md:grid-cols-2"><button onClick={()=>openTransfer('knowledge-transfer')} className="rounded-2xl border-2 border-emerald-500 bg-emerald-950/60 p-5 text-left hover:border-emerald-300"><div className="flex items-center gap-3"><ArrowRightLeft className="h-6 w-6 text-emerald-300"/><b className="text-xl text-white">Knowledge Transfer</b></div><p className="mt-2 text-sm leading-relaxed text-slate-300">Move practice directly from the site that knows to the site that needs it. Fast and targeted, but it builds capability locally.</p></button><button onClick={()=>openTransfer('update-intranet')} className="rounded-2xl border-2 border-indigo-500 bg-indigo-950/60 p-5 text-left hover:border-indigo-300"><div className="flex items-center gap-3"><Building2 className="h-6 w-6 text-indigo-300"/><b className="text-xl text-white">Corporate Intranet</b></div><p className="mt-2 text-sm leading-relaxed text-slate-300">Publish knowledge so it can be reached across the organisation. Broader access, but teams still need enough capability to understand and apply it.</p></button></div></div></div>}
@@ -171,8 +183,8 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
             {needsTargetSite&&<div className="max-w-[320px]"><label className="block text-[10px] uppercase text-slate-500 font-black">Site<select value={siteId} disabled={aarSiteLocked} onChange={e=>setSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white normal-case disabled:opacity-60">{activeSites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label></div>}
            </div>}
           </div>
-          <div className="min-w-[250px] flex-1 rounded-xl border border-slate-700 bg-slate-950/75 p-3"><div className="text-[10px] font-black uppercase tracking-wide text-slate-500">What changes</div><div className="mt-1 text-sm font-bold leading-snug text-slate-200">{expected}</div>{needsExpert&&selectedExpert&&<div className="mt-1 text-xs text-slate-500">{selectedExpert.name} · {expertLocation}{selectedExpert.isSPOF&&<span className="ml-1 font-black text-rose-300">SPOF</span>}</div>}{selectedId==='update-intranet'&&<div className="mt-1 text-xs text-slate-500">Corporate {company.intranet[domain]} · best local {bestLocal} · best expert {bestExpert}</div>}{selectedId==='join-cop'&&<div className="mt-1 text-xs text-slate-500">Our expert {selectedExpertSkill??0} · network {peerScore}</div>}</div>
-          <div className="w-[210px] shrink-0"><button onClick={commit} disabled={company.actionsRemaining<=0||(needsExpert&&!selectedExpert)||(needsTargetSite&&!selectedSite)||invalidRiver||(selectedId==='aar'&&!selectedAarEvent)||(selectedId==='aar'&&relevantDomains.length===0)||(selectedId==='aar'&&!expertChoices.length)||(selectedId==='automate'&&company.automatedDomains.includes(domain))} className="w-full rounded-xl bg-amber-400 px-3 py-3 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">RUN · {formatCurrency(totalCost)}</button>{invalidRiver&&<div className="mt-1 text-[11px] font-bold text-rose-300">Choose a stronger teaching site and a different receiving site.</div>}{investmentSite&&<div className="mt-1 text-[10px] text-slate-500">{investmentSite.name}: {formatCurrency(investmentSite.turnover)} → {formatCurrency(siteTurnoverAfter??investmentSite.turnover)}</div>}</div>
+          <div className="min-w-[250px] flex-1 rounded-xl border border-slate-700 bg-slate-950/75 p-3"><div className="text-[10px] font-black uppercase tracking-wide text-slate-500">What changes</div><div className={`mt-1 text-sm font-bold leading-snug ${siteTooBusy?'text-rose-300':'text-slate-200'}`}>{whatChanges}</div>{needsExpert&&selectedExpert&&<div className="mt-1 text-xs text-slate-500">{selectedExpert.name} · {expertLocation}{selectedExpert.isSPOF&&<span className="ml-1 font-black text-rose-300">SPOF</span>}</div>}{selectedId==='update-intranet'&&<div className="mt-1 text-xs text-slate-500">Corporate {company.intranet[domain]} · best local {bestLocal} · best expert {bestExpert}</div>}{selectedId==='join-cop'&&<div className="mt-1 text-xs text-slate-500">Our expert {selectedExpertSkill??0} · network {peerScore}</div>}</div>
+          <div className="w-[230px] shrink-0"><label className={`mb-2 flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-xs ${useSIF?'border-indigo-400 bg-indigo-950/45':'border-slate-700 bg-slate-950'}`}><input type="checkbox" checked={useSIF} onChange={e=>setUseSIF(e.target.checked)} className="h-4 w-4"/><span className="min-w-0 flex-1"><b className="text-white">Use SIF</b><span className="ml-1 text-slate-400">{formatCurrency(sifAvailable)} available</span></span></label><button onClick={commit} disabled={company.actionsRemaining<=0||(needsExpert&&!selectedExpert)||(needsTargetSite&&!selectedSite)||invalidRiver||siteTooBusy||sifInsufficient||(selectedId==='aar'&&!selectedAarEvent)||(selectedId==='aar'&&relevantDomains.length===0)||(selectedId==='aar'&&!expertChoices.length)||(selectedId==='automate'&&company.automatedDomains.includes(domain))} className="w-full rounded-xl bg-amber-400 px-3 py-3 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">RUN · {formatCurrency(totalCost)}</button>{sifInsufficient&&<div className="mt-1 text-[11px] font-bold text-rose-300">SIF has {formatCurrency(sifAvailable)}; this needs {formatCurrency(totalCost)}.</div>}{invalidRiver&&<div className="mt-1 text-[11px] font-bold text-rose-300">Choose a stronger teaching site and a different receiving site.</div>}{investmentSite&&<div className="mt-1 text-[10px] text-slate-500">{useSIF?<>SIF: {formatCurrency(sifAvailable)} → {formatCurrency(sifAfter)}</>:<>{investmentSite.name}: {formatCurrency(investmentSite.turnover)} → {formatCurrency(siteTurnoverAfter??investmentSite.turnover)}</>}</div>}</div>
          </div>
        </section>
      </div>
