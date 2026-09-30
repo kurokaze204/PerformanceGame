@@ -2,6 +2,7 @@ import type { KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { resolveSingleEventExplicitV2 } from './challengeResponseV2.ts';
 import { executeInvestmentActionV4, copMembershipActiveV4 } from './investmentActionsV4.ts';
+import { COP_JOIN_COST_V5 } from './copNetworkV5.ts';
 import { interventionUnlocked } from './experienceModeV3.ts';
 import { executeRiskPhaseV4 } from './riskPhaseV4.ts';
 
@@ -20,6 +21,45 @@ export function companyAutopilotActiveV1(session:GameSessionV2,companyId:string)
   if(session.isFinalDisruptionActive||companyPlayerCountV1(session,companyId)>0)return false;
   if(session.round>1)return true;
   return session.companies.some(company=>company.id!==companyId&&companyPlayerCountV1(session,company.id)>0&&roundPhase(company)==='waiting');
+}
+
+function unansweredIncomingCopRequests(session:GameSessionV2,companyId:string){
+  return (session.copMessages||[]).filter(message=>
+    message.kind==='request'&&
+    message.toCompanyId===companyId&&
+    !(session.copMessages||[]).some(reply=>reply.kind==='response'&&reply.replyToId===message.id)
+  );
+}
+
+export function acceptPendingCopRequestsForAutopilotV1(session:GameSessionV2,company:CompanyV2):number{
+  if(!companyAutopilotActiveV1(session,company.id))return 0;
+  const requests=unansweredIncomingCopRequests(session,company.id);
+  for(const request of requests){
+    const from=session.companies.find(candidate=>candidate.id===request.fromCompanyId);
+    const label=request.domain?request.domain:'general business';
+    session.copMessages.push({
+      id:`cop-msg-${Date.now()}-${Math.random().toString(36).slice(2,7)}-auto-response`,
+      fromCompanyId:company.id,
+      toCompanyId:request.fromCompanyId,
+      domain:request.domain,
+      message:`Yes — we are willing to join the ${label} Community of Practice and share what we know. We will register our membership at our next Invest opportunity.`,
+      round:session.round,
+      createdAt:new Date().toISOString(),
+      kind:'response',
+      response:'accepted',
+      replyToId:request.id,
+    });
+    void from;
+  }
+  return requests.length;
+}
+
+function acceptedCopRequestsForCompany(session:GameSessionV2,companyId:string){
+  return (session.copMessages||[])
+    .filter(request=>request.kind==='request'&&request.toCompanyId===companyId)
+    .filter(request=>(session.copMessages||[]).some(reply=>
+      reply.kind==='response'&&reply.replyToId===request.id&&reply.fromCompanyId===companyId&&reply.response==='accepted'
+    ));
 }
 
 function strongestExpert(company:CompanyV2,domain:KnowledgeDomain){
@@ -85,6 +125,34 @@ function makeSimpleInvestments(session:GameSessionV2,company:CompanyV2){
   const priorPhase=session.phase;
   session.phase='investment';
   try{
+    // A CoP invitation is a social commitment. Honour accepted invitations before
+    // spending Actions on routine KM work so an empty company becomes a useful
+    // reciprocal member at the first legal Invest opportunity.
+    if(interventionUnlocked(session.experienceMode,session.round,'JOIN_COP')){
+      for(const request of acceptedCopRequestsForCompany(session,company.id)){
+        if(company.actionsRemaining<=0)break;
+        const requestDomain=request.domain;
+        const alreadyJoined=session.experienceMode==='newbie'
+          ? session.copMemberships.some(membership=>membership.companyId===company.id&&membership.activeRound>=session.round&&(membership.scope==='general'||membership.domain==='general'))
+          : requestDomain
+            ? session.copMemberships.some(membership=>membership.companyId===company.id&&membership.activeRound>=session.round&&membership.domain===requestDomain)
+            : false;
+        if(alreadyJoined)continue;
+        const representative=session.experienceMode==='expert'&&requestDomain
+          ? strongestExpert(company,requestDomain)
+          : company.experts.find(expert=>!expert.isVacant);
+        if(!representative)continue;
+        const result=executeInvestmentActionV4(session,company,{
+          type:'JOIN_COP',
+          companyId:company.id,
+          expertId:representative.id,
+          domain:requestDomain,
+          useSIF:company.strategicInvestmentFund>=COP_JOIN_COST_V5,
+        } as any);
+        if(session.experienceMode==='newbie'&&result.success)break;
+      }
+    }
+
     let safety=0;
     while(company.actionsRemaining>0&&safety++<12){
       let acted=false;
@@ -112,14 +180,16 @@ export interface AutopilotRoundResultV1{
   eventsResolved:number;
   actionsUsed:number;
   riskApplied:boolean;
+  copRequestsAccepted?:number;
 }
 
 export function autoplayCompanyToWaitingV1(session:GameSessionV2,company:CompanyV2):AutopilotRoundResultV1{
   const beforeEvents=(session.activeEvents[company.id]||[]).filter(event=>event.isResolved).length;
   const beforeActions=company.actionsRemaining;
   const phase=roundPhase(company);
+  const copRequestsAccepted=acceptPendingCopRequestsForAutopilotV1(session,company);
 
-  if(phase==='waiting')return{companyId:company.id,companyName:company.name,eventsResolved:0,actionsUsed:0,riskApplied:false};
+  if(phase==='waiting')return{companyId:company.id,companyName:company.name,eventsResolved:0,actionsUsed:0,riskApplied:false,copRequestsAccepted};
 
   if(phase==='events')resolveRemainingEvents(session,company);
   if(phase==='events'||phase==='investment')makeSimpleInvestments(session,company);
@@ -139,13 +209,16 @@ export function autoplayCompanyToWaitingV1(session:GameSessionV2,company:Company
     eventsResolved:Math.max(0,afterEvents-beforeEvents),
     actionsUsed:Math.max(0,beforeActions-company.actionsRemaining),
     riskApplied,
+    copRequestsAccepted,
   };
 }
 
 export function autoplayEligibleEmptyCompaniesV1(session:GameSessionV2):AutopilotRoundResultV1[]{
   const results:AutopilotRoundResultV1[]=[];
   for(const company of session.companies){
-    if(companyAutopilotActiveV1(session,company.id)&&roundPhase(company)!=='waiting')results.push(autoplayCompanyToWaitingV1(session,company));
+    if(!companyAutopilotActiveV1(session,company.id))continue;
+    const result=autoplayCompanyToWaitingV1(session,company);
+    if(roundPhase(company)!=='waiting'||result.copRequestsAccepted||result.eventsResolved||result.actionsUsed||result.riskApplied)results.push(result);
   }
   return results;
 }
