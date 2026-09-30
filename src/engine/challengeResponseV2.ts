@@ -9,6 +9,7 @@ import {
   validateEventAllocationV2,
 } from './coreV2.ts';
 import { copMembershipActiveV4, expertTravelCostV4, recordPublicationEvidenceV4 } from './investmentActionsV4.ts';
+import { copSupportBonusV5 } from './copNetworkV5.ts';
 import { roundInvestmentMoneyV1 } from './investmentCapacityV1.ts';
 import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 
@@ -134,7 +135,7 @@ export function evaluateEventDomainKnowledgeExplicitV2(
     expertScore,
   ]);
   const copBonus=allocation.useCoPSupport&&copMembershipActiveV4(session,company.id,domain)
-    ? Math.min(2,config.cop_support_bonus)
+    ? copSupportBonusV5(session,company,domain,composed.depth)
     : 0;
   const automationBonus=company.automatedDomains.includes(domain)?config.automation_bonus:0;
   const withoutConsultant=composed.total+copBonus+automationBonus;
