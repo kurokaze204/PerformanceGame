@@ -112,7 +112,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
   const findExpert = () => company.experts.find((e) => e.id === expertId && !e.isVacant);
   const wantsSIF = Boolean(useSIF);
   const fundingError = (totalCost:number) => wantsSIF && company.strategicInvestmentFund + 0.0001 < totalCost
-    ? { success:false, message:`The Strategic Investment Fund has ${company.strategicInvestmentFund}k available but this investment costs ${totalCost}k.` }
+    ? { success:false, message:`The Strategic Investment Fund has $${company.strategicInvestmentFund}k available but this investment costs $${totalCost}k.` }
     : null;
   const capacityError = (directSiteId?:string) => directSiteId && !siteCanTakeKmActivityV1(company, session.round, directSiteId)
     ? { success:false, message:`${company.sites.find(site=>site.id===directSiteId)?.name || 'This site'} is too busy for more KM work this round. Choose another site or wait until next round.` }
@@ -142,7 +142,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     site.teamCapability[domain] += 1;
     recordPublicationEvidenceV4(company, domain, 1);
     const investmentAttribution = finish(totalCost, site.id);
-    return { success: true, message: `${site.name} ${domain} Team Capability increased to ${site.teamCapability[domain]}. Cost ${totalCost}k${travelCost ? ` including ${travelCost}k travel` : ''}.${fundingSuffix}`, costTurnover: totalCost, travelCost, investmentAttribution };
+    return { success: true, message: `${site.name} ${domain} Team Capability increased to ${site.teamCapability[domain]}. Cost $${totalCost}k${travelCost ? ` including $${travelCost}k travel` : ''}.${fundingSuffix}`, costTurnover: totalCost, travelCost, investmentAttribution };
   }
 
   if (type === 'TRAIN_EXPERT') {
@@ -154,7 +154,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
     skill.score += 1;
     const investmentAttribution = finish(baseCost, directSiteId);
-    return { success: true, message: `${expert.name} increased ${domain} expertise to ${skill.score}. Cost ${baseCost}k.${fundingSuffix}${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${expert.name} increased ${domain} expertise to ${skill.score}. Cost $${baseCost}k.${fundingSuffix}${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'CORPORATE_TRAINING') {
@@ -164,7 +164,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
     beneficiaries.forEach((site) => { site.teamCapability[domain] += 1; });
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${domain} Team Capability increased at ${beneficiaries.length} site(s). Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${domain} Team Capability increased at ${beneficiaries.length} site(s). Cost $${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'CODIFY_SITE') {
@@ -175,7 +175,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
     site.codifiedKnowledge[domain] += 1;
     const investmentAttribution = finish(baseCost, site.id);
-    return { success: true, message: `${site.name} ${domain} Local Codified Knowledge increased to ${site.codifiedKnowledge[domain]}. Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${site.name} ${domain} Local Codified Knowledge increased to ${site.codifiedKnowledge[domain]}. Cost $${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'UPDATE_INTRANET') {
@@ -194,7 +194,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
     company.intranet[domain] += growth; company.intranetRoundGrowth[domain] += growth;
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${domain} Corporate Intranet increased +${growth} to ${company.intranet[domain]}. Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${domain} Corporate Intranet increased +${growth} to ${company.intranet[domain]}. Cost $${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'LESSONS_LEARNED') {
@@ -218,7 +218,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const investmentAttribution = finish(baseCost, site.id);
     return {
       success: true,
-      message: `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost ${baseCost}k.`,
+      message: `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost $${baseCost}k.`,
       costTurnover: baseCost,
       investmentAttribution,
       eventInstanceId,
@@ -235,7 +235,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (existing) { existing.expertId = expert.id; existing.activeRound = activeThrough; }
     else session.copMemberships.push({ companyId: company.id, domain, expertId: expert.id, activeRound: activeThrough });
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${expert.name} joined the ${domain} CoP. Network support is available for the next two rounds. Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${expert.name} joined the ${domain} CoP. Network support is available for the next two rounds. Cost $${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'HORIZON_SCAN') {
@@ -243,7 +243,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
     company.horizonScanDomain = domain; company.horizonScanAvailableRound = session.round + 1; company.horizonScanUsedThisRound = false;
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${domain} Horizon Scan armed for Round ${session.round + 1}. Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${domain} Horizon Scan armed for Round ${session.round + 1}. Cost $${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'AUTOMATE') {
@@ -252,7 +252,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
     company.automatedDomains.push(domain);
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${domain} knowledge automated. Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${domain} knowledge automated. Cost $${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   return { success: false, message: 'Unknown investment action.' };
