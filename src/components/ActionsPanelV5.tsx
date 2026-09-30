@@ -26,7 +26,7 @@ const INTERVENTIONS:Intervention[]=[
  {id:'codify-site',title:'Codify Site Knowledge',description:'Turn local know-how into reusable documentation (+1 Local Codified).',anchor:'existing',icon:BookOpen,actionType:'CODIFY_SITE'},
  {id:'train-expert',title:'Train Expert',description:'Deepen one expert domain by +1.',anchor:'expert',icon:GraduationCap,actionType:'TRAIN_EXPERT'},
  {id:'update-intranet',title:'Update Corporate Intranet',description:'Publish stronger organisational knowledge into the corporate knowledge base.',anchor:'existing',icon:Building2,actionType:'UPDATE_INTRANET'},
- {id:'join-cop',title:'Join Community of Practice',description:'Connect an expert to external peers and gain network support for two future rounds.',anchor:'network',icon:Network,actionType:'JOIN_COP'},
+ {id:'join-cop',title:'Join Community of Practice',description:'Join or renew a reciprocal peer network for the next Event round.',anchor:'network',icon:Network,actionType:'JOIN_COP'},
  {id:'aar',title:'Lessons Learned / AAR',description:'Turn experience into local, expert and corporate knowledge.',anchor:'existing',icon:Sparkles,actionType:'LESSONS_LEARNED'},
  {id:'horizon-scan',title:'Horizon Scan',description:'Scout a domain so matching Events can be anticipated next round.',anchor:'risk',icon:Radar,actionType:'HORIZON_SCAN'},
  {id:'automate',title:'Automation',description:'Embed critical domain knowledge in systems (+2 on future challenges).',anchor:'existing',icon:Bot,actionType:'AUTOMATE'},
@@ -118,8 +118,8 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
    if(selectedId==='update-intranet')return `${DOMAIN_INFO[domain].label} Corporate ${company.intranet[domain]} → higher if stronger source knowledge exists`;
    if(selectedId==='aar'){const siteBefore=selectedSite?.teamCapability[domain]??0;const hqBefore=company.intranet[domain]||0;const expertChange=selectedExpertSkill!=null?`${selectedExpert?.name} ${selectedExpertSkill} → ${selectedExpertSkill+1}`:`${selectedExpert?.name} facilitates only · no personal ${DOMAIN_INFO[domain].label} gain`;return selectedAarEvent&&selectedSite&&selectedExpert?`AAR on “${selectedAarEvent.card.title}” → ${selectedSite.name} Team ${siteBefore} → ${siteBefore+1} · ${expertChange} · HQ ${hqBefore} → ${hqBefore+1}`:'Choose a completed challenge and expert facilitator';}
    if(selectedId==='join-cop')return session.experienceMode==='newbie'
-     ? 'Join the general business CoP for two rounds. Network knowledge becomes usable when another company also joins.'
-     : `Join the ${DOMAIN_INFO[domain].label} CoP for two rounds. Network knowledge becomes usable when another company joins the same domain.`;
+     ? 'Join the general business CoP for the next Event round. Network knowledge becomes usable when another company also joins.'
+     : `Join the ${DOMAIN_INFO[domain].label} CoP for the next Event round. Network knowledge becomes usable when another company joins the same domain.`;
    if(selectedId==='automate')return company.automatedDomains.includes(domain)?`${DOMAIN_INFO[domain].label} is already automated`:`Add +${session.config.automation_bonus} embedded knowledge to future ${DOMAIN_INFO[domain].label} challenges`;
    return `Arm ${DOMAIN_INFO[domain].label} Horizon Scan for round ${session.round+1}`;
  },[selectedId,selectedSite,sourceSite,selectedExpert,selectedExpertSkill,selectedAarEvent,domain,activeSites,company.intranet,company.automatedDomains,session.round,session.config,riverSourceScore,riverTargetBefore,riverTargetAfter]);
