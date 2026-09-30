@@ -112,7 +112,7 @@ assert.equal(boardToolTabsSource.includes('RiverDiagramOverlay'),false,'Legacy R
 assert.equal(boardToolTabsSource.includes('PROGRAMMED_FAILURE_TAG'),false,'Board tools must not resurrect River based on transfer unlock state');
 
 const facilitatorSource=readFileSync(new URL('../src/components/FacilitatorControlRoomV2.tsx',import.meta.url),'utf8');
-assert.ok(facilitatorSource.includes("'remove-company'"),'Facilitator control room must allow an empty company to be removed');
+assert.ok(facilitatorSource.includes('facilitator/remove-company'),'Facilitator control room must allow an empty company to be removed');
 assert.ok(facilitatorSource.includes('team.length>0'),'Company removal must be disabled while players are still assigned');
 assert.ok(facilitatorSource.includes("facilitator/remove-player"),'Facilitator must be able to remove duplicate or abandoned player records');
 assert.ok(facilitatorSource.includes('Remove duplicate or abandoned player'),'Player removal control must explain its purpose');
