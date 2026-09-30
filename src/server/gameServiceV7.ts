@@ -70,6 +70,7 @@ async function addExpansionCompany(session:GameSessionV2){
   const index=session.companies.length;
   const name=COMPANY_NAMES[index]||`Company ${index+1}`;
   const company=createInitialCompanyV2(name,`comp-${index+1}-${session.id.toLowerCase()}`,session.config);
+  company.autopilotEnabled=true;
   diversifyInitialKnowledge(company);
   recalculateCompanySPOFV2(company,session.config);
   session.companies.push(company);
