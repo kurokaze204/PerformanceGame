@@ -1,6 +1,7 @@
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState}from'react';
 import{motion}from'motion/react';
 import{BriefcaseBusiness,Building2,Check,Handshake,ShieldQuestion,Sparkles,Users}from'lucide-react';
+import{DOMAIN_INFO}from'../types/game.ts';
 import type{KnowledgeDomain}from'../types/game.ts';
 import type{ActiveEventAllocationV2,ActiveEventV2,CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import{currentConsultantRate}from'../engine/coreV2.ts';
