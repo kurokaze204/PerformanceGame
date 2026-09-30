@@ -112,6 +112,8 @@ assert.ok(facilitatorSource.includes('Finish round now'),'Facilitator control ro
 assert.ok(facilitatorSource.includes("'remove-company'"),'Facilitator control room must allow an empty company to be removed');
 assert.ok(facilitatorSource.includes('autopilot will keep this company moving'),'Facilitator control room must explain empty-company autopilot');
 assert.ok(facilitatorSource.includes('team.length>0'),'Company removal must be disabled while players are still assigned');
+assert.ok(facilitatorSource.includes("facilitator/remove-player"),'Facilitator must be able to remove duplicate or abandoned player records');
+assert.ok(facilitatorSource.includes('Remove duplicate or abandoned player'),'Player removal control must explain its purpose');
 assert.ok(facilitatorSource.includes("facilitator/autopilot-company"),'Facilitator must be able to toggle company autopilot');
 assert.ok(facilitatorSource.includes("companyIndex===0?'Autopilot locked off':'Autopilot'"),'Company 1 must visibly show autopilot locked off');
 assert.ok(facilitatorSource.includes('disabled={busy||companyIndex===0||team.length>0||session.isFinalDisruptionActive}'),'Autopilot checkbox must be disabled for Company 1 and staffed companies');
