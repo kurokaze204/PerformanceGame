@@ -9,6 +9,7 @@ import {
   deleteSessionAndSelectNextV2,
   facilitatorFinishCompanyRoundV1,
   facilitatorRemoveCompanyV1,
+  facilitatorSetCompanyAutopilotV1,
   facilitatorUpdateV2,
   getGameEventLogs,
   getSessionV2,
@@ -324,6 +325,13 @@ async function startServer() {
     if (!await requireFacilitator(req, res)) return;
     try {
       const result = await facilitatorRemoveCompanyV1(req.params.id, req.body?.companyId);
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post('/api/sessions/:id/facilitator/autopilot-company', async (req, res) => {
+    if (!await requireFacilitator(req, res)) return;
+    try {
+      const result = await facilitatorSetCompanyAutopilotV1(req.params.id, req.body?.companyId, Boolean(req.body?.enabled));
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
