@@ -57,7 +57,7 @@ export interface SimulationConfig {
   three_domain_ratio:number;
 }
 
-export interface CoPMembership { companyId:string; domain:KnowledgeDomain; expertId:string; activeRound:number; }
+export interface CoPMembership { companyId:string; domain:KnowledgeDomain|'general'; expertId:string; activeRound:number; scope?:'general'|'domain'; }
 export interface GameEventLog { id:string; sessionId:string; companyId?:string; participantId?:string; eventType:string; timestamp:string; round:number; phase:GamePhase; title:string; description:string; payload:Record<string,any>; }
 export interface Participant { id:string; sessionId:string; name:string; companyId:string; role:'participant'|'controller'|'facilitator'; lastSeen:string; }
 export interface GameSession { id:string; title:string; name?:string; round:number; phase:GamePhase; isPaused:boolean; isFinalDisruptionActive:boolean; finalDisruptionCard?:EventCard; finalDisruptionResolved?:boolean; companies:Company[]; activeEvents:Record<string,ActiveEvent[]>; copMemberships:CoPMembership[]; config:SimulationConfig; createdAt:string; updatedAt:string; }
