@@ -65,7 +65,7 @@ async function startServer() {
 
   app.post('/api/sessions', async (req, res) => {
     try {
-      const { sessionId, title, name, companyNames, companyCount, experienceMode, gameDurationMinutes, maxPlayersPerCompany, actionsPerRound, populationMode, gameEndMode, finalRoundCount, isPublic, facilitatorPassword } = req.body || {};
+      const { sessionId, title, name, companyNames, companyCount, experienceMode, gameDurationMinutes, maxPlayersPerCompany, actionsPerRound, populationMode, gameEndMode, finalRoundCount, isPublic, facilitatorPassword, soloMode } = req.body || {};
       const code = String(sessionId || `KM${Math.floor(1000 + Math.random() * 9000)}`).toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,16);
       if(!code)return res.status(400).json({error:'Game code is required.'});
       if(await getSessionV2(code))return res.status(409).json({error:'That game code is already in use. Please generate another.'});
@@ -83,6 +83,7 @@ async function startServer() {
         populationMode: populationMode as PopulationMode,
         gameEndMode: gameEndMode as GameEndMode,
         finalRoundCount: Number(finalRoundCount || 30),
+        soloMode: Boolean(soloMode),
       });
       await saveSessionAccessV1(session.id,Boolean(isPublic),String(facilitatorPassword||''));
       await captureSessionStart(session);
