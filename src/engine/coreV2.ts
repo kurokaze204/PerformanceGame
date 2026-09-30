@@ -65,6 +65,10 @@ export function createInitialCompanyV2(name: string, id: string, config: Simulat
   company.strategicInvestmentFund = INITIAL_STRATEGIC_INVESTMENT_FUND_V1;
   company.experts.forEach((e) => { e.replacementDueRound = null; });
   recalculateCompanySPOFV2(company, config);
+  company.initialRiverSnapshot = {
+    sites: structuredClone(company.sites),
+    experts: structuredClone(company.experts),
+  };
   return company;
 }
 
