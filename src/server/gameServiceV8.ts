@@ -11,7 +11,7 @@ import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEvent
 import { resolveSingleEventExplicitV2 } from '../engine/challengeResponseV2.ts';
 import { swapDisruptionWithPeerV1 } from '../engine/disruptionPlusV1.ts';
 import { acceptPendingCopRequestsForAutopilotV1, autoplayCompanyToWaitingV1, autoplayEligibleEmptyCompaniesV1, companyAutopilotActiveV1, companyPlayerCountV1 } from '../engine/emptyCompanyAutopilotV1.ts';
-import { saveParticipant, saveSessionV2 } from './dbV2.ts';
+import { deleteParticipant, saveParticipant, saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
@@ -261,6 +261,20 @@ export async function recoverParticipantV1(sessionId:string,payload:{id?:string;
     await saveSessionV2(session);
     broadcastV2(session,'PARTICIPANT_RECOVERED',{participantId:participant.id,companyId:company.id});
     return{success:true,message:`${participant.name} was restored to ${company.name}.`,session,participant};
+  });
+}
+
+export async function facilitatorRemoveParticipantV1(sessionId:string,participantId:string){
+  return serialisePhaseChange(sessionId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    const participant=session.participants.find(item=>item.id===participantId&&item.role==='participant');
+    if(!participant)return{success:false,message:'Player not found.',session};
+    session.participants=session.participants.filter(item=>item.id!==participantId);
+    await deleteParticipant(participantId);
+    await saveSessionV2(session);
+    broadcastV2(session,'FACILITATOR_REMOVED_PARTICIPANT',{participantId,companyId:participant.companyId,name:participant.name});
+    return{success:true,message:`${participant.name} was removed from the game.`,session};
   });
 }
 
