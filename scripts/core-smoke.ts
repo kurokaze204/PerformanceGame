@@ -451,6 +451,23 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   assert.ok(session.copMemberships.some(membership=>membership.companyId===empty.id&&membership.activeRound>=session.round),'autopilot must register the accepted CoP membership before routine investments');
 }
 
+// Company 1 is a permanent human anchor, even if a stale/manual setting tries to enable autopilot.
+{
+  const anchorCompany=createInitialCompanyV2('Anchor Co','anchor-co',DEFAULT_CONFIG);
+  const secondCompany=createInitialCompanyV2('Second Co','second-co',DEFAULT_CONFIG);
+  const session=asSessionV2({
+    id:'AUTO-ANCHOR',title:'Autopilot Anchor Smoke',round:3,phase:'respond',isPaused:false,isFinalDisruptionActive:false,
+    companies:[anchorCompany,secondCompany],activeEvents:{[anchorCompany.id]:[],[secondCompany.id]:[]},copMemberships:[],participants:[],
+    config:{...DEFAULT_CONFIG},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+  } as any);
+  anchorCompany.autopilotEnabled=true;
+  assert.equal(companyAutopilotActiveV1(session,anchorCompany.id),false,'Company 1 must never enter autopilot');
+  secondCompany.autopilotEnabled=false;
+  assert.equal(companyAutopilotActiveV1(session,secondCompany.id),false,'facilitator must be able to switch autopilot off');
+  secondCompany.autopilotEnabled=true;
+  assert.equal(companyAutopilotActiveV1(session,secondCompany.id),true,'an empty non-anchor company may be autopiloted when enabled');
+}
+
 // During Round 1, empty companies wait until a staffed company has actually finished.
 {
   const staffed=createInitialCompanyV2('Round One Staffed','round1-staffed',DEFAULT_CONFIG);
