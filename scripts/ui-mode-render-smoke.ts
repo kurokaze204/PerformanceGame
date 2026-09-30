@@ -116,8 +116,8 @@ const finishLessonEnd=eventPlaytestSource.indexOf('if(pendingContinue)',finishLe
 const finishLessonSource=eventPlaytestSource.slice(finishLessonStart,finishLessonEnd);
 assert.equal(finishLessonSource.includes('setPendingContinue(null)'),false,'Newbie transfer lesson must remain visible until Event acknowledgement succeeds');
 
-const appBoardSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
-assert.ok(appBoardSource.includes("activeEventIndex=chosen>=0?chosen:-1"),'board must not fall back to a resolved Event when no unresolved Event exists');
-assert.ok(appBoardSource.includes("if(!event||event.isResolved)return;setBoardTool(null)"),'opening a resolved Event must be ignored');
+const appBoardEventSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
+assert.ok(appBoardEventSource.includes("activeEventIndex=chosen>=0?chosen:-1"),'board must not fall back to a resolved Event when no unresolved Event exists');
+assert.ok(appBoardEventSource.includes("if(!event||event.isResolved)return;setBoardTool(null)"),'opening a resolved Event must be ignored');
 
 console.log('Mode-aware UI render smoke tests passed.');
