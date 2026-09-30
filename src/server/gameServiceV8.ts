@@ -112,6 +112,10 @@ function repairPendingResolutionPointers(session:GameSessionV2):boolean{
 }
 
 function repairMixedCompanyPhases(session:GameSessionV2):boolean{
+  // This repairs the specific legacy/global phase drift where one company moved
+  // the shared session into Invest/Consequences while peers still had Events.
+  // Never reinterpret Risk/Waiting state from old Event objects.
+  if(session.phase!=='investment'&&session.phase!=='consequences')return false;
   const unfinished=session.companies.filter(company=>(session.activeEvents[company.id]||[]).some(event=>!event.isResolved));
   if(!unfinished.length)return false;
   let changed=false;
