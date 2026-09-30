@@ -10,7 +10,7 @@ const DOMAINS:Domain[]=['engineering','hr','marketing','operations','finance'];
 const SITES=['MEL','SYD','BNE','ADL','PER','DRW'];
 const COSTS:Record<Intervention,number>={river:18,intranet:35,codify:20,train:20,aar:15,cop:25,automation:150,'corporate-training':95};
 const BUSINESS:BusinessStrategy[]=['short_term_profit','growth','downside_protection','balanced','adaptive'];
-const KNOWLEDGE:KnowledgeStrategy[]=['rely_on_people','build_team_capability','capture_knowledge','build_networks','automate_critical_knowledge','buy_expertise','no_particular_strategy'];
+const KNOWLEDGE:KnowledgeStrategy[]=['rely_on_people','build_team_capability','capture_knowledge','build_networks','automate_critical_knowledge','buy_expertise','transfer_best_practice','no_particular_strategy'];
 const OVERLAYS:RiskOverlay[]=['bullish','balanced','risk_averse'];
 
 interface Policy { risk:number; spend:number; sharing:number; codify:number; learning:number; expert:number; network:number; tech:number; reserve:number; minValueRatio:number; }
@@ -34,7 +34,7 @@ function policyFor(b:BusinessStrategy,k:KnowledgeStrategy,o:RiskOverlay):Policy{
   short_term_profit:{risk:.62,spend:.30,reserve:.28,minValueRatio:.045}, growth:{risk:.78,spend:.78,reserve:.10,minValueRatio:.012}, downside_protection:{risk:.22,spend:.38,reserve:.34,minValueRatio:.035}, balanced:{risk:.50,spend:.50,reserve:.20,minValueRatio:.025}, adaptive:{risk:.55,spend:.62,reserve:.18,minValueRatio:.018}
  };
  const knowledge:Record<KnowledgeStrategy,Partial<Policy>>={
-  rely_on_people:{expert:.92,sharing:.62,codify:.18,network:.35,tech:.20,learning:.45}, build_team_capability:{sharing:.85,learning:.82,expert:.55,codify:.48,network:.45}, capture_knowledge:{codify:.95,learning:.70,sharing:.52,expert:.42,network:.30}, build_networks:{network:.95,sharing:.78,expert:.55,codify:.35}, automate_critical_knowledge:{tech:.95,codify:.55,sharing:.35,learning:.35}, buy_expertise:{expert:.98,spend:.72,sharing:.25,codify:.20,network:.20}, no_particular_strategy:{sharing:.50,codify:.50,learning:.50,expert:.50,network:.50,tech:.50}
+  rely_on_people:{expert:.92,sharing:.62,codify:.18,network:.35,tech:.20,learning:.45}, build_team_capability:{sharing:.85,learning:.82,expert:.55,codify:.48,network:.45}, capture_knowledge:{codify:.95,learning:.70,sharing:.52,expert:.42,network:.30}, build_networks:{network:.95,sharing:.78,expert:.55,codify:.35}, automate_critical_knowledge:{tech:.95,codify:.55,sharing:.35,learning:.35}, buy_expertise:{expert:.98,spend:.72,sharing:.25,codify:.20,network:.20}, transfer_best_practice:{sharing:.98,learning:.78,expert:.45,codify:.38,network:.55,tech:.25}, no_particular_strategy:{sharing:.50,codify:.50,learning:.50,expert:.50,network:.50,tech:.50}
  };
  p={...p,...business[b],...knowledge[k]};
  if(o==='bullish'){p.risk=clamp(p.risk+.18,0,1);p.spend=clamp(p.spend+.18,0,1);p.reserve=Math.max(.05,p.reserve-.08);p.minValueRatio=Math.max(.006,p.minValueRatio*.65)}
