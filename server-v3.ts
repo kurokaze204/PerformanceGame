@@ -7,6 +7,8 @@ import {
   applyLearningV2,
   createNewSessionV2,
   deleteSessionAndSelectNextV2,
+  facilitatorFinishCompanyRoundV1,
+  facilitatorRemoveCompanyV1,
   facilitatorUpdateV2,
   getGameEventLogs,
   getSessionV2,
@@ -310,6 +312,20 @@ async function startServer() {
     if (!await requireFacilitator(req, res)) return;
     try { res.json({ success: true, session: await moveParticipantV3(req.params.id, req.body?.participantId, req.body?.companyId) }); }
     catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post('/api/sessions/:id/facilitator/finish-company-round', async (req, res) => {
+    if (!await requireFacilitator(req, res)) return;
+    try {
+      const result = await facilitatorFinishCompanyRoundV1(req.params.id, req.body?.companyId);
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post('/api/sessions/:id/facilitator/remove-company', async (req, res) => {
+    if (!await requireFacilitator(req, res)) return;
+    try {
+      const result = await facilitatorRemoveCompanyV1(req.params.id, req.body?.companyId);
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
   app.post('/api/sessions/:id/delete', async (req, res) => {
