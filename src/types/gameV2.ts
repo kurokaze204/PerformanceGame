@@ -224,7 +224,7 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.cumulativeCorporateKnowledgeSpend ??= 0;
   c.cumulativeSiteKnowledgeSpend ??= {};
   c.disruptionSwapNotice ??= null;
-  c.strategicInvestmentFund ??= Math.round(Math.max(0, c.turnover) * 0.05 * 10) / 10;
+  c.strategicInvestmentFund ??= 25;
   c.siteKmActivityUse ??= { round: 0, counts: {} };
   for (const site of c.sites || []) c.cumulativeSiteKnowledgeSpend[site.id] ??= 0;
   for (const expert of c.experts || []) expert.replacementName ??= null;
