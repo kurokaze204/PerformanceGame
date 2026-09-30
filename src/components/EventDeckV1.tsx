@@ -49,7 +49,7 @@ export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,ca
  const pendingDelayRef=useRef('');
  const[showDelayHelp,setShowDelayHelp]=useState(false);
  const sharedId=String((company as any).uiOpenEventInstanceId||'');
- const shared=events.map((event,index)=>({event,index})).find(item=>item.event.instanceId===sharedId);
+ const shared=events.map((event,index)=>({event,index})).find(item=>item.event.instanceId===sharedId&&!item.event.isResolved);
  const lastSharedOpenIdRef=useRef('');
  const delayHelpKey='tpg_horizon_delay_help_seen';
  const markSharedOpen=async(index:number)=>{
