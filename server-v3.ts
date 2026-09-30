@@ -362,8 +362,16 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+    app.use(express.static(distPath,{
+      setHeaders:(res,filePath)=>{
+        if(filePath.endsWith('index.html'))res.setHeader('Cache-Control','no-store');
+        else if(filePath.includes(`${path.sep}assets${path.sep}`))res.setHeader('Cache-Control','public, max-age=31536000, immutable');
+      },
+    }));
+    app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control','no-store');
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
   app.listen(PORT, '0.0.0.0', () => console.log(`The Performance Gap V3 server running on http://0.0.0.0:${PORT}`));
 }
