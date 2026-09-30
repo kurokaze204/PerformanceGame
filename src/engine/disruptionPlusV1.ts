@@ -1,7 +1,8 @@
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, DisruptionAssignmentV1, GameSessionV2 } from '../types/gameV2.ts';
 import { FINAL_DISRUPTION_CARDS } from './cards.ts';
-import { copMembershipActiveV4, copPeerKnowledgeScoreV4 } from './investmentActionsV4.ts';
+import { copMembershipActiveV4 } from './investmentActionsV4.ts';
+import { copPeerKnowledgeSourceV5, copSupportBonusV5 } from './copNetworkV5.ts';
 import { calculateUsableIntranetV2 } from './coreV2.ts';
 import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 
@@ -216,8 +217,9 @@ export function evaluateFinalDisruptionV1(session:GameSessionV2,company:CompanyV
       :(expert?corporateRaw:0);
     const composed=composeKnowledgeSources([siteKnowledge,corporate,expertScore]);
     const copActive=copMembershipActiveV4(session,company.id,domain);
-    const peer=copActive?peerOrganisationalKnowledge(session,company,domain,card.previousCompanyId):{score:0,sourceCompanyName:undefined};
-    const copBonus=copActive&&peer.score>0?Math.min(2,session.config.cop_support_bonus):0;
+    const reciprocalPeer=copActive?copPeerKnowledgeSourceV5(session,company.id,domain):null;
+    const peer=reciprocalPeer?{score:reciprocalPeer.score,sourceCompanyName:reciprocalPeer.name}:{score:0,sourceCompanyName:undefined};
+    const copBonus=copActive?copSupportBonusV5(session,company,domain,composed.depth):0;
     const totalKnowledge=composed.total+copBonus;
     const gap=Math.max(0,requirement.difficulty-totalKnowledge);
     return{
