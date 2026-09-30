@@ -154,7 +154,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
     skill.score += 1;
     const investmentAttribution = finish(baseCost, directSiteId);
-    return { success: true, message: `${expert.name} increased ${domain} expertise to ${skill.score}. Cost $${baseCost}k.${fundingSuffix}${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${expert.name} increased ${domain} expertise to ${skill.score}. Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'CORPORATE_TRAINING') {
@@ -218,7 +218,7 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const investmentAttribution = finish(baseCost, site.id);
     return {
       success: true,
-      message: `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost $${baseCost}k.`,
+      message: `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost ${baseCost}k.${fundingSuffix}`,
       costTurnover: baseCost,
       investmentAttribution,
       eventInstanceId,
