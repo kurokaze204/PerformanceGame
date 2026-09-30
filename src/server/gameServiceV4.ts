@@ -6,6 +6,7 @@ import { dealCompanyDisruptionsV1, refreshCompanyDisruptionStrengthV1 } from '..
 import { createInitialCompanyV2, drawRoundEventsV2 } from '../engine/coreV2.ts';
 import { interventionUnlocked } from '../engine/experienceModeV3.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
+import { initialiseSoloCoPPeerV5 } from '../engine/copNetworkV5.ts';
 import { saveParticipant, saveSessionV2 } from './dbV2.ts';
 import {
   advancePhaseV2 as legacyAdvancePhaseV2,
@@ -49,6 +50,7 @@ export interface CreateGameOptions {
   actionsPerRound?: number;
   gameEndMode?: GameEndMode;
   finalRoundCount?: number;
+  soloMode?: boolean;
 }
 
 const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
@@ -77,10 +79,12 @@ export async function createNewSessionV2(sessionId:string,title:string,companyNa
  session.experienceMode=options.experienceMode==='expert'?'expert':'newbie';
  session.gameDurationMinutes=clamp(Number(options.gameDurationMinutes||60),20,240);
  session.finalWindowMinutes=10;session.minutesPerMove=8;session.maxPlayersPerCompany=clamp(Number(options.maxPlayersPerCompany||6),1,20);session.participants=[];
+ session.soloMode=Boolean(options.soloMode);
  session.gameEndMode=session.experienceMode==='expert'&&options.gameEndMode==='rounds'?'rounds':'time';
  session.finalRoundCount=clamp(Number(options.finalRoundCount||30),1,200);
  session.timerStartedAt=null;session.timerEndsAt=null;session.timerPausedSecondsRemaining=session.gameDurationMinutes*60;session.riskResults=null;
  dealCompanyDisruptionsV1(session);
+ initialiseSoloCoPPeerV5(session);
  setNextPair(session);for(const company of session.companies)session.activeEvents[company.id]=drawRoundEventsV2(session,company);
  await saveSessionV2(session);return session;
 }
