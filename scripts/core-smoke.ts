@@ -6,6 +6,7 @@ import {
   currentConsultantRate,
   drawRoundEventsV2,
   executeKnowledgeActionV2,
+  prepareNextRoundV2,
   resolveSingleEventV2,
   validateEventAllocationV2,
 } from '../src/engine/coreV2.ts';
@@ -14,7 +15,7 @@ import {
   resolveSingleEventExplicitV2,
 } from '../src/engine/challengeResponseV2.ts';
 import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
-import { SITE_KM_ACTIVITY_LIMIT_V1, strategicInvestmentContributionV1 } from '../src/engine/investmentCapacityV1.ts';
+import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, siteKnowledgePointsV1, siteTurnoverGrowthPercentV1 } from '../src/engine/investmentCapacityV1.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -77,12 +78,33 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   }
 }
 
-// SIF starts at 5% of current company turnover without reducing turnover.
+// SIF starts at a fixed $25k without reducing turnover.
 {
   const { company }=makeSession();
   const before=company.turnover;
-  assert.equal(company.strategicInvestmentFund,strategicInvestmentContributionV1(company));
+  assert.equal(company.strategicInvestmentFund,INITIAL_STRATEGIC_INVESTMENT_FUND_V1);
+  assert.equal(company.strategicInvestmentFund,25);
   assert.equal(company.turnover,before,'creating the SIF must not transfer money out of site turnover');
+}
+
+// Round-start site growth is driven by local knowledge plus experts, then the 5% SIF budget is added from the new turnover.
+{
+  const { session,company }=makeSession('expert');
+  const site=company.sites[0];
+  const domains=['engineering','hr','marketing','operations','finance'] as const;
+  for(const domain of domains){site.teamCapability[domain]=2;site.codifiedKnowledge[domain]=1;}
+  company.experts.forEach((expert,index)=>{expert.location=index===0?site.id:'HQ';expert.homeLocation=expert.location;});
+  const localExpertPoints=company.experts[0].domains.reduce((sum,skill)=>sum+skill.score,0);
+  assert.equal(siteKnowledgePointsV1(company,site.id),10+localExpertPoints);
+  assert.equal(siteTurnoverGrowthPercentV1(company,site.id),(10+localExpertPoints)/6);
+  const beforeSite=site.turnover;
+  const beforeCompany=company.turnover;
+  company.strategicInvestmentFund=25;
+  session.round=2;
+  prepareNextRoundV2(session);
+  assert.ok(site.turnover>beforeSite,'site turnover must grow at the start of a round');
+  assert.ok(company.turnover>beforeCompany,'company turnover must reflect knowledge-driven site growth');
+  assert.equal(company.strategicInvestmentFund,Math.round((25+company.turnover*0.05)*10)/10,'SIF budget must be calculated after turnover growth');
 }
 
 // SIF can fund a local investment and each site can absorb at most three local KM activities per round.
