@@ -102,6 +102,11 @@ assert.ok(investPanelSource.indexOf('>Domain<select')<investPanelSource.indexOf(
 assert.ok(investPanelSource.includes('grid grid-cols-2 gap-2'),'Teaching and Receiving Site controls must share the full row');
 assert.ok(investPanelSource.includes("selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${riverTargetBefore} → ${Math.max(riverTargetBefore,riverTargetAfter)}`:'Choose a receiving site'"),'Knowledge Transfer outcome must describe only the receiving-site change');
 assert.equal(investPanelSource.includes('embedded/>'),false,'Disruption card must not remain embedded in the investment chooser');
+const boardToolTabsSource=readFileSync(new URL('../src/components/BoardToolTabsV1.tsx',import.meta.url),'utf8');
+assert.equal(boardToolTabsSource.includes('<span>River</span>'),false,'Legacy River button must not appear in the board tools');
+assert.equal(boardToolTabsSource.includes('RiverDiagramOverlay'),false,'Legacy River overlay must not be wired into board tools');
+assert.equal(boardToolTabsSource.includes('PROGRAMMED_FAILURE_TAG'),false,'Board tools must not resurrect River based on transfer unlock state');
+
 const facilitatorSource=readFileSync(new URL('../src/components/FacilitatorControlRoomV2.tsx',import.meta.url),'utf8');
 assert.ok(facilitatorSource.includes('Finish round now'),'Facilitator control room must allow a company round to be finished early');
 assert.ok(facilitatorSource.includes("'remove-company'"),'Facilitator control room must allow an empty company to be removed');
