@@ -236,7 +236,7 @@ export async function recoverParticipantV1(sessionId:string,payload:{id?:string;
     const participantId=String(payload?.id||'').trim();
     const companyId=String(payload?.companyId||'').trim();
     const company=session.companies.find(candidate=>candidate.id===companyId);
-    if(!participantId||!company)return{success:false,message:'Participant recovery details are invalid.',session};
+    if(!participantId||participantId.startsWith('fac-view-')||!company)return{success:false,message:'Participant recovery details are invalid.',session};
     const existing=session.participants.find(participant=>participant.id===participantId);
     if(existing)return{success:true,message:'Participant already registered.',session,participant:existing};
 
