@@ -18,9 +18,13 @@ export function companyPlayerCountV1(session:GameSessionV2,companyId:string):num
 }
 
 export function companyAutopilotActiveV1(session:GameSessionV2,companyId:string):boolean{
+  const index=session.companies.findIndex(company=>company.id===companyId);
+  const company=index>=0?session.companies[index]:undefined;
+  // Company 1 is the human anchor for the session and is never eligible for autopilot.
+  if(index<=0||!company||!company.autopilotEnabled)return false;
   if(session.isFinalDisruptionActive||companyPlayerCountV1(session,companyId)>0)return false;
   if(session.round>1)return true;
-  return session.companies.some(company=>company.id!==companyId&&companyPlayerCountV1(session,company.id)>0&&roundPhase(company)==='waiting');
+  return session.companies.some(other=>other.id!==companyId&&companyPlayerCountV1(session,other.id)>0&&roundPhase(other)==='waiting');
 }
 
 function unansweredIncomingCopRequests(session:GameSessionV2,companyId:string){
