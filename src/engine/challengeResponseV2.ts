@@ -8,7 +8,8 @@ import {
   recalculateCompanySPOFV2,
   validateEventAllocationV2,
 } from './coreV2.ts';
-import { copMembershipActiveV4, recordPublicationEvidenceV4 } from './investmentActionsV4.ts';
+import { copMembershipActiveV4, expertTravelCostV4, recordPublicationEvidenceV4 } from './investmentActionsV4.ts';
+import { roundInvestmentMoneyV1 } from './investmentCapacityV1.ts';
 import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 
 export interface ExplicitSourceValues {
@@ -24,8 +25,8 @@ export interface ExplicitSourceValues {
 }
 
 function activeSites(company: CompanyV2): Site[] { return company.sites.filter((site) => !site.isClosed); }
-function recalcCompanyTurnover(company: CompanyV2): void { company.turnover = Math.round(company.sites.reduce((sum, site) => sum + (site.isClosed ? 0 : site.turnover), 0)); }
-function applySiteDelta(company: CompanyV2, site: Site, delta: number): void { site.turnover = Math.max(0, Math.round(site.turnover + delta)); recalcCompanyTurnover(company); }
+function recalcCompanyTurnover(company: CompanyV2): void { company.turnover = roundInvestmentMoneyV1(company.sites.reduce((sum, site) => sum + (site.isClosed ? 0 : site.turnover), 0)); }
+function applySiteDelta(company: CompanyV2, site: Site, delta: number): void { site.turnover = Math.max(0, roundInvestmentMoneyV1(site.turnover + delta)); recalcCompanyTurnover(company); }
 function applyCompanyDelta(company: CompanyV2, delta: number): void {
   const sites = activeSites(company); if (!sites.length || delta === 0) return;
   const total = sites.reduce((sum, site) => sum + site.turnover, 0); let remaining = Math.round(delta);
@@ -221,7 +222,7 @@ export function resolveSingleEventExplicitV2(sessionInput: GameSessionV2, compan
       const expert=selectedExpert(company,event,domain);
       if(expert){
         if(event.card.scope==='local'&&event.targetSiteId&&expert.location!==event.targetSiteId&&!chargedTravellers.has(expert.id)){
-          const travelCost=Math.max(0,Number(allocation.expertTravelCost||0));
+          const travelCost=expertTravelCostV4(expert.location,event.targetSiteId);
           interventionCost+=travelCost;
           allocation.expertTravelCost=travelCost;
           chargedTravellers.add(expert.id);
