@@ -67,10 +67,12 @@ assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||sessi
 const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
 assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
 assert.ok(investPanelSource.includes("'aar':['LESSONS_LEARNED',{siteId,expertId,domain,eventInstanceId:selectedAarEvent?.instanceId}]"),'AAR must submit one expert facilitator');
-assert.ok(investPanelSource.includes("previewSiteDelta={selectedId==='aar'?1:0}"),'AAR must preview its site learning on the River');
-assert.ok(investPanelSource.includes("previewExpertDelta={selectedId==='aar'&&selectedExpertSkill!=null?1:0}"),'AAR must preview facilitator learning only when the facilitator holds the selected domain');
+assert.ok(investPanelSource.includes("previewSiteDelta={selectedId==='aar'&&selectedAarEvent?1:0}"),'AAR must preview site learning only while an unused completed challenge is selected');
+assert.ok(investPanelSource.includes("previewExpertDelta={selectedId==='aar'&&selectedAarEvent&&selectedExpertSkill!=null?1:0}"),'AAR must preview facilitator learning only for an unused challenge and a facilitator who holds the selected domain');
 assert.ok(investPanelSource.includes('const expertChoices=activeExperts;'),'AAR facilitator choices must include all employed experts');
-assert.ok(investPanelSource.includes("previewHQDelta={selectedId==='aar'?1:0}"),'AAR must preview corporate learning on the River');
+assert.ok(investPanelSource.includes("const aarEligibleEvents=resolvedEvents.filter(e=>!e.experientialLearningAwarded);"),'AAR chooser must exclude completed challenges that already produced Lessons Learned');
+assert.ok(investPanelSource.includes("No unused completed challenge"),'AAR controls must visibly explain when no eligible challenge remains');
+assert.ok(investPanelSource.includes("previewHQDelta={selectedId==='aar'&&selectedAarEvent?1:0}"),'AAR must preview corporate learning only while an unused completed challenge is selected');
 const investmentRiverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
 assert.ok(investmentRiverSource.includes('{abbrev(site.id)}'),'Invest River site labels must use three-letter site abbreviations');
 assert.ok(investmentRiverSource.includes('{firstName(mark.expert.name)} · {loc}'),'Invest River expert labels must show first name and city abbreviation');
