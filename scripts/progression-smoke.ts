@@ -70,8 +70,9 @@ const tutorialWrapper=readFileSync(new URL('../src/components/EventDecisionCardP
 assert.ok(tutorialWrapper.includes("event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)"),'tutorial must identify the programmed failure by tag');
 assert.equal(tutorialWrapper.includes("cardNumber===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG)"),false,'tutorial must not depend on dealt-card position');
 const appBoard=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
-assert.ok(appBoard.includes("targetPhase:'investment'"),'final Event must advance directly to Invest');
-assert.ok(appBoard.includes('await advanceToInvestment('),'completion path must use the direct Invest transition helper');
+assert.equal(appBoard.includes("targetPhase:'investment'"),false,'one company finishing Events must not call the legacy global Invest transition');
+assert.equal(appBoard.includes('advanceToInvestment'),false,'final Event acknowledgement must rely on the server company-specific phase transition');
+assert.ok(appBoard.includes("(nextCompany as any)?.roundPhase==='investment'"),'final Event must enter the completed company into Invest directly');
 
 const tutorialSession=await createNewSessionV2('TUTORIAL-FAIL-SMOKE','Tutorial Failure Smoke',['Alpha'],{experienceMode:'newbie',gameDurationMinutes:45});
 const tutorialCompany=tutorialSession.companies[0];
