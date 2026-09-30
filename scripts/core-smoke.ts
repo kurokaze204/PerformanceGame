@@ -17,7 +17,6 @@ import {
 import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
 import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, siteKnowledgePointsV1, siteTurnoverGrowthPercentV1 } from '../src/engine/investmentCapacityV1.ts';
 import { COP_GENERAL_DOMAIN_V5, companyHasCopMembershipV5, reciprocalCopPeersV5 } from '../src/engine/copNetworkV5.ts';
-import { autoplayEligibleEmptyCompaniesV1, companyAutopilotActiveV1 } from '../src/engine/emptyCompanyAutopilotV1.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -400,88 +399,8 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   }
 }
 
-// Empty multiplayer companies enter simple autopilot after Round 1 and stop blocking the room.
-{
-  const staffed=createInitialCompanyV2('Staffed Co','staffed-co',DEFAULT_CONFIG);
-  const empty=createInitialCompanyV2('Empty Co','empty-co',DEFAULT_CONFIG);
-  const domain='engineering' as const;
-  const event:ActiveEvent={
-    instanceId:'AUTO-EVENT',
-    card:{id:'AUTO-EVENT',type:'problem',scope:'local',title:'Autopilot challenge',description:'Smoke test',domains:[{domain,difficulty:5}],impact:10,tags:['test']},
-    targetSiteId:empty.sites[0].id,
-    allocations:{[domain]:{}} as any,
-    isResolved:false,
-  };
-  const session=asSessionV2({
-    id:'AUTO',
-    title:'Autopilot Smoke',
-    round:2,
-    phase:'respond',
-    isPaused:false,
-    isFinalDisruptionActive:false,
-    companies:[staffed,empty],
-    activeEvents:{[staffed.id]:[],[empty.id]:[event]},
-    copMemberships:[],
-    copMessages:[{
-      id:'cop-request-auto',
-      fromCompanyId:staffed.id,
-      toCompanyId:empty.id,
-      message:'Will you join our general business CoP?',
-      round:2,
-      createdAt:new Date().toISOString(),
-      kind:'request',
-    }],
-    participants:[{id:'p1',sessionId:'AUTO',name:'Player',companyId:staffed.id,role:'participant',lastSeen:new Date().toISOString()}],
-    config:{...DEFAULT_CONFIG},
-    createdAt:new Date().toISOString(),
-    updatedAt:new Date().toISOString(),
-  } as any);
-  (staffed as any).roundPhase='events';
-  (empty as any).roundPhase='events';
-  assert.equal(companyAutopilotActiveV1(session,staffed.id),false,'a staffed company must never be autopiloted');
-  assert.equal(companyAutopilotActiveV1(session,empty.id),true,'a zero-player company must be autopiloted from Round 2');
-  const results=autoplayEligibleEmptyCompaniesV1(session);
-  assert.equal(results.length,1);
-  assert.equal(results[0].companyId,empty.id);
-  assert.equal((empty as any).roundPhase,'waiting','autopilot company must finish its round');
-  assert.ok((session.activeEvents[empty.id]||[]).every(candidate=>candidate.isResolved),'autopilot must resolve remaining Events');
-  assert.equal((staffed as any).roundPhase,'events','autopilot must not advance the staffed company');
-  const copReply=(session.copMessages||[]).find(message=>message.replyToId==='cop-request-auto');
-  assert.equal(copReply?.response,'accepted','autopilot must accept an unanswered CoP request at its first opportunity');
-  assert.ok(session.copMemberships.some(membership=>membership.companyId===empty.id&&membership.activeRound>=session.round),'autopilot must register the accepted CoP membership before routine investments');
-}
-
-// Company 1 is a permanent human anchor, even if a stale/manual setting tries to enable autopilot.
-{
-  const anchorCompany=createInitialCompanyV2('Anchor Co','anchor-co',DEFAULT_CONFIG);
-  const secondCompany=createInitialCompanyV2('Second Co','second-co',DEFAULT_CONFIG);
-  const session=asSessionV2({
-    id:'AUTO-ANCHOR',title:'Autopilot Anchor Smoke',round:3,phase:'respond',isPaused:false,isFinalDisruptionActive:false,
-    companies:[anchorCompany,secondCompany],activeEvents:{[anchorCompany.id]:[],[secondCompany.id]:[]},copMemberships:[],participants:[],
-    config:{...DEFAULT_CONFIG},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
-  } as any);
-  anchorCompany.autopilotEnabled=true;
-  assert.equal(companyAutopilotActiveV1(session,anchorCompany.id),false,'Company 1 must never enter autopilot');
-  secondCompany.autopilotEnabled=false;
-  assert.equal(companyAutopilotActiveV1(session,secondCompany.id),false,'facilitator must be able to switch autopilot off');
-  secondCompany.autopilotEnabled=true;
-  assert.equal(companyAutopilotActiveV1(session,secondCompany.id),true,'an empty non-anchor company may be autopiloted when enabled');
-}
-
-// During Round 1, empty companies wait until a staffed company has actually finished.
-{
-  const staffed=createInitialCompanyV2('Round One Staffed','round1-staffed',DEFAULT_CONFIG);
-  const empty=createInitialCompanyV2('Round One Empty','round1-empty',DEFAULT_CONFIG);
-  const session=asSessionV2({
-    id:'AUTO-R1',title:'Round 1 Autopilot Smoke',round:1,phase:'respond',isPaused:false,isFinalDisruptionActive:false,
-    companies:[staffed,empty],activeEvents:{[staffed.id]:[],[empty.id]:[]},copMemberships:[],
-    participants:[{id:'p2',sessionId:'AUTO-R1',name:'Player',companyId:staffed.id,role:'participant',lastSeen:new Date().toISOString()}],
-    config:{...DEFAULT_CONFIG},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
-  } as any);
-  (staffed as any).roundPhase='events';(empty as any).roundPhase='events';
-  assert.equal(companyAutopilotActiveV1(session,empty.id),false,'empty companies must not auto-start before staffed teams complete Round 1');
-  (staffed as any).roundPhase='waiting';
-  assert.equal(companyAutopilotActiveV1(session,empty.id),true,'finishing a staffed company in Round 1 must activate empty-company autopilot');
-}
+// Empty companies intentionally have no automation in the CEO model. They neither
+// advance themselves nor block staffed companies, so there is no autopilot engine
+// to test or maintain.
 
 console.log('Core V2 smoke tests passed.');
