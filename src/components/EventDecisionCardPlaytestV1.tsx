@@ -101,9 +101,12 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
 
   const finishLesson=async()=>{
     const data=pendingContinue;
+    if(!data||ackBusy)return;
     localStorage.setItem(lessonKey,'1');
     localStorage.setItem(`tpg_intranet_unlock_${session.id}_${company.id}`,'1');
-    setPendingContinue(null);
+    // Keep the teaching overlay mounted until the server has acknowledged the
+    // resolved Event. Clearing it first briefly exposes the stale pre-resolution
+    // decision card while the acknowledgement request is in flight.
     await acknowledgeCompanyResolution(data);
   };
 
