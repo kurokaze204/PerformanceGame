@@ -2,7 +2,7 @@ import type { ActionPayload, KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { AUSTRALIAN_CITIES, HQ_COORDINATES } from './config.ts';
 import { recalculateCompanySPOFV2 } from './coreV2.ts';
-import { SITE_KM_ACTIVITY_LIMIT_V1, recordSiteKmActivityV1, roundInvestmentMoneyV1, siteCanTakeKmActivityV1 } from './investmentCapacityV1.ts';
+import { recordSiteKmActivityV1, roundInvestmentMoneyV1, siteCanTakeKmActivityV1 } from './investmentCapacityV1.ts';
 
 export const INVESTMENT_COSTS_V4: Record<string, number> = {
   KNOWLEDGE_TRANSFER: 18,
@@ -159,12 +159,12 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
 
   if (type === 'CORPORATE_TRAINING') {
     if (!domain) return { success: false, message: 'Choose a domain.' };
-    let changed = 0;
-    company.sites.forEach((site) => { if (!site.isClosed && site.teamCapability[domain] < company.intranet[domain]) { site.teamCapability[domain] += 1; changed++; } });
-    if (!changed) return { success: false, message: 'No site can currently benefit from this Corporate Training.' };
+    const beneficiaries = company.sites.filter((site) => !site.isClosed && site.teamCapability[domain] < company.intranet[domain]);
+    if (!beneficiaries.length) return { success: false, message: 'No site can currently benefit from this Corporate Training.' };
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
+    beneficiaries.forEach((site) => { site.teamCapability[domain] += 1; });
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${domain} Team Capability increased at ${changed} site(s). Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return { success: true, message: `${domain} Team Capability increased at ${beneficiaries.length} site(s). Cost ${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
   }
 
   if (type === 'CODIFY_SITE') {
