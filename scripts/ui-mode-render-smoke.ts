@@ -114,6 +114,7 @@ assert.ok(facilitatorSource.includes('autopilot will keep this company moving'),
 assert.ok(facilitatorSource.includes('team.length>0'),'Company removal must be disabled while players are still assigned');
 assert.ok(facilitatorSource.includes("facilitator/remove-player"),'Facilitator must be able to remove duplicate or abandoned player records');
 assert.ok(facilitatorSource.includes('Remove duplicate or abandoned player'),'Player removal control must explain its purpose');
+assert.ok(facilitatorSource.includes('older duplicate'),'Facilitator must flag the older record when identical player names are duplicated');
 assert.ok(facilitatorSource.includes("facilitator/autopilot-company"),'Facilitator must be able to toggle company autopilot');
 assert.ok(facilitatorSource.includes("companyIndex===0?'Autopilot locked off':'Autopilot'"),'Company 1 must visibly show autopilot locked off');
 assert.ok(facilitatorSource.includes('disabled={busy||companyIndex===0||team.length>0||session.isFinalDisruptionActive}'),'Autopilot checkbox must be disabled for Company 1 and staffed companies');
@@ -122,6 +123,8 @@ const autopilotSource=readFileSync(new URL('../src/engine/emptyCompanyAutopilotV
 assert.ok(autopilotSource.includes("if(index<=0||!company||!company.autopilotEnabled)return false"),'Autopilot engine must hard-exclude Company 1 and respect the facilitator switch');
 
 const serviceV4Source=readFileSync(new URL('../src/server/gameServiceV4.ts',import.meta.url),'utf8');
+assert.ok(serviceV4Source.includes("PARTICIPANT_REJOINED"),'Exact-name re-entry must resume an existing participant rather than create another record');
+assert.ok(serviceV4Source.includes("p.name.trim().toLocaleLowerCase()===cleanName.toLocaleLowerCase()"),'Participant rejoin matching must normalise exact player names');
 assert.ok(serviceV4Source.includes("participantCountBefore===0&&!session.timerStartedAt&&!session.timerEndsAt"),'Game timer must auto-start when the first real player joins');
 assert.ok(serviceV4Source.includes("target.autopilotEnabled=false"),'Assigning a player to a company must immediately disable autopilot');
 
