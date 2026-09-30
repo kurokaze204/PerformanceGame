@@ -3,15 +3,12 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import {
-  advancePhaseV2,
   applyLearningV2,
   createNewSessionV2,
   deleteSessionAndSelectNextV2,
-  facilitatorFinishCompanyRoundV1,
   facilitatorRemoveCompanyV1,
   facilitatorRemoveParticipantV1,
-  facilitatorSetCompanyAutopilotV1,
-  facilitatorUpdateV2,
+  facilitatorAssignCompanyCeoV1,
   getGameEventLogs,
   getSessionV2,
   initializeDefaultSessionV2,
@@ -19,16 +16,17 @@ import {
   knowledgeActionV2,
   listSessionsV2,
   moveParticipantV3,
+  participantCanControlCompanyV1,
   redrawEventV2,
   recoverParticipantV1,
   registerSSEClientV2,
   resetAllV2,
   resolveEventV2,
-  resolveFinalDisruptionV2,
   setEventAllocationV2,
   timerPauseV2,
   timerResetV2,
   timerStartV2,
+  transferCompanyCeoV1,
   updateGameSettingsV3,
 } from './src/server/gameServiceV3.ts';
 import {
@@ -61,6 +59,18 @@ async function startServer() {
     const code=String(passcode||'');
     if(process.env.FACILITATOR_SECRET&&code===process.env.FACILITATOR_SECRET)return true;
     return verifySessionFacilitatorPasswordV1(sessionId,code);
+  };
+
+  const requireCompanyController = async (req:express.Request,res:express.Response,companyIdValue?:string) => {
+    const companyId=String(companyIdValue||req.body?.companyId||'');
+    const participantId=String(req.body?.participantId||'');
+    const session=await getSessionV2(req.params.id.toUpperCase());
+    if(!session){res.status(404).json({error:'Session not found.'});return false;}
+    if(!participantCanControlCompanyV1(session,companyId,participantId)){
+      res.status(403).json({error:'Read-only company view. Only the current CEO can make game decisions.'});
+      return false;
+    }
+    return true;
   };
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', engine: 'core-v2.3', time: new Date().toISOString() }));
@@ -124,8 +134,17 @@ async function startServer() {
     }catch(e:any){res.status(400).json({error:e.message});}
   });
 
+  app.post('/api/sessions/:id/company/transfer-ceo',async(req,res)=>{
+    try{
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
+      const result=await transferCompanyCeoV1(req.params.id,String(req.body?.companyId||''),String(req.body?.participantId||''),String(req.body?.targetParticipantId||''));
+      res.status(result.success?200:400).json(result);
+    }catch(e:any){res.status(400).json({error:e.message});}
+  });
+
   app.post('/api/sessions/:id/strategy', async (req, res) => {
     try {
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
       const session = await getSessionV2(req.params.id.toUpperCase());
       if (!session) return res.status(404).json({ error: 'Session not found' });
       const company = session.companies.find(c => c.id === req.body?.companyId);
@@ -166,6 +185,7 @@ async function startServer() {
 
   const allocationHandler = async (req: express.Request, res: express.Response) => {
     try {
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
       const { companyId, eventInstanceId, domain, allocation, expertId, useCoPSupport, consultantPoints } = req.body || {};
       const proposed = allocation || { expertId, useCoPSupport, consultantPoints };
       const result = await setEventAllocationV2(req.params.id, companyId, eventInstanceId, domain, proposed);
@@ -177,6 +197,7 @@ async function startServer() {
 
   app.post('/api/sessions/:id/events/reputation', async (req, res) => {
     try {
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
       const result = await resolveWithReputationV2(req.params.id, req.body?.companyId, req.body?.eventInstanceId);
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
@@ -184,6 +205,7 @@ async function startServer() {
 
   const redrawHandler = async (req: express.Request, res: express.Response) => {
     try {
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
       const result = await redrawEventV2(req.params.id, req.body?.companyId, req.body?.eventInstanceId);
       if (result.success) {
         const company = result.session.companies.find(c => c.id === req.body?.companyId);
@@ -197,6 +219,7 @@ async function startServer() {
 
   const resolveHandler = async (req: express.Request, res: express.Response) => {
     try {
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
       const before = await getSessionV2(req.params.id.toUpperCase());
       if (!before) return res.status(404).json({ error: 'Session not found' });
       const companyBefore = before.companies.find(c => c.id === req.body?.companyId);
@@ -217,6 +240,7 @@ async function startServer() {
 
   const learningHandler = async (req: express.Request, res: express.Response) => {
     try {
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
       const { companyId, eventInstanceId, domain, target, targetId } = req.body || {};
       const result = await applyLearningV2(req.params.id, companyId, eventInstanceId, domain, target, targetId);
       if (result.success) await captureStateMetric(result.session, 'EXPERIENTIAL_LEARNING');
@@ -228,6 +252,7 @@ async function startServer() {
 
   const actionHandler = async (req: express.Request, res: express.Response) => {
     try {
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
       const { companyId, payload, actionType, params, type, siteId, expertId, domain, targetLocation, learningTarget } = req.body || {};
       const normalized = payload || { type: actionType || type, siteId: params?.siteId || siteId, expertId: params?.expertId || expertId, domain: params?.domain || domain, targetLocation: params?.targetLocation || targetLocation, learningTarget: params?.learningTarget || learningTarget, ...(params || {}) };
       if (!normalized.type) return res.status(400).json({ error: 'Action type is required.' });
@@ -238,6 +263,10 @@ async function startServer() {
           try { await captureKnowledgeAction(result.session, company, result, normalized.type); }
           catch (analyticsError) { console.error('Analytics capture failed after successful action', analyticsError); }
         }
+        if(normalized.type==='FINAL_DISRUPTION_RESOLVE'&&result.session.finalDisruptionResolved){
+          try { await finaliseAnalyticsRun(result.session, (result.session as any).finalDisruptionResults || []); }
+          catch (analyticsError) { console.error('Final analytics capture failed', analyticsError); }
+        }
       }
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
@@ -247,11 +276,12 @@ async function startServer() {
 
   app.post('/api/sessions/:id/replacement-location', async (req, res) => {
     try {
+      if(!await requireCompanyController(req,res,req.body?.companyId))return;
       const session = await getSessionV2(req.params.id.toUpperCase());
       if (!session) return res.status(404).json({ error: 'Session not found.' });
-      if (session.phase !== 'risk') return res.status(400).json({ error: 'Replacement location is chosen during Knowledge Risk.' });
       const company = session.companies.find(c => c.id === req.body?.companyId);
       if (!company) return res.status(404).json({ error: 'Company not found.' });
+      if (company.roundPhase !== 'risk') return res.status(400).json({ error: 'Replacement location is chosen during Knowledge Risk.' });
       const expert = company.experts.find(e => e.id === req.body?.expertId);
       if (!expert || !expert.isVacant || expert.replacementDueRound == null) return res.status(400).json({ error: 'No replacement is due for that expert.' });
       const site = company.sites.find(s => s.id === req.body?.siteId && !s.isClosed);
@@ -263,35 +293,6 @@ async function startServer() {
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
-  const advanceHandler = async (req: express.Request, res: express.Response) => {
-    try {
-      const result = await advancePhaseV2(req.params.id, req.body?.targetPhase);
-      if (result.success) {
-        try {
-          if (result.session.phase === 'respond' && !result.session.isFinalDisruptionActive) {
-            for (const company of result.session.companies) await captureRoundReveals(result.session, company);
-          }
-          await captureStateMetric(result.session, `PHASE_${result.session.phase.toUpperCase()}`);
-        } catch (analyticsError) {
-          console.error('Analytics capture failed after successful phase advance', analyticsError);
-        }
-      }
-      res.status(result.success ? 200 : 400).json(result);
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-  };
-  app.post('/api/sessions/:id/advance', advanceHandler);
-  app.post('/api/sessions/:id/advance-phase', advanceHandler);
-
-  const finalHandler = async (req, res) => {
-    try {
-      const result = await resolveFinalDisruptionV2(req.params.id);
-      await finaliseAnalyticsRun(result.session, result.results || []);
-      res.json(result);
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-  };
-  app.post('/api/sessions/:id/final-disruption', finalHandler);
-  app.post('/api/sessions/:id/resolve-final-disruption', finalHandler);
-
   app.post('/api/sessions/:id/timer/start', async (req, res) => res.json(await timerStartV2(req.params.id)));
   app.post('/api/sessions/:id/timer/pause', async (req, res) => res.json(await timerPauseV2(req.params.id)));
   app.post('/api/sessions/:id/timer/reset', async (req, res) => res.json(await timerResetV2(req.params.id)));
@@ -302,16 +303,6 @@ async function startServer() {
     return false;
   };
 
-  app.post('/api/sessions/:id/facilitator/override', async (req, res) => {
-    if (!await requireFacilitator(req, res)) return;
-    try { res.json({ success: true, session: await facilitatorUpdateV2(req.params.id, req.body?.updates || {}) }); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
-  });
-  app.post('/api/sessions/:id/facilitator-override', async (req, res) => {
-    if (!await requireFacilitator(req, res)) return;
-    try { res.json({ success: true, session: await facilitatorUpdateV2(req.params.id, req.body?.updates || {}) }); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
-  });
   app.post('/api/sessions/:id/facilitator/settings', async (req, res) => {
     if (!await requireFacilitator(req, res)) return;
     try { res.json({ success: true, session: await updateGameSettingsV3(req.params.id, req.body || {}) }); }
@@ -322,24 +313,17 @@ async function startServer() {
     try { res.json({ success: true, session: await moveParticipantV3(req.params.id, req.body?.participantId, req.body?.companyId) }); }
     catch (e: any) { res.status(400).json({ error: e.message }); }
   });
-  app.post('/api/sessions/:id/facilitator/finish-company-round', async (req, res) => {
+  app.post('/api/sessions/:id/facilitator/assign-ceo', async (req, res) => {
     if (!await requireFacilitator(req, res)) return;
     try {
-      const result = await facilitatorFinishCompanyRoundV1(req.params.id, req.body?.companyId);
-      res.status(result.success ? 200 : 400).json(result);
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
+      const result=await facilitatorAssignCompanyCeoV1(req.params.id,String(req.body?.companyId||''),String(req.body?.participantId||''));
+      res.status(result.success?200:400).json(result);
+    } catch (e:any) { res.status(400).json({error:e.message}); }
   });
   app.post('/api/sessions/:id/facilitator/remove-company', async (req, res) => {
     if (!await requireFacilitator(req, res)) return;
     try {
       const result = await facilitatorRemoveCompanyV1(req.params.id, req.body?.companyId);
-      res.status(result.success ? 200 : 400).json(result);
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-  });
-  app.post('/api/sessions/:id/facilitator/autopilot-company', async (req, res) => {
-    if (!await requireFacilitator(req, res)) return;
-    try {
-      const result = await facilitatorSetCompanyAutopilotV1(req.params.id, req.body?.companyId, Boolean(req.body?.enabled));
       res.status(result.success ? 200 : 400).json(result);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
