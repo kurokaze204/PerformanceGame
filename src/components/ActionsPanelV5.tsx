@@ -36,6 +36,7 @@ function costFor(actionType:string){return INVESTMENT_COSTS_V4[actionType]||0;}
 export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,onNextPhase,referenceSiteId,referenceHQ=false})=>{
  const showLocalCodified=localCodifiedVisible(session.experienceMode);
  const resolvedEvents=(session.activeEvents[company.id]||[]).filter(e=>e.isResolved);
+ const aarEligibleEvents=resolvedEvents.filter(e=>!e.experientialLearningAwarded);
  const tutorialEvent=resolvedEvents.find(e=>e.card.tags?.includes(PROGRAMMED_FAILURE_TAG));
  const tutorialComplete=Boolean(tutorialEvent&&tutorialEvent.success===false);
  const lessonKey=`tpg_intranet_unlock_${session.id}_${company.id}`;
@@ -54,10 +55,10 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const [sourceSiteId,setSourceSiteId]=useState(activeSites[1]?.id||activeSites[0]?.id||'');
  const [expertId,setExpertId]=useState(activeExperts[0]?.id||'');
  const [domain,setDomain]=useState<KnowledgeDomain>('engineering');
- const [aarEventId,setAarEventId]=useState(resolvedEvents[0]?.instanceId||'');
+ const [aarEventId,setAarEventId]=useState(aarEligibleEvents[0]?.instanceId||'');
  const [useSIF,setUseSIF]=useState(false);
  const selected=visibleInterventions.find(i=>i.id===selectedId)||visibleInterventions[0];
- const selectedAarEvent=resolvedEvents.find(e=>e.instanceId===aarEventId)||resolvedEvents[0];
+ const selectedAarEvent=aarEligibleEvents.find(e=>e.instanceId===aarEventId)||aarEligibleEvents[0];
  const selectedSite=activeSites.find(s=>s.id===siteId)||activeSites[0];
  const sourceSite=availableTeachingSites.find(s=>s.id===sourceSiteId)||availableTeachingSites.find(s=>s.id!==selectedSite?.id)||availableTeachingSites[0];
  const expertChoices=activeExperts;
@@ -67,7 +68,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  useEffect(()=>{if(selectedSite&&selectedSite.id!==siteId)setSiteId(selectedSite.id)},[selectedSite?.id]);
  useEffect(()=>{if(sourceSite&&sourceSite.id!==sourceSiteId)setSourceSiteId(sourceSite.id)},[sourceSite?.id]);
  useEffect(()=>{if(selectedExpert&&selectedExpert.id!==expertId)setExpertId(selectedExpert.id)},[selectedExpert?.id]);
- useEffect(()=>{if(resolvedEvents.length&&!resolvedEvents.some(e=>e.instanceId===aarEventId))setAarEventId(resolvedEvents[0].instanceId)},[aarEventId,resolvedEvents]);
+ useEffect(()=>{if(aarEligibleEvents.length&&!aarEligibleEvents.some(e=>e.instanceId===aarEventId))setAarEventId(aarEligibleEvents[0].instanceId);else if(!aarEligibleEvents.length&&aarEventId)setAarEventId('')},[aarEventId,aarEligibleEvents]);
  useEffect(()=>{if(selectedId==='aar'&&selectedAarEvent?.card.scope==='local'&&selectedAarEvent.targetSiteId)setSiteId(selectedAarEvent.targetSiteId)},[selectedId,selectedAarEvent?.instanceId]);
  if(!selected)return null;
  const tutorialDomain=tutorialEvent?.card.domains[0]?.domain;
@@ -93,7 +94,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  useEffect(()=>{if(relevantDomains.length&&!relevantDomains.includes(domain))setDomain(relevantDomains[0])},[relevantDomains,domain]);
  const peerScore=copPeerKnowledgeScoreV4(session,company,domain);
  const selectedExpertSkill=selectedExpert?.domains.find(x=>x.domain===domain)?.score;
- const travelCost=selectedId==='local-training'&&selectedExpert&&selectedSite?expertTravelCostV4(selectedExpert.location,selectedSite.id):0;
+ const travelCost=((selectedId==='local-training')||(selectedId==='aar'&&selectedAarEvent))&&selectedExpert&&selectedSite?expertTravelCostV4(selectedExpert.location,selectedSite.id):0;
  const baseCost=costFor(selected.actionType);
  const totalCost=roundInvestmentMoneyV1(baseCost+travelCost);
  const bestSiteTeam=Math.max(0,...activeSites.map(s=>s.teamCapability[domain]||0));
@@ -117,7 +118,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
    if(selectedId==='codify-site'){const b=selectedSite?.codifiedKnowledge[domain]??0;return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Docs ${b} → ${b+1}`:'Choose a site';}
    if(selectedId==='train-expert')return selectedExpertSkill!=null?`${selectedExpert?.name} ${DOMAIN_INFO[domain].label} ${selectedExpertSkill} → ${selectedExpertSkill+1}`:'Choose a domain held by the expert';
    if(selectedId==='update-intranet')return `${DOMAIN_INFO[domain].label} Corporate ${company.intranet[domain]} → higher if stronger source knowledge exists`;
-   if(selectedId==='aar'){const siteBefore=selectedSite?.teamCapability[domain]??0;const hqBefore=company.intranet[domain]||0;const expertChange=selectedExpertSkill!=null?`${selectedExpert?.name} ${selectedExpertSkill} → ${selectedExpertSkill+1}`:`${selectedExpert?.name} facilitates only · no personal ${DOMAIN_INFO[domain].label} gain`;return selectedAarEvent&&selectedSite&&selectedExpert?`AAR on “${selectedAarEvent.card.title}” → ${selectedSite.name} Team ${siteBefore} → ${siteBefore+1} · ${expertChange} · HQ ${hqBefore} → ${hqBefore+1}`:'Choose a completed challenge and expert facilitator';}
+   if(selectedId==='aar'){if(!selectedAarEvent)return 'No unused completed challenge is available for another AAR.';const siteBefore=selectedSite?.teamCapability[domain]??0;const hqBefore=company.intranet[domain]||0;const expertChange=selectedExpertSkill!=null?`${selectedExpert?.name} ${selectedExpertSkill} → ${selectedExpertSkill+1}`:`${selectedExpert?.name} facilitates only · no personal ${DOMAIN_INFO[domain].label} gain`;return selectedSite&&selectedExpert?`AAR on “${selectedAarEvent.card.title}” → ${selectedSite.name} Team ${siteBefore} → ${siteBefore+1} · ${expertChange} · HQ ${hqBefore} → ${hqBefore+1}`:'Choose an expert facilitator';}
    if(selectedId==='join-cop')return session.experienceMode==='newbie'
      ? 'Join the general business CoP for the next Event round. Network knowledge becomes usable when another company also joins.'
      : `Join the ${DOMAIN_INFO[domain].label} CoP for the next Event round. Network knowledge becomes usable when another company joins the same domain.`;
@@ -164,7 +165,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
        <div className="min-h-[384px] min-w-0">
          {selectedId==='join-cop'
            ?<CoPNetworkPanelV1 session={session} company={company} domain={domain} onPerformAction={onPerformAction}/>
-           :<InvestmentRiverView company={company} mode={session.experienceMode} selectedDomain={domain} selectedSiteId={riverTargetSiteId} sourceSiteId={riverSourceSiteId} selectedExpertId={riverExpertId} highlightHQ={riverHighlightHQ} highlightAllSites={riverHighlightAllSites} highlightDomain showSiteLabels={selectedId==='knowledge-transfer'} referenceSiteId={referenceSiteId} referenceHQ={referenceHQ} previewSiteDelta={selectedId==='aar'?1:0} previewExpertDelta={selectedId==='aar'&&selectedExpertSkill!=null?1:0} previewHQDelta={selectedId==='aar'?1:0}/>} 
+           :<InvestmentRiverView company={company} mode={session.experienceMode} selectedDomain={domain} selectedSiteId={riverTargetSiteId} sourceSiteId={riverSourceSiteId} selectedExpertId={riverExpertId} highlightHQ={riverHighlightHQ} highlightAllSites={riverHighlightAllSites} highlightDomain showSiteLabels={selectedId==='knowledge-transfer'} referenceSiteId={referenceSiteId} referenceHQ={referenceHQ} previewSiteDelta={selectedId==='aar'&&selectedAarEvent?1:0} previewExpertDelta={selectedId==='aar'&&selectedAarEvent&&selectedExpertSkill!=null?1:0} previewHQDelta={selectedId==='aar'&&selectedAarEvent?1:0}/>} 
        </div>
        <aside className="relative w-[300px] shrink-0 rounded-2xl border border-slate-700 bg-slate-950/95 p-3 pb-4">
          <div className="mb-2 text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Choose an investment</div>
@@ -187,7 +188,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
              <label className="block text-[10px] uppercase text-slate-500 font-black">Receiving site<select value={siteId} onChange={e=>setSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-white normal-case">{activeSites.map(s=><option key={s.id} value={s.id}>{s.name} · team {s.teamCapability[domain]||0}</option>)}</select></label>
             </div>
            </div>:<div data-investment-controls className="space-y-2">
-            {selectedId==='aar'&&<div className="max-w-[560px]"><label className="block text-[10px] uppercase text-slate-500 font-black">Recent challenge<select value={selectedAarEvent?.instanceId||''} onChange={e=>setAarEventId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white normal-case">{resolvedEvents.map(e=><option key={e.instanceId} value={e.instanceId}>{e.success===false?'FAIL':'SUCCESS'} · {e.card.title}</option>)}</select></label></div>}
+            {selectedId==='aar'&&<div className="max-w-[560px]"><label className="block text-[10px] uppercase text-slate-500 font-black">Recent challenge<select value={selectedAarEvent?.instanceId||''} onChange={e=>setAarEventId(e.target.value)} disabled={!aarEligibleEvents.length} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white normal-case disabled:opacity-50">{!aarEligibleEvents.length&&<option value="">No unused completed challenge</option>}{aarEligibleEvents.map(e=><option key={e.instanceId} value={e.instanceId}>{e.success===false?'FAIL':'SUCCESS'} · {e.card.title}</option>)}</select></label></div>}
             {selectedId==='join-cop'&&session.experienceMode==='newbie'
               ?<div className="max-w-[320px] rounded-lg border border-violet-700 bg-violet-950/25 px-3 py-2"><div className="text-[10px] font-black uppercase text-slate-500">CoP scope</div><div className="mt-0.5 text-sm font-black text-white">General business · all Newbie domains</div></div>
               :<div className="max-w-[320px]"><label className="block text-[10px] uppercase text-slate-500 font-black">Domain<select value={domain} onChange={e=>setDomain(e.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white normal-case">{relevantDomains.map(d=><option key={d} value={d}>{DOMAIN_INFO[d].label}</option>)}</select></label></div>}
