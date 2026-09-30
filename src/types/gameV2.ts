@@ -132,6 +132,7 @@ export interface CompanyV2 extends Company {
   disruptionSwapNotice?: DisruptionSwapNoticeV1 | null;
   riverTeachingUse?: { round: number; siteIds: string[] };
   strategicInvestmentFund: number;
+  autopilotEnabled: boolean;
   siteKmActivityUse?: { round: number; counts: Record<string, number> };
   initialRiverSnapshot?: {
     sites: Company['sites'];
@@ -264,6 +265,10 @@ export function asCompanyV2(company: Company): CompanyV2 {
 export function asSessionV2(session: GameSession): GameSessionV2 {
   const s = session as GameSessionV2;
   s.companies = s.companies.map(asCompanyV2);
+  s.companies.forEach((company,index)=>{
+    company.autopilotEnabled ??= index > 0;
+    if(index===0)company.autopilotEnabled=false;
+  });
   s.timerStartedAt ??= null;
   s.timerEndsAt ??= null;
   s.timerPausedSecondsRemaining ??= null;
