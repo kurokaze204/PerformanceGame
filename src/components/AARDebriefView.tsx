@@ -52,6 +52,7 @@ const KNOWLEDGE_LABELS: Record<KnowledgeStrategy, string> = {
   build_networks: 'Build networks',
   automate_critical_knowledge: 'Automate critical knowledge',
   buy_expertise: 'Buy expertise when needed',
+  transfer_best_practice: 'Transfer Best Practice around the organisation',
   no_particular_strategy: 'No particular knowledge strategy',
 };
 
@@ -195,7 +196,7 @@ export const AARDebriefView: React.FC<AARDebriefViewProps> = ({ session, company
               <div className="grid md:grid-cols-2 gap-3">{actualCards.map(card => <Evidence key={card.title} card={card} toneClass={toneClass}/>)}</div>
               {onOpenCharts&&<button onClick={onOpenCharts} className="mt-4 w-full rounded-2xl border-2 border-indigo-600 bg-indigo-950/35 p-4 text-left hover:border-indigo-300"><div className="flex items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-indigo-600 bg-slate-950"><BarChart3 className="h-5 w-5 text-indigo-300"/></div><div><div className="font-black text-white">Explore the charts</div><div className="mt-0.5 text-xs text-slate-400">Compare the trends with what you intended to happen, then return here to discuss why reality differed.</div></div><ArrowRight className="ml-auto h-5 w-5 shrink-0 text-indigo-300"/></div></button>}
               <TurnoverStory metrics={companyMetrics}/>
-              <BenchmarkCharts rows={benchmarks} currentCompanyId={company.id} companies={session.companies} mode={session.experienceMode}/>
+              <BenchmarkCharts rows={benchmarks} currentCompanyId={company.id} companies={session.companies} mode={session.experienceMode} metrics={analytics?.metrics||[]}/>
             </div>}
 
             {question === 'why' && <div className="mt-5 space-y-3">{whyPrompts.map((prompt, index) => <div key={index} className="rounded-xl border border-amber-800/70 bg-amber-950/20 p-4"><div className="text-[10px] uppercase tracking-wider text-amber-300 font-black">Discuss</div><div className="text-base text-white font-bold mt-1">{prompt}</div></div>)}</div>}
@@ -219,13 +220,40 @@ const TurnoverStory:React.FC<{metrics:any[]}>=({metrics})=>{
  return <div className="mt-5 rounded-2xl border-2 border-amber-800 bg-amber-950/10 p-4"><div className="text-[10px] uppercase tracking-[.16em] text-amber-300 font-black">Turnover story</div><h4 className="mt-1 text-lg font-black text-white">Where did the money move?</h4><div className="mt-4 flex items-end gap-2 overflow-x-auto pb-1 min-h-[180px]">{points.map((row,index)=>{const value=n(row.turnover);const height=Math.max(8,(value/max)*130);const trigger=String(row.trigger||'');const special=trigger==='FINAL_CONSULTANT';return <div key={index} className="min-w-[58px] text-center"><div className="text-[9px] font-black text-slate-400">{formatCurrency(value)}</div><div className={'mx-auto mt-1 w-8 rounded-t '+(special?'bg-rose-500':trigger.includes('FINAL')?'bg-amber-400':'bg-indigo-500')} style={{height:String(height)+'px'}}/><div className={'mt-1 text-[8px] font-black '+(special?'text-rose-300':'text-slate-500')}>{label(trigger)}</div></div>})}</div></div>;
 };
 
-const BenchmarkCharts:React.FC<{rows:BenchmarkRow[];currentCompanyId:string;companies:CompanyV2[];mode:GameSessionV2['experienceMode']}>=({rows,currentCompanyId,companies,mode})=>{
+const COMPANY_TURNOVER_COLORS=['#22c55e','#38bdf8','#f59e0b','#a78bfa','#fb7185','#2dd4bf','#60a5fa','#f97316'];
+
+const MultiCompanyTurnoverChart:React.FC<{companies:CompanyV2[];metrics:any[]}>=({companies,metrics})=>{
+ const series=companies.map((comp,index)=>{
+  const rows=(metrics||[]).filter((row:any)=>row.company_id===comp.id&&row.turnover!==null&&row.turnover!==undefined)
+   .sort((a:any,b:any)=>n(a.elapsed_seconds)-n(b.elapsed_seconds)||String(a.captured_at||'').localeCompare(String(b.captured_at||'')));
+  const points=rows.length?rows.map((row:any,pointIndex:number)=>({x:n(row.elapsed_seconds),y:n(row.turnover),index:pointIndex})):
+   [{x:0,y:n(comp.startingTurnover),index:0},{x:1,y:n(comp.turnover),index:1}];
+  return{id:comp.id,name:comp.name,color:COMPANY_TURNOVER_COLORS[index%COMPANY_TURNOVER_COLORS.length],points};
+ });
+ if(!series.length)return null;
+ const allPoints=series.flatMap(s=>s.points),maxX=Math.max(1,...allPoints.map(p=>p.x)),maxY=Math.max(1,...allPoints.map(p=>p.y));
+ const W=980,H=330,left=68,right=24,top=24,bottom=54,innerW=W-left-right,innerH=H-top-bottom;
+ const x=(point:{x:number;index:number},count:number)=>left+((maxX>1?point.x:(count<=1?0:point.index/Math.max(1,count-1)))/(maxX>1?maxX:1))*innerW;
+ const y=(value:number)=>top+innerH-(value/maxY)*innerH;
+ const minuteMode=maxX>1;
+ return <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-950/75 p-4">
+  <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-xs font-black text-white">Turnover across all companies</div><div className="mt-1 text-[10px] text-slate-500">{minuteMode?'Shared game timeline in minutes':'Start-to-finish comparison'} · each company has its own line</div></div><div className="flex flex-wrap justify-end gap-x-4 gap-y-1">{series.map(s=><span key={s.id} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-300"><span className="h-2.5 w-2.5 rounded-full" style={{background:s.color}}/>{s.name}</span>)}</div></div>
+  <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 w-full h-auto min-h-[260px]" role="img" aria-label="Turnover over time for all companies">
+   {[0,.25,.5,.75,1].map(frac=>{const value=maxY*frac,py=y(value);return <g key={frac}><line x1={left} y1={py} x2={W-right} y2={py} stroke="#263247" strokeWidth="1"/><text x={left-10} y={py+4} textAnchor="end" fill="#94a3b8" fontSize="11" fontWeight="700">{formatCurrency(value)}</text></g>})}
+   {[0,.25,.5,.75,1].map(frac=>{const px=left+innerW*frac;return <g key={frac}><line x1={px} y1={top} x2={px} y2={top+innerH} stroke="#1e293b" strokeWidth="1"/><text x={px} y={H-22} textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="700">{minuteMode?`${Math.round(maxX*frac/60)}m`:frac===0?'START':frac===1?'FINISH':''}</text></g>})}
+   {series.map(s=><g key={s.id}><polyline points={s.points.map(point=>`${x(point,s.points.length)},${y(point.y)}`).join(' ')} fill="none" stroke={s.color} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round"/>{s.points.map((point,index)=><circle key={index} cx={x(point,s.points.length)} cy={y(point.y)} r="3.5" fill={s.color} stroke="#0f172a" strokeWidth="1.2"/>)}</g>)}
+  </svg>
+ </div>;
+};
+
+const BenchmarkCharts:React.FC<{rows:BenchmarkRow[];currentCompanyId:string;companies:CompanyV2[];mode:GameSessionV2['experienceMode'];metrics:any[]}>=({rows,currentCompanyId,companies,mode,metrics})=>{
  const maxTurnover=Math.max(1,...rows.map(r=>r.finalTurnover));
  const maxCapability=Math.max(1,...rows.flatMap(r=>[r.avgTeam,r.avgCorporate]));
  return <div className="mt-5 rounded-2xl border-2 border-indigo-800 bg-indigo-950/15 p-4">
   <div className="text-[10px] uppercase tracking-[.16em] text-indigo-300 font-black">Game benchmark</div><h4 className="text-lg font-black text-white mt-1">How did the companies finish?</h4><p className="text-xs text-slate-400 mt-1">Use this for comparison and discussion, not as a single winner score. Different strategies can produce different kinds of resilience.</p>
+  <MultiCompanyTurnoverChart companies={companies} metrics={metrics}/>
   <div className="mt-4 grid lg:grid-cols-3 gap-3"><BenchmarkMetric title="Final turnover" rows={rows} currentCompanyId={currentCompanyId} value={r=>r.finalTurnover} max={maxTurnover} label={r=>formatCurrency(r.finalTurnover)}/><BenchmarkMetric title="Challenge success rate" rows={rows} currentCompanyId={currentCompanyId} value={r=>r.successRate} max={100} label={r=>pct(r.successRate)}/><BenchmarkCapability rows={rows} currentCompanyId={currentCompanyId} max={maxCapability}/></div>
-  <div className="mt-5 border-t border-indigo-900/70 pt-4"><div className="text-[10px] uppercase tracking-[.16em] text-emerald-300 font-black">Knowledge Rivers</div><h5 className="mt-1 text-base font-black text-white">Where did each company’s knowledge actually sit?</h5><p className="mt-1 text-xs text-slate-400">Compare the shape as well as the average. A wide blue gap means useful knowledge exists somewhere in the company but is unevenly distributed. Yellow people show expertise that may sit above the local capability available at sites.</p><div className="mt-3 grid md:grid-cols-2 gap-3">{companies.map(comp=><MiniRiverBenchmark key={comp.id} company={comp} mode={mode} highlight={comp.id===currentCompanyId}/>)}</div></div>
+  <div className="mt-5 border-t border-indigo-900/70 pt-4"><div className="text-[10px] uppercase tracking-[.16em] text-emerald-300 font-black">Knowledge Rivers</div><h5 className="mt-1 text-base font-black text-white">How did each company’s knowledge River change?</h5><p className="mt-1 text-xs text-slate-400">Compare each company’s starting shape with where it finished. A wide blue gap means useful knowledge is unevenly distributed. Yellow people show deep expertise above local capability.</p><div className="mt-3 space-y-4">{companies.map(comp=>{const start=comp.initialRiverSnapshot?({...comp,sites:comp.initialRiverSnapshot.sites,experts:comp.initialRiverSnapshot.experts} as CompanyV2):null;return <div key={comp.id} className={`rounded-2xl border p-3 ${comp.id===currentCompanyId?'border-emerald-800 bg-emerald-950/10':'border-slate-800 bg-slate-950/40'}`}><div className={`mb-2 text-sm font-black ${comp.id===currentCompanyId?'text-emerald-300':'text-white'}`}>{comp.name}{comp.id===currentCompanyId?' · YOU':''}</div><div className="grid xl:grid-cols-2 gap-3">{start?<MiniRiverBenchmark company={start} mode={mode} highlight={comp.id===currentCompanyId} label="START"/>:<div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/60 p-4 text-xs text-slate-500 grid place-items-center min-h-[180px]">Starting River was not captured for this older game.</div>}<MiniRiverBenchmark company={comp} mode={mode} highlight={comp.id===currentCompanyId} label="FINISH"/></div></div>})}</div></div>
  </div>
 };
 
