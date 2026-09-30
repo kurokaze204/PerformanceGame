@@ -202,7 +202,6 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const site = findSite(); if (!site) return { success: false, message: 'Site not found.' };
     const facilitator = findExpert(); if (!facilitator) return { success: false, message: 'Choose an employed expert facilitator.' };
     const facilitatorSkill = facilitator.domains.find((skill) => skill.domain === domain);
-    if (!facilitatorSkill) return { success: false, message: 'The AAR facilitator must hold the selected domain.' };
     const event = (session.activeEvents[company.id] || []).find((e) => e.instanceId === eventInstanceId && e.isResolved);
     if (!event) return { success: false, message: 'Lessons Learned can only use one of this round’s completed challenges.' };
     if (event.experientialLearningAwarded) return { success: false, message: 'An AAR has already been completed for this challenge. Each challenge can only be used once for Lessons Learned.' };
@@ -211,18 +210,20 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     const capacityFailure = capacityError(site.id); if (capacityFailure) return capacityFailure;
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
     site.teamCapability[domain] += 1;
-    facilitatorSkill.score += 1;
+    if (facilitatorSkill) facilitatorSkill.score += 1;
     company.intranet[domain] += 1;
     recordPublicationEvidenceV4(company, domain, 2);
     event.experientialLearningAwarded = true;
     const investmentAttribution = finish(baseCost, site.id);
     return {
       success: true,
-      message: `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost ${baseCost}k.${fundingSuffix}`,
+      message: facilitatorSkill
+        ? `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost ${baseCost}k.${fundingSuffix}`
+        : `AAR on “${event.card.title}” increased ${site.name} Team Capability and Corporate Intranet knowledge in ${domain} by +1. ${facilitator.name} facilitated outside their expertise, so their personal score did not increase. Cost ${baseCost}k.${fundingSuffix}`,
       costTurnover: baseCost,
       investmentAttribution,
       eventInstanceId,
-      aarLearning: { siteId: site.id, expertId: facilitator.id, domain, siteDelta: 1, expertDelta: 1, intranetDelta: 1 },
+      aarLearning: { siteId: site.id, expertId: facilitator.id, domain, siteDelta: 1, expertDelta: facilitatorSkill ? 1 : 0, intranetDelta: 1 },
     };
   }
 
