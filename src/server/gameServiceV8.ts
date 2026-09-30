@@ -343,6 +343,7 @@ export async function resolveEventV2(sessionId:string,companyId:string,eventInst
     if(!company)return{success:false,message:'Company not found.',session};
     const event=(session.activeEvents[company.id]||[]).find(candidate=>candidate.instanceId===eventInstanceId);
     if(!event)return{success:false,message:'Event not found.',session};
+    if(event.isResolved)return{success:false,message:'That Event has already been resolved.',session};
     const existing=(event as any).uiResolutionData;
     if(existing)return{success:true,eventSuccess:Boolean(existing.eventSuccess),result:existing.result,session};
     const openId=String((company as any).uiOpenEventInstanceId||'');
@@ -397,10 +398,15 @@ async function acknowledgeEventResolution(sessionId:string,companyId:string,even
     if(!session)return{success:false,message:'Session not found.'};
     const company=session.companies.find(candidate=>candidate.id===companyId);
     if(!company)return{success:false,message:'Company not found.',session};
+    const event=(session.activeEvents[company.id]||[]).find(candidate=>candidate.instanceId===eventInstanceId);
+    if(!event)return{success:false,message:'Event not found.',session};
+    // Multiple browsers can share one company. If another teammate has already
+    // acknowledged this result, converge on the authoritative session instead of
+    // trapping the later browser on a stale result screen.
+    if(event.isResolved)return{success:true,message:'Event already acknowledged.',session};
     const currentId=String((company as any).uiOpenEventInstanceId||'');
     if(currentId!==eventInstanceId)return{success:false,message:'That Event is no longer the company Event.',session};
-    const event=(session.activeEvents[company.id]||[]).find(candidate=>candidate.instanceId===eventInstanceId);
-    if(!event||(event as any).uiResolutionData==null)return{success:false,message:'There is no resolved Event waiting for acknowledgement.',session};
+    if((event as any).uiResolutionData==null)return{success:false,message:'There is no resolved Event waiting for acknowledgement.',session};
 
     event.isResolved=true;
     clearCompanyOpenEventV1(session,companyId,eventInstanceId);
