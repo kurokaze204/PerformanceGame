@@ -107,6 +107,16 @@ assert.ok(facilitatorSource.includes('Finish round now'),'Facilitator control ro
 assert.ok(facilitatorSource.includes("'remove-company'"),'Facilitator control room must allow an empty company to be removed');
 assert.ok(facilitatorSource.includes('autopilot will keep this company moving'),'Facilitator control room must explain empty-company autopilot');
 assert.ok(facilitatorSource.includes('team.length>0'),'Company removal must be disabled while players are still assigned');
+assert.ok(facilitatorSource.includes("facilitator/autopilot-company"),'Facilitator must be able to toggle company autopilot');
+assert.ok(facilitatorSource.includes("companyIndex===0?'Autopilot locked off':'Autopilot'"),'Company 1 must visibly show autopilot locked off');
+assert.ok(facilitatorSource.includes('disabled={busy||companyIndex===0||team.length>0||session.isFinalDisruptionActive}'),'Autopilot checkbox must be disabled for Company 1 and staffed companies');
+
+const autopilotSource=readFileSync(new URL('../src/engine/emptyCompanyAutopilotV1.ts',import.meta.url),'utf8');
+assert.ok(autopilotSource.includes("if(index<=0||!company||!company.autopilotEnabled)return false"),'Autopilot engine must hard-exclude Company 1 and respect the facilitator switch');
+
+const serviceV4Source=readFileSync(new URL('../src/server/gameServiceV4.ts',import.meta.url),'utf8');
+assert.ok(serviceV4Source.includes("participantCountBefore===0&&!session.timerStartedAt&&!session.timerEndsAt"),'Game timer must auto-start when the first real player joins');
+assert.ok(serviceV4Source.includes("target.autopilotEnabled=false"),'Assigning a player to a company must immediately disable autopilot');
 
 const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
 for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
