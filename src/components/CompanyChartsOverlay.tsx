@@ -61,6 +61,36 @@ export function captureRoundSnapshot(company: CompanyV2, round: number): RoundSn
   return liveSnapshot(company, round);
 }
 
+const round2=(value:number)=>Math.round(value*100)/100;
+
+function syntheticPreGameHistory(base:RoundSnapshot,company:CompanyV2):RoundSnapshot[]{
+  const seed=[...company.id].reduce((sum,ch)=>sum+ch.charCodeAt(0),0);
+  const turnoverRate=0.015+(seed%8)/1000;
+  const knowledgeRate=0.008+((seed>>3)%7)/1000;
+  return [3,2,1].map((steps,index)=>{
+    const turnoverFactor=1/Math.pow(1+turnoverRate,steps);
+    const knowledgeFactor=1/Math.pow(1+knowledgeRate,steps);
+    const sites=Object.fromEntries(Object.entries(base.sites).map(([siteId,site])=>[siteId,{
+      ...site,
+      turnover:round2(site.turnover*turnoverFactor),
+      totalLocalKnowledge:round2(site.totalLocalKnowledge*knowledgeFactor),
+      totalCodifiedKnowledge:round2(site.totalCodifiedKnowledge*knowledgeFactor),
+      cumulativeKnowledgeSpend:0,
+      maxByDomain:Object.fromEntries(DOMAINS.map(domain=>[domain,round2((site.maxByDomain[domain]||0)*knowledgeFactor)])) as Record<KnowledgeDomain,number>,
+    }])) as RoundSnapshot['sites'];
+    return{
+      round:index-2,
+      companyTurnover:round2(base.companyTurnover*turnoverFactor),
+      cumulativeKnowledgeSpend:0,
+      cumulativeCorporateKnowledgeSpend:0,
+      intranet:Object.fromEntries(DOMAINS.map(domain=>[domain,round2((base.intranet[domain]||0)*knowledgeFactor)])) as Record<KnowledgeDomain,number>,
+      sites,
+    };
+  });
+}
+
+const roundLabel=(round:number)=>round<=0?`P${round-1}`:`R${round}`;
+
 const TrendChart: React.FC<{ title: string; rounds: number[]; series: Series[]; enabled: Record<string, boolean>; scales?: Record<string, Scale> }> = ({ title, rounds, series, enabled, scales }) => {
   const shown = series.filter((s) => enabled[s.id]);
   // Keep the card compact, but use a viewBox aspect ratio close to the rendered
@@ -81,7 +111,7 @@ const TrendChart: React.FC<{ title: string; rounds: number[]; series: Series[]; 
   return <section className="rounded-xl border border-slate-700 bg-slate-950/85 p-2 min-w-0">
     <div className="font-black text-white text-base leading-tight mb-1">{title}</div>
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[112px] bg-slate-900/55 rounded-lg">
-      {rounds.map((r,i)=>{const x=left+(rounds.length<=1?innerW/2:i*innerW/(rounds.length-1));return <g key={r}><line x1={x} y1={top} x2={x} y2={top+innerH} stroke="#334155" strokeWidth="1"/><text x={x} y={height-4} textAnchor="middle" fill="#cbd5e1" fontSize="9" fontWeight="700">R{r}</text></g>})}
+      {rounds.map((r,i)=>{const x=left+(rounds.length<=1?innerW/2:i*innerW/(rounds.length-1));return <g key={r}><line x1={x} y1={top} x2={x} y2={top+innerH} stroke="#334155" strokeWidth="1"/><text x={x} y={height-4} textAnchor="middle" fill={r<=0?'#64748b':'#cbd5e1'} fontSize="9" fontWeight="700">{roundLabel(r)}</text></g>})}
       {shown.map((s)=><polyline key={s.id} points={pointsFor(s)} fill="none" stroke={LINE_COLORS[series.findIndex(x=>x.id===s.id)%LINE_COLORS.length]} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>)}
     </svg>
   </section>;
@@ -94,6 +124,9 @@ export const CompanyChartsOverlay: React.FC<Props> = ({ company, snapshots, onCl
     snapshots.forEach((s) => byRound.set(s.round, s));
     const latestRound = Math.max(1, ...snapshots.map(s=>s.round));
     byRound.set(latestRound, liveSnapshot(company, latestRound));
+    const actual=[...byRound.values()].filter(snapshot=>snapshot.round>0).sort((a,b)=>a.round-b.round);
+    const base=actual[0]||liveSnapshot(company,latestRound);
+    for(const snapshot of syntheticPreGameHistory(base,company))byRound.set(snapshot.round,snapshot);
     return [...byRound.values()].sort((a,b)=>a.round-b.round);
   }, [company, snapshots]);
   const rounds = data.map(d=>d.round);
@@ -132,7 +165,7 @@ export const CompanyChartsOverlay: React.FC<Props> = ({ company, snapshots, onCl
   return <div className="fixed left-0 right-0 top-[var(--tpg-header-height)] bottom-0 z-[300] bg-[#080b12]/98 backdrop-blur-sm p-3 md:p-5 overflow-hidden">
     <div className="relative h-full max-w-[1600px] mx-auto rounded-3xl border border-indigo-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-700 flex items-start justify-between gap-4 shrink-0">
-        <div><div className="text-xs uppercase tracking-[0.18em] text-indigo-300 font-black">Company Trends</div><h2 className="text-xl font-black text-white">How your capability is changing round by round</h2><p className="text-xs text-slate-400 mt-1">Each factor uses the same scale across every city, starting at zero unless that factor falls negative. That means relative height is meaningful: a city at half another city's turnover will plot at roughly half the height. Corporate HQ remains a separate company-level view. The shared legend controls every chart.</p></div>
+        <div><div className="text-xs uppercase tracking-[0.18em] text-indigo-300 font-black">Company Trends</div><h2 className="text-xl font-black text-white">How your capability is changing round by round</h2><p className="text-xs text-slate-400 mt-1">Each factor uses the same scale across every city, starting at zero unless that factor falls negative. That means relative height is meaningful: a city at half another city's turnover will plot at roughly half the height. Corporate HQ remains a separate company-level view. The shared legend controls every chart.</p><p className="mt-1 text-[10px] font-bold text-slate-500">P-3 to P-1 are simulated pre-game history, back-cast from the starting company with gentle growth. They are context only and do not affect gameplay.</p></div>
         <button onClick={onClose} className="tpg-close-button shrink-0" aria-label="Close charts" title="Close charts"><X className="w-5 h-5"/></button>
       </div>
       <div className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_230px] gap-3 p-3">
