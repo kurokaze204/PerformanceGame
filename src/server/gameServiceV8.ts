@@ -240,6 +240,48 @@ async function moveExpertPermanently(sessionId:string,companyId:string,payload:a
   });
 }
 
+async function sendCopMessage(sessionId:string,companyId:string,payload:any){
+  return serialisePhaseChange(sessionId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!company)return{success:false,message:'Company not found.',session};
+    const targetCompanyId=String(payload?.targetCompanyId||'');
+    const target=session.companies.find(candidate=>candidate.id===targetCompanyId);
+    const soloTarget=session.soloMode&&session.soloCopPeer?.id===targetCompanyId?session.soloCopPeer:null;
+    if(!target&&!soloTarget)return{success:false,message:'The company you are trying to contact is no longer available.',session};
+    const raw=String(payload?.message||'').trim();
+    if(!raw)return{success:false,message:'Write a message before sending it.',session};
+    const message=raw.slice(0,600);
+    const domain=(['engineering','hr','marketing','operations','finance'] as string[]).includes(String(payload?.domain||''))?payload.domain as KnowledgeDomain:undefined;
+    session.copMessages??=[];
+    const now=new Date().toISOString();
+    session.copMessages.push({
+      id:`cop-msg-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+      fromCompanyId:company.id,
+      toCompanyId:targetCompanyId,
+      domain,
+      message,
+      round:session.round,
+      createdAt:now,
+    });
+    if(soloTarget){
+      session.copMessages.push({
+        id:`cop-msg-${Date.now()}-${Math.random().toString(36).slice(2,7)}-reply`,
+        fromCompanyId:soloTarget.id,
+        toCompanyId:company.id,
+        domain,
+        message:soloPeerAutoReplyV5(session,domain),
+        round:session.round,
+        createdAt:new Date(Date.now()+1).toISOString(),
+      });
+    }
+    await saveSessionV2(session);
+    broadcastV2(session,'COP_MESSAGE_SENT',{fromCompanyId:company.id,toCompanyId:targetCompanyId,domain});
+    return{success:true,message:soloTarget?'Message sent. Meridian Partners replied.':'Message sent to the other company.',session};
+  });
+}
+
 async function openCompanyEventCard(sessionId:string,companyId:string,eventInstanceId:string){
   return serialiseCompanyEventOpenV1(sessionId,companyId,async()=>{
     const session=await baseGetSessionV2(sessionId.toUpperCase());
@@ -350,6 +392,7 @@ export async function knowledgeActionV2(sessionId:string,companyId:string,payloa
   if(payload?.type==='FINAL_DISRUPTION_RESOLVE')return serialisePhaseChange(sessionId,()=>baseKnowledgeActionV2(sessionId,companyId,payload));
   if(payload?.type==='SITE_KNOWLEDGE_SHARING')return serialisePhaseChange(sessionId,()=>baseKnowledgeActionV2(sessionId,companyId,payload));
   if(payload?.type==='MOVE_EXPERT')return moveExpertPermanently(sessionId,companyId,payload);
+  if(payload?.type==='COP_MESSAGE')return sendCopMessage(sessionId,companyId,payload);
   if(payload?.type==='SET_REPLACEMENT_LOCATION')return setReplacementLocation(sessionId,companyId,payload);
   if(payload?.type==='OPEN_EVENT_CARD')return openCompanyEventCard(sessionId,companyId,String(payload?.eventInstanceId||''));
   if(payload?.type==='ACK_EVENT_RESOLUTION')return acknowledgeEventResolution(sessionId,companyId,String(payload?.eventInstanceId||''));
