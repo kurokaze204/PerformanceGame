@@ -453,6 +453,38 @@ export async function getGameEventLogs(sessionId: string): Promise<GameEventLog[
   return memoryStore.eventLogs.filter((l) => l.sessionId === sessionId);
 }
 
+export async function getParticipantsForSession(sessionId: string): Promise<Participant[]> {
+  const id = sessionId.toUpperCase();
+  const merged = new Map<string, Participant>();
+  for (const participant of memoryStore.participants.values()) {
+    if (participant.sessionId.toUpperCase() === id) merged.set(participant.id, participant);
+  }
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `SELECT id, session_id, name, company_id, role, last_seen
+         FROM performance_gap.participants
+         WHERE session_id = $1
+         ORDER BY last_seen ASC`,
+        [id],
+      );
+      for (const row of result.rows) {
+        merged.set(row.id, {
+          id: row.id,
+          sessionId: row.session_id,
+          name: row.name,
+          companyId: row.company_id,
+          role: row.role,
+          lastSeen: row.last_seen instanceof Date ? row.last_seen.toISOString() : String(row.last_seen),
+        } as Participant);
+      }
+    } catch (e) {
+      console.error('[DB] Error reading participants from Postgres:', e);
+    }
+  }
+  return [...merged.values()];
+}
+
 /**
  * Register or update Participant
  */
