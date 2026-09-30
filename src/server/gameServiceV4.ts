@@ -76,7 +76,7 @@ export async function createNewSessionV2(sessionId:string,title:string,companyNa
  const config={...DEFAULT_CONFIG,rounds:99,events_per_round:2,actions_per_round:clamp(Number(options.actionsPerRound??DEFAULT_CONFIG.actions_per_round),1,10)};
  const companies=companyNames.map((name,idx)=>{
   const company=createInitialCompanyV2(name,`comp-${idx+1}-${id.toLowerCase()}`,config);
-  company.autopilotEnabled=idx>0;
+
   return company;
  });
  const session=asSessionV2({id,title,round:1,phase:'respond',isPaused:false,isFinalDisruptionActive:false,companies,activeEvents:{},copMemberships:[],config,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()} as GameSession);
@@ -100,19 +100,19 @@ export async function initializeDefaultSessionV2():Promise<GameSessionV2>{
  return session;
 }
 
-function autoCompany(session:GameSessionV2){const counts=new Map(session.companies.map(c=>[c.id,0]));for(const p of session.participants.filter(p=>p.role==='participant'))counts.set(p.companyId,(counts.get(p.companyId)||0)+1);return[...session.companies].filter(c=>(counts.get(c.id)||0)<session.maxPlayersPerCompany).sort((a,b)=>(counts.get(a.id)||0)-(counts.get(b.id)||0))[0]}
+function autoCompany(session:GameSessionV2){const counts=new Map(session.companies.map(c=>[c.id,0]));for(const p of session.participants.filter(p=>p.role!=='facilitator'))counts.set(p.companyId,(counts.get(p.companyId)||0)+1);return[...session.companies].filter(c=>(counts.get(c.id)||0)<session.maxPlayersPerCompany).sort((a,b)=>(counts.get(a.id)||0)-(counts.get(b.id)||0))[0]}
 
 export async function joinSessionV2(sessionId:string,name:string,companyId?:string,role:Participant['role']='participant'){
  const session=await getSessionOrThrow(sessionId);
  const cleanName=(name||'Player').trim()||'Player';
  if(role==='participant'){
-   const exact=session.participants.filter(p=>p.role==='participant'&&p.name.trim().toLocaleLowerCase()===cleanName.toLocaleLowerCase());
+   const exact=session.participants.filter(p=>p.role!=='facilitator'&&p.name.trim().toLocaleLowerCase()===cleanName.toLocaleLowerCase());
    if(exact.length){
      const existing=[...exact].sort((a,b)=>new Date(b.lastSeen).getTime()-new Date(a.lastSeen).getTime())[0];
      const existingCompany=session.companies.find(c=>c.id===existing.companyId);
      if(existingCompany){
        existing.lastSeen=new Date().toISOString();
-       existingCompany.autopilotEnabled=false;
+
        await saveParticipant(existing);await saveSessionV2(session);
        broadcastV2(session,'PARTICIPANT_REJOINED',{participant:existing});
        return{session,participant:existing,rejoined:true};
@@ -121,11 +121,11 @@ export async function joinSessionV2(sessionId:string,name:string,companyId?:stri
  }
  const requested=session.companies.find(c=>c.id===companyId);const target=role==='facilitator'?(requested||session.companies[0]):(requested||autoCompany(session));
  if(!target)throw new Error('All companies have reached the player limit. Ask the facilitator to increase the team size or move a player.');
- const count=session.participants.filter(p=>p.role==='participant'&&p.companyId===target.id).length;if(role==='participant'&&count>=session.maxPlayersPerCompany)throw new Error(`${target.name} is full (${session.maxPlayersPerCompany} players).`);
- const participantCountBefore=session.participants.filter(p=>p.role==='participant').length;
+ const count=session.participants.filter(p=>p.role!=='facilitator'&&p.companyId===target.id).length;if(role==='participant'&&count>=session.maxPlayersPerCompany)throw new Error(`${target.name} is full (${session.maxPlayersPerCompany} players).`);
+ const participantCountBefore=session.participants.filter(p=>p.role!=='facilitator').length;
  const participant:Participant={id:`part-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,sessionId:session.id,name:cleanName,companyId:target.id,role,lastSeen:new Date().toISOString()};session.participants.push(participant);
  if(role==='participant'){
-   target.autopilotEnabled=false;
+
    if(participantCountBefore===0&&!session.timerStartedAt&&!session.timerEndsAt){
      const remaining=session.timerPausedSecondsRemaining??session.gameDurationMinutes*60;
      session.timerStartedAt=new Date().toISOString();
@@ -136,7 +136,7 @@ export async function joinSessionV2(sessionId:string,name:string,companyId?:stri
  await saveParticipant(participant);await saveSessionV2(session);broadcastV2(session,'PARTICIPANT_JOINED',{participant,timerAutoStarted:role==='participant'&&participantCountBefore===0});return{session,participant};
 }
 
-export async function moveParticipantV3(sessionId:string,participantId:string,companyId:string){const session=await getSessionOrThrow(sessionId);const participant=session.participants.find(p=>p.id===participantId);const target=session.companies.find(c=>c.id===companyId);if(!participant||!target)throw new Error('Player or company not found.');const targetCount=session.participants.filter(p=>p.role==='participant'&&p.companyId===companyId&&p.id!==participantId).length;if(participant.role==='participant'&&targetCount>=session.maxPlayersPerCompany)throw new Error(`${target.name} is already at the player limit.`);participant.companyId=target.id;participant.lastSeen=new Date().toISOString();if(participant.role==='participant')target.autopilotEnabled=false;await saveParticipant(participant);await saveSessionV2(session);broadcastV2(session,'PARTICIPANT_MOVED',{participantId,companyId,autopilotDisabled:participant.role==='participant'});return session}
+export async function moveParticipantV3(sessionId:string,participantId:string,companyId:string){const session=await getSessionOrThrow(sessionId);const participant=session.participants.find(p=>p.id===participantId);const target=session.companies.find(c=>c.id===companyId);if(!participant||!target)throw new Error('Player or company not found.');const targetCount=session.participants.filter(p=>p.role!=='facilitator'&&p.companyId===companyId&&p.id!==participantId).length;if(participant.role==='participant'&&targetCount>=session.maxPlayersPerCompany)throw new Error(`${target.name} is already at the player limit.`);participant.companyId=target.id;participant.lastSeen=new Date().toISOString();await saveParticipant(participant);await saveSessionV2(session);broadcastV2(session,'PARTICIPANT_MOVED',{participantId,companyId});return session}
 
 export async function updateGameSettingsV3(sessionId:string,updates:{gameDurationMinutes?:number;maxPlayersPerCompany?:number;gameEndMode?:GameEndMode;finalRoundCount?:number}){const session=await getSessionOrThrow(sessionId);if(updates.maxPlayersPerCompany!=null)session.maxPlayersPerCompany=clamp(Number(updates.maxPlayersPerCompany),1,20);if(session.experienceMode==='expert'&&updates.gameEndMode)session.gameEndMode=updates.gameEndMode==='rounds'?'rounds':'time';else if(session.experienceMode!=='expert')session.gameEndMode='time';if(updates.finalRoundCount!=null)session.finalRoundCount=clamp(Number(updates.finalRoundCount),1,200);if(updates.gameDurationMinutes!=null){const oldFull=session.gameDurationMinutes*60;const elapsed=session.timerEndsAt?Math.max(0,oldFull-remainingSeconds(session)):Math.max(0,oldFull-(session.timerPausedSecondsRemaining??oldFull));session.gameDurationMinutes=clamp(Number(updates.gameDurationMinutes),20,240);const next=Math.max(0,session.gameDurationMinutes*60-elapsed);if(session.timerEndsAt)session.timerEndsAt=new Date(Date.now()+next*1000).toISOString();else session.timerPausedSecondsRemaining=next}refreshCompanyDisruptionStrengthV1(session);await saveSessionV2(session);broadcastV2(session,'GAME_SETTINGS_UPDATED');return session}
 
