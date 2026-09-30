@@ -59,7 +59,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  return <div className="h-full min-h-[260px] rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-inner">
   <div className="flex items-center justify-between gap-3 px-1">
    <div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>
-   <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span>● Site</span><span className="text-sky-300">◆ HQ</span><span className="text-amber-300">● Expert</span></div>
+   <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span className="text-slate-50">● Site</span><span className="text-sky-300">◆ HQ</span><span className="text-amber-300">● Expert</span></div>
   </div>
   <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[220px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
    {ticks.map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
