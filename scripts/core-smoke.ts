@@ -330,4 +330,26 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   assert.equal(company.intranet[domain],9);
 }
 
+// 12. Any employed expert may facilitate an AAR, but non-domain facilitators do not gain personal expertise.
+{
+  const { session, company } = makeSession('expert');
+  session.phase='investment';
+  company.actionsRemaining=5;
+  const site=company.sites.find(candidate=>!candidate.isClosed)!;
+  const domain=company.experts.find(candidate=>!candidate.isVacant)!.domains[0].domain;
+  const facilitator=company.experts.find(candidate=>!candidate.isVacant&&!candidate.domains.some(skill=>skill.domain===domain))!;
+  assert.ok(facilitator,'smoke company must include a non-domain facilitator');
+  const beforeFacilitatorScores=facilitator.domains.map(skill=>skill.score);
+  const teamBefore=site.teamCapability[domain];
+  const intranetBefore=company.intranet[domain];
+  const event:ActiveEvent={instanceId:'AAR-NON-DOMAIN',card:{id:'AAR-NON-DOMAIN',type:'problem',scope:'local',title:'Cross-domain facilitator',description:'Smoke test',domains:[{domain,difficulty:5}],impact:10,tags:['test']},targetSiteId:site.id,allocations:{[domain]:{}} as any,isResolved:true,success:true};
+  session.activeEvents[company.id]=[event as any];
+  const result:any=executeInvestmentActionV4(session,company,{type:'LESSONS_LEARNED',companyId:company.id,siteId:site.id,expertId:facilitator.id,domain,eventInstanceId:event.instanceId});
+  assert.equal(result.success,true);
+  assert.equal(site.teamCapability[domain],teamBefore+1);
+  assert.equal(company.intranet[domain],intranetBefore+1);
+  assert.deepEqual(facilitator.domains.map(skill=>skill.score),beforeFacilitatorScores,'non-domain facilitator expertise must not increase');
+  assert.equal(result.aarLearning?.expertDelta,0);
+}
+
 console.log('Core V2 smoke tests passed.');
