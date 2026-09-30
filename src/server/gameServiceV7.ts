@@ -25,6 +25,7 @@ const COMPANY_NAMES = [
   'Apex Technologies','Vanguard Systems','Horizon BioTech','Stratos Engineering',
   'Northstar Manufacturing','Southern Cross Industries','Meridian Group','Summit Systems',
 ];
+const MAX_COMPANIES = COMPANY_NAMES.length;
 const REPLACEMENT_NAMES = [
   'Alex Morgan','Priya Shah','Daniel Chen','Mia Thompson','Jordan Lee','Samira Patel','Liam Brooks','Nina Alvarez',
   'Marcus Reed','Sophie Nguyen','Ethan Walsh','Grace Kim','Owen Clarke','Aisha Rahman','Noah Bennett','Chloe Martin',
@@ -89,7 +90,10 @@ export async function joinSessionV2(sessionId:string,name:string,companyId?:stri
   const counts=new Map(session.companies.map(c=>[c.id,0]));
   for(const p of session.participants.filter(p=>p.role==='participant'))counts.set(p.companyId,(counts.get(p.companyId)||0)+1);
   let target=session.companies.find(c=>(counts.get(c.id)||0)<session.maxPlayersPerCompany);
-  if(!target)target=await addExpansionCompany(session);
+  if(!target){
+    if(session.companies.length>=MAX_COMPANIES)throw new Error(`This game already has the maximum of ${MAX_COMPANIES} companies.`);
+    target=await addExpansionCompany(session);
+  }
   return baseJoinSessionV2(sessionId,name,target.id,role);
 }
 
