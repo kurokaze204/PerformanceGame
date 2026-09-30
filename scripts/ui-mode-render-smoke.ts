@@ -112,29 +112,31 @@ assert.equal(boardToolTabsSource.includes('RiverDiagramOverlay'),false,'Legacy R
 assert.equal(boardToolTabsSource.includes('PROGRAMMED_FAILURE_TAG'),false,'Board tools must not resurrect River based on transfer unlock state');
 
 const facilitatorSource=readFileSync(new URL('../src/components/FacilitatorControlRoomV2.tsx',import.meta.url),'utf8');
-assert.ok(facilitatorSource.includes('Finish round now'),'Facilitator control room must allow a company round to be finished early');
 assert.ok(facilitatorSource.includes("'remove-company'"),'Facilitator control room must allow an empty company to be removed');
-assert.ok(facilitatorSource.includes('autopilot will keep this company moving'),'Facilitator control room must explain empty-company autopilot');
 assert.ok(facilitatorSource.includes('team.length>0'),'Company removal must be disabled while players are still assigned');
 assert.ok(facilitatorSource.includes("facilitator/remove-player"),'Facilitator must be able to remove duplicate or abandoned player records');
 assert.ok(facilitatorSource.includes('Remove duplicate or abandoned player'),'Player removal control must explain its purpose');
-assert.ok(facilitatorSource.includes('older duplicate'),'Facilitator must flag the older record when identical player names are duplicated');
+assert.ok(facilitatorSource.includes("facilitator/assign-ceo"),'Facilitator must be able to assign the company CEO');
+assert.ok(facilitatorSource.includes('One CEO writes'),'Facilitator UI must explain the single-writer company rule');
+assert.ok(facilitatorSource.includes('Companies are independent'),'Facilitator UI must explain asynchronous company progression');
+assert.equal(facilitatorSource.toLowerCase().includes('autopilot'),false,'Retired autopilot UI must not return');
+assert.equal(facilitatorSource.includes('Finish round now'),false,'Facilitator must not force company progression');
 assert.equal(facilitatorSource.includes('fac-view-'),false,'Returning from facilitator mode must not manufacture a fake player identity');
-assert.ok(facilitatorSource.includes("facilitator/autopilot-company"),'Facilitator must be able to toggle company autopilot');
-assert.ok(facilitatorSource.includes("companyIndex===0?'Autopilot locked off':'Autopilot'"),'Company 1 must visibly show autopilot locked off');
-assert.ok(facilitatorSource.includes('disabled={busy||companyIndex===0||team.length>0||session.isFinalDisruptionActive}'),'Autopilot checkbox must be disabled for Company 1 and staffed companies');
-
-const autopilotSource=readFileSync(new URL('../src/engine/emptyCompanyAutopilotV1.ts',import.meta.url),'utf8');
-assert.ok(autopilotSource.includes("if(index<=0||!company||!company.autopilotEnabled)return false"),'Autopilot engine must hard-exclude Company 1 and respect the facilitator switch');
 
 const serviceV4Source=readFileSync(new URL('../src/server/gameServiceV4.ts',import.meta.url),'utf8');
 assert.ok(serviceV4Source.includes("PARTICIPANT_REJOINED"),'Exact-name re-entry must resume an existing participant rather than create another record');
 assert.ok(serviceV4Source.includes("p.name.trim().toLocaleLowerCase()===cleanName.toLocaleLowerCase()"),'Participant rejoin matching must normalise exact player names');
 assert.ok(serviceV4Source.includes("participantCountBefore===0&&!session.timerStartedAt&&!session.timerEndsAt"),'Game timer must auto-start when the first real player joins');
-assert.ok(serviceV4Source.includes("target.autopilotEnabled=false"),'Assigning a player to a company must immediately disable autopilot');
+assert.equal(serviceV4Source.includes('autopilotEnabled'),false,'Participant allocation must not resurrect autopilot');
 
-const investDockSource=readFileSync(new URL('../src/components/InvestmentDecisionDockV1.tsx',import.meta.url),'utf8');
-for(const label of ['Sites','Experts','HQ','Score'])assert.ok(investDockSource.includes(`'${label}'`),`Invest must preserve the ${label} reference control`);
+assert.equal(boardToolTabsSource.includes('InvestmentDecisionDockV1'),false,'Legacy shared-phase Invest dock must be removed from board tools');
+
+const serviceV9Source=readFileSync(new URL('../src/server/gameServiceV9.ts',import.meta.url),'utf8');
+assert.ok(serviceV9Source.includes("company.round+=1"),'finishing Knowledge Risk must advance one company round');
+assert.ok(serviceV9Source.includes("company.roundPhase='events'"),'a company must return to Events independently');
+assert.equal(serviceV9Source.includes("'waiting' |"),false,'waiting must not be a valid company round phase');
+assert.ok(serviceV9Source.includes('syncSessionSummary(session)'), 'session phase/round must be a compatibility summary');
+assert.equal(serviceV9Source.toLowerCase().includes('autoplaycompanytowaiting'),false,'autopilot round orchestration must not survive in the active service');
 
 const finalDisruptionSource=readFileSync(new URL('../src/components/FinalDisruptionModalV2.tsx',import.meta.url),'utf8');
 assert.ok(finalDisruptionSource.includes('TRY YOUR LUCK WITHOUT EXTERNAL HELP'),'Final Disruption must clearly label an under-strength no-consultant attempt');
@@ -157,6 +159,10 @@ assert.equal(finishLessonSource.includes('setPendingContinue(null)'),false,'Newb
 const appBoardEventSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
 assert.ok(appBoardEventSource.includes("sessionStorage.getItem('tpg_facilitator_game_view')!=='1'"),'Facilitator game-view mode must remain facilitator identity without reopening the control room');
 assert.ok(appBoardEventSource.includes("activeEventIndex=chosen>=0?chosen:-1"),'board must not fall back to a resolved Event when no unresolved Event exists');
-assert.ok(appBoardEventSource.includes("if(!event||event.isResolved)return;setBoardTool(null)"),'opening a resolved Event must be ignored');
+assert.ok(appBoardEventSource.includes("actionType:'OPEN_EVENT_CARD'"),'CEO opening an Event must claim it on the server for all company members');
+assert.ok(appBoardEventSource.includes("participantId:participant?.id"),'player writes must carry the participant identity for CEO authorization');
+assert.ok(appBoardEventSource.includes("Read only ·"),'followers must have a visible read-only company mode');
+assert.ok(appBoardEventSource.includes('company.controllerParticipantId===participant.id'),'write controls must derive from the authoritative company CEO');
+assert.equal(appBoardEventSource.includes('/advance-phase'),false,'player UI must not expose global phase advancement');
 
 console.log('Mode-aware UI render smoke tests passed.');
