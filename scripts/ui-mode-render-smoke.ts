@@ -60,10 +60,14 @@ assert.ok(disruptionCardSource.includes('staticVertical?:boolean'),'Disruption m
 assert.ok(disruptionCardSource.includes("min-h-[44px]"),'Vertical Disruption domain rows must reserve space for long labels such as Human Resources');
 assert.ok(disruptionCardSource.includes("w-[132px] min-h-[176px]"),'Invest Disruption card must retain the same vertical proportions as the board card');
 assert.ok(disruptionCardSource.includes("[overflow-wrap:normal]"),'Disruption domain names must not split inside words');
-assert.ok(appBoardSource.includes("companyRoundPhase!=='investment'"),'Board-level Disruption card must be suppressed during Invest to avoid duplication');
+assert.ok(appBoardSource.includes("companyRoundPhase==='events'"),'Board-level Event/Disruption UI must render only for the current company Events phase');
 
 const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
 assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||session"),'Event acknowledgement must prefer the authoritative acknowledged session before selecting the next card');
+assert.equal(appBoardCurrent.includes('advanceToInvestment'),false,'Completing one company Events must not call the legacy global Invest transition');
+assert.ok(appBoardCurrent.includes("else if(startStage==='learn'&&companyRoundPhase==='investment')"),'Newbie Invest teaching overlay must follow the current company phase only');
+assert.ok(appBoardCurrent.includes("const deckVisible=companyRoundPhase==='events'"),'Event deck visibility must follow the current company phase only');
+assert.ok(appBoardCurrent.includes("const displayPhase=companyRoundPhase==='events'?'respond':companyRoundPhase==='investment'?'investment':'risk'"),'Phase bar must be company-specific in multiplayer');
 const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
 assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
 assert.ok(investPanelSource.includes("'aar':['LESSONS_LEARNED',{siteId,expertId,domain,eventInstanceId:selectedAarEvent?.instanceId}]"),'AAR must submit one expert facilitator');
