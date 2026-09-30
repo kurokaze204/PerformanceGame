@@ -111,6 +111,25 @@ function repairPendingResolutionPointers(session:GameSessionV2):boolean{
   return changed;
 }
 
+function repairMixedCompanyPhases(session:GameSessionV2):boolean{
+  const unfinished=session.companies.filter(company=>(session.activeEvents[company.id]||[]).some(event=>!event.isResolved));
+  if(!unfinished.length)return false;
+  let changed=false;
+  for(const company of session.companies){
+    const hasUnresolved=(session.activeEvents[company.id]||[]).some(event=>!event.isResolved);
+    const desired:CompanyRoundPhase=hasUnresolved?'events':'investment';
+    if(roundPhase(company,fallbackFromSession(session))!==desired){
+      setRoundPhase(company,desired);
+      changed=true;
+    }
+  }
+  if(session.phase!=='respond'){
+    session.phase='respond';
+    changed=true;
+  }
+  return changed;
+}
+
 function runEligibleAutopilot(session:GameSessionV2){
   const results=autoplayEligibleEmptyCompaniesV1(session);
   for(const result of results){
@@ -150,6 +169,7 @@ export async function getSessionV2(sessionId:string):Promise<GameSessionV2|null>
   if(!session)return null;
   let healed=ensureRoundPhases(session);
   if(repairPendingResolutionPointers(session))healed=true;
+  if(repairMixedCompanyPhases(session))healed=true;
   if(session.soloMode&&!session.soloCopPeer){initialiseSoloCoPPeerV5(session);healed=true;}
   const autopilotResults=runEligibleAutopilot(session);
   if(autopilotResults.length)healed=true;
