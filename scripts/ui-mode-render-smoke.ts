@@ -108,5 +108,16 @@ const eventDeckSource=readFileSync(new URL('../src/components/EventDeckV1.tsx',i
 assert.ok(eventDeckSource.includes("const lastSharedOpenIdRef=useRef('')"),'Event deck must remember the last shared-open Event id');
 assert.ok(eventDeckSource.includes("if(lastSharedOpenIdRef.current===nextSharedId)return"),'Closing an Event must not reopen the same shared Event');
 assert.equal(eventDeckSource.includes("},[shared?.event.instanceId,cardOpen,activeIndex]);"),false,'Shared Event synchronisation must not re-fire merely because the local card was closed');
+assert.ok(eventDeckSource.includes("item.event.instanceId===sharedId&&!item.event.isResolved"),'resolved Events must be ignored by shared-open synchronisation');
+
+const eventPlaytestSource=readFileSync(new URL('../src/components/EventDecisionCardPlaytestV1.tsx',import.meta.url),'utf8');
+const finishLessonStart=eventPlaytestSource.indexOf('const finishLesson=async()=>');
+const finishLessonEnd=eventPlaytestSource.indexOf('if(pendingContinue)',finishLessonStart);
+const finishLessonSource=eventPlaytestSource.slice(finishLessonStart,finishLessonEnd);
+assert.equal(finishLessonSource.includes('setPendingContinue(null)'),false,'Newbie transfer lesson must remain visible until Event acknowledgement succeeds');
+
+const appBoardSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
+assert.ok(appBoardSource.includes("activeEventIndex=chosen>=0?chosen:-1"),'board must not fall back to a resolved Event when no unresolved Event exists');
+assert.ok(appBoardSource.includes("if(!event||event.isResolved)return;setBoardTool(null)"),'opening a resolved Event must be ignored');
 
 console.log('Mode-aware UI render smoke tests passed.');
