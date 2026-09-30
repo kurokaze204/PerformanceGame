@@ -109,9 +109,10 @@ export async function captureKnowledgeAction(session: GameSessionV2, company: Co
     const directSiteId = result?.investmentAttribution?.siteId as string | undefined;
     const corporateCost = Number(result?.investmentAttribution?.corporateCost || 0);
     const directCost = Number(result?.investmentAttribution?.siteCost || 0);
-    if (directSiteId && directCost > 0) addSiteSpend(company, directSiteId, directCost);
-    if (corporateCost > 0) addCorporateSpend(company, corporateCost);
-    if (!directSiteId && corporateCost <= 0) addCorporateSpend(company, cost);
+    const sifCost = Number(result?.investmentAttribution?.sifCost || 0);
+    if (directSiteId && (directCost > 0 || sifCost > 0)) addSiteSpend(company, directSiteId, directCost + sifCost);
+    if (!directSiteId && (corporateCost > 0 || sifCost > 0)) addCorporateSpend(company, corporateCost + sifCost);
+    if (!directSiteId && corporateCost <= 0 && sifCost <= 0) addCorporateSpend(company, cost);
   }
   await saveSessionV2(session);
   await recordCompanyMetric(session, company, `ACTION_${actionType}`);
