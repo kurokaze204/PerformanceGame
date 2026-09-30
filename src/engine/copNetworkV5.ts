@@ -44,7 +44,7 @@ export function copCompanyTopScoresV5(session:GameSessionV2,company:CompanyV2):D
 
 export function reciprocalCopPeersV5(session:GameSessionV2,companyId:string,domain:KnowledgeDomain):{id:string;name:string;score:number;simulated?:boolean}[]{
   if(!companyHasCopMembershipV5(session,companyId,domain))return[];
-  const peers=session.companies
+  const peers:{id:string;name:string;score:number;simulated?:boolean}[]=session.companies
     .filter(peer=>peer.id!==companyId&&companyHasCopMembershipV5(session,peer.id,domain))
     .map(peer=>({id:peer.id,name:peer.name,score:companyBestKnowledgeV5(session,peer,domain)}));
   if(session.soloMode&&session.soloCopPeer){
