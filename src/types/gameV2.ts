@@ -23,6 +23,7 @@ export type KnowledgeStrategy =
   | 'build_networks'
   | 'automate_critical_knowledge'
   | 'buy_expertise'
+  | 'transfer_best_practice'
   | 'no_particular_strategy';
 
 export type ExperienceMode = 'newbie' | 'expert';
@@ -110,6 +111,10 @@ export interface CompanyV2 extends Company {
   riverTeachingUse?: { round: number; siteIds: string[] };
   strategicInvestmentFund: number;
   siteKmActivityUse?: { round: number; counts: Record<string, number> };
+  initialRiverSnapshot?: {
+    sites: Company['sites'];
+    experts: ExpertV2[];
+  };
 }
 
 export interface RiskSummaryV2 {
