@@ -79,5 +79,11 @@ const acknowledgeSource=serviceSource.slice(acknowledgeStart,acknowledgeEnd);
 assert.ok(acknowledgeStart>=0&&acknowledgeEnd>acknowledgeStart,'current server must expose acknowledgement flow');
 assert.equal(acknowledgeSource.includes('claimCompanyOpenEventV1('),false,'acknowledging one Event must not auto-claim/open the next Event');
 assert.ok(acknowledgeSource.includes("clearCompanyOpenEventV1(session,companyId,eventInstanceId)"),'acknowledging an Event must clear the shared open-card state');
+assert.ok(acknowledgeSource.includes("if(event.isResolved)return{success:true"),'duplicate acknowledgements from another browser must be idempotent');
+
+const resolveStart=serviceSource.indexOf('export async function resolveEventV2');
+const resolveEnd=serviceSource.indexOf('async function acknowledgeEventResolution',resolveStart);
+const resolveSource=serviceSource.slice(resolveStart,resolveEnd);
+assert.ok(resolveSource.includes("if(event.isResolved)return{success:false,message:'That Event has already been resolved.'"),'resolved Events must never be resolvable again');
 
 console.log('Company Event-open synchronisation and race smoke tests passed.');
