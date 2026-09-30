@@ -47,9 +47,10 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const W=920,H=350,padL=64,padR=92,padT=34,padB=58;
  const x=(index:number)=>padL+index*((W-padL-padR)/Math.max(1,domains.length-1));
  const y=(value:number)=>padT+(maxY-value)*((H-padT-padB)/maxY);
- const northPath=data.map((item,index)=>`${index?'L':'M'} ${x(index)} ${y(item.north)}`).join(' ');
- const southPath=data.map((item,index)=>`${index?'L':'M'} ${x(index)} ${y(item.south)}`).join(' ');
- const fill=`${northPath} ${[...data].reverse().map((item,reverseIndex)=>`L ${x(data.length-1-reverseIndex)} ${y(item.south)}`).join(' ')} Z`;
+ const riverLeft=x(0)-40,riverRight=x(domains.length-1)+40;
+ const northPath=`M ${riverLeft} ${y(data[0].north)} ${data.map((item,index)=>`L ${x(index)} ${y(item.north)}`).join(' ')} L ${riverRight} ${y(data[data.length-1].north)}`;
+ const southPath=`M ${riverLeft} ${y(data[0].south)} ${data.map((item,index)=>`L ${x(index)} ${y(item.south)}`).join(' ')} L ${riverRight} ${y(data[data.length-1].south)}`;
+ const fill=`${northPath} L ${riverRight} ${y(data[data.length-1].south)} ${[...data].reverse().map((item,reverseIndex)=>`L ${x(data.length-1-reverseIndex)} ${y(item.south)}`).join(' ')} L ${riverLeft} ${y(data[0].south)} Z`;
  const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
  const spreadLabelYs=(preferred:number[],gap=17)=>{if(!preferred.length)return[] as number[];const min=padT+10,max=H-padB-8;const ordered=preferred.map((value,index)=>({value,index})).sort((a,b)=>a.value-b.value);const placed=ordered.map(item=>item.value);for(let i=0;i<placed.length;i++)placed[i]=Math.max(i?placed[i-1]+gap:min,Math.max(min,placed[i]));if(placed[placed.length-1]>max){placed[placed.length-1]=max;for(let i=placed.length-2;i>=0;i--)placed[i]=Math.min(placed[i],placed[i+1]-gap)}const result=Array(preferred.length).fill(0);ordered.forEach((item,index)=>{result[item.index]=placed[index]});return result};
  const domainIndex=domains.indexOf(selectedDomain);
