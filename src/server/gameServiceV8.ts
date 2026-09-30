@@ -1,6 +1,8 @@
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { GameSessionV2 } from '../types/gameV2.ts';
 import { executeRiskPhaseV4 } from '../engine/riskPhaseV4.ts';
+import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
+import { EXPERT_RELOCATION_COST_V1, roundInvestmentMoneyV1 } from '../engine/investmentCapacityV1.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
@@ -204,6 +206,36 @@ async function setReplacementLocation(sessionId:string,companyId:string,payload:
   return{success:true,message:'Replacement base updated.',session,expertId:expert.id,siteId:site.id};
 }
 
+async function moveExpertPermanently(sessionId:string,companyId:string,payload:any){
+  return serialiseCompanyEventOpenV1(sessionId,companyId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!company)return{success:false,message:'Company not found.',session};
+    const expert=company.experts.find(candidate=>candidate.id===String(payload?.expertId||'')&&!candidate.isVacant);
+    if(!expert)return{success:false,message:'Choose an employed expert.',session};
+    const target=company.sites.find(site=>site.id===String(payload?.targetLocation||'')&&!site.isClosed);
+    if(!target)return{success:false,message:'Choose an active site.',session};
+    if(expert.location===target.id)return{success:false,message:`${expert.name} is already based at ${target.name}.`,session};
+    if(company.strategicInvestmentFund+0.0001<EXPERT_RELOCATION_COST_V1)return{success:false,message:`The Strategic Investment Fund has ${company.strategicInvestmentFund}k available. Permanent relocation costs ${EXPERT_RELOCATION_COST_V1}k.`,session};
+
+    company.strategicInvestmentFund=roundInvestmentMoneyV1(company.strategicInvestmentFund-EXPERT_RELOCATION_COST_V1);
+    expert.location=target.id;
+    expert.homeLocation=target.id;
+    if(expert.state==='HQ Assignment')expert.state='Available';
+    recalculateCompanySPOFV2(company,session.config);
+    await saveSessionV2(session);
+    broadcastV2(session,'EXPERT_PERMANENTLY_RELOCATED',{companyId,expertId:expert.id,siteId:target.id,cost:EXPERT_RELOCATION_COST_V1});
+    return{
+      success:true,
+      message:`${expert.name} permanently moved to ${target.name}. Cost ${EXPERT_RELOCATION_COST_V1}k from SIF. No Action used.`,
+      session,
+      costTurnover:EXPERT_RELOCATION_COST_V1,
+      investmentAttribution:{siteId:target.id,siteCost:0,corporateCost:0,sifCost:EXPERT_RELOCATION_COST_V1},
+    };
+  });
+}
+
 async function openCompanyEventCard(sessionId:string,companyId:string,eventInstanceId:string){
   return serialiseCompanyEventOpenV1(sessionId,companyId,async()=>{
     const session=await baseGetSessionV2(sessionId.toUpperCase());
@@ -313,6 +345,7 @@ export async function knowledgeActionV2(sessionId:string,companyId:string,payloa
   if(payload?.type==='FINISH_RISK')return finishRisk(sessionId,companyId);
   if(payload?.type==='FINAL_DISRUPTION_RESOLVE')return serialisePhaseChange(sessionId,()=>baseKnowledgeActionV2(sessionId,companyId,payload));
   if(payload?.type==='SITE_KNOWLEDGE_SHARING')return serialisePhaseChange(sessionId,()=>baseKnowledgeActionV2(sessionId,companyId,payload));
+  if(payload?.type==='MOVE_EXPERT')return moveExpertPermanently(sessionId,companyId,payload);
   if(payload?.type==='SET_REPLACEMENT_LOCATION')return setReplacementLocation(sessionId,companyId,payload);
   if(payload?.type==='OPEN_EVENT_CARD')return openCompanyEventCard(sessionId,companyId,String(payload?.eventInstanceId||''));
   if(payload?.type==='ACK_EVENT_RESOLUTION')return acknowledgeEventResolution(sessionId,companyId,String(payload?.eventInstanceId||''));
