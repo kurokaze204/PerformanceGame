@@ -2,6 +2,7 @@ import type { KnowledgeDomain } from '../types/game.ts';
 import type { CompanyV2, ExperienceMode, GameSessionV2 } from '../types/gameV2.ts';
 import { INVESTMENT_COSTS_V4, recordPublicationEvidenceV4 } from './investmentActionsV4.ts';
 import { recalculateCompanySPOFV2 } from './coreV2.ts';
+import { recordSiteKmActivityV1, roundInvestmentMoneyV1, siteCanTakeKmActivityV1 } from './investmentCapacityV1.ts';
 
 export function riverSiteKnowledgeScore(site:CompanyV2['sites'][number],domain:KnowledgeDomain,mode:ExperienceMode='expert'):number{
   // Newbie deliberately collapses local knowledge into Team Capability so players
@@ -43,20 +44,25 @@ export function executeRiverKnowledgeSharing(session:GameSessionV2,company:Compa
   const before=target.teamCapability[domain]||0;
   const targetScore=riverTransferTarget(sourceScore,before);
   if(targetScore<=before)return{success:false,message:`${target.name} already has Team Capability ${before}; ${source.name} cannot lift it further through Knowledge Transfer.`,session};
+  if(!siteCanTakeKmActivityV1(company,session.round,target.id))return{success:false,message:`${target.name} is too busy for more KM work this round. Choose another site or wait until next round.`,session};
+  const cost=INVESTMENT_COSTS_V4.SITE_KNOWLEDGE_SHARING;
+  const useSIF=Boolean(payload?.useSIF);
+  if(useSIF&&company.strategicInvestmentFund+0.0001<cost)return{success:false,message:`The Strategic Investment Fund has ${company.strategicInvestmentFund}k available but this investment costs ${cost}k.`,session};
   target.teamCapability[domain]=targetScore;
   markRiverTeachingSiteUsed(company,session.round,source.id);
   recordPublicationEvidenceV4(company,domain,1);
-  const cost=INVESTMENT_COSTS_V4.SITE_KNOWLEDGE_SHARING;
-  target.turnover=Math.max(0,target.turnover-cost);
-  company.turnover=Math.round(company.sites.reduce((sum,s)=>sum+(s.isClosed?0:s.turnover),0));
+  recordSiteKmActivityV1(company,session.round,target.id);
+  if(useSIF)company.strategicInvestmentFund=roundInvestmentMoneyV1(Math.max(0,company.strategicInvestmentFund-cost));
+  else target.turnover=Math.max(0,roundInvestmentMoneyV1(target.turnover-cost));
+  company.turnover=roundInvestmentMoneyV1(company.sites.reduce((sum,s)=>sum+(s.isClosed?0:s.turnover),0));
   company.actionsRemaining-=1;
   recalculateCompanySPOFV2(company,session.config);
   return{
     success:true,
     session,
-    message:`${source.name} transferred ${domain} practice to ${target.name}. ${target.name} Team Capability increased ${before} → ${targetScore}, closing half the gap toward ${source.name}'s locally available ${session.experienceMode==='newbie'?'Team Capability':'knowledge score'} ${sourceScore}, rounded up. Cost $${cost}k.`,
+    message:`${source.name} transferred ${domain} practice to ${target.name}. ${target.name} Team Capability increased ${before} → ${targetScore}, closing half the gap toward ${source.name}'s locally available ${session.experienceMode==='newbie'?'Team Capability':'knowledge score'} ${sourceScore}, rounded up. Cost ${cost}k.${useSIF?' Paid from SIF.':''}`,
     costTurnover:cost,
-    investmentAttribution:{siteId:target.id,siteCost:cost,corporateCost:0},
+    investmentAttribution:{siteId:target.id,siteCost:useSIF?0:cost,corporateCost:0,sifCost:useSIF?cost:0},
     riverTransfer:{sourceSiteId:source.id,targetSiteId:target.id,domain,sourceScore,targetScore,before},
   };
 }
