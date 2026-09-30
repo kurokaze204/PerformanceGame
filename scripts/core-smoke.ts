@@ -422,6 +422,15 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
     companies:[staffed,empty],
     activeEvents:{[staffed.id]:[],[empty.id]:[event]},
     copMemberships:[],
+    copMessages:[{
+      id:'cop-request-auto',
+      fromCompanyId:staffed.id,
+      toCompanyId:empty.id,
+      message:'Will you join our general business CoP?',
+      round:2,
+      createdAt:new Date().toISOString(),
+      kind:'request',
+    }],
     participants:[{id:'p1',sessionId:'AUTO',name:'Player',companyId:staffed.id,role:'participant',lastSeen:new Date().toISOString()}],
     config:{...DEFAULT_CONFIG},
     createdAt:new Date().toISOString(),
@@ -437,6 +446,9 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   assert.equal((empty as any).roundPhase,'waiting','autopilot company must finish its round');
   assert.ok((session.activeEvents[empty.id]||[]).every(candidate=>candidate.isResolved),'autopilot must resolve remaining Events');
   assert.equal((staffed as any).roundPhase,'events','autopilot must not advance the staffed company');
+  const copReply=(session.copMessages||[]).find(message=>message.replyToId==='cop-request-auto');
+  assert.equal(copReply?.response,'accepted','autopilot must accept an unanswered CoP request at its first opportunity');
+  assert.ok(session.copMemberships.some(membership=>membership.companyId===empty.id&&membership.activeRound>=session.round),'autopilot must register the accepted CoP membership before routine investments');
 }
 
 // During Round 1, empty companies wait until a staffed company has actually finished.
