@@ -10,7 +10,7 @@ import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificatio
 import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEventOpenV1 } from '../engine/companyEventOpenV1.ts';
 import { resolveSingleEventExplicitV2 } from '../engine/challengeResponseV2.ts';
 import { swapDisruptionWithPeerV1 } from '../engine/disruptionPlusV1.ts';
-import { autoplayCompanyToWaitingV1, autoplayEligibleEmptyCompaniesV1, companyPlayerCountV1 } from '../engine/emptyCompanyAutopilotV1.ts';
+import { acceptPendingCopRequestsForAutopilotV1, autoplayCompanyToWaitingV1, autoplayEligibleEmptyCompaniesV1, companyAutopilotActiveV1, companyPlayerCountV1 } from '../engine/emptyCompanyAutopilotV1.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
@@ -354,9 +354,20 @@ async function sendCopMessage(sessionId:string,companyId:string,payload:any){
         response:'accepted',
       });
     }
+    const autoAccepted=target&&companyAutopilotActiveV1(session,target.id)
+      ? acceptPendingCopRequestsForAutopilotV1(session,target)
+      : 0;
     await saveSessionV2(session);
-    broadcastV2(session,'COP_MESSAGE_SENT',{fromCompanyId:company.id,toCompanyId:targetCompanyId,domain});
-    return{success:true,message:soloTarget?'Message sent. Meridian Partners replied.':'Message sent to the other company.',session};
+    broadcastV2(session,'COP_MESSAGE_SENT',{fromCompanyId:company.id,toCompanyId:targetCompanyId,domain,autoAccepted:Boolean(autoAccepted)});
+    return{
+      success:true,
+      message:soloTarget
+        ?'Message sent. Meridian Partners replied.'
+        :autoAccepted
+          ?`Message sent. ${target?.name||'The autopilot company'} accepted the CoP request.`
+          :'Message sent to the other company.',
+      session,
+    };
   });
 }
 
