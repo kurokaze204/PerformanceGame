@@ -12,7 +12,7 @@ export const INVESTMENT_COSTS_V4: Record<string, number> = {
   CODIFY_SITE: 2.5,
   TRAIN_EXPERT: 20,
   UPDATE_INTRANET: 30,
-  LESSONS_LEARNED: 20,
+  LESSONS_LEARNED: 8,
   JOIN_COP: COP_JOIN_COST_V5,
   HORIZON_SCAN: 40,
   AUTOMATE: 80,
@@ -200,20 +200,24 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
     if (event.experientialLearningAwarded) return { success: false, message: 'An AAR has already been completed for this challenge. Each challenge can only be used once for Lessons Learned.' };
     if (!event.card.domains.some((r) => r.domain === domain)) return { success: false, message: 'Choose a domain that was part of the selected challenge.' };
     if (event.card.scope === 'local' && event.targetSiteId !== site.id) return { success: false, message: 'A local challenge can only generate Lessons Learned at the site where it occurred.' };
+    const travelCost = expertTravelCostV4(facilitator.location, site.id);
+    const totalCost = roundInvestmentMoneyV1(baseCost + travelCost);
     const capacityFailure = capacityError(site.id); if (capacityFailure) return capacityFailure;
-    const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
+    const fundingFailure = fundingError(totalCost); if (fundingFailure) return fundingFailure;
     site.teamCapability[domain] += 1;
     if (facilitatorSkill) facilitatorSkill.score += 1;
     company.intranet[domain] += 1;
     recordPublicationEvidenceV4(company, domain, 2);
     event.experientialLearningAwarded = true;
-    const investmentAttribution = finish(baseCost, site.id);
+    const investmentAttribution = finish(totalCost, site.id);
+    const travelText = travelCost ? ` including ${travelCost}k facilitator travel` : '';
     return {
       success: true,
       message: facilitatorSkill
-        ? `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost ${baseCost}k.${fundingSuffix}`
-        : `AAR on “${event.card.title}” increased ${site.name} Team Capability and Corporate Intranet knowledge in ${domain} by +1. ${facilitator.name} facilitated outside their expertise, so their personal score did not increase. Cost ${baseCost}k.${fundingSuffix}`,
-      costTurnover: baseCost,
+        ? `AAR on “${event.card.title}” increased ${site.name} Team Capability, ${facilitator.name} expertise and Corporate Intranet knowledge in ${domain} by +1. Cost ${totalCost}k${travelText}.${fundingSuffix}`
+        : `AAR on “${event.card.title}” increased ${site.name} Team Capability and Corporate Intranet knowledge in ${domain} by +1. ${facilitator.name} facilitated outside their expertise, so their personal score did not increase. Cost ${totalCost}k${travelText}.${fundingSuffix}`,
+      costTurnover: totalCost,
+      travelCost,
       investmentAttribution,
       eventInstanceId,
       aarLearning: { siteId: site.id, expertId: facilitator.id, domain, siteDelta: 1, expertDelta: facilitatorSkill ? 1 : 0, intranetDelta: 1 },
