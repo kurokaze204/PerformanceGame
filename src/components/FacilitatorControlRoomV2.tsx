@@ -55,7 +55,7 @@ export const FacilitatorControlRoomV2:React.FC<Props>=({session,passcode,onSessi
      onToast(d.message||'Autopilot updated.');
    }finally{setBusyCompanyId(null)}
  };
- const returnToGame=()=>{try{const facilitatorRaw=localStorage.getItem('tpg_participant');if(facilitatorRaw)sessionStorage.setItem('tpg_facilitator_participant',facilitatorRaw);const playerRaw=sessionStorage.getItem('tpg_facilitator_game_player');if(playerRaw){const player=JSON.parse(playerRaw);localStorage.setItem('tpg_participant',playerRaw);if(player.companyId)localStorage.setItem('tpg_company_id',player.companyId)}else if(facilitatorRaw){const facilitator=JSON.parse(facilitatorRaw);localStorage.setItem('tpg_participant',JSON.stringify({...facilitator,id:`fac-view-${facilitator.id}`,role:'participant'}))}sessionStorage.setItem('tpg_facilitator_game_view','1')}catch{}window.location.reload()};
+ const returnToGame=()=>{try{const facilitatorRaw=localStorage.getItem('tpg_participant');if(facilitatorRaw)sessionStorage.setItem('tpg_facilitator_participant',facilitatorRaw);const playerRaw=sessionStorage.getItem('tpg_facilitator_game_player');if(playerRaw){const player=JSON.parse(playerRaw);localStorage.setItem('tpg_participant',playerRaw);if(player.companyId)localStorage.setItem('tpg_company_id',player.companyId)}sessionStorage.setItem('tpg_facilitator_game_view','1')}catch{}window.location.reload()};
 
  return <div className="space-y-4" aria-label="Facilitator control panel">
   <div className="flex justify-end"><button onClick={returnToGame} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-black text-slate-300 flex items-center gap-2"><ArrowLeft className="w-4 h-4"/>Return to game</button></div>
