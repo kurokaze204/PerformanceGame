@@ -103,11 +103,27 @@ export async function initializeDefaultSessionV2():Promise<GameSessionV2>{
 function autoCompany(session:GameSessionV2){const counts=new Map(session.companies.map(c=>[c.id,0]));for(const p of session.participants.filter(p=>p.role==='participant'))counts.set(p.companyId,(counts.get(p.companyId)||0)+1);return[...session.companies].filter(c=>(counts.get(c.id)||0)<session.maxPlayersPerCompany).sort((a,b)=>(counts.get(a.id)||0)-(counts.get(b.id)||0))[0]}
 
 export async function joinSessionV2(sessionId:string,name:string,companyId?:string,role:Participant['role']='participant'){
- const session=await getSessionOrThrow(sessionId);const requested=session.companies.find(c=>c.id===companyId);const target=role==='facilitator'?(requested||session.companies[0]):(requested||autoCompany(session));
+ const session=await getSessionOrThrow(sessionId);
+ const cleanName=(name||'Player').trim()||'Player';
+ if(role==='participant'){
+   const exact=session.participants.filter(p=>p.role==='participant'&&p.name.trim().toLocaleLowerCase()===cleanName.toLocaleLowerCase());
+   if(exact.length){
+     const existing=[...exact].sort((a,b)=>new Date(b.lastSeen).getTime()-new Date(a.lastSeen).getTime())[0];
+     const existingCompany=session.companies.find(c=>c.id===existing.companyId);
+     if(existingCompany){
+       existing.lastSeen=new Date().toISOString();
+       existingCompany.autopilotEnabled=false;
+       await saveParticipant(existing);await saveSessionV2(session);
+       broadcastV2(session,'PARTICIPANT_REJOINED',{participant:existing});
+       return{session,participant:existing,rejoined:true};
+     }
+   }
+ }
+ const requested=session.companies.find(c=>c.id===companyId);const target=role==='facilitator'?(requested||session.companies[0]):(requested||autoCompany(session));
  if(!target)throw new Error('All companies have reached the player limit. Ask the facilitator to increase the team size or move a player.');
  const count=session.participants.filter(p=>p.role==='participant'&&p.companyId===target.id).length;if(role==='participant'&&count>=session.maxPlayersPerCompany)throw new Error(`${target.name} is full (${session.maxPlayersPerCompany} players).`);
  const participantCountBefore=session.participants.filter(p=>p.role==='participant').length;
- const participant:Participant={id:`part-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,sessionId:session.id,name:name||'Player',companyId:target.id,role,lastSeen:new Date().toISOString()};session.participants.push(participant);
+ const participant:Participant={id:`part-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,sessionId:session.id,name:cleanName,companyId:target.id,role,lastSeen:new Date().toISOString()};session.participants.push(participant);
  if(role==='participant'){
    target.autopilotEnabled=false;
    if(participantCountBefore===0&&!session.timerStartedAt&&!session.timerEndsAt){
