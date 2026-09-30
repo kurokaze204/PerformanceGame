@@ -19,6 +19,7 @@ import {
   listSessionsV2,
   moveParticipantV3,
   redrawEventV2,
+  recoverParticipantV1,
   registerSSEClientV2,
   resetAllV2,
   resolveEventV2,
@@ -106,6 +107,12 @@ async function startServer() {
       res.json(await joinSessionV2(req.params.id, req.body?.name, req.body?.companyId, req.body?.role));
     }
     catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post('/api/sessions/:id/recover-participant', async (req,res)=>{
+    try{
+      const result=await recoverParticipantV1(req.params.id,req.body||{});
+      res.status(result.success?200:400).json(result);
+    }catch(e:any){res.status(400).json({error:e.message});}
   });
 
   app.post('/api/sessions/:id/facilitator/login',async(req,res)=>{
