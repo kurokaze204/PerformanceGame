@@ -11,7 +11,7 @@ import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEvent
 import { resolveSingleEventExplicitV2 } from '../engine/challengeResponseV2.ts';
 import { swapDisruptionWithPeerV1 } from '../engine/disruptionPlusV1.ts';
 import { acceptPendingCopRequestsForAutopilotV1, autoplayCompanyToWaitingV1, autoplayEligibleEmptyCompaniesV1, companyAutopilotActiveV1, companyPlayerCountV1 } from '../engine/emptyCompanyAutopilotV1.ts';
-import { saveSessionV2 } from './dbV2.ts';
+import { saveParticipant, saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
@@ -226,6 +226,41 @@ async function finishRisk(sessionId:string,companyId:string){
     }
 
     return advanceAfterKnowledgeRisk(session);
+  });
+}
+
+export async function recoverParticipantV1(sessionId:string,payload:{id?:string;name?:string;companyId?:string}){
+  return serialisePhaseChange(sessionId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    const participantId=String(payload?.id||'').trim();
+    const companyId=String(payload?.companyId||'').trim();
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!participantId||!company)return{success:false,message:'Participant recovery details are invalid.',session};
+    const existing=session.participants.find(participant=>participant.id===participantId);
+    if(existing)return{success:true,message:'Participant already registered.',session,participant:existing};
+
+    const participant:Participant={
+      id:participantId,
+      sessionId:session.id,
+      name:String(payload?.name||'Player').trim()||'Player',
+      companyId:company.id,
+      role:'participant',
+      lastSeen:new Date().toISOString(),
+    };
+    const participantCountBefore=session.participants.filter(item=>item.role==='participant').length;
+    session.participants.push(participant);
+    company.autopilotEnabled=false;
+    if(participantCountBefore===0&&!session.timerStartedAt&&!session.timerEndsAt){
+      const remaining=session.timerPausedSecondsRemaining??session.gameDurationMinutes*60;
+      session.timerStartedAt=new Date().toISOString();
+      session.timerEndsAt=new Date(Date.now()+remaining*1000).toISOString();
+      session.timerPausedSecondsRemaining=null;
+    }
+    await saveParticipant(participant);
+    await saveSessionV2(session);
+    broadcastV2(session,'PARTICIPANT_RECOVERED',{participantId:participant.id,companyId:company.id});
+    return{success:true,message:`${participant.name} was restored to ${company.name}.`,session,participant};
   });
 }
 
