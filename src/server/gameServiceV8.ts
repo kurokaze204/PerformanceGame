@@ -3,6 +3,7 @@ import type { GameSessionV2 } from '../types/gameV2.ts';
 import { executeRiskPhaseV4 } from '../engine/riskPhaseV4.ts';
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { EXPERT_RELOCATION_COST_V1, roundInvestmentMoneyV1 } from '../engine/investmentCapacityV1.ts';
+import { advanceSoloCoPPeerV5, initialiseSoloCoPPeerV5, soloPeerAutoReplyV5 } from '../engine/copNetworkV5.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
@@ -99,6 +100,7 @@ async function advanceAfterKnowledgeRisk(session:GameSessionV2){
   const advanced:any=await baseAdvancePhaseV2(session.id,'respond');
   if(!advanced?.success||!advanced.session)return advanced;
   if(!advanced.session.isFinalDisruptionActive){
+    advanceSoloCoPPeerV5(advanced.session);
     for(const nextCompany of advanced.session.companies)setRoundPhase(nextCompany,'events');
     await saveSessionV2(advanced.session);
     broadcastV2(advanced.session,'ALL_COMPANIES_STARTED_NEXT_ROUND',{round:advanced.session.round});
@@ -115,7 +117,9 @@ export async function getSessionV2(sessionId:string):Promise<GameSessionV2|null>
   const id=sessionId.toUpperCase();
   const session=await baseGetSessionV2(id);
   if(!session)return null;
-  if(ensureRoundPhases(session))await saveSessionV2(session);
+  let healed=ensureRoundPhases(session);
+  if(session.soloMode&&!session.soloCopPeer){initialiseSoloCoPPeerV5(session);healed=true;}
+  if(healed)await saveSessionV2(session);
   if(session.isFinalDisruptionActive||!allCompaniesWaiting(session))return session;
 
   // Self-heal a session if the last FINISH_RISK request was interrupted after
