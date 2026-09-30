@@ -209,6 +209,34 @@ async function finishRisk(sessionId:string,companyId:string){
   });
 }
 
+export async function facilitatorSetCompanyAutopilotV1(sessionId:string,companyId:string,enabled:boolean){
+  return serialisePhaseChange(sessionId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    ensureRoundPhases(session);
+    const index=session.companies.findIndex(candidate=>candidate.id===companyId);
+    const company=index>=0?session.companies[index]:undefined;
+    if(!company)return{success:false,message:'Company not found.',session};
+    if(index===0){
+      company.autopilotEnabled=false;
+      await saveSessionV2(session);
+      return{success:enabled?false:true,message:'Company 1 is the human anchor and cannot be put on autopilot.',session};
+    }
+    if(enabled&&companyPlayerCountV1(session,companyId)>0)return{success:false,message:'Autopilot cannot be enabled while players are assigned to this company.',session};
+    company.autopilotEnabled=Boolean(enabled);
+    const autopilotResults=enabled?runEligibleAutopilot(session):[];
+    await saveSessionV2(session);
+    broadcastV2(session,'FACILITATOR_AUTOPILOT_UPDATED',{companyId,enabled:company.autopilotEnabled,autopilotCompanies:autopilotResults.map(item=>item.companyId)});
+    return{
+      success:true,
+      message:company.autopilotEnabled
+        ?`${company.name} autopilot is enabled.`
+        :`${company.name} autopilot is off.`,
+      session,
+    };
+  });
+}
+
 export async function facilitatorFinishCompanyRoundV1(sessionId:string,companyId:string){
   return serialisePhaseChange(sessionId,async()=>{
     const session=await baseGetSessionV2(sessionId.toUpperCase());
@@ -244,6 +272,7 @@ export async function facilitatorRemoveCompanyV1(sessionId:string,companyId:stri
     if(assigned>0)return{success:false,message:`Move the ${assigned} assigned player${assigned===1?'':'s'} to another company before removing ${company.name}.`,session};
 
     session.companies=session.companies.filter(candidate=>candidate.id!==companyId);
+    if(session.companies[0])session.companies[0].autopilotEnabled=false;
     delete session.activeEvents[companyId];
     if(session.riskResults)delete session.riskResults[companyId];
     session.copMemberships=(session.copMemberships||[]).filter(membership=>membership.companyId!==companyId);
