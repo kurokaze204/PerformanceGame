@@ -92,6 +92,20 @@ function allCompaniesWaiting(session:GameSessionV2):boolean{
   return session.companies.length>0&&session.companies.every(company=>roundPhase(company,fallbackFromSession(session))==='waiting');
 }
 
+function repairPendingResolutionPointers(session:GameSessionV2):boolean{
+  let changed=false;
+  for(const company of session.companies){
+    const pending=(session.activeEvents[company.id]||[]).filter(event=>!event.isResolved&&(event as any).uiResolutionData!=null);
+    if(pending.length!==1)continue;
+    const pendingId=pending[0].instanceId;
+    if(String((company as any).uiOpenEventInstanceId||'')!==pendingId){
+      (company as any).uiOpenEventInstanceId=pendingId;
+      changed=true;
+    }
+  }
+  return changed;
+}
+
 function runEligibleAutopilot(session:GameSessionV2){
   const results=autoplayEligibleEmptyCompaniesV1(session);
   for(const result of results){
@@ -130,6 +144,7 @@ export async function getSessionV2(sessionId:string):Promise<GameSessionV2|null>
   const session=await baseGetSessionV2(id);
   if(!session)return null;
   let healed=ensureRoundPhases(session);
+  if(repairPendingResolutionPointers(session))healed=true;
   if(session.soloMode&&!session.soloCopPeer){initialiseSoloCoPPeerV5(session);healed=true;}
   const autopilotResults=runEligibleAutopilot(session);
   if(autopilotResults.length)healed=true;
@@ -519,12 +534,17 @@ async function acknowledgeEventResolution(sessionId:string,companyId:string,even
     // acknowledged this result, converge on the authoritative session instead of
     // trapping the later browser on a stale result screen.
     if(event.isResolved)return{success:true,message:'Event already acknowledged.',session};
-    const currentId=String((company as any).uiOpenEventInstanceId||'');
-    if(currentId!==eventInstanceId)return{success:false,message:'That Event is no longer the company Event.',session};
     if((event as any).uiResolutionData==null)return{success:false,message:'There is no resolved Event waiting for acknowledgement.',session};
 
+    // uiResolutionData is the authoritative proof that this Event has already
+    // been resolved and is waiting only for acknowledgement. A stale/missing
+    // shared-open pointer must never trap a company on the result/teaching screen.
     event.isResolved=true;
-    clearCompanyOpenEventV1(session,companyId,eventInstanceId);
+    const currentId=String((company as any).uiOpenEventInstanceId||'');
+    if(currentId===eventInstanceId)clearCompanyOpenEventV1(session,companyId,eventInstanceId);
+    else if(!currentId||(session.activeEvents[company.id]||[]).every(candidate=>candidate.instanceId!==currentId||candidate.isResolved)){
+      delete (company as any).uiOpenEventInstanceId;
+    }
     // Do not claim or open the next Event automatically. The company must
     // deliberately click a face-down card. OPEN_EVENT_CARD then claims that
     // card for the whole company so every player sees the same Event.
