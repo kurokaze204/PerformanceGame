@@ -80,6 +80,8 @@ assert.ok(acknowledgeStart>=0&&acknowledgeEnd>acknowledgeStart,'current server m
 assert.equal(acknowledgeSource.includes('claimCompanyOpenEventV1('),false,'acknowledging one Event must not auto-claim/open the next Event');
 assert.ok(acknowledgeSource.includes("clearCompanyOpenEventV1(session,companyId,eventInstanceId)"),'acknowledging an Event must clear the shared open-card state');
 assert.ok(acknowledgeSource.includes("if(event.isResolved)return{success:true"),'duplicate acknowledgements from another browser must be idempotent');
+assert.ok(acknowledgeSource.includes("if(companyFinished)setRoundPhase(company,'investment')"),'finishing a company Events must move only that company into Invest');
+assert.ok(acknowledgeSource.includes("session.phase=allCompanyEventsResolved(session)?'investment':'respond'"),'shared phase must stay in Events while another company still has unresolved Events');
 
 const resolveStart=serviceSource.indexOf('export async function resolveEventV2');
 const resolveEnd=serviceSource.indexOf('async function acknowledgeEventResolution',resolveStart);
