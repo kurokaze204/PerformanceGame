@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { GameSession, KnowledgeDomain } from '../types/game.ts';
 import { CompanyV2, GameSessionV2, asSessionV2 } from '../types/gameV2.ts';
-import { deleteGameSession, getGameEventLogs, getParticipantsForSession, initDatabase, logGameEvent, resetAllDatabaseData, saveParticipant } from './db.ts';
+import { deleteGameSession, deleteParticipant, getGameEventLogs, getParticipantsForSession, initDatabase, logGameEvent, resetAllDatabaseData, saveParticipant } from './db.ts';
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({
@@ -12,7 +12,7 @@ const pool = process.env.DATABASE_URL ? new Pool({
 const memory = new Map<string, GameSessionV2>();
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
 
-export { logGameEvent, getGameEventLogs, saveParticipant };
+export { deleteParticipant, logGameEvent, getGameEventLogs, saveParticipant };
 
 export interface CompanyMetricSnapshot {
   avgTeamCapability: number;
