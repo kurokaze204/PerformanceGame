@@ -18,7 +18,7 @@ const LESSONS:Record<number,{eyebrow:string;heading:string;intro:string;items:Le
     eyebrow:'Newbie mode · Round 2 unlock',heading:'Knowledge you can access without owning',
     intro:'Round 1 focused on moving and building knowledge inside your organisation. Round 2 adds relationships: sometimes the smartest answer is to connect to expertise that sits elsewhere.',
     items:[
-      {title:'Communities of Practice & networks',icon:Handshake,p1:'A Community of Practice creates trusted access to peers who solve similar problems. In real organisations this can expose people to experience, weak signals and specialist knowledge that would be too expensive—or too narrow—to employ permanently.',p2:'In the game, joining a CoP gives future network support in that domain. It complements internal capability rather than replacing it: your organisation still benefits from knowing enough to recognise, absorb and use what the network provides.',interventions:'Join Community of Practice · Ask our network for help'}
+      {title:'Communities of Practice & networks',icon:Handshake,p1:'A Community of Practice creates trusted access to peers who solve similar problems. In real organisations this can expose people to experience, weak signals and specialist knowledge that would be too expensive—or too narrow—to employ permanently.',p2:'In the game, the Newbie CoP is a general business community. Your company pays to participate for the next Event round, but the network only becomes useful when another company also joins. That makes the relationship reciprocal: sometimes you need their knowledge, and sometimes they need yours.',interventions:'Join Community of Practice · Ask our network for help'}
     ]
   },
   3:{
