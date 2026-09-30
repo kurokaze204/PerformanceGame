@@ -14,6 +14,7 @@ import {
   resolveSingleEventExplicitV2,
 } from '../src/engine/challengeResponseV2.ts';
 import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
+import { SITE_KM_ACTIVITY_LIMIT_V1, strategicInvestmentContributionV1 } from '../src/engine/investmentCapacityV1.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -56,7 +57,7 @@ assert.deepEqual({
   KNOWLEDGE_TRANSFER:18,
   SITE_KNOWLEDGE_SHARING:5,
   CORPORATE_TRAINING:60,
-  CODIFY_SITE:20,
+  CODIFY_SITE:2.5,
   TRAIN_EXPERT:20,
   UPDATE_INTRANET:30,
   LESSONS_LEARNED:20,
@@ -68,9 +69,44 @@ assert.equal(expertTravelCostV4('melbourne','melbourne'),0,'same-city expert use
 for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin']){
   for(const to of ['melbourne','sydney','brisbane','adelaide','perth','darwin']){
     const travel=expertTravelCostV4(from,to);
-    assert.ok(travel>=0&&travel<=20,'expert travel must stay between $0k and $20k');
-    assert.equal(travel%5,0,'expert travel must use $5k increments');
+    if(from===to)assert.equal(travel,0,'same-city expert travel must remain free');
+    else{
+      assert.ok(travel>=0.4&&travel<=1.6,'expert travel must stay between $0.4k and $1.6k');
+      assert.equal(Math.round(travel*10),travel*10,'expert travel must use one-decimal $k increments');
+    }
   }
+}
+
+// SIF starts at 5% of current company turnover without reducing turnover.
+{
+  const { company }=makeSession();
+  const before=company.turnover;
+  assert.equal(company.strategicInvestmentFund,strategicInvestmentContributionV1(company));
+  assert.equal(company.turnover,before,'creating the SIF must not transfer money out of site turnover');
+}
+
+// SIF can fund a local investment and each site can absorb at most three local KM activities per round.
+{
+  const { session, company }=makeSession('expert');
+  session.phase='investment';
+  company.actionsRemaining=6;
+  const site=company.sites.find(candidate=>!candidate.isClosed)!;
+  const domains=['engineering','hr','marketing','operations'] as const;
+  for(const domain of domains){site.teamCapability[domain]=6;site.codifiedKnowledge[domain]=0;}
+  const beforeTurnover=site.turnover;
+  const beforeSif=company.strategicInvestmentFund;
+  const first=executeInvestmentActionV4(session,company,{type:'CODIFY_SITE',companyId:company.id,siteId:site.id,domain:domains[0],useSIF:true});
+  assert.equal(first.success,true);
+  assert.equal(site.turnover,beforeTurnover,'SIF-funded local work must not reduce site turnover');
+  assert.equal(company.strategicInvestmentFund,Math.round((beforeSif-2.5)*10)/10);
+  for(const domain of domains.slice(1,3)){
+    const result=executeInvestmentActionV4(session,company,{type:'CODIFY_SITE',companyId:company.id,siteId:site.id,domain,useSIF:true});
+    assert.equal(result.success,true);
+  }
+  const fourth=executeInvestmentActionV4(session,company,{type:'CODIFY_SITE',companyId:company.id,siteId:site.id,domain:domains[3],useSIF:true});
+  assert.equal(fourth.success,false);
+  assert.match(String(fourth.message),/too busy for more KM work/i);
+  assert.equal(SITE_KM_ACTIVITY_LIMIT_V1,3);
 }
 
 // 1. Planned game has an equal event mix.
