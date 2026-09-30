@@ -13,6 +13,25 @@ async function expiredSolo(id:string){
   return session;
 }
 
+// Permanent expert relocation is available outside Invest, costs SIF only, and does not consume an Action.
+{
+  const relocation=await createNewSessionV2('EXPERT-RELOCATION-SMOKE','Expert relocation smoke',['Alpha'],{experienceMode:'expert',gameDurationMinutes:30});
+  const company=relocation.companies[0];
+  relocation.phase='respond';
+  (company as any).roundPhase='events';
+  const expert=company.experts.find(candidate=>!candidate.isVacant)!;
+  expert.state='Supporting Event';
+  const target=company.sites.find(site=>!site.isClosed&&site.id!==expert.location)!;
+  const actionsBefore=company.actionsRemaining;
+  const sifBefore=company.strategicInvestmentFund;
+  await saveSessionV2(relocation);
+  const moved:any=await knowledgeActionV2(relocation.id,company.id,{type:'MOVE_EXPERT',expertId:expert.id,targetLocation:target.id});
+  assert.equal(moved.success,true,'expert relocation must work during the Event phase, even while the expert is supporting an Event');
+  assert.equal(moved.session.companies[0].experts.find((candidate:any)=>candidate.id===expert.id).location,target.id);
+  assert.equal(moved.session.companies[0].strategicInvestmentFund,sifBefore-20);
+  assert.equal(moved.session.companies[0].actionsRemaining,actionsBefore,'permanent relocation must not consume an Action');
+}
+
 const direct=await expiredSolo('RISK-HANDOFF-DIRECT');
 const result:any=await knowledgeActionV2(direct.id,direct.companies[0].id,{type:'FINISH_RISK'});
 assert.equal(result.success,true);
