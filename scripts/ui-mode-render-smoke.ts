@@ -68,7 +68,8 @@ const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.t
 assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
 assert.ok(investPanelSource.includes("'aar':['LESSONS_LEARNED',{siteId,expertId,domain,eventInstanceId:selectedAarEvent?.instanceId}]"),'AAR must submit one expert facilitator');
 assert.ok(investPanelSource.includes("previewSiteDelta={selectedId==='aar'?1:0}"),'AAR must preview its site learning on the River');
-assert.ok(investPanelSource.includes("previewExpertDelta={selectedId==='aar'?1:0}"),'AAR must preview facilitator learning on the River');
+assert.ok(investPanelSource.includes("previewExpertDelta={selectedId==='aar'&&selectedExpertSkill!=null?1:0}"),'AAR must preview facilitator learning only when the facilitator holds the selected domain');
+assert.ok(investPanelSource.includes('const expertChoices=activeExperts;'),'AAR facilitator choices must include all employed experts');
 assert.ok(investPanelSource.includes("previewHQDelta={selectedId==='aar'?1:0}"),'AAR must preview corporate learning on the River');
 const investmentRiverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
 assert.ok(investmentRiverSource.includes('{abbrev(site.id)}'),'Invest River site labels must use three-letter site abbreviations');
