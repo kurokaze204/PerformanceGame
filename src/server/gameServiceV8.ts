@@ -1,4 +1,4 @@
-import type { KnowledgeDomain } from '../types/game.ts';
+import type { KnowledgeDomain, Participant } from '../types/game.ts';
 import type { GameSessionV2 } from '../types/gameV2.ts';
 import { executeRiskPhaseV4 } from '../engine/riskPhaseV4.ts';
 import { recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
@@ -16,6 +16,7 @@ import { broadcastV2 } from './gameServiceV2.ts';
 import {
   advancePhaseV2 as baseAdvancePhaseV2,
   getSessionV2 as baseGetSessionV2,
+  joinSessionV2 as baseJoinSessionV2,
   knowledgeActionV2 as baseKnowledgeActionV2,
   resolveEventV2 as baseResolveEventV2,
 } from './gameServiceV7.ts';
@@ -82,6 +83,10 @@ function serialisePhaseChange<T>(sessionId:string, work:()=>Promise<T>):Promise<
   const run=prior.then(work,work);
   phaseQueues.set(key,run.finally(()=>{if(phaseQueues.get(key)===run)phaseQueues.delete(key);}));
   return run;
+}
+
+export async function joinSessionV2(sessionId:string,name:string,companyId?:string,role:Participant['role']='participant'){
+  return serialisePhaseChange(sessionId,()=>baseJoinSessionV2(sessionId,name,companyId,role));
 }
 
 function allCompanyEventsResolved(session:GameSessionV2):boolean{
