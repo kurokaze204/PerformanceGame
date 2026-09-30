@@ -10,6 +10,7 @@ import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificatio
 import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEventOpenV1 } from '../engine/companyEventOpenV1.ts';
 import { resolveSingleEventExplicitV2 } from '../engine/challengeResponseV2.ts';
 import { swapDisruptionWithPeerV1 } from '../engine/disruptionPlusV1.ts';
+import { autoplayCompanyToWaitingV1, autoplayEligibleEmptyCompaniesV1, companyPlayerCountV1 } from '../engine/emptyCompanyAutopilotV1.ts';
 import { saveSessionV2 } from './dbV2.ts';
 import { broadcastV2 } from './gameServiceV2.ts';
 import {
@@ -91,6 +92,16 @@ function allCompaniesWaiting(session:GameSessionV2):boolean{
   return session.companies.length>0&&session.companies.every(company=>roundPhase(company,fallbackFromSession(session))==='waiting');
 }
 
+function runEligibleAutopilot(session:GameSessionV2){
+  const results=autoplayEligibleEmptyCompaniesV1(session);
+  for(const result of results){
+    const company=session.companies.find(candidate=>candidate.id===result.companyId);
+    if(company)nameRiskReplacements(session,company);
+  }
+  if(results.length)applyInterfaceSimplificationV1(session);
+  return results;
+}
+
 async function advanceAfterKnowledgeRisk(session:GameSessionV2){
   // Put the shared session into the legacy risk state only for the atomic
   // hand-off into the next round/final disruption. Company-specific risk
@@ -102,8 +113,9 @@ async function advanceAfterKnowledgeRisk(session:GameSessionV2){
   if(!advanced.session.isFinalDisruptionActive){
     advanceSoloCoPPeerV5(advanced.session);
     for(const nextCompany of advanced.session.companies)setRoundPhase(nextCompany,'events');
+    const autopilotResults=runEligibleAutopilot(advanced.session);
     await saveSessionV2(advanced.session);
-    broadcastV2(advanced.session,'ALL_COMPANIES_STARTED_NEXT_ROUND',{round:advanced.session.round});
+    broadcastV2(advanced.session,'ALL_COMPANIES_STARTED_NEXT_ROUND',{round:advanced.session.round,autopilotCompanies:autopilotResults.map(item=>item.companyId)});
   }
   return{
     ...advanced,
@@ -119,6 +131,8 @@ export async function getSessionV2(sessionId:string):Promise<GameSessionV2|null>
   if(!session)return null;
   let healed=ensureRoundPhases(session);
   if(session.soloMode&&!session.soloCopPeer){initialiseSoloCoPPeerV5(session);healed=true;}
+  const autopilotResults=runEligibleAutopilot(session);
+  if(autopilotResults.length)healed=true;
   if(healed)await saveSessionV2(session);
   if(session.isFinalDisruptionActive||!allCompaniesWaiting(session))return session;
 
@@ -138,9 +152,10 @@ export async function advancePhaseV2(sessionId:string,requested?:any){
   const result:any=await baseAdvancePhaseV2(sessionId,requested);
   if(!result?.success||!result.session)return result;
   if(result.session.phase==='investment'){
-    for(const company of result.session.companies)setRoundPhase(company,'investment');
+    for(const company of result.session.companies)if(roundPhase(company,fallbackFromSession(result.session))!=='waiting')setRoundPhase(company,'investment');
+    const autopilotResults=runEligibleAutopilot(result.session);
     await saveSessionV2(result.session);
-    broadcastV2(result.session,'COMPANIES_ENTERED_INVESTMENT',{round:result.session.round});
+    broadcastV2(result.session,'COMPANIES_ENTERED_INVESTMENT',{round:result.session.round,autopilotCompanies:autopilotResults.map(item=>item.companyId)});
   }else if(result.session.phase==='respond'&&!result.session.isFinalDisruptionActive){
     for(const company of result.session.companies)setRoundPhase(company,'events');
     await saveSessionV2(result.session);
@@ -182,14 +197,74 @@ async function finishRisk(sessionId:string,companyId:string){
     if(roundPhase(company,fallbackFromSession(session))!=='risk')return{success:false,message:'Finish investing before completing Knowledge Risk.',session};
 
     setRoundPhase(company,'waiting');
+    const autopilotResults=runEligibleAutopilot(session);
     if(!allCompaniesWaiting(session)){
       await saveSessionV2(session);
-      broadcastV2(session,'COMPANY_WAITING_FOR_NEXT_ROUND',{companyId:company.id,round:session.round});
+      broadcastV2(session,'COMPANY_WAITING_FOR_NEXT_ROUND',{companyId:company.id,round:session.round,autopilotCompanies:autopilotResults.map(item=>item.companyId)});
       const waiting=session.companies.filter(candidate=>roundPhase(candidate,fallbackFromSession(session))==='waiting').length;
       return{success:true,message:`Knowledge Risk complete. Waiting for the other companies (${waiting}/${session.companies.length} finished).`,session};
     }
 
     return advanceAfterKnowledgeRisk(session);
+  });
+}
+
+export async function facilitatorFinishCompanyRoundV1(sessionId:string,companyId:string){
+  return serialisePhaseChange(sessionId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    ensureRoundPhases(session);
+    if(session.isFinalDisruptionActive)return{success:false,message:'Company rounds cannot be force-finished during the Final Challenge.',session};
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!company)return{success:false,message:'Company not found.',session};
+    if(roundPhase(company,fallbackFromSession(session))==='waiting')return{success:true,message:`${company.name} has already finished this round.`,session};
+    const result=autoplayCompanyToWaitingV1(session,company);
+    nameRiskReplacements(session,company);
+    applyInterfaceSimplificationV1(session);
+    if(allCompaniesWaiting(session)){
+      const advanced:any=await advanceAfterKnowledgeRisk(session);
+      if(advanced?.success&&advanced.session)return{...advanced,message:`${company.name} was finished by the facilitator. All companies were ready, so Round ${advanced.session.round} has begun.`};
+      return advanced;
+    }
+    await saveSessionV2(session);
+    broadcastV2(session,'FACILITATOR_FINISHED_COMPANY_ROUND',{companyId,round:session.round,result});
+    return{success:true,message:`${company.name} was finished for Round ${session.round}.`,session,result};
+  });
+}
+
+export async function facilitatorRemoveCompanyV1(sessionId:string,companyId:string){
+  return serialisePhaseChange(sessionId,async()=>{
+    const session=await baseGetSessionV2(sessionId.toUpperCase());
+    if(!session)return{success:false,message:'Session not found.'};
+    if(session.isFinalDisruptionActive)return{success:false,message:'Companies cannot be removed during the Final Challenge.',session};
+    if(session.companies.length<=1)return{success:false,message:'The game must keep at least one company.',session};
+    const company=session.companies.find(candidate=>candidate.id===companyId);
+    if(!company)return{success:false,message:'Company not found.',session};
+    const assigned=companyPlayerCountV1(session,companyId);
+    if(assigned>0)return{success:false,message:`Move the ${assigned} assigned player${assigned===1?'':'s'} to another company before removing ${company.name}.`,session};
+
+    session.companies=session.companies.filter(candidate=>candidate.id!==companyId);
+    delete session.activeEvents[companyId];
+    if(session.riskResults)delete session.riskResults[companyId];
+    session.copMemberships=(session.copMemberships||[]).filter(membership=>membership.companyId!==companyId);
+    session.copMessages=(session.copMessages||[]).filter(message=>message.fromCompanyId!==companyId&&message.toCompanyId!==companyId);
+    for(const remaining of session.companies){
+      if(remaining.disruptionSwapNotice?.fromCompanyId===companyId)remaining.disruptionSwapNotice=null;
+    }
+    if(Array.isArray((session as any).finalDisruptionResults)){
+      (session as any).finalDisruptionResults=(session as any).finalDisruptionResults.filter((item:any)=>item.companyId!==companyId);
+    }
+    applyInterfaceSimplificationV1(session);
+
+    if(allCompaniesWaiting(session)){
+      const advanced:any=await advanceAfterKnowledgeRisk(session);
+      if(advanced?.success&&advanced.session)return{...advanced,message:`${company.name} was removed. All remaining companies were ready, so the next round has begun.`};
+      return advanced;
+    }
+
+    await saveSessionV2(session);
+    broadcastV2(session,'FACILITATOR_REMOVED_COMPANY',{companyId,companyName:company.name,round:session.round});
+    return{success:true,message:`${company.name} was removed from the game.`,session};
   });
 }
 
