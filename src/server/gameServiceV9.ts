@@ -717,9 +717,27 @@ export async function knowledgeActionV2(sessionId:string,companyId:string,payloa
   if(payload?.type==='ACK_EVENT_RESOLUTION')return acknowledgeEventResolution(sessionId,companyId,String(payload?.eventInstanceId||''));
 
   if(payload?.type==='FINAL_DISRUPTION_RESOLVE'){
-    const result:any=await runLegacyCompanyMutation(sessionId,companyId,'events',()=>baseKnowledgeActionV2(sessionId,companyId,payload));
-    if(result?.session){await normaliseFinalResolution(result.session);}
-    return result;
+    return serialiseSession(sessionId,async()=>{
+      const session=await baseGetSessionV2(sessionId.toUpperCase());
+      if(!session)return{success:false,message:'Session not found.'};
+      ensureCompanyState(session);
+      const company=session.companies.find(candidate=>candidate.id===companyId);
+      if(!company)return{success:false,message:'Company not found.',session};
+      if(!session.isFinalDisruptionActive)return{success:false,message:'The Final Challenge has not started.',session};
+      // Final Challenge is shared workshop timing, but each company resolves only
+      // its own card. Do not require or alter the company's normal round phase.
+      session.round=company.round;
+      session.phase='respond';
+      await saveSessionV2(session);
+      const result:any=await baseKnowledgeActionV2(sessionId,companyId,payload);
+      const authoritative=(result?.session||await baseGetSessionV2(session.id)) as GameSessionV2|null;
+      if(authoritative){
+        ensureCompanyState(authoritative);
+        await normaliseFinalResolution(authoritative);
+        return{...result,session:authoritative};
+      }
+      return result;
+    });
   }
 
   const session=await baseGetSessionV2(sessionId.toUpperCase());
