@@ -2,7 +2,7 @@ import type { CoPMembership, DomainScoreMap, KnowledgeDomain } from '../types/ga
 import type { CompanyV2, GameSessionV2, SoloCoPPeerV1 } from '../types/gameV2.ts';
 
 export const COP_JOIN_COST_V5=5;
-export const COP_MEMBERSHIP_ROUNDS_V5=2;
+export const COP_MEMBERSHIP_ROUNDS_V5=1;
 export const COP_GENERAL_DOMAIN_V5='general' as const;
 export const COP_DOMAINS_V5:KnowledgeDomain[]=['engineering','hr','marketing','operations','finance'];
 
@@ -34,6 +34,12 @@ export function copMembershipMatchesV5(session:GameSessionV2,membership:CoPMembe
 
 export function companyHasCopMembershipV5(session:GameSessionV2,companyId:string,domain:KnowledgeDomain):boolean{
   return session.copMemberships.some(membership=>copMembershipMatchesV5(session,membership,companyId,domain));
+}
+
+export function copCompanyTopScoresV5(session:GameSessionV2,company:CompanyV2):DomainScoreMap{
+  const scores={} as DomainScoreMap;
+  COP_DOMAINS_V5.forEach(domain=>{scores[domain]=companyBestKnowledgeV5(session,company,domain)});
+  return scores;
 }
 
 export function reciprocalCopPeersV5(session:GameSessionV2,companyId:string,domain:KnowledgeDomain):{id:string;name:string;score:number;simulated?:boolean}[]{
