@@ -169,14 +169,30 @@ export async function getSessionV2(sessionId:string):Promise<GameSessionV2|null>
 }
 
 export async function advancePhaseV2(sessionId:string,requested?:any){
+  // Investment is company-specific in multiplayer. Never let one browser move
+  // every company into Invest through the legacy global phase endpoint.
+  if(requested==='investment'){
+    return serialisePhaseChange(sessionId,async()=>{
+      const session=await baseGetSessionV2(sessionId.toUpperCase());
+      if(!session)return{success:false,message:'Session not found.'};
+      ensureRoundPhases(session);
+      let changed=false;
+      for(const company of session.companies){
+        if(roundPhase(company,fallbackFromSession(session))==='events'&&(session.activeEvents[company.id]||[]).every(event=>event.isResolved)){
+          setRoundPhase(company,'investment');
+          changed=true;
+        }
+      }
+      session.phase=allCompanyEventsResolved(session)?'investment':'respond';
+      const autopilotResults=runEligibleAutopilot(session);
+      await saveSessionV2(session);
+      broadcastV2(session,'COMPANY_PHASES_SYNCHRONISED',{round:session.round,autopilotCompanies:autopilotResults.map(item=>item.companyId)});
+      return{success:true,message:changed?'Completed companies entered Invest.':'Company phases are already up to date.',session};
+    });
+  }
   const result:any=await baseAdvancePhaseV2(sessionId,requested);
   if(!result?.success||!result.session)return result;
-  if(result.session.phase==='investment'){
-    for(const company of result.session.companies)if(roundPhase(company,fallbackFromSession(result.session))!=='waiting')setRoundPhase(company,'investment');
-    const autopilotResults=runEligibleAutopilot(result.session);
-    await saveSessionV2(result.session);
-    broadcastV2(result.session,'COMPANIES_ENTERED_INVESTMENT',{round:result.session.round,autopilotCompanies:autopilotResults.map(item=>item.companyId)});
-  }else if(result.session.phase==='respond'&&!result.session.isFinalDisruptionActive){
+  if(result.session.phase==='respond'&&!result.session.isFinalDisruptionActive){
     for(const company of result.session.companies)setRoundPhase(company,'events');
     await saveSessionV2(result.session);
   }
@@ -602,10 +618,20 @@ async function acknowledgeEventResolution(sessionId:string,companyId:string,even
     // Do not claim or open the next Event automatically. The company must
     // deliberately click a face-down card. OPEN_EVENT_CARD then claims that
     // card for the whole company so every player sees the same Event.
-    if(allCompanyEventsResolved(session))session.phase='consequences';
+    const companyEvents=(session.activeEvents[company.id]||[]);
+    const companyFinished=companyEvents.every(candidate=>candidate.isResolved);
+    if(companyFinished)setRoundPhase(company,'investment');
+    // Keep the shared legacy phase on Events while any human company is still
+    // resolving Events. Only move the legacy phase once every company has
+    // completed its Event work; company.roundPhase is authoritative meanwhile.
+    session.phase=allCompanyEventsResolved(session)?'investment':'respond';
     await saveSessionV2(session);
-    broadcastV2(session,'COMPANY_EVENT_ACKNOWLEDGED',{companyId,eventInstanceId});
-    return{success:true,message:'Event complete. Choose the next Event card when you are ready.',session};
+    broadcastV2(session,companyFinished?'COMPANY_ENTERED_INVESTMENT':'COMPANY_EVENT_ACKNOWLEDGED',{companyId,eventInstanceId});
+    return{
+      success:true,
+      message:companyFinished?'Events complete. Begin investing for the next round.':'Event complete. Choose the next Event card when you are ready.',
+      session,
+    };
   });
 }
 
