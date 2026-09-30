@@ -515,6 +515,17 @@ export async function saveParticipant(participant: Participant): Promise<void> {
   }
 }
 
+export async function deleteParticipant(participantId: string): Promise<void> {
+  memoryStore.participants.delete(participantId);
+  if (pool) {
+    try {
+      await pool.query(`DELETE FROM performance_gap.participants WHERE id = $1`, [participantId]);
+    } catch (e) {
+      console.error('[DB] Error deleting participant from Postgres:', e);
+    }
+  }
+}
+
 /**
  * Delete a specific Game Session
  */
