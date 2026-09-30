@@ -3,6 +3,7 @@ import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { AUSTRALIAN_CITIES, HQ_COORDINATES } from './config.ts';
 import { recalculateCompanySPOFV2 } from './coreV2.ts';
 import { recordSiteKmActivityV1, roundInvestmentMoneyV1, siteCanTakeKmActivityV1 } from './investmentCapacityV1.ts';
+import { COP_GENERAL_DOMAIN_V5, COP_JOIN_COST_V5, COP_MEMBERSHIP_ROUNDS_V5, companyBestKnowledgeV5, companyHasCopMembershipV5, copPeerKnowledgeSourceV5, reciprocalCopPeersV5 } from './copNetworkV5.ts';
 
 export const INVESTMENT_COSTS_V4: Record<string, number> = {
   KNOWLEDGE_TRANSFER: 18,
@@ -12,7 +13,7 @@ export const INVESTMENT_COSTS_V4: Record<string, number> = {
   TRAIN_EXPERT: 20,
   UPDATE_INTRANET: 30,
   LESSONS_LEARNED: 20,
-  JOIN_COP: 20,
+  JOIN_COP: COP_JOIN_COST_V5,
   HORIZON_SCAN: 40,
   AUTOMATE: 80,
 };
@@ -47,28 +48,20 @@ export function expertTravelCostV4(from: string, target?: string): number {
   return roundInvestmentMoneyV1(0.4 + scaled * 1.2);
 }
 
-function companyBestKnowledge(company: CompanyV2, domain: KnowledgeDomain): number {
-  const siteBest = Math.max(0, ...company.sites.filter((s) => !s.isClosed).map((s) => Math.max(s.teamCapability[domain] || 0, s.codifiedKnowledge[domain] || 0)));
-  const expertBest = Math.max(0, ...company.experts.filter((e) => !e.isVacant).flatMap((e) => e.domains.filter((d) => d.domain === domain).map((d) => d.score)));
-  return Math.max(company.intranet[domain] || 0, siteBest, expertBest);
-}
-
-function hash(text: string): number {
-  let value = 0;
-  for (let i = 0; i < text.length; i++) value = ((value << 5) - value + text.charCodeAt(i)) | 0;
-  return Math.abs(value);
+export function companyBestKnowledgeV4(session: GameSessionV2, company: CompanyV2, domain: KnowledgeDomain): number {
+  return companyBestKnowledgeV5(session, company, domain);
 }
 
 export function copPeerKnowledgeScoreV4(session: GameSessionV2, company: CompanyV2, domain: KnowledgeDomain): number {
-  const own = companyBestKnowledge(company, domain);
-  const others = session.companies.filter((c) => c.id !== company.id);
-  if (others.length) return Math.max(0, ...others.map((c) => companyBestKnowledge(c, domain)));
-  const strong = (hash(`${session.id}:${domain}`) % 5) < 3;
-  return strong ? own + 2 : own;
+  return copPeerKnowledgeSourceV5(session, company.id, domain)?.score || 0;
 }
 
 export function copMembershipActiveV4(session: GameSessionV2, companyId: string, domain: KnowledgeDomain): boolean {
-  return session.copMemberships.some((m) => m.companyId === companyId && m.domain === domain && m.activeRound >= session.round);
+  return reciprocalCopPeersV5(session, companyId, domain).length > 0;
+}
+
+export function companyHasCopMembershipV4(session: GameSessionV2, companyId: string, domain: KnowledgeDomain): boolean {
+  return companyHasCopMembershipV5(session, companyId, domain);
 }
 
 function recalcTurnover(company: CompanyV2) {
@@ -228,15 +221,33 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
   }
 
   if (type === 'JOIN_COP') {
-    if (!expertId || !domain) return { success: false, message: 'Choose an expert and domain.' };
-    const expert = findExpert(); if (!expert || !expertAvailable(expert) || !expert.domains.some((x) => x.domain === domain)) return { success: false, message: 'Eligible employed expert required.' };
+    if (!expertId) return { success: false, message: 'Choose an expert to represent the company in the Community of Practice.' };
+    const expert = findExpert();
+    if (!expert || !expertAvailable(expert)) return { success: false, message: 'Choose an employed expert.' };
+    if (session.experienceMode === 'expert') {
+      if (!domain) return { success: false, message: 'Choose the CoP domain.' };
+      if (!expert.domains.some((x) => x.domain === domain)) return { success: false, message: 'In Expert mode the representative must hold the domain they register in.' };
+    }
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
-    const existing = session.copMemberships.find((m) => m.companyId === company.id && m.domain === domain);
-    const activeThrough = session.round + 2;
-    if (existing) { existing.expertId = expert.id; existing.activeRound = activeThrough; }
-    else session.copMemberships.push({ companyId: company.id, domain, expertId: expert.id, activeRound: activeThrough });
+    const membershipDomain = session.experienceMode === 'newbie' ? COP_GENERAL_DOMAIN_V5 : domain!;
+    const scope = session.experienceMode === 'newbie' ? 'general' as const : 'domain' as const;
+    const existing = session.copMemberships.find((m) => m.companyId === company.id && (scope === 'general' ? (m.scope === 'general' || m.domain === COP_GENERAL_DOMAIN_V5) : m.domain === membershipDomain));
+    const activeThrough = session.round + COP_MEMBERSHIP_ROUNDS_V5;
+    if (existing) { existing.expertId = expert.id; existing.domain = membershipDomain; existing.scope = scope; existing.activeRound = activeThrough; }
+    else session.copMemberships.push({ companyId: company.id, domain: membershipDomain, expertId: expert.id, activeRound: activeThrough, scope });
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${expert.name} joined the ${domain} CoP. Network support is available for the next two rounds. Cost $${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    const partnerReady = session.experienceMode === 'newbie'
+      ? reciprocalCopPeersV5(session, company.id, 'engineering').length > 0
+      : reciprocalCopPeersV5(session, company.id, domain!).length > 0;
+    const label = session.experienceMode === 'newbie' ? 'general business CoP' : `${domain} CoP`;
+    return {
+      success: true,
+      message: partnerReady
+        ? `${expert.name} joined the ${label}. A reciprocal member is already participating, so network support is live. Cost ${baseCost}k.${fundingSuffix}`
+        : `${expert.name} joined the ${label}. Network support will become usable when another company also joins. Cost ${baseCost}k.${fundingSuffix}`,
+      costTurnover: baseCost,
+      investmentAttribution,
+    };
   }
 
   if (type === 'HORIZON_SCAN') {
