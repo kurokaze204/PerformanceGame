@@ -22,7 +22,7 @@ import {
 import { DEFAULT_CONFIG } from './config.ts';
 import { EVENT_CARDS_DECK } from './cards.ts';
 import { createInitialCompany as createLegacyInitialCompany } from './rules.ts';
-import { roundInvestmentMoneyV1, strategicInvestmentContributionV1 } from './investmentCapacityV1.ts';
+import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, applyKnowledgeTurnoverGrowthV1, roundInvestmentMoneyV1, strategicInvestmentContributionV1 } from './investmentCapacityV1.ts';
 
 export const CORE_V2_VERSION = '0.2.0';
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
@@ -62,6 +62,7 @@ export function createInitialCompanyV2(name: string, id: string, config: Simulat
   company.problemEventsDrawn = 0;
   company.opportunityEventsDrawn = 0;
   company.horizonScanAvailableRound = null;
+  company.strategicInvestmentFund = INITIAL_STRATEGIC_INVESTMENT_FUND_V1;
   company.experts.forEach((e) => { e.replacementDueRound = null; });
   recalculateCompanySPOFV2(company, config);
   return company;
@@ -304,11 +305,11 @@ export function validateEventAllocationV2(
 }
 
 function recalcCompanyTurnover(company: CompanyV2): void {
-  company.turnover = Math.round(company.sites.reduce((sum, s) => sum + (s.isClosed ? 0 : s.turnover), 0));
+  company.turnover = roundInvestmentMoneyV1(company.sites.reduce((sum, s) => sum + (s.isClosed ? 0 : s.turnover), 0));
 }
 
 function applySiteDelta(company: CompanyV2, site: Site, delta: number): void {
-  site.turnover = Math.max(0, Math.round(site.turnover + delta));
+  site.turnover = Math.max(0, roundInvestmentMoneyV1(site.turnover + delta));
   recalcCompanyTurnover(company);
 }
 
@@ -669,6 +670,7 @@ export function prepareNextRoundV2(sessionInput: GameSession): void {
       } else if (!expert.isVacant) expert.state = expert.location === 'HQ' ? 'HQ Assignment' : 'Available';
     });
     company.actionsRemaining = session.config.actions_per_round;
+    applyKnowledgeTurnoverGrowthV1(company);
     company.strategicInvestmentFund = roundInvestmentMoneyV1(company.strategicInvestmentFund + strategicInvestmentContributionV1(company));
     company.intranetRoundGrowth = emptyScores(0);
     company.auditedSiteId = null;
