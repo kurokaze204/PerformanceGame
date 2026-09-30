@@ -62,7 +62,7 @@ assert.deepEqual({
   CODIFY_SITE:2.5,
   TRAIN_EXPERT:20,
   UPDATE_INTRANET:30,
-  LESSONS_LEARNED:20,
+  LESSONS_LEARNED:8,
   JOIN_COP:5,
   HORIZON_SCAN:40,
   AUTOMATE:80,
@@ -324,11 +324,20 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   company.intranet[domain]=8;
   const event:ActiveEvent={instanceId:'AAR-LEARNING',card:{id:'AAR-LEARNING',type:'problem',scope:'local',title:'AAR learning',description:'Smoke test',domains:[{domain,difficulty:5}],impact:10,tags:['test']},targetSiteId:site.id,allocations:{[domain]:{}} as any,isResolved:true,success:true};
   session.activeEvents[company.id]=[event as any];
-  const result=executeInvestmentActionV4(session,company,{type:'LESSONS_LEARNED',companyId:company.id,siteId:site.id,expertId:expert.id,domain,eventInstanceId:event.instanceId});
+  const otherSite=company.sites.find(candidate=>!candidate.isClosed&&candidate.id!==site.id)!;
+  expert.location=otherSite.id;
+  expert.homeLocation=otherSite.id;
+  const expectedTravel=expertTravelCostV4(expert.location,site.id);
+  const result:any=executeInvestmentActionV4(session,company,{type:'LESSONS_LEARNED',companyId:company.id,siteId:site.id,expertId:expert.id,domain,eventInstanceId:event.instanceId});
   assert.equal(result.success,true);
   assert.equal(site.teamCapability[domain],9);
   assert.equal(expert.domains.find(skill=>skill.domain===domain)!.score,9);
   assert.equal(company.intranet[domain],9);
+  assert.equal(result.travelCost,expectedTravel,'AAR must charge facilitator travel to the AAR site');
+  assert.equal(result.costTurnover,Math.round((8+expectedTravel)*10)/10,'AAR total must be $8k plus facilitator travel');
+  assert.equal(event.experientialLearningAwarded,true);
+  const repeat=executeInvestmentActionV4(session,company,{type:'LESSONS_LEARNED',companyId:company.id,siteId:site.id,expertId:expert.id,domain,eventInstanceId:event.instanceId});
+  assert.equal(repeat.success,false,'the same completed challenge cannot generate a second AAR');
 }
 
 // 12. Any employed expert may facilitate an AAR, but non-domain facilitators do not gain personal expertise.
