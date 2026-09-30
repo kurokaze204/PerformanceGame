@@ -38,6 +38,9 @@ export interface CoPMessageV1 {
   message:string;
   round:number;
   createdAt:string;
+  kind?:'request'|'response';
+  response?:'accepted'|'declined';
+  replyToId?:string;
 }
 
 export interface SoloCoPPeerV1 {
