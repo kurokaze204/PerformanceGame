@@ -7,10 +7,10 @@ import{expertDisplayName}from'../utils/expertDisplay.ts';
 import{formatCurrency}from'../utils/format.ts';
 import{EXPERT_RELOCATION_COST_V1}from'../engine/investmentCapacityV1.ts';
 
-interface Props{company:CompanyV2;domains:KnowledgeDomain[];session?:GameSessionV2;onSessionUpdate?:(session:GameSessionV2)=>void;onSelectExpert?:(expert:Expert)=>void;heading?:boolean;}
+interface Props{company:CompanyV2;domains:KnowledgeDomain[];session?:GameSessionV2;participantId?:string;readOnly?:boolean;onSessionUpdate?:(session:GameSessionV2)=>void;onSelectExpert?:(expert:Expert)=>void;heading?:boolean;}
 const busyStates=new Set(['Supporting Event','Travelling','Training','Knowledge Transfer','Expertise Capture','CoP Participant']);
 
-export const ExpertReferenceList:React.FC<Props>=({company,domains,session,onSessionUpdate,onSelectExpert,heading=false})=>{
+export const ExpertReferenceList:React.FC<Props>=({company,domains,session,participantId,readOnly=false,onSessionUpdate,onSelectExpert,heading=false})=>{
  const[showSpofHelp,setShowSpofHelp]=useState(false);
  const[moveTargets,setMoveTargets]=useState<Record<string,string>>({});
  const[moving,setMoving]=useState<string|null>(null);
@@ -19,10 +19,10 @@ export const ExpertReferenceList:React.FC<Props>=({company,domains,session,onSes
  const relocationAvailable=company.strategicInvestmentFund+0.0001>=EXPERT_RELOCATION_COST_V1;
 
  const moveExpert=async(expert:Expert,targetLocation:string)=>{
-  if(!session||!targetLocation||moving)return;
+  if(!session||!targetLocation||moving||readOnly)return;
   setMoving(expert.id);setMoveMessage('');
   try{
-   const response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,actionType:'MOVE_EXPERT',params:{expertId:expert.id,targetLocation}})});
+   const response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,participantId,actionType:'MOVE_EXPERT',params:{expertId:expert.id,targetLocation}})});
    const data=await response.json();
    if(!response.ok||data.success===false)throw new Error(data.message||data.error||'Could not move this expert.');
    if(data.session)onSessionUpdate?.(data.session);
@@ -51,7 +51,7 @@ export const ExpertReferenceList:React.FC<Props>=({company,domains,session,onSes
      <div className="mt-3 flex flex-wrap gap-3">{visible.map(d=><span key={d.domain} className="inline-flex items-center gap-2"><DomainBadge domain={d.domain}/><b className="text-lg text-white">{d.score}</b></span>)}{!visible.length&&<span className="text-xs font-bold text-slate-500">Replacement pending</span>}</div>
      {spof.length>0&&<div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-rose-300"><span>Single point of failure:</span>{spof.map(d=><DomainBadge key={d} domain={d}/>)}</div>}
     </button>
-    {!e.isVacant&&session&&<div className="mt-3 border-t border-slate-800 pt-3"><div className="mb-1.5 flex items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500"><ArrowRightLeft className="h-3.5 w-3.5"/>Permanent move</div><div className="text-[10px] font-black text-amber-300">{formatCurrency(EXPERT_RELOCATION_COST_V1)} · no Action</div></div><div className="flex gap-2"><select value={target} onChange={event=>setMoveTargets(current=>({...current,[e.id]:event.target.value}))} disabled={!destinations.length||moving===e.id} className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-xs font-bold text-white disabled:opacity-50">{destinations.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}</select><button type="button" onClick={()=>void moveExpert(e,target)} disabled={!target||moving===e.id||!relocationAvailable} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-black text-white disabled:bg-slate-800 disabled:text-slate-600">{moving===e.id?'MOVING…':'MOVE'}</button></div>{!relocationAvailable&&<div className="mt-1 text-[10px] font-bold text-rose-300">Needs {formatCurrency(EXPERT_RELOCATION_COST_V1)} SIF.</div>}<div className="mt-1 text-[10px] text-slate-500">Can be done at any time. The expert’s permanent base changes immediately.</div></div>}
+    {!e.isVacant&&session&&<div className="mt-3 border-t border-slate-800 pt-3"><div className="mb-1.5 flex items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500"><ArrowRightLeft className="h-3.5 w-3.5"/>Permanent move</div><div className="text-[10px] font-black text-amber-300">{formatCurrency(EXPERT_RELOCATION_COST_V1)} · no Action</div></div><div className="flex gap-2"><select value={target} onChange={event=>setMoveTargets(current=>({...current,[e.id]:event.target.value}))} disabled={readOnly||!destinations.length||moving===e.id} className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-xs font-bold text-white disabled:opacity-50">{destinations.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}</select><button type="button" onClick={()=>void moveExpert(e,target)} disabled={readOnly||!target||moving===e.id||!relocationAvailable} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-black text-white disabled:bg-slate-800 disabled:text-slate-600">{moving===e.id?'MOVING…':'MOVE'}</button></div>{!relocationAvailable&&<div className="mt-1 text-[10px] font-bold text-rose-300">Needs {formatCurrency(EXPERT_RELOCATION_COST_V1)} SIF.</div>}<div className="mt-1 text-[10px] text-slate-500">Can be done at any time. The expert’s permanent base changes immediately.</div></div>}
    </div>})}</div>
   {showSpofHelp&&<div className="fixed inset-0 z-[220] grid place-items-center bg-black/65 p-4" onClick={()=>setShowSpofHelp(false)}><div className="w-full max-w-md rounded-2xl border border-amber-600 bg-slate-950 p-4 shadow-2xl" onClick={e=>e.stopPropagation()}><div className="flex items-start justify-between gap-3"><div><div className="text-[10px] uppercase tracking-wider text-amber-300 font-black">Knowledge risk</div><h3 className="text-lg font-black text-white">Single Point of Failure</h3></div><button onClick={()=>setShowSpofHelp(false)} className="rounded-lg border border-slate-700 p-1.5 text-slate-300"><X className="h-4 w-4"/></button></div><p className="mt-2 text-sm leading-relaxed text-slate-300">Any experts with this icon hold substantially more knowledge than the organisation can access without them. Reduce the gap through transfer, codification or training so they are less likely to resign from over-work.</p></div></div>}
  </>;
