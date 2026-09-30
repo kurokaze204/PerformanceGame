@@ -86,6 +86,11 @@ assert.ok(investPanelSource.includes("left-1/2")&&investPanelSource.includes("ma
 assert.equal(investPanelSource.includes("min-[1280px]:right-[360px]"),false,'Invest workspace must not reserve a dead gap for right-hand slide-ins');
 assert.ok(investPanelSource.includes('min-h-[384px]'),'River and investment chooser must be twenty percent taller than the previous 320px workspace');
 assert.ok(investPanelSource.includes('data-investment-controls'),'Non-transfer investment controls must use the cleaned stacked layout');
+assert.ok(investPanelSource.includes('name="investment-budget"'),'Invest payment box must offer Local and SIF budget choices');
+assert.ok(investPanelSource.includes('Continue: SIF')&&investPanelSource.includes('Continue: {localBudgetLabel}'),'Invest payment box must show the resulting budget/turnover impact');
+assert.ok(investPanelSource.includes('const blockingWarning=invalidRiver'),'Invalid investment choices must replace the payment box with a blocking warning');
+assert.ok(investPanelSource.includes('grid-cols-[minmax(0,700px)_minmax(150px,1fr)]'),'AAR Recent Challenge control must reserve wider space beside the site information box');
+assert.ok(investPanelSource.includes('{selectedSite?.name||\'—\'}'),'AAR Site must render as information rather than a disabled dropdown');
 assert.ok(investPanelSource.includes("'Expert name'"),'Expert selection must have its own labelled row');
 assert.ok(investPanelSource.includes('grid-cols-[minmax(0,1fr)_300px]'),'River and investment choices must share a stable top-row layout');
 assert.equal(investPanelSource.includes('overflow-y-auto'),false,'Core Invest workspace must not introduce internal scrollbars');
