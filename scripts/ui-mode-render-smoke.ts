@@ -115,6 +115,7 @@ assert.ok(facilitatorSource.includes('team.length>0'),'Company removal must be d
 assert.ok(facilitatorSource.includes("facilitator/remove-player"),'Facilitator must be able to remove duplicate or abandoned player records');
 assert.ok(facilitatorSource.includes('Remove duplicate or abandoned player'),'Player removal control must explain its purpose');
 assert.ok(facilitatorSource.includes('older duplicate'),'Facilitator must flag the older record when identical player names are duplicated');
+assert.equal(facilitatorSource.includes('fac-view-'),false,'Returning from facilitator mode must not manufacture a fake player identity');
 assert.ok(facilitatorSource.includes("facilitator/autopilot-company"),'Facilitator must be able to toggle company autopilot');
 assert.ok(facilitatorSource.includes("companyIndex===0?'Autopilot locked off':'Autopilot'"),'Company 1 must visibly show autopilot locked off');
 assert.ok(facilitatorSource.includes('disabled={busy||companyIndex===0||team.length>0||session.isFinalDisruptionActive}'),'Autopilot checkbox must be disabled for Company 1 and staffed companies');
@@ -150,6 +151,7 @@ const finishLessonSource=eventPlaytestSource.slice(finishLessonStart,finishLesso
 assert.equal(finishLessonSource.includes('setPendingContinue(null)'),false,'Newbie transfer lesson must remain visible until Event acknowledgement succeeds');
 
 const appBoardEventSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
+assert.ok(appBoardEventSource.includes("sessionStorage.getItem('tpg_facilitator_game_view')!=='1'"),'Facilitator game-view mode must remain facilitator identity without reopening the control room');
 assert.ok(appBoardEventSource.includes("activeEventIndex=chosen>=0?chosen:-1"),'board must not fall back to a resolved Event when no unresolved Event exists');
 assert.ok(appBoardEventSource.includes("if(!event||event.isResolved)return;setBoardTool(null)"),'opening a resolved Event must be ignored');
 
