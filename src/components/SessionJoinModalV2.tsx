@@ -60,11 +60,11 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,initialMode='sol
  const selectSoloExperience=(next:ExperienceMode)=>{setSoloExperienceMode(next);setSoloActionsPerRound(defaultActionsForMode(next));setSoloDuration(next==='newbie'?45:60);if(next==='newbie')setSoloGameEndMode('time')};
  const copyCode=()=>navigator.clipboard?.writeText(gameCode);
 
- const createAndJoin=async(args:{code:string;name:string;count:number;options:CreateOptions;publicGame:boolean;password?:string;autoStart?:boolean})=>{
+ const createAndJoin=async(args:{code:string;name:string;count:number;options:CreateOptions;publicGame:boolean;password?:string;autoStart?:boolean;soloMode?:boolean})=>{
   if(!hasName||creating)return;
   setCreating(true);setCreateError(null);rememberName();
   try{
-   const res=await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:args.code,name:args.name,companyCount:args.count,...args.options,isPublic:args.publicGame,facilitatorPassword:args.password||''})});
+   const res=await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:args.code,name:args.name,companyCount:args.count,...args.options,isPublic:args.publicGame,facilitatorPassword:args.password||'',soloMode:Boolean(args.soloMode)})});
    const created=await res.json();
    if(!res.ok)throw new Error(created.error||'Could not create the game.');
    try{localStorage.setItem(`tpg_creator_${created.id}`,playerName.trim())}catch{}
@@ -96,7 +96,7 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,initialMode='sol
       <div className="grid sm:grid-cols-2 gap-3">{soloExperienceMode==='expert'&&soloGameEndMode==='rounds'?<Field label="Rounds before Final Challenge"><input type="number" min={1} max={200} value={soloFinalRoundCount} onChange={e=>setSoloFinalRoundCount(Math.max(1,Math.min(200,Number(e.target.value))))} className="control"/></Field>:<Field label="Game length"><select value={soloDuration} onChange={e=>setSoloDuration(Number(e.target.value))} className="control"><option value={30}>30 minutes</option><option value={45}>45 minutes</option><option value={60}>60 minutes</option><option value={90}>90 minutes</option></select></Field>}<Field label="Actions each round"><input type="number" min={1} max={10} value={soloActionsPerRound} onChange={e=>setSoloActionsPerRound(Math.max(1,Math.min(10,Number(e.target.value))))} className="control"/></Field></div>
       <Summary>{soloExperienceMode==='newbie'?`Recommended first game: ${soloDuration} minutes with ${soloActionsPerRound} Actions per round. Knowledge-management capabilities are introduced gradually.`:soloGameEndMode==='rounds'?`Expert game: full model from Round 1, with the Final Challenge after Round ${soloFinalRoundCount}.`:`Expert game: full model from Round 1, ${soloDuration} minutes, ${soloActionsPerRound} Actions per round.`}</Summary>
       {!hasName&&<Hint>Enter your name to start.</Hint>}{createError&&<ErrorText>{createError}</ErrorText>}
-      <button disabled={!hasName||creating} onClick={()=>void createAndJoin({code:makeGameCode(),name:'Solo Performance Gap',count:1,options:soloOptions,publicGame:false,autoStart:soloOptions.gameEndMode==='time'})} className="primary text-base disabled:opacity-40"><Sparkles className="h-5 w-5"/>{creating?'STARTING…':'START SOLO GAME'}</button>
+      <button disabled={!hasName||creating} onClick={()=>void createAndJoin({code:makeGameCode(),name:'Solo Performance Gap',count:1,options:soloOptions,publicGame:false,autoStart:soloOptions.gameEndMode==='time',soloMode:true})} className="primary text-base disabled:opacity-40"><Sparkles className="h-5 w-5"/>{creating?'STARTING…':'START SOLO GAME'}</button>
      </div>}
 
      {mode==='join'&&<div className="mt-6 space-y-5">
