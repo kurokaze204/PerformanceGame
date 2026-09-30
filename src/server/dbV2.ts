@@ -25,9 +25,13 @@ function round2(n: number): number { return Math.round(n * 100) / 100; }
 
 async function mergeAuthoritativeParticipants(session: GameSessionV2): Promise<GameSessionV2> {
   const persisted = await getParticipantsForSession(session.id);
-  if (!persisted.length) return session;
-  const merged = new Map((session.participants || []).map((participant) => [participant.id, participant]));
-  for (const participant of persisted) merged.set(participant.id, participant);
+  const local = (session.participants || []).filter((participant) => !participant.id.startsWith('fac-view-'));
+  const legacyFacilitatorPlayers = persisted.filter((participant) => participant.id.startsWith('fac-view-'));
+  if (legacyFacilitatorPlayers.length) await Promise.all(legacyFacilitatorPlayers.map((participant) => deleteParticipant(participant.id)));
+  const merged = new Map(local.map((participant) => [participant.id, participant]));
+  for (const participant of persisted) {
+    if (!participant.id.startsWith('fac-view-')) merged.set(participant.id, participant);
+  }
   session.participants = [...merged.values()];
   return session;
 }
