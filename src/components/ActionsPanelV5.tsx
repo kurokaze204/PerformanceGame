@@ -44,6 +44,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const visibleInterventions=INTERVENTIONS.filter(item=>interventionUnlocked(session.experienceMode,session.round,item.actionType)
    &&(item.actionType!=='UPDATE_INTRANET'||transferUnlocked)
    &&(item.actionType!=='SITE_KNOWLEDGE_SHARING'||transferUnlocked));
+ const pendingCopRequests=(session.copMessages||[]).filter(message=>message.toCompanyId===company.id&&message.kind==='request'&&!(session.copMessages||[]).some(reply=>reply.replyToId===message.id&&reply.kind==='response'));
  const [selectedId,setSelectedId]=useState<InterventionId>(visibleInterventions[0]?.id||'local-training');
  const activeSites=company.sites.filter(s=>!s.isClosed);
  const usedTeachingSiteIds=riverTeachingSitesUsedThisRound(company,session.round);
@@ -167,7 +168,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
        </div>
        <aside className="relative w-[300px] shrink-0 rounded-2xl border border-slate-700 bg-slate-950/95 p-3 pb-4">
          <div className="mb-2 text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Choose an investment</div>
-         <div className="space-y-1.5">{visibleInterventions.map(item=>{const Icon=item.icon;const active=item.id===selectedId;const cost=costFor(item.actionType);return <button key={item.id} onClick={()=>setSelectedId(item.id)} className={`w-full rounded-xl border-2 px-3 py-1.5 text-left transition ${active?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-900 hover:border-emerald-500'}`}><div className="flex items-center gap-2"><Icon className={`h-4 w-4 shrink-0 ${active?'text-amber-300':'text-emerald-300'}`}/><b className="min-w-0 flex-1 text-[13px] leading-tight text-white">{item.title}</b><span className="text-[11px] font-black text-amber-300">{formatCurrency(cost)}</span></div></button>})}</div>
+         <div className="space-y-1.5">{visibleInterventions.map(item=>{const Icon=item.icon;const active=item.id===selectedId;const cost=costFor(item.actionType);return <button key={item.id} onClick={()=>setSelectedId(item.id)} className={`w-full rounded-xl border-2 px-3 py-1.5 text-left transition ${active?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-900 hover:border-emerald-500'}`}><div className="flex items-center gap-2"><Icon className={`h-4 w-4 shrink-0 ${active?'text-amber-300':'text-emerald-300'}`}/><b className="min-w-0 flex-1 text-[13px] leading-tight text-white">{item.title}</b>{item.id==='join-cop'&&pendingCopRequests.length>0&&<span className="rounded-full border border-violet-400 bg-violet-950 px-1.5 py-0.5 text-[8px] font-black text-violet-200">REQUEST</span>}<span className="text-[11px] font-black text-amber-300">{formatCurrency(cost)}</span></div></button>})}</div>
          <div aria-hidden="true" data-investment-arrow className="absolute -bottom-3 left-1/2 h-6 w-6 -translate-x-1/2 rotate-45 border-r border-b border-slate-700 bg-slate-950"/>
        </aside>
      </div>
