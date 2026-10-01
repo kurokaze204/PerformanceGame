@@ -84,7 +84,7 @@ export const EventDeckV1:React.FC<Props>=({session,company,events,activeIndex,ca
  },[delayed?.instanceId]);
  const openCard=(index:number)=>{if(cardOpen)return;onOpenCard(index);void markSharedOpen(index)};
  const delayCard=(eventInstanceId:string)=>{pendingDelayRef.current=eventInstanceId;onDelayCard(eventInstanceId)};
- return <div className="absolute left-4 top-4 z-20 h-[440px] w-[650px] max-w-[calc(100%-24px)] select-none pointer-events-none" aria-label="Event cards">
+ return <div className="tpg-event-deck absolute left-4 top-4 z-20 h-[440px] w-[650px] max-w-[calc(100%-24px)] select-none pointer-events-none" aria-label="Event cards">
    <div className="absolute left-0 top-0" style={{width:cardW+16,height:cardH+16}}><div className="absolute inset-0 rounded-[18px] border-[4px] border-dashed border-violet-700/80 bg-transparent grid place-items-center"><span className="text-sm font-black tracking-[.18em] text-violet-700/70">EVENTS</span></div></div>
    <div className="absolute left-[8px] top-[8px] pointer-events-none" style={{width:cardW,height:cardH,transform:'translate(4px,4px)',filter:'drop-shadow(0 13px 12px rgba(0,0,0,.6))'}}/>
    {Array.from({length:stackCards},(_,index)=>{const offset=stackCards-1-index;return <div key={`deck-${index}`} className="absolute pointer-events-none" style={{left:8-offset,top:8-offset,width:cardW,height:cardH,zIndex:2+index,transform:`rotate(${stackRotation(index)}deg)`,transformOrigin:'center center'}}><CardBack/></div>})}
