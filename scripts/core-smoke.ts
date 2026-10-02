@@ -15,7 +15,7 @@ import {
   resolveSingleEventExplicitV2,
 } from '../src/engine/challengeResponseV2.ts';
 import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
-import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, siteKnowledgePointsV1, siteTurnoverGrowthPercentV1 } from '../src/engine/investmentCapacityV1.ts';
+import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, STRATEGIC_INVESTMENT_RATE_V1, siteKnowledgePointsV1, siteTurnoverGrowthPercentV1 } from '../src/engine/investmentCapacityV1.ts';
 import { COP_GENERAL_DOMAIN_V5, companyHasCopMembershipV5, reciprocalCopPeersV5 } from '../src/engine/copNetworkV5.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
@@ -88,7 +88,7 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   assert.equal(company.turnover,before,'creating the SIF must not transfer money out of site turnover');
 }
 
-// Round-start site growth is driven by local knowledge plus experts, then the 5% SIF budget is added from the new turnover.
+// Round-start site growth is driven by local knowledge plus experts, then the 3% SIF budget is added from the new turnover.
 {
   const { session,company }=makeSession('expert');
   const site=company.sites[0];
@@ -105,7 +105,8 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   prepareNextRoundV2(session);
   assert.ok(site.turnover>beforeSite,'site turnover must grow at the start of a round');
   assert.ok(company.turnover>beforeCompany,'company turnover must reflect knowledge-driven site growth');
-  assert.equal(company.strategicInvestmentFund,Math.round((25+company.turnover*0.05)*10)/10,'SIF budget must be calculated after turnover growth');
+  assert.equal(STRATEGIC_INVESTMENT_RATE_V1,0.03,'round SIF contribution must be 3% of turnover');
+  assert.equal(company.strategicInvestmentFund,Math.round((25+company.turnover*STRATEGIC_INVESTMENT_RATE_V1)*10)/10,'SIF budget must be calculated after turnover growth');
 }
 
 // SIF can fund a local investment and each site can absorb at most three local KM activities per round.
