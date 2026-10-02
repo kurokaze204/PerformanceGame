@@ -1,6 +1,6 @@
 import type { CompanyV2 } from '../types/gameV2.ts';
 
-export const STRATEGIC_INVESTMENT_RATE_V1 = 0.05;
+export const STRATEGIC_INVESTMENT_RATE_V1 = 0.03;
 export const INITIAL_STRATEGIC_INVESTMENT_FUND_V1 = 25;
 export const SITE_KM_ACTIVITY_LIMIT_V1 = 3;
 export const EXPERT_RELOCATION_COST_V1 = 20;
