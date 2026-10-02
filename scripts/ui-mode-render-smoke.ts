@@ -68,6 +68,9 @@ assert.equal(appBoardCurrent.includes('advanceToInvestment'),false,'Completing o
 assert.ok(appBoardCurrent.includes("else if(startStage==='learn'&&companyRoundPhase==='investment')"),'Newbie Invest teaching overlay must follow the current company phase only');
 assert.ok(appBoardCurrent.includes("const deckVisible=companyRoundPhase==='events'"),'Event deck visibility must follow the current company phase only');
 assert.ok(appBoardCurrent.includes("const displayPhase=companyRoundPhase==='events'?'respond':companyRoundPhase==='investment'?'investment':'risk'"),'Phase bar must be company-specific in multiplayer');
+assert.ok(appBoardCurrent.includes("toast(d.message||'Action completed.',30000)"),'successful investment action notices must remain visible for 30 seconds');
+assert.ok(appBoardCurrent.includes('dismissNotification();const companyId=company.id'),'starting the next investment action must dismiss the previous action notice');
+assert.ok(appBoardCurrent.includes('aria-label="Close notification"'),'action notices must provide an explicit close button');
 const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
 assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
 assert.ok(investPanelSource.includes("'aar':['LESSONS_LEARNED',{siteId,expertId,domain,eventInstanceId:selectedAarEvent?.instanceId}]"),'AAR must submit one expert facilitator');
@@ -81,6 +84,11 @@ const investmentRiverSource=readFileSync(new URL('../src/components/InvestmentRi
 assert.ok(investmentRiverSource.includes('{abbrev(site.id)}'),'Invest River site labels must use three-letter site abbreviations');
 assert.ok(investmentRiverSource.includes('{firstName(mark.expert.name)} · {loc}'),'Invest River expert labels must show first name and city abbreviation');
 assert.ok(investmentRiverSource.includes('fontSize="13"'),'Invest River labels must remain readable at the central workspace size');
+assert.ok(investPanelSource.includes("interventionIds:['aar','knowledge-transfer']"),'AAR and Knowledge Transfer must share one investment strategy group');
+assert.ok(investPanelSource.includes("interventionIds:['train-expert','local-training']"),'Expert development and Local Training must share one investment strategy group');
+assert.ok(investPanelSource.includes("interventionIds:['update-intranet','corporate-training']"),'Corporate Intranet and Corporate Training must share one investment strategy group');
+assert.ok(investPanelSource.includes("interventionIds:['horizon-scan','join-cop']"),'Horizon Scan and Community of Practice must share one investment strategy group');
+assert.ok(investPanelSource.includes('data-investment-strategy={strategy.id}'),'Investment strategy groups must be visibly grouped and colour coded');
 assert.ok(investPanelSource.includes('Choose an investment'),'Invest must keep investment choices beside the River');
 assert.ok(investPanelSource.includes('data-investment-arrow'),'Choose an investment panel must retain its bottom pointer');
 assert.ok(investPanelSource.includes('data-knowledge-transfer-controls'),'Knowledge Transfer controls must use the dedicated vertical hierarchy');
