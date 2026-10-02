@@ -18,6 +18,7 @@ interface Props { session: GameSessionV2; company: CompanyV2; onPerformAction: (
 type InterventionId='knowledge-transfer'|'local-training'|'corporate-training'|'codify-site'|'train-expert'|'update-intranet'|'aar'|'join-cop'|'horizon-scan'|'automate';
 type AnchorId='existing'|'expert'|'network'|'favour'|'external'|'risk';
 type Intervention={id:InterventionId; title:string; description:string; anchor:AnchorId; icon:React.ElementType; actionType:string};
+type InvestmentStrategy={id:string; title:string; interventionIds:InterventionId[]; wrapClass:string; labelClass:string; buttonClass:string; iconClass:string};
 const DOMAINS:KnowledgeDomain[]=['engineering','hr','marketing','operations','finance'];
 const INTERVENTIONS:Intervention[]=[
  {id:'knowledge-transfer',title:'Knowledge Transfer',description:'Move proven know-how directly from one site to another.',anchor:'existing',icon:ArrowRightLeft,actionType:'SITE_KNOWLEDGE_SHARING'},
@@ -30,6 +31,13 @@ const INTERVENTIONS:Intervention[]=[
  {id:'aar',title:'Lessons Learned / AAR',description:'Turn experience into local, expert and corporate knowledge.',anchor:'existing',icon:Sparkles,actionType:'LESSONS_LEARNED'},
  {id:'horizon-scan',title:'Horizon Scan',description:'Scout a domain so matching Events can be anticipated next round.',anchor:'risk',icon:Radar,actionType:'HORIZON_SCAN'},
  {id:'automate',title:'Automation',description:'Embed critical domain knowledge in systems (+2 on future challenges).',anchor:'existing',icon:Bot,actionType:'AUTOMATE'},
+];
+const INVESTMENT_STRATEGIES:InvestmentStrategy[]=[
+ {id:'learn-transfer',title:'Learn & transfer',interventionIds:['aar','knowledge-transfer'],wrapClass:'border-emerald-800/80 bg-emerald-950/20',labelClass:'text-emerald-300',buttonClass:'border-emerald-800 bg-emerald-950/35 hover:border-emerald-400',iconClass:'text-emerald-300'},
+ {id:'develop-people',title:'Develop people',interventionIds:['train-expert','local-training'],wrapClass:'border-sky-800/80 bg-sky-950/20',labelClass:'text-sky-300',buttonClass:'border-sky-800 bg-sky-950/35 hover:border-sky-400',iconClass:'text-sky-300'},
+ {id:'scale-knowledge',title:'Scale knowledge',interventionIds:['update-intranet','corporate-training'],wrapClass:'border-indigo-800/80 bg-indigo-950/20',labelClass:'text-indigo-300',buttonClass:'border-indigo-800 bg-indigo-950/35 hover:border-indigo-400',iconClass:'text-indigo-300'},
+ {id:'connect-anticipate',title:'Connect & anticipate',interventionIds:['horizon-scan','join-cop'],wrapClass:'border-violet-800/80 bg-violet-950/20',labelClass:'text-violet-300',buttonClass:'border-violet-800 bg-violet-950/35 hover:border-violet-400',iconClass:'text-violet-300'},
+ {id:'embed-systems',title:'Embed in systems',interventionIds:['codify-site','automate'],wrapClass:'border-cyan-800/80 bg-cyan-950/20',labelClass:'text-cyan-300',buttonClass:'border-cyan-800 bg-cyan-950/35 hover:border-cyan-400',iconClass:'text-cyan-300'},
 ];
 function costFor(actionType:string){return INVESTMENT_COSTS_V4[actionType]||0;}
 
@@ -192,7 +200,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
        </div>
        <aside className="relative w-[300px] shrink-0 rounded-2xl border border-slate-700 bg-slate-950/95 p-3 pb-4">
          <div className="mb-2 text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Choose an investment</div>
-         <div className="space-y-1.5">{visibleInterventions.map(item=>{const Icon=item.icon;const active=item.id===selectedId;const cost=costFor(item.actionType);return <button key={item.id} onClick={()=>setSelectedId(item.id)} className={`w-full rounded-xl border-2 px-3 py-1.5 text-left transition ${active?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-900 hover:border-emerald-500'}`}><div className="flex items-center gap-2"><Icon className={`h-4 w-4 shrink-0 ${active?'text-amber-300':'text-emerald-300'}`}/><b className="min-w-0 flex-1 text-[13px] leading-tight text-white">{item.title}</b>{item.id==='join-cop'&&pendingCopRequests.length>0&&<span className="rounded-full border border-violet-400 bg-violet-950 px-1.5 py-0.5 text-[8px] font-black text-violet-200">REQUEST</span>}<span className="text-[11px] font-black text-amber-300">{formatCurrency(cost)}</span></div></button>})}</div>
+         <div className="space-y-1.5">{INVESTMENT_STRATEGIES.map(strategy=>{const items=strategy.interventionIds.map(id=>visibleInterventions.find(item=>item.id===id)).filter((item):item is Intervention=>Boolean(item));if(!items.length)return null;return <div key={strategy.id} data-investment-strategy={strategy.id} className={`rounded-xl border px-1.5 py-1 ${strategy.wrapClass}`}><div className={`mb-0.5 px-1 text-[8px] font-black uppercase tracking-[.14em] ${strategy.labelClass}`}>{strategy.title}</div><div className="space-y-1">{items.map(item=>{const Icon=item.icon;const active=item.id===selectedId;const cost=costFor(item.actionType);return <button key={item.id} onClick={()=>setSelectedId(item.id)} className={`w-full rounded-lg border-2 px-2.5 py-1 text-left transition ${strategy.buttonClass} ${active?'ring-2 ring-amber-300 ring-offset-1 ring-offset-slate-950':''}`}><div className="flex items-center gap-2"><Icon className={`h-4 w-4 shrink-0 ${strategy.iconClass}`}/><b className="min-w-0 flex-1 text-[12px] leading-tight text-white">{item.title}</b>{item.id==='join-cop'&&pendingCopRequests.length>0&&<span className="rounded-full border border-violet-400 bg-violet-950 px-1.5 py-0.5 text-[8px] font-black text-violet-200">REQUEST</span>}<span className="text-[10px] font-black text-amber-300">{formatCurrency(cost)}</span></div></button>})}</div></div>})}</div>
          <div aria-hidden="true" data-investment-arrow className="absolute -bottom-3 left-1/2 h-6 w-6 -translate-x-1/2 rotate-45 border-r border-b border-slate-700 bg-slate-950"/>
        </aside>
      </div>
