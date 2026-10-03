@@ -203,7 +203,8 @@ export function evaluateFinalDisruptionV1(session:GameSessionV2,company:CompanyV
     const reciprocalPeer=copActive?copPeerKnowledgeSourceV5(session,company.id,domain):null;
     const peer=reciprocalPeer?{score:reciprocalPeer.score,sourceCompanyName:reciprocalPeer.name}:{score:0,sourceCompanyName:undefined};
     const copBonus=copActive?copSupportBonusV5(session,company,domain,composed.depth):0;
-    const totalKnowledge=composed.total+copBonus;
+    const automationBonus=company.automatedDomains.includes(domain)?session.config.automation_bonus:0;
+    const totalKnowledge=composed.total+copBonus+automationBonus;
     const gap=Math.max(0,requirement.difficulty-totalKnowledge);
     return{
       domain,
@@ -223,6 +224,7 @@ export function evaluateFinalDisruptionV1(session:GameSessionV2,company:CompanyV
       breadthBonus:composed.breadth,
       sourceCount:composed.sourceCount,
       copScore:copBonus,
+      automationBonus,
       copPeerKnowledge:peer.score,
       copSourceCompanyName:peer.sourceCompanyName,
       totalKnowledge,
