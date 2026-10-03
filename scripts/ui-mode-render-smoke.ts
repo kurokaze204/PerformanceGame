@@ -87,8 +87,9 @@ assert.ok(kmWeekBoardSource.includes('fixed inset-0 z-[120] bg-black/70')&&kmWee
 assert.ok(kmWeekBoardSource.includes("state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1"),'The score briefing must trigger at the first free-play Invest round only');
 assert.ok(kmWeekBoardSource.includes('animateKnowledgeSpark')&&riverSource.includes('data-river-target'),'KM Week investments must send a visual knowledge spark toward the River');
 assert.ok(globalCssSource.includes('.kmw-knowledge-spark')&&globalCssSource.includes('transition-duration: 1.2s'),'KM Week River changes must use the glowing spark and 1.2 second movement');
-assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1")&&kmWeekBoardSource.includes('const duration=firstGuidedRound?1700:850'),'The first guided River cue must run at half speed');
+assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1")&&kmWeekBoardSource.includes('const travelDuration=firstGuidedRound?2200:1100'),'The first guided River cue must run at half speed while later rounds remain slower than before');
 assert.ok(kmWeekBoardSource.includes('dx-loop')&&kmWeekBoardSource.includes('dx+loop*.60'),'The knowledge spark path must arc past and loop back to the River target');
+assert.ok(kmWeekBoardSource.includes('{duration:300,easing:\'ease-out\'')&&kmWeekBoardSource.includes('requestAnimationFrame(()=>requestAnimationFrame'),'The knowledge spark must fade for 0.3 seconds and fully disappear before River state animation begins');
 assert.ok(kmWeekBoardSource.includes('If you solve it')&&kmWeekBoardSource.includes('If you fail'),'KM Week Challenge cards must show the business win and loss before a decision');
 assert.ok(kmWeekBoardSource.includes('Moving an expert from another site costs an additional')&&kmWeekBoardSource.includes('travel -
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
