@@ -82,6 +82,8 @@ assert.equal(kmWeekBoardSource.includes('disabled={guided} className="mt-1 w-ful
 assert.ok(kmWeekBoardSource.includes('any valid transfer will work'),'Guided Knowledge Transfer must make clear that the player may choose any valid source, destination and domain');
 assert.ok(kmWeekBoardSource.includes('actionError'),'Rejected KM Week actions must explain the problem inline rather than appearing to do nothing');
 assert.ok(kmWeekBoardSource.includes('data-kmw-knowledge-bars')&&kmWeekBoardSource.includes('Requirement')&&kmWeekBoardSource.includes('Local'),'KM Week Challenge detail must visualise requirement and local knowledge as horizontal bars');
+assert.ok(riverSource.includes('data-kmw-shock-cutoff')&&riverSource.includes('strokeDasharray="10 8"'),'Business Shock must draw a yellow dotted cut-off line across the Knowledge River');
+assert.ok(kmWeekBoardSource.includes('KM_WEEK_SHOCK_CUTOFF')&&kmWeekBoardSource.includes('Look at the River:'),'KM Week Business Shock must explain the River cut-off before resolution');
 assert.ok(kmWeekBoardSource.includes("requirementMet?'bg-emerald-400':'bg-rose-500'"),'The Challenge requirement bar must turn green when the selected knowledge meets the requirement');
 assert.ok(kmWeekBoardSource.includes("appliedMethod==='expert'")&&kmWeekBoardSource.includes('bg-amber-400'),'Selecting an expert must visibly apply the expert knowledge bar');
 assert.ok(kmWeekBoardSource.includes('Score briefing · Round 4 Invest')&&kmWeekBoardSource.includes('Only the total score matters'),'The first free-play Invest must explain the scorecard and multiple paths to success');
