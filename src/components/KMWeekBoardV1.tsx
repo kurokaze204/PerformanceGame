@@ -194,8 +194,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   spark.style.top=`${startY-9}px`;
   document.body.appendChild(spark);
   const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1;
-  const duration=firstGuidedRound?1700:850;
-  const animation=spark.animate([
+  const travelDuration=firstGuidedRound?2200:1100;
+  const travel=spark.animate([
    {transform:'translate(0px,0px) scale(.8)',opacity:0},
    {transform:`translate(${dx*.10}px,${-rise*.58}px) scale(1.18)`,opacity:1,offset:.10},
    {transform:`translate(${dx*.34}px,${-rise}px) scale(1.12)`,opacity:1,offset:.26},
@@ -203,12 +203,19 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    {transform:`translate(${dx*.84}px,${dy*.40}px) scale(.98)`,opacity:1,offset:.60},
    {transform:`translate(${dx-loop}px,${dy*.82}px) scale(.96)`,opacity:1,offset:.74},
    {transform:`translate(${dx-loop*.55}px,${dy+loop*.45}px) scale(.92)`,opacity:1,offset:.84},
-   {transform:`translate(${dx+loop*.60}px,${dy+loop*.32}px) scale(.86)`,opacity:.95,offset:.92},
-   {transform:`translate(${dx}px,${dy}px) scale(.42)`,opacity:0}
-  ],{duration,easing:'cubic-bezier(.33,.02,.22,1)',fill:'forwards'});
-  try{await animation.finished}catch{}
+   {transform:`translate(${dx+loop*.60}px,${dy+loop*.32}px) scale(.86)`,opacity:1,offset:.92},
+   {transform:`translate(${dx}px,${dy}px) scale(.82)`,opacity:1}
+  ],{duration:travelDuration,easing:'cubic-bezier(.33,.02,.22,1)',fill:'forwards'});
+  try{await travel.finished}catch{}
+  const fade=spark.animate([
+   {transform:`translate(${dx}px,${dy}px) scale(.82)`,opacity:1},
+   {transform:`translate(${dx}px,${dy}px) scale(.55)`,opacity:0}
+  ],{duration:300,easing:'ease-out',fill:'forwards'});
+  try{await fade.finished}catch{}
   spark.remove();
-  await new Promise(resolve=>setTimeout(resolve,70));
+  // Let the browser paint one completely orb-free frame before applying the
+  // new session state. Only then can the River begin its 1.2s transition.
+  await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
  };
 
  const commitResponse=async()=>{
