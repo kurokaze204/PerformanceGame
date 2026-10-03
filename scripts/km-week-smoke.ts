@@ -84,8 +84,9 @@ assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.oper
 assert.equal(company.kmWeek?.guidedTurn,3);
 
 resolveGuided();
-result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',sourceSiteId:'brisbane',targetSiteId:'perth',domain:'operations'});
+result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',sourceSiteId:'melbourne',targetSiteId:'brisbane',domain:'hr'});
 assert.equal(result.success,true,result.message);
+assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.hr,1,'Guided Knowledge Transfer must accept any valid domain/source/target choice');
 assert.equal(company.kmWeek?.stage,'free');
 assert.equal(company.kmWeek?.freeRound,1);
 assert.equal(company.kmWeek?.challenges.length,2);
