@@ -266,6 +266,7 @@ export function resolveKMWeekChallengeV1(
   let won=false;
   let roll:number|undefined;
   let expert:ExpertV2|undefined;
+  let travelCost=0;
   if(method==='local'){
     won=(site.teamCapability[challenge.domain]||0)>=challenge.difficulty;
     if(!won)return{success:false,message:`${site.name} only has ${site.teamCapability[challenge.domain]||0}; this Challenge needs ${challenge.difficulty}. Choose another response.`};
@@ -278,6 +279,7 @@ export function resolveKMWeekChallengeV1(
     if(state.stage==='free'&&state.usedExpertIds.includes(expert.id))return{success:false,message:`${expert.name} has already handled a Challenge this round.`};
     won=skill.score>=challenge.difficulty;
     if(!won)return{success:false,message:`${expert.name} has Knowledge ${skill.score}; this Challenge needs ${challenge.difficulty}.`};
+    travelCost=expert.location===site.id?0:2;
     expert.location=site.id;
     expert.state='Supporting Event';
     if(state.stage==='free')state.usedExpertIds.push(expert.id);
@@ -293,13 +295,16 @@ export function resolveKMWeekChallengeV1(
   challenge.resolution=method;
   challenge.expertId=expert?.id;
   challenge.dieRoll=roll;
-  const turnoverChange=won?challenge.impact:-challenge.impact;
+  const businessChange=won?challenge.impact:-challenge.impact;
+  const turnoverChange=businessChange-travelCost;
+  challenge.travelCost=travelCost||undefined;
   challenge.turnoverChange=turnoverChange;
   applyTurnover(company,turnoverChange);
   if(won&&state.stage==='free')state.freeSuccesses+=1;
+  const travelText=travelCost?` Expert travel -${travelCost}k.`:'';
   state.lastMessage=won
-    ? `${site.name} handled “${challenge.title}”. Turnover +$${challenge.impact}k.`
-    : `${site.name} could not contain “${challenge.title}”. Turnover -$${challenge.impact}k.`;
+    ? `${site.name} handled “${challenge.title}”. Business +${challenge.impact}k.${travelText} Net turnover ${turnoverChange>=0?'+':''}${turnoverChange}k.`
+    : `${site.name} could not contain “${challenge.title}”. Business -${challenge.impact}k.${travelText} Net turnover -${Math.abs(turnoverChange)}k.`;
   afterChallengeSet(session,company);
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
