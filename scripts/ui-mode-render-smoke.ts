@@ -183,7 +183,7 @@ assert.equal(appBoardEventSource.includes('/advance-phase'),false,'player UI mus
 // Player-legibility audit: important mechanics must be visible without adding permanent instruction walls.
 const eventDecisionSource=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
 assert.ok(eventPlaytestSource.includes('diagnostic={Boolean(isOpeningLesson)}'),'opening Newbie challenge must be explicitly marked as diagnostic');
-assert.ok(eventDecisionSource.includes('Normal probability rules start with the next challenge.'),'diagnostic challenge must explain that its outcome is not a normal probability roll');
+assert.ok(eventDecisionSource.includes("What happens when your company has the knowledge but the local site doesn't? You are about to find out."),'diagnostic challenge must frame the knowledge-access gap in player language');
 assert.ok(eventDecisionSource.includes('D {e.depthKnowledge} · B +{e.breadthBonus}'),'ordinary Event scoring must expose compact depth/breadth values');
 assert.ok(eventDecisionSource.includes('A relevant expert unlocks the full score.'),'Corporate Intranet must reveal when absorptive capacity limits usable knowledge');
 assert.ok(eventDecisionSource.includes('Each consultant engagement increases the future rate by 35%.'),'consultant UI must reveal escalating future rates');
