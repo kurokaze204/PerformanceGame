@@ -84,6 +84,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[selectedChallengeId,setSelectedChallengeId]=useState('');
  const[pendingResponse,setPendingResponse]=useState<PendingResponse>(null);
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
+ const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
  const[expertId,setExpertId]=useState('');
  const[sourceSiteId,setSourceSiteId]=useState('brisbane');
@@ -116,6 +117,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
 
  useEffect(()=>{
+  if(state?.stage==='guided'&&state.phase==='invest'&&state.guidedTurn===1)setFirstInvestBriefDismissed(false);
+ },[state?.stage,state?.phase,state?.guidedTurn]);
+
+ useEffect(()=>{
   if(!state)return;
   if(state.stage==='guided'&&state.phase==='invest'){
     if(state.guidedTurn===1){setInvestment('TRAIN_EXPERT');setSelectedDomain('operations');setExpertId(specialistFor(company,'operations')?.id||'');}
@@ -140,7 +145,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const activeExpertScore=activeChallenge&&activeExpert?activeExpert.domains.find(skill=>skill.domain===activeChallenge.domain)?.score||0:0;
  const expertUsed=Boolean(activeExpert&&state.usedExpertIds.includes(activeExpert.id));
 
- const post=async(payload:any)=>{
+ const post=async(payload:any,beforeApply?:()=>Promise<void>)=>{
   if(readOnly){onToast(`Read only · ${controllerName||'Your CEO'} controls this company.`);return false}
   if(busy)return false;
   setBusy(true);
@@ -148,11 +153,35 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,participantId:participant?.id,actionType:payload.type,params:payload})});
    const data=await response.json();
    if(!response.ok||data?.success===false){onToast(data?.message||data?.error||'That move is not available.');return false}
-   if(data.session)onSessionUpdate(data.session);
+   if(data.session){if(beforeApply)await beforeApply();onSessionUpdate(data.session);}
    if(data.message)onToast(data.message,4500);
    return true;
   }catch{onToast('Could not complete that move.');return false}
   finally{setBusy(false)}
+ };
+
+ const animateKnowledgeSpark=async(startX:number,startY:number,targetKey:string)=>{
+  const target=document.querySelector(`[data-river-target="${targetKey}"]`) as SVGGraphicsElement|null;
+  if(!target)return;
+  const rect=target.getBoundingClientRect();
+  const endX=rect.left+rect.width/2,endY=rect.top+rect.height/2;
+  const dx=endX-startX,dy=endY-startY;
+  const swing=Math.min(120,Math.max(55,Math.abs(dx)*0.16));
+  const spark=document.createElement('div');
+  spark.className='kmw-knowledge-spark';
+  spark.style.left=`${startX-9}px`;
+  spark.style.top=`${startY-9}px`;
+  document.body.appendChild(spark);
+  const animation=spark.animate([
+   {transform:'translate(0px,0px) scale(.8)',opacity:0},
+   {transform:`translate(${dx*.12}px,${dy*.15}px) scale(1.15)`,opacity:1,offset:.14},
+   {transform:`translate(${dx*.38+swing}px,${dy*.34}px) scale(1)`,opacity:1,offset:.42},
+   {transform:`translate(${dx*.70-swing*.55}px,${dy*.72}px) scale(.95)`,opacity:1,offset:.72},
+   {transform:`translate(${dx}px,${dy}px) scale(.45)`,opacity:0}
+  ],{duration:850,easing:'cubic-bezier(.35,.02,.25,1)',fill:'forwards'});
+  try{await animation.finished}catch{}
+  spark.remove();
+  await new Promise(resolve=>setTimeout(resolve,70));
  };
 
  const commitResponse=async()=>{
@@ -161,7 +190,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(ok)setPendingResponse(null);
  };
 
- const permittedInvestments:KMWeekInvestment[]=guided?(state.guidedTurn===1?['TRAIN_EXPERT']:state.guidedTurn===2?['LOCAL_TRAINING']:['KNOWLEDGE_TRANSFER']):['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER'];
+ const guidedTargetInvestment:KMWeekInvestment|undefined=guided?(state.guidedTurn===1?'TRAIN_EXPERT':state.guidedTurn===2?'LOCAL_TRAINING':'KNOWLEDGE_TRANSFER'):undefined;
+ const permittedInvestments:KMWeekInvestment[]=['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER'];
  const source=company.sites.find(site=>site.id===sourceSiteId);
  const target=company.sites.find(site=>site.id===targetSiteId);
  const investmentPreview=investment==='TRAIN_EXPERT'
@@ -170,18 +200,24 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     ?specialist&&localTrainingSite?`${localTrainingSite.name} ${domainLabel(specialistDomain)}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min(5,(localTrainingSite.teamCapability[specialistDomain]||0)+1)}`:'Choose a company expert'
     :source&&target?`${source.name} ${domainLabel(selectedDomain)} ${source.teamCapability[selectedDomain]||0} → ${target.name} ${target.teamCapability[selectedDomain]||0}`:'Choose two sites';
 
- const invest=async()=>{
-  let payload:any;
+ const invest=async(event:React.MouseEvent<HTMLButtonElement>)=>{
+  let payload:any,targetKey='';
   if(investment==='TRAIN_EXPERT'){
     const expert=specialist||experts[0];if(!expert)return;
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
     payload={type:'KM_WEEK_INVEST',investment,expertId:expert.id,domain};
+    targetKey=`expert:${expert.id}:${domain}`;
   }else if(investment==='LOCAL_TRAINING'){
     const expert=specialist||experts[0];if(!expert||!localTrainingSite)return;
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
     payload={type:'KM_WEEK_INVEST',investment,expertId:expert.id,siteId:localTrainingSite.id,domain};
-  }else payload={type:'KM_WEEK_INVEST',investment,domain:selectedDomain,sourceSiteId,targetSiteId};
-  await post(payload);
+    targetKey=`site:${localTrainingSite.id}:${domain}`;
+  }else{
+    payload={type:'KM_WEEK_INVEST',investment,domain:selectedDomain,sourceSiteId,targetSiteId};
+    targetKey=`site:${targetSiteId}:${selectedDomain}`;
+  }
+  const startX=event.clientX,startY=event.clientY;
+  await post(payload,()=>animateKnowledgeSpark(startX,startY,targetKey));
  };
 
  const challengeDone=state.challenges.length>0&&state.challenges.every(challenge=>challenge.status!=='open');
@@ -231,7 +267,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     </div>
 
     <aside className="space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-2">
-     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className="flex min-h-[360px] shrink-0 items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 xl:min-h-0 xl:flex-1">
+     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className="flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 xl:min-h-0 xl:flex-1">
+      {state.stage==='guided'&&state.guidedTurn===1&&<div className="mb-4 max-w-[350px] rounded-2xl border border-amber-700/70 bg-amber-950/20 p-3 text-left shadow-lg"><div className="text-[9px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Challenge</div><p className="mt-2 text-[11px] leading-relaxed text-slate-200">Welcome! You are the new CEO of <b className="text-white">{company.name}</b>. It’s a business with promise but also some challenges to overcome. There are islands of excellence and a few experts you can rely on to meet the challenges, but your role is to build up knowledge so every site performs well. Business goes on while you make improvements, so you will have to use the expertise you have to solve daily events. In fact, here comes one right now. <b className="text-amber-200">Click the card below to see what it is.</b></p></div>}
       <button type="button" onClick={()=>setChallengeFocusOpen(true)} className="group kmw-start-card relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
        <div className="absolute inset-2 rounded-[13px] border border-violet-400/35"/>
        <div className="text-[9px] font-black uppercase tracking-[.24em] text-violet-300">The Performance Gap</div>
@@ -266,17 +303,19 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       </>}
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'&&<>
-       <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5"><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?guidedCopy.invest:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
+       {state.stage==='guided'&&state.guidedTurn===1&&!firstInvestBriefDismissed?<div className="mt-3 rounded-2xl border-2 border-amber-600 bg-[linear-gradient(145deg,#2a1a0d,#141522)] p-4 shadow-xl"><div className="text-[9px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Invest</div><p className="mt-2 text-[11px] leading-relaxed text-slate-200">OK, you managed to deal with today’s emergencies. Now it’s time to start building our company capability. Over time we want to avoid relying on individual experts, but right now it looks like they are a big part of the solution. Follow the instructions here to start us on the track to recovery.</p><button type="button" onClick={()=>setFirstInvestBriefDismissed(true)} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">CONTINUE TO INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button></div>:<>
+       <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5"><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?<><span>{guidedCopy.invest}</span><br/><span className="font-black text-amber-200">Guided move: choose {guidedTargetInvestment==='TRAIN_EXPERT'?'Train Expert':guidedTargetInvestment==='LOCAL_TRAINING'?'Local Training':'Knowledge Transfer'}.</span></>:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
        <div className="mt-2 grid grid-cols-3 gap-1.5">
-        {permittedInvestments.includes('TRAIN_EXPERT')&&<button onClick={()=>setInvestment('TRAIN_EXPERT')} className={`rounded-xl border-2 p-2 text-left ${investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}><GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+$1 depth · $15k</div></button>}
-        {permittedInvestments.includes('LOCAL_TRAINING')&&<button onClick={()=>setInvestment('LOCAL_TRAINING')} className={`rounded-xl border-2 p-2 text-left ${investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}><Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+$1 local · $10k</div></button>}
-        {permittedInvestments.includes('KNOWLEDGE_TRANSFER')&&<button onClick={()=>setInvestment('KNOWLEDGE_TRANSFER')} className={`rounded-xl border-2 p-2 text-left ${investment==='KNOWLEDGE_TRANSFER'?'border-emerald-300 bg-emerald-950/40':'border-slate-700 bg-slate-950'}`}><Workflow className="h-4 w-4 text-emerald-300"/><div className="mt-1 text-[10px] font-black text-white">Knowledge Transfer</div><div className="text-[9px] text-slate-500">Move know-how · $8k</div></button>}
+        <button disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>setInvestment('TRAIN_EXPERT')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}><GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+$1 depth · $15k</div></button>
+        <button disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>setInvestment('LOCAL_TRAINING')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}><Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+$1 local · $10k</div></button>
+        <button disabled={guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'} onClick={()=>setInvestment('KNOWLEDGE_TRANSFER')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='KNOWLEDGE_TRANSFER'?'border-emerald-300 bg-emerald-950/40':'border-slate-700 bg-slate-950'}`}><Workflow className="h-4 w-4 text-emerald-300"/><div className="mt-1 text-[10px] font-black text-white">Knowledge Transfer</div><div className="text-[9px] text-slate-500">Move know-how · $8k</div></button>
        </div>
        <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/75 p-2.5">
-        {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} disabled={guided} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white disabled:opacity-70">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div><div className="text-[9px] font-black uppercase text-slate-500">{investment==='LOCAL_TRAINING'?'Current site':'Knowledge domain'}</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{investment==='LOCAL_TRAINING'?localTrainingSite?.name||'—':domainLabel(specialistDomain)}</div></div></div>:<div className="grid grid-cols-3 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} disabled={guided} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} disabled={guided} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} disabled={guided} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
+        {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div><div className="text-[9px] font-black uppercase text-slate-500">{investment==='LOCAL_TRAINING'?'Current site':'Knowledge domain'}</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{investment==='LOCAL_TRAINING'?localTrainingSite?.name||'—':domainLabel(specialistDomain)}</div></div></div>:<div className="grid grid-cols-3 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
         <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span></div>
-        <button onClick={()=>void invest()} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+        <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>
+       </>}
       </>}
 
       {state.stage==='shock'&&<div className="mt-3 text-center"><div className="mx-auto grid h-14 w-14 place-items-center rounded-full border-4 border-rose-300 bg-rose-950"><ShieldCheck className="h-7 w-7 text-rose-200"/></div><div className="mt-2 text-[9px] font-black uppercase tracking-[.20em] text-rose-300">Business Shock</div><h3 className="mt-1 text-xl font-black text-white">Your company experts are unavailable.</h3><p className="mt-2 text-xs leading-relaxed text-slate-300">Five issues hit at once. There are no interventions now. This checks the local capability you actually built.</p><button onClick={()=>void post({type:'KM_WEEK_RESOLVE_SHOCK'})} disabled={busy||readOnly} className="mt-4 h-11 w-full rounded-xl border-2 border-white bg-white text-sm font-black text-rose-950 disabled:opacity-40">{busy?'CHECKING…':'COMMIT BUSINESS SHOCK'}</button></div>}
