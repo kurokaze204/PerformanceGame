@@ -123,7 +123,7 @@ export function buildProgrammedAssemblyOpportunity(
 
   // Make the lesson legible: one domain is comfortably local; the other needs
   // the site's basic knowledge plus a Deep Expert to reach certainty.
-  targetSite.teamCapability[localDomain]=Math.max(3,targetSite.teamCapability[localDomain]||0);
+  targetSite.teamCapability[localDomain]=Math.max(4,targetSite.teamCapability[localDomain]||0);
   targetSite.teamCapability[expertDomain]=1;
   if(mode==='expert'){
     targetSite.codifiedKnowledge[localDomain]=Math.min(targetSite.teamCapability[localDomain],targetSite.codifiedKnowledge[localDomain]||1);
@@ -139,8 +139,8 @@ export function buildProgrammedAssemblyOpportunity(
     title:'LEARNING: Assemble the Right Knowledge',
     description:`${targetSite.name} has a valuable customer opportunity. The local team can handle the ${localLabel} side, but the ${expertLabel} requirement needs deeper specialist knowledge.`,
     domains:[
-      {domain:localDomain,difficulty:2},
-      {domain:expertDomain,difficulty:preferred.skill.score},
+      {domain:localDomain,difficulty:4},
+      {domain:expertDomain,difficulty:preferred.skill.score+1},
     ],
     impact:20,
     tags:[
