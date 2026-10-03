@@ -108,10 +108,15 @@ assert.ok(investPanelSource.includes('min-h-[384px]'),'River and investment choo
 assert.ok(investPanelSource.includes('data-investment-controls'),'Non-transfer investment controls must use the cleaned stacked layout');
 assert.ok(investPanelSource.includes('name="investment-budget"'),'Invest payment box must offer Local and SIF budget choices');
 assert.ok(investPanelSource.includes('Continue: SIF')&&investPanelSource.includes('Continue: {localBudgetLabel}'),'Invest payment box must show the resulting budget/turnover impact');
-assert.ok(investPanelSource.includes('const blockingWarning=invalidRiver'),'Invalid investment choices must replace the payment box with a blocking warning');
+assert.ok(investPanelSource.includes('const blockingWarning=invalidRiver'),'Invalid non-budget investment choices must still block Run');
+assert.ok(investPanelSource.includes('const sifWarning=sifInsufficient'),'Insufficient SIF must be tracked separately from other blocking warnings');
+assert.ok(investPanelSource.includes('runDisabled=Boolean(blockingWarning||sifWarning)'),'Insufficient SIF must block Run without replacing the budget selector');
+assert.ok(investPanelSource.includes('{sifWarning&&<div'),'Insufficient SIF warning must render above the payment panel');
 assert.ok(investPanelSource.includes('grid-cols-[minmax(0,700px)_minmax(150px,1fr)]'),'AAR Recent Challenge control must reserve wider space beside the site information box');
 assert.ok(investPanelSource.includes('{selectedSite?.name||\'—\'}'),'AAR Site must render as information rather than a disabled dropdown');
 assert.ok(investPanelSource.includes("'Expert name'"),'Expert selection must have its own labelled row');
+const nonTransferControls=investPanelSource.slice(investPanelSource.indexOf('data-investment-controls'),investPanelSource.indexOf('<div className="min-w-[250px] flex-1',investPanelSource.indexOf('data-investment-controls')));
+assert.ok(nonTransferControls.indexOf("'Expert name'")<nonTransferControls.indexOf('>Domain<select'),'Expert-dependent investments must ask for Expert before Domain');
 assert.ok(investPanelSource.includes('grid-cols-[minmax(0,1fr)_300px]'),'River and investment choices must share a stable top-row layout');
 assert.equal(investPanelSource.includes('overflow-y-auto'),false,'Core Invest workspace must not introduce internal scrollbars');
 assert.ok(investPanelSource.includes("showSiteLabels={selectedId==='knowledge-transfer'}"),'Knowledge Transfer must label all site values on the River');
