@@ -81,6 +81,7 @@ const ResponseButton:React.FC<{selected:boolean;disabled?:boolean;children:React
 export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnly,controllerName,onSessionUpdate,onToast,onLeave,onTransferCeo})=>{
  const state=company.kmWeek;
  const[busy,setBusy]=useState(false);
+ const[actionError,setActionError]=useState('');
  const[selectedDomain,setSelectedDomain]=useState<KnowledgeDomain>('operations');
  const[selectedChallengeId,setSelectedChallengeId]=useState('');
  const[pendingResponse,setPendingResponse]=useState<PendingResponse>(null);
@@ -151,14 +152,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(readOnly){onToast(`Read only · ${controllerName||'Your CEO'} controls this company.`);return false}
   if(busy)return false;
   setBusy(true);
+  setActionError('');
   try{
    const response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,participantId:participant?.id,actionType:payload.type,params:payload})});
    const data=await response.json();
-   if(!response.ok||data?.success===false){onToast(data?.message||data?.error||'That move is not available.');return false}
+   if(!response.ok||data?.success===false){const message=data?.message||data?.error||'That move is not available.';setActionError(message);onToast(message);return false}
    if(data.session){if(beforeApply)await beforeApply();onSessionUpdate(data.session);}
    if(data.message)onToast(data.message,4500);
    return true;
-  }catch{onToast('Could not complete that move.');return false}
+  }catch{setActionError('Could not complete that move.');onToast('Could not complete that move.');return false}
   finally{setBusy(false)}
  };
 
@@ -326,6 +328,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/75 p-2.5">
         {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div><div className="text-[9px] font-black uppercase text-slate-500">{investment==='LOCAL_TRAINING'?'Current site':'Knowledge domain'}</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{investment==='LOCAL_TRAINING'?localTrainingSite?.name||'—':domainLabel(specialistDomain)}</div></div></div>:<div className="grid grid-cols-3 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
         <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span></div>
+        {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
         <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>
        </>}
