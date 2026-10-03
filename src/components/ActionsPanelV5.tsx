@@ -26,7 +26,7 @@ const INTERVENTIONS:Intervention[]=[
  {id:'corporate-training',title:'Corporate Training',description:'Raise Team Capability at every site that can benefit (+1).',anchor:'existing',icon:Building2,actionType:'CORPORATE_TRAINING'},
  {id:'codify-site',title:'Codify Site Knowledge',description:'Turn local know-how into reusable documentation (+1 Local Codified).',anchor:'existing',icon:BookOpen,actionType:'CODIFY_SITE'},
  {id:'train-expert',title:'Train Expert',description:'Deepen one expert domain by +1.',anchor:'expert',icon:GraduationCap,actionType:'TRAIN_EXPERT'},
- {id:'update-intranet',title:'Update Corporate Intranet',description:'Publish stronger organisational knowledge into the corporate knowledge base.',anchor:'existing',icon:Building2,actionType:'UPDATE_INTRANET'},
+ {id:'update-intranet',title:'Update Corporate Intranet',description:'Copy one domain from one site to the corporate knowledge base. Once per round.',anchor:'existing',icon:Building2,actionType:'UPDATE_INTRANET'},
  {id:'join-cop',title:'Join Community of Practice',description:'Join or renew a reciprocal peer network for the next Event round.',anchor:'network',icon:Network,actionType:'JOIN_COP'},
  {id:'aar',title:'Lessons Learned / AAR',description:'Turn experience into local, expert and corporate knowledge.',anchor:'existing',icon:Sparkles,actionType:'LESSONS_LEARNED'},
  {id:'horizon-scan',title:'Horizon Scan',description:'Scout a domain so matching Events can be anticipated next round.',anchor:'risk',icon:Radar,actionType:'HORIZON_SCAN'},
@@ -87,6 +87,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const tutorialSourceScore=tutorialDomain&&tutorialSource?riverSiteKnowledgeScore(tutorialSource,tutorialDomain,session.experienceMode):0;
  const tutorialTargetScore=tutorialDomain&&tutorialTarget?riverSiteKnowledgeScore(tutorialTarget,tutorialDomain,session.experienceMode):0;
  const needsTargetSite=['knowledge-transfer','local-training','codify-site','aar'].includes(selectedId);
+ const needsIntranetSourceSite=selectedId==='update-intranet';
  const needsSourceSite=selectedId==='knowledge-transfer';
  const needsExpert=['local-training','train-expert','join-cop','aar'].includes(selectedId);
  const relevantDomains=useMemo(()=>{
@@ -118,20 +119,22 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
  const riverSourceScore=sourceSite?riverSiteKnowledgeScore(sourceSite,domain,session.experienceMode):0;
  const riverTargetBefore=selectedSite?.teamCapability[domain]||0;
  const riverTargetAfter=riverTransferTarget(riverSourceScore);
+ const intranetSourceScore=selectedSite?riverSiteKnowledgeScore(selectedSite,domain,session.experienceMode):0;
+ const intranetUpdatedThisRound=Object.values(company.intranetRoundGrowth).some(value=>Number(value)>0);
  const expected=useMemo(()=>{
    if(selectedId==='knowledge-transfer')return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${riverTargetBefore} → ${Math.max(riverTargetBefore,riverTargetAfter)}`:'Choose a receiving site';
    if(selectedId==='local-training'){const b=selectedSite?.teamCapability[domain]??0;return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${b} → ${b+1}`:'Choose a site';}
    if(selectedId==='corporate-training')return `${activeSites.filter(s=>s.teamCapability[domain]<company.intranet[domain]).length} site(s) can gain +1 Team Capability`;
    if(selectedId==='codify-site'){const b=selectedSite?.codifiedKnowledge[domain]??0;return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Docs ${b} → ${b+1}`:'Choose a site';}
    if(selectedId==='train-expert')return selectedExpertSkill!=null?`${selectedExpert?.name} ${DOMAIN_INFO[domain].label} ${selectedExpertSkill} → ${selectedExpertSkill+1}`:'Choose a domain held by the expert';
-   if(selectedId==='update-intranet')return `${DOMAIN_INFO[domain].label} Corporate ${company.intranet[domain]} → higher if stronger source knowledge exists`;
+   if(selectedId==='update-intranet')return selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} ${intranetSourceScore} → Corporate ${company.intranet[domain]} → ${Math.max(company.intranet[domain],intranetSourceScore)}`:'Choose a source site';
    if(selectedId==='aar'){if(!selectedAarEvent)return 'No unused completed challenge is available for another AAR.';const siteBefore=selectedSite?.teamCapability[domain]??0;const hqBefore=company.intranet[domain]||0;const expertChange=selectedExpertSkill!=null?`${selectedExpert?.name} ${selectedExpertSkill} → ${selectedExpertSkill+1}`:`${selectedExpert?.name} facilitates only · no personal ${DOMAIN_INFO[domain].label} gain`;return selectedSite&&selectedExpert?`AAR on “${selectedAarEvent.card.title}” → ${selectedSite.name} Team ${siteBefore} → ${siteBefore+1} · ${expertChange} · HQ ${hqBefore} → ${hqBefore+1}`:'Choose an expert facilitator';}
    if(selectedId==='join-cop')return session.experienceMode==='newbie'
      ? 'Join the general business CoP for the next Event round. Network knowledge becomes usable when another company also joins.'
      : `Join the ${DOMAIN_INFO[domain].label} CoP for the next Event round. Network knowledge becomes usable when another company joins the same domain.`;
    if(selectedId==='automate')return company.automatedDomains.includes(domain)?`${DOMAIN_INFO[domain].label} is already automated`:`Add +${session.config.automation_bonus} embedded knowledge to future ${DOMAIN_INFO[domain].label} challenges`;
    return `Arm ${DOMAIN_INFO[domain].label} Horizon Scan for round ${session.round+1}`;
- },[selectedId,selectedSite,sourceSite,selectedExpert,selectedExpertSkill,selectedAarEvent,domain,activeSites,company.intranet,company.automatedDomains,session.round,session.config,riverSourceScore,riverTargetBefore,riverTargetAfter]);
+ },[selectedId,selectedSite,sourceSite,selectedExpert,selectedExpertSkill,selectedAarEvent,domain,activeSites,company.intranet,company.automatedDomains,session.round,session.config,riverSourceScore,riverTargetBefore,riverTargetAfter,intranetSourceScore]);
  const commit=()=>{
    const map:Record<InterventionId,[string,any]>={
     'knowledge-transfer':['SITE_KNOWLEDGE_SHARING',{sourceSiteId,siteId,domain}],
@@ -139,7 +142,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
     'corporate-training':['CORPORATE_TRAINING',{domain}],
     'codify-site':['CODIFY_SITE',{siteId,domain}],
     'train-expert':['TRAIN_EXPERT',{expertId,domain}],
-    'update-intranet':['UPDATE_INTRANET',{domain}],
+    'update-intranet':['UPDATE_INTRANET',{siteId,domain}],
     'aar':['LESSONS_LEARNED',{siteId,expertId,domain,eventInstanceId:selectedAarEvent?.instanceId}],
     'join-cop':['JOIN_COP',{expertId,domain}],
     'horizon-scan':['HORIZON_SCAN',{domain}],
@@ -147,12 +150,12 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
    };
    const [type,params]=map[selectedId];onPerformAction(type,{...params,useSIF});
  };
- const openTransfer=(id:'knowledge-transfer'|'update-intranet')=>{localStorage.setItem(lessonKey,'1');setShowIntranetLesson(false);setSelectedId(id);if(tutorialDomain)setDomain(tutorialDomain);if(tutorialSource)setSourceSiteId(tutorialSource.id);if(tutorialTarget)setSiteId(tutorialTarget.id)};
+ const openTransfer=(id:'knowledge-transfer'|'update-intranet')=>{localStorage.setItem(lessonKey,'1');setShowIntranetLesson(false);setSelectedId(id);if(tutorialDomain)setDomain(tutorialDomain);if(tutorialSource)setSourceSiteId(tutorialSource.id);if(id==='update-intranet'&&tutorialSource)setSiteId(tutorialSource.id);else if(tutorialTarget)setSiteId(tutorialTarget.id)};
  const actionTotal=session.config.actions_per_round;
  const expertLocation=selectedExpert?(selectedExpert.location==='HQ'?'Corporate HQ':activeSites.find(s=>s.id===selectedExpert.location)?.name||selectedExpert.location):'';
  const invalidRiver=selectedId==='knowledge-transfer'&&(!sourceSite||!selectedSite||sourceSite.id===selectedSite.id||usedTeachingSiteIds.includes(sourceSite.id)||riverTargetAfter<=riverTargetBefore);
  const riverTargetSiteId=needsTargetSite?selectedSite?.id:undefined;
- const riverSourceSiteId=needsSourceSite?sourceSite?.id:undefined;
+ const riverSourceSiteId=needsSourceSite?sourceSite?.id:(needsIntranetSourceSite?selectedSite?.id:undefined);
  const riverExpertId=needsExpert?selectedExpert?.id:undefined;
  const riverHighlightHQ=selectedId==='update-intranet'||selectedId==='corporate-training'||selectedId==='aar';
  const riverHighlightAllSites=selectedId==='corporate-training';
@@ -172,23 +175,27 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
        ? 'No Actions remaining this round.'
        : needsExpert&&!selectedExpert
          ? 'Choose an employed expert.'
-         : needsTargetSite&&!selectedSite
-           ? 'Choose a site.'
+         : (needsTargetSite||needsIntranetSourceSite)&&!selectedSite
+           ? needsIntranetSourceSite?'Choose a source site.':'Choose a site.'
            : selectedId==='aar'&&!selectedAarEvent
              ? 'No unused completed challenge is available for another AAR.'
              : selectedId==='aar'&&relevantDomains.length===0
                ? 'This challenge has no eligible knowledge domain for an AAR.'
                : selectedId==='aar'&&!expertChoices.length
                  ? 'No employed expert is available to facilitate the AAR.'
-                 : selectedId==='automate'&&company.automatedDomains.includes(domain)
-                   ? `${DOMAIN_INFO[domain].label} is already automated.`
-                   : sifInsufficient
+                 : selectedId==='update-intranet'&&intranetUpdatedThisRound
+                   ? 'Corporate Intranet has already been updated this round. Available again next round.'
+                   : selectedId==='update-intranet'&&selectedSite&&intranetSourceScore<=company.intranet[domain]
+                     ? `${selectedSite.name} cannot improve Corporate ${DOMAIN_INFO[domain].label}; choose a stronger site or another domain.`
+                     : selectedId==='automate'&&company.automatedDomains.includes(domain)
+                       ? `${DOMAIN_INFO[domain].label} is already automated.`
+                       : sifInsufficient
                      ? `SIF has ${formatCurrency(sifAvailable)} available; this investment costs ${formatCurrency(totalCost)}.`
                      : '';
  const runDisabled=Boolean(blockingWarning);
 
  return <>
- {showIntranetLesson&&<div className="fixed inset-0 z-[150] bg-black/70 grid place-items-center p-6" role="dialog" aria-modal="true" aria-labelledby="intranet-unlock-title"><div className="w-full max-w-3xl rounded-3xl border-2 border-indigo-400 bg-slate-950 p-7 shadow-2xl"><div className="text-xs uppercase tracking-[0.2em] text-indigo-300 font-black">A knowledge gap is not always a knowledge shortage</div><h2 id="intranet-unlock-title" className="mt-2 text-3xl font-black text-white">The company knew. {tutorialTarget?.name||'This site'} didn’t.</h2><p className="mt-4 text-base leading-relaxed text-slate-300">{tutorialTarget?.name||'The affected site'} could reach about <b className="text-white">{tutorialTargetScore}</b> in {tutorialDomain?DOMAIN_INFO[tutorialDomain].label:'the required domain'}, while {tutorialSource?.name||'another site'} already held capability around <b className="text-white">{tutorialSourceScore}</b>. The knowledge existed inside the organisation; it was stranded in another place when the decision had to be made.</p><p className="mt-3 text-base leading-relaxed text-slate-300">You now have two different ways to move that knowledge around the company.</p><div className="mt-5 grid gap-4 md:grid-cols-2"><button onClick={()=>openTransfer('knowledge-transfer')} className="rounded-2xl border-2 border-emerald-500 bg-emerald-950/60 p-5 text-left hover:border-emerald-300"><div className="flex items-center gap-3"><ArrowRightLeft className="h-6 w-6 text-emerald-300"/><b className="text-xl text-white">Knowledge Transfer</b></div><p className="mt-2 text-sm leading-relaxed text-slate-300">Move practice directly from the site that knows to the site that needs it. Fast and targeted, but it builds capability locally.</p></button><button onClick={()=>openTransfer('update-intranet')} className="rounded-2xl border-2 border-indigo-500 bg-indigo-950/60 p-5 text-left hover:border-indigo-300"><div className="flex items-center gap-3"><Building2 className="h-6 w-6 text-indigo-300"/><b className="text-xl text-white">Corporate Intranet</b></div><p className="mt-2 text-sm leading-relaxed text-slate-300">Publish knowledge so it can be reached across the organisation. Broader access, but teams still need enough capability to understand and apply it.</p></button></div></div></div>}
+ {showIntranetLesson&&<div className="fixed inset-0 z-[150] bg-black/70 grid place-items-center p-6" role="dialog" aria-modal="true" aria-labelledby="intranet-unlock-title"><div className="w-full max-w-3xl rounded-3xl border-2 border-indigo-400 bg-slate-950 p-7 shadow-2xl"><div className="text-xs uppercase tracking-[0.2em] text-indigo-300 font-black">A knowledge gap is not always a knowledge shortage</div><h2 id="intranet-unlock-title" className="mt-2 text-3xl font-black text-white">The company knew. {tutorialTarget?.name||'This site'} didn’t.</h2><p className="mt-4 text-base leading-relaxed text-slate-300">{tutorialTarget?.name||'The affected site'} could reach about <b className="text-white">{tutorialTargetScore}</b> in {tutorialDomain?DOMAIN_INFO[tutorialDomain].label:'the required domain'}, while {tutorialSource?.name||'another site'} already held capability around <b className="text-white">{tutorialSourceScore}</b>. The knowledge existed inside the organisation; it was stranded in another place when the decision had to be made.</p><p className="mt-3 text-base leading-relaxed text-slate-300">You now have two different ways to move that knowledge around the company.</p><div className="mt-5 grid gap-4 md:grid-cols-2"><button onClick={()=>openTransfer('knowledge-transfer')} className="rounded-2xl border-2 border-emerald-500 bg-emerald-950/60 p-5 text-left hover:border-emerald-300"><div className="flex items-center gap-3"><ArrowRightLeft className="h-6 w-6 text-emerald-300"/><b className="text-xl text-white">Knowledge Transfer</b></div><p className="mt-2 text-sm leading-relaxed text-slate-300">Move practice directly from the site that knows to the site that needs it. Fast and targeted, but it builds capability locally.</p></button><button onClick={()=>openTransfer('update-intranet')} className="rounded-2xl border-2 border-indigo-500 bg-indigo-950/60 p-5 text-left hover:border-indigo-300"><div className="flex items-center gap-3"><Building2 className="h-6 w-6 text-indigo-300"/><b className="text-xl text-white">Corporate Intranet</b></div><p className="mt-2 text-sm leading-relaxed text-slate-300">Choose one site and one domain to publish at that site's available knowledge level. You can do this once per round. Broader access still does not mean every team has the capability to apply it.</p></button></div></div></div>}
  <div className="fixed left-1/2 top-[94px] bottom-[72px] z-[90] w-[calc(100%_-_24px)] max-w-[min(100%,calc((100dvh-var(--tpg-header-height,88px)-24px)*4/3))] -translate-x-1/2 rounded-3xl border border-slate-700 bg-[#080b12]/[0.985] shadow-2xl p-4 overflow-hidden flex flex-col" role="region" aria-label="Investment actions">
    <div className="flex items-center justify-between gap-4 shrink-0"><div><div className="text-xs uppercase tracking-[0.18em] text-indigo-300 font-black">Invest</div><h2 className="text-2xl font-black text-white">Build capability for the next round</h2></div><div className="flex items-center gap-4"><div className="flex items-center gap-2" aria-label={`${company.actionsRemaining} of ${actionTotal} actions left`}><span className="text-xs uppercase text-slate-500 font-black mr-1">Actions</span>{Array.from({length:actionTotal},(_,i)=>{const available=i<company.actionsRemaining;return <div key={i} aria-hidden="true" className={`w-10 h-10 rounded-full border-2 grid place-items-center text-sm font-black ${available?'border-amber-300 bg-amber-400 text-slate-950 shadow-lg shadow-amber-950/40':'border-slate-700 bg-slate-950 text-slate-600'}`}>{i+1}</div>})}</div><button onClick={onNextPhase} className="rounded-xl border border-indigo-500 bg-indigo-950 px-4 py-3 font-black text-indigo-100 flex items-center gap-2">Finish investing <ArrowRight className="w-4 h-4"/></button></div></div>
    <div className="mt-3 flex min-h-0 flex-col gap-3">
@@ -224,7 +231,7 @@ export const ActionsPanelV5:React.FC<Props>=({session,company,onPerformAction,on
               ?<div className="max-w-[320px] rounded-lg border border-violet-700 bg-violet-950/25 px-3 py-2"><div className="text-[10px] font-black uppercase text-slate-500">CoP scope</div><div className="mt-0.5 text-sm font-black text-white">General business · all Newbie domains</div></div>
               :<div className="max-w-[320px]"><label className="block text-[10px] uppercase text-slate-500 font-black">Domain<select value={domain} onChange={e=>setDomain(e.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white normal-case">{relevantDomains.map(d=><option key={d} value={d}>{DOMAIN_INFO[d].label}</option>)}</select></label></div>}
             {needsExpert&&<div className="max-w-[440px]"><label className="block text-[10px] uppercase text-slate-500 font-black">{selectedId==='aar'?'AAR facilitator':'Expert name'}<select value={selectedExpert?.id||''} onChange={e=>setExpertId(e.target.value)} disabled={!expertChoices.length} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white normal-case disabled:opacity-50">{!expertChoices.length&&<option value="">No employed expert available</option>}{expertChoices.map(x=>{const hasDomain=x.domains.some(skill=>skill.domain===domain);return <option key={x.id} value={x.id}>{x.name}{selectedId==='aar'&&!hasDomain?' · facilitator only':''}</option>})}</select></label></div>}
-            {needsTargetSite&&selectedId!=='aar'&&<div className="max-w-[320px]"><label className="block text-[10px] uppercase text-slate-500 font-black">Site<select value={siteId} onChange={e=>setSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white normal-case">{activeSites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label></div>}
+            {(needsTargetSite||needsIntranetSourceSite)&&selectedId!=='aar'&&<div className="max-w-[320px]"><label className="block text-[10px] uppercase text-slate-500 font-black">{needsIntranetSourceSite?'Source site':'Site'}<select value={siteId} onChange={e=>setSiteId(e.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white normal-case">{activeSites.map(s=><option key={s.id} value={s.id}>{s.name}{needsIntranetSourceSite?` · available ${riverSiteKnowledgeScore(s,domain,session.experienceMode)}`:''}</option>)}</select></label>{needsIntranetSourceSite&&<div className="mt-1 text-[10px] font-bold normal-case text-indigo-300">Copies this site's available knowledge for the selected domain. One Intranet update per round.</div>}</div>}
            </div>}
           </div>
           <div className="min-w-[250px] flex-1 rounded-xl border border-slate-700 bg-slate-950/75 p-3"><div className="text-[10px] font-black uppercase tracking-wide text-slate-500">What changes</div><div className={`mt-1 text-sm font-bold leading-snug ${siteTooBusy?'text-rose-300':'text-slate-200'}`}>{whatChanges}</div>{needsExpert&&selectedExpert&&<div className="mt-1 text-xs text-slate-500">{selectedExpert.name} · {expertLocation}{selectedExpert.isSPOF&&<span className="ml-1 font-black text-rose-300">SPOF</span>}</div>}{selectedId==='update-intranet'&&<div className="mt-1 text-xs text-slate-500">Corporate {company.intranet[domain]} · best local {bestLocal} · best expert {bestExpert}</div>}{selectedId==='join-cop'&&<div className="mt-1 text-xs text-slate-500">{session.experienceMode==='newbie'?'General business CoP':`Our expert ${selectedExpertSkill??0}`} · strongest reciprocal peer {peerScore||'—'}</div>}</div>
