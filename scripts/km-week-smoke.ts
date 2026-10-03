@@ -67,7 +67,11 @@ const resolveGuided=()=>{
   assert.equal(company.kmWeek?.phase,'invest');
 };
 
+const openingTurnover=company.turnover;
 resolveGuided();
+assert.equal(company.kmWeek?.challenges[0].travelCost,2,'Expert travel between sites must cost $2k');
+assert.equal(company.kmWeek?.challenges[0].turnoverChange,28,'A +$30k Challenge solved by a travelling expert must net +$28k turnover');
+assert.equal(company.turnover,openingTurnover+28,'Challenge value and travel cost must both flow through company turnover');
 let result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:opsExpert().id,domain:'operations'});
 assert.equal(result.success,true,result.message);
 assert.equal(opsExpert().domains[0].score,5);
