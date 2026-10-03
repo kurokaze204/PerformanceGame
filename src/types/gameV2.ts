@@ -9,6 +9,7 @@ import {
   KnowledgeDomain,
   Participant,
 } from './game.ts';
+import type { KMWeekCompanyState, KMWeekGoalId } from './kmWeek.ts';
 
 export type BusinessStrategy =
   | 'short_term_profit'
@@ -148,6 +149,7 @@ export interface CompanyV2 extends Company {
     sites: Company['sites'];
     experts: ExpertV2[];
   };
+  kmWeek?: KMWeekCompanyState;
 }
 
 export interface RiskSummaryV2 {
@@ -212,6 +214,7 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   soloMode: boolean;
   copMessages: CoPMessageV1[];
   soloCopPeer: SoloCoPPeerV1 | null;
+  kmWeekGoalId?: KMWeekGoalId;
 }
 
 export interface V2BalanceConfig {
