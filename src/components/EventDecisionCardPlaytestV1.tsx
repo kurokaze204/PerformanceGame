@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
-import { PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
+import { PROGRAMMED_ASSEMBLY_TAG, PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { OptimisticEventDecisionCardV1 } from './OptimisticEventDecisionCardV1.tsx';
 import { NewbieTransferUnlockOverlay } from './NewbieTransferUnlockOverlay.tsx';
 import { SharedEventResolutionV1 } from './SharedEventResolutionV1.tsx';
@@ -20,13 +20,6 @@ interface Props {
   readOnly?: boolean;
 }
 
-const ROUND_ONE_DISABLED_LABELS = [
-  'Ask one of our experts to help',
-  'Ask our network for help',
-  'Call in a favour',
-  'Engage external expertise',
-];
-
 const OPENING_PROBLEMS:Record<KnowledgeDomain,{title:string;description:(site:string)=>string}>={
   engineering:{title:'Production Instrument Calibration Fault',description:site=>`A critical production instrument at ${site} has begun returning inconsistent readings. Operations can continue briefly, but the fault must be diagnosed before quality is compromised.`},
   hr:{title:'Unexpected Shift Supervisor Absence',description:site=>`Two experienced shift supervisors at ${site} call in sick just before a major production run. The site must reorganise coverage quickly without disrupting output or safety.`},
@@ -40,34 +33,19 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   const [pendingContinue,setPendingContinue]=useState<any|null>(null);
   const [ackBusy,setAckBusy]=useState(false);
   const decisionRootRef=useRef<HTMLDivElement|null>(null);
-  const isOpeningLesson=session.experienceMode==='newbie'&&session.round===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
+  const isOpeningDiagnostic=session.round===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
+  const isAssemblyLesson=session.round===1&&event.card.tags?.includes(PROGRAMMED_ASSEMBLY_TAG);
+  const isNewbieOpeningLesson=session.experienceMode==='newbie'&&Boolean(isOpeningDiagnostic);
   const lessonKey=`tpg_transfer_unlock_${session.id}_${company.id}`;
-  const simplifyRoundOne=session.experienceMode==='newbie'&&session.round===1;
   const sharedResolution=(event as any).uiResolutionData;
   const displayEvent=useMemo<ActiveEventV2>(()=>{
-    if(!isOpeningLesson)return event;
+    if(!isOpeningDiagnostic)return event;
     const domain=event.card.domains[0]?.domain;
     const problem=domain?OPENING_PROBLEMS[domain]:undefined;
     if(!problem)return event;
     const site=company.sites.find(candidate=>candidate.id===event.targetSiteId)?.name||'the local site';
     return {...event,card:{...event.card,title:problem.title,description:problem.description(site)}};
-  },[company.sites,event,isOpeningLesson]);
-
-  useEffect(()=>{
-    const root=decisionRootRef.current;
-    if(!root)return;
-    const applyRoundOneLocks=()=>{
-      root.querySelectorAll('button').forEach(button=>{
-        const label=button.textContent?.trim()||'';
-        const locked=simplifyRoundOne&&ROUND_ONE_DISABLED_LABELS.some(target=>label.startsWith(target));
-        if(locked){button.disabled=true;button.setAttribute('aria-disabled','true');button.classList.add('opacity-35','grayscale','cursor-not-allowed');button.classList.remove('hover:border-violet-300','hover:bg-violet-950');}
-      });
-    };
-    applyRoundOneLocks();
-    const observer=new MutationObserver(applyRoundOneLocks);
-    observer.observe(root,{childList:true,subtree:true});
-    return()=>observer.disconnect();
-  },[simplifyRoundOne,event.instanceId]);
+  },[company.sites,event,isOpeningDiagnostic]);
 
   const acknowledgeCompanyResolution=async(data:any)=>{
     if(ackBusy||readOnly)return;
@@ -113,7 +91,7 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   };
 
   const interceptContinue=async(data:any)=>{
-    if(isOpeningLesson&&!localStorage.getItem(lessonKey)){setPendingContinue(data);return;}
+    if(isNewbieOpeningLesson&&!localStorage.getItem(lessonKey)){setPendingContinue(data);return;}
     await acknowledgeCompanyResolution(data);
   };
 
@@ -138,5 +116,7 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
     return <SharedEventResolutionV1 session={session} company={company} event={displayEvent} onContinue={()=>acknowledgeCompanyResolution({session})}/>;
   }
 
-  return <div ref={decisionRootRef}>{readOnly&&<div className="mb-2 rounded-xl border border-amber-700 bg-amber-950/35 px-3 py-2 text-center text-xs font-black text-amber-200">READ ONLY · Your CEO controls this company</div>}<OptimisticEventDecisionCardV1 {...props} event={displayEvent} diagnostic={Boolean(isOpeningLesson)} onAcknowledgeResolution={interceptContinue}/></div>;
+  const availableModes=isOpeningDiagnostic?['existing'] as const:isAssemblyLesson?['existing','expert'] as const:undefined;
+  const teachingHint=isAssemblyLesson?'Click each domain. Use Team Capability; add the relevant expert where local knowledge is not enough.':undefined;
+  return <div ref={decisionRootRef}>{readOnly&&<div className="mb-2 rounded-xl border border-amber-700 bg-amber-950/35 px-3 py-2 text-center text-xs font-black text-amber-200">READ ONLY · Your CEO controls this company</div>}<OptimisticEventDecisionCardV1 {...props} event={displayEvent} diagnostic={Boolean(isOpeningDiagnostic)} availableModes={availableModes?[...availableModes]:undefined} teamOnlyExisting={Boolean(isAssemblyLesson)} teachingHint={teachingHint} onAcknowledgeResolution={interceptContinue}/></div>;
 };
