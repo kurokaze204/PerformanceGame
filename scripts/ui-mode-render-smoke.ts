@@ -49,7 +49,8 @@ assert.ok(riskSource.includes('title="Single Point of Failure"'),'Knowledge Risk
 const riskRollSource=readFileSync(new URL('../src/components/RiskRollTrack.tsx',import.meta.url),'utf8');
 assert.ok(riskRollSource.includes("n>=2&&n<=3&&spof"),'SPOF risk track must show two resignation outcomes in addition to retirement');
 const firstLessonSource=readFileSync(new URL('../src/components/NewbieTransferUnlockOverlay.tsx',import.meta.url),'utf8');
-assert.ok(firstLessonSource.includes('Your best source sets the depth; additional independent sources add breadth; consultants can fill specific gaps.'),'first Newbie Event lesson must explain the shared knowledge composition rule');
+assert.ok(firstLessonSource.includes('The problem was access, not absence.'),'opening diagnostic debrief must land the knowledge-location lesson concisely');
+assert.ok(firstLessonSource.includes('Knowledge Transfer')&&firstLessonSource.includes('Corporate Intranet'),'opening diagnostic debrief must point to the two later investment responses without a text wall');
 
 assert.ok(appBoardSource.includes("actionType:'FINISH_INVESTING'"),'Invest completion must use the dedicated per-company FINISH_INVESTING action');
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
