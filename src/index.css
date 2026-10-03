@@ -255,6 +255,37 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
   }
 }
 
+
+/* KM Week knowledge movement: draw the eye to the River before capability moves. */
+.kmw-knowledge-spark {
+  position: fixed;
+  z-index: 500;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(circle at 35% 35%, #fff7ae 0 18%, #fde047 38%, #f59e0b 70%, transparent 72%);
+  box-shadow: 0 0 10px #fde047, 0 0 24px #facc15, 0 0 42px rgb(250 204 21 / .65);
+}
+.kmw-river-motion,
+.kmw-river-motion * {
+  transition-duration: 1.2s;
+  transition-timing-function: cubic-bezier(.2,.72,.2,1);
+  transition-property: cx, cy, x, y, x1, x2, y1, y2, d, transform;
+}
+
+/* KM Week: the facedown Challenge card is a deliberate "start play" affordance,
+   and the revealed action card flips into focus. */
+.kmw-start-card { transform-style: preserve-3d; }
+.kmw-card-reveal {
+  transform-origin: center center;
+  animation: kmw-card-reveal .34s cubic-bezier(.2,.75,.2,1);
+}
+@keyframes kmw-card-reveal {
+  0% { transform: perspective(900px) rotateY(-82deg) scale(.96); opacity: .3; }
+  100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

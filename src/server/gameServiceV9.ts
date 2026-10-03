@@ -8,6 +8,7 @@ import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import { applyProgressionToCurrentEvents, PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
 import { claimCompanyOpenEventV1, clearCompanyOpenEventV1, serialiseCompanyEventOpenV1 } from '../engine/companyEventOpenV1.ts';
+import { applyKMWeekActionV1, ensureKMWeekSessionV1 } from '../engine/kmWeekV1.ts';
 import { resolveSingleEventExplicitV2 } from '../engine/challengeResponseV2.ts';
 import { dealCompanyDisruptionsV1, swapDisruptionWithPeerV1 } from '../engine/disruptionPlusV1.ts';
 import { deleteParticipant, saveParticipant, saveSessionV2 } from './dbV2.ts';
@@ -171,6 +172,7 @@ async function startFinalChallenge(session:GameSessionV2){
 
 async function healSession(session:GameSessionV2){
   let changed=ensureCompanyState(session);
+  if(ensureKMWeekSessionV1(session))changed=true;
   if(repairPendingResolutionPointers(session))changed=true;
   if(session.soloMode&&!session.soloCopPeer){initialiseSoloCoPPeerV5(session);changed=true;}
   const roleChanges=reconcileCompanyControllersV1(session);
@@ -697,6 +699,21 @@ async function normaliseFinalResolution(session:GameSessionV2){
 }
 
 export async function knowledgeActionV2(sessionId:string,companyId:string,payload:any){
+  if(String(payload?.type||'').startsWith('KM_WEEK_')){
+    return serialiseSession(sessionId,async()=>{
+      const session=await baseGetSessionV2(sessionId.toUpperCase());
+      if(!session)return{success:false,message:'Session not found.'};
+      ensureCompanyState(session);
+      ensureKMWeekSessionV1(session);
+      const result:any=applyKMWeekActionV1(session,companyId,payload);
+      if(result.success){
+        syncSessionSummary(session);
+        await saveSessionV2(session);
+        broadcastV2(session,'KM_WEEK_UPDATED',{companyId,actionType:payload?.type});
+      }
+      return{...result,session};
+    });
+  }
   if(payload?.type==='ACK_DISRUPTION_SWAP_NOTICE'){
     return serialiseSession(sessionId,async()=>{
       const session=await baseGetSessionV2(sessionId.toUpperCase());
