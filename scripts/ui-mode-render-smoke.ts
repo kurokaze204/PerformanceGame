@@ -79,6 +79,8 @@ assert.ok(kmWeekBoardSource.includes('kmw-card-reveal'),'Opening a Challenge mus
 assert.ok(kmWeekBoardSource.includes('CEO briefing · Before Challenge')&&kmWeekBoardSource.includes('CEO briefing · Before Invest'),'The first guided round must explain Challenge and Invest before play');
 assert.ok(kmWeekBoardSource.includes("guidedTargetInvestment!=='TRAIN_EXPERT'")&&kmWeekBoardSource.includes("guidedTargetInvestment!=='LOCAL_TRAINING'")&&kmWeekBoardSource.includes("guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'"),'Guided Invest must show all three strategy choices and grey out the two not being taught');
 assert.equal(kmWeekBoardSource.includes('disabled={guided} className="mt-1 w-full rounded-lg'),false,'Guided selectors must remain explorable while the tutorial constrains the intended move');
+assert.ok(kmWeekBoardSource.includes('any valid transfer will work'),'Guided Knowledge Transfer must make clear that the player may choose any valid source, destination and domain');
+assert.ok(kmWeekBoardSource.includes('actionError'),'Rejected KM Week actions must explain the problem inline rather than appearing to do nothing');
 assert.ok(kmWeekBoardSource.includes('animateKnowledgeSpark')&&riverSource.includes('data-river-target'),'KM Week investments must send a visual knowledge spark toward the River');
 assert.ok(globalCssSource.includes('.kmw-knowledge-spark')&&globalCssSource.includes('transition-duration: 1.2s'),'KM Week River changes must use the glowing spark and 1.2 second movement');
 assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1")&&kmWeekBoardSource.includes('const duration=firstGuidedRound?1700:850'),'The first guided River cue must run at half speed');
