@@ -36,6 +36,11 @@ export interface KMWeekInvestmentRecord {
   meaningfulFlow?: boolean;
 }
 
+export interface KMWeekTurnoverPoint {
+  label: string;
+  turnover: number;
+}
+
 export interface KMWeekScore {
   business: number;
   expertise: number;
@@ -68,6 +73,7 @@ export interface KMWeekCompanyState {
   knowledgeTransfers: number;
   meaningfulTransfers: number;
   investmentHistory: KMWeekInvestmentRecord[];
+  turnoverHistory: KMWeekTurnoverPoint[];
   shockChecks: KMWeekShockCheck[];
   shockResolved: boolean;
   score: KMWeekScore;
