@@ -13,6 +13,7 @@ interface Props {
   onAcknowledgeResolution: (data:any)=>Promise<void>|void;
   onRedrawEvent?: (eventId:string)=>Promise<void>|void;
   canHorizonRedraw?: boolean;
+  diagnostic?: boolean;
 }
 
 type AllocationMap = ActiveEventV2['allocations'];
