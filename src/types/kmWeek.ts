@@ -19,6 +19,7 @@ export interface KMWeekChallenge {
   expertId?: string;
   dieRoll?: number;
   turnoverChange?: number;
+  travelCost?: number;
   guided?: boolean;
 }
 
