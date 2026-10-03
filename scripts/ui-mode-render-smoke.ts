@@ -182,7 +182,7 @@ assert.equal(appBoardEventSource.includes('/advance-phase'),false,'player UI mus
 
 // Player-legibility audit: important mechanics must be visible without adding permanent instruction walls.
 const eventDecisionSource=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
-assert.ok(eventPlaytestSource.includes('diagnostic={Boolean(isOpeningLesson)}'),'opening Newbie challenge must be explicitly marked as diagnostic');
+assert.ok(eventPlaytestSource.includes('diagnostic={Boolean(isOpeningDiagnostic)}'),'opening challenge must be explicitly marked as diagnostic in both modes');
 assert.ok(eventDecisionSource.includes("What happens when your company has the knowledge but the local site doesn't? You are about to find out."),'diagnostic challenge must frame the knowledge-access gap in player language');
 assert.ok(eventDecisionSource.includes('D {e.depthKnowledge} · B +{e.breadthBonus}'),'ordinary Event scoring must expose compact depth/breadth values');
 assert.ok(eventDecisionSource.includes('A relevant expert unlocks the full score.'),'Corporate Intranet must reveal when absorptive capacity limits usable knowledge');
@@ -195,5 +195,27 @@ assert.ok(investPanelSource.includes('Horizon Scan scope')&&investPanelSource.in
 const expertModalSource=readFileSync(new URL('../src/components/ExpertModal.tsx',import.meta.url),'utf8');
 assert.ok(expertModalSource.includes('SPOF gap ≥ ${config.spof_gap}'),'SPOF tooltip must use the configured threshold rather than a stale hard-coded value');
 assert.ok(riskSource.includes('Team Capability above 1 can lose one point'),'Newbie Knowledge Risk must explain its visible workforce-risk rule');
+
+// Round 1 teaching controls must be hidden rather than greyed out.
+assert.equal(eventPlaytestSource.includes('ROUND_ONE_DISABLED_LABELS'),false,'retired greyed-out Round 1 strategy buttons must not return');
+assert.ok(eventPlaytestSource.includes("isOpeningDiagnostic?['existing']"),'first teaching challenge must expose only existing knowledge');
+assert.ok(eventPlaytestSource.includes("isAssemblyLesson?['existing','expert']"),'second teaching challenge must expose only existing knowledge and experts');
+assert.ok(eventDecisionSource.includes('visibleModes.map'),'Event strategy rail must render only currently available strategies');
+assert.ok(eventPlaytestSource.includes('teamOnlyExisting={Boolean(isAssemblyLesson)}'),'second teaching challenge must focus existing knowledge on Team Capability');
+assert.ok(eventDecisionSource.includes('2-domain lesson'),'second teaching challenge must have a compact two-domain teaching cue');
+assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInstanceId||event.instanceId)'),'board must display the authoritative Round 1 teaching card even when another card was clicked');
+
+{
+ const s=session('expert'),c=s.companies[0],event=s.activeEvents[c.id][0];
+ const staged=renderToStaticMarkup(React.createElement(EventDecisionCardV4,{session:s,company:c,event,cardNumber:1,availableModes:['existing','expert'],teamOnlyExisting:true,teachingHint:'test hint',onSetAllocation:()=>{},onResolveEvent:async()=>({}),onAcknowledgeResolution:()=>{}}));
+ assert.ok(staged.includes('Use what we already know'),'second lesson must retain existing knowledge');
+ assert.ok(staged.includes('Ask one of our experts to help'),'second lesson must expose experts');
+ assert.equal(staged.includes('Ask our network for help'),false,'unavailable network strategy must be hidden, not greyed out');
+ assert.equal(staged.includes('Call in a favour'),false,'unavailable favour strategy must be hidden, not greyed out');
+ assert.equal(staged.includes('Engage external expertise'),false,'unavailable consultant strategy must be hidden, not greyed out');
+ assert.equal(staged.includes('Accept the risk'),false,'unavailable risk strategy must be hidden, not greyed out');
+ assert.equal(staged.includes('Corporate Intranet'),false,'second teaching challenge existing-knowledge picker must focus on Team Capability');
+ assert.equal(staged.includes('Local Codified'),false,'second teaching challenge must not distract Expert players with codified knowledge');
+}
 
 console.log('Mode-aware UI render smoke tests passed.');
