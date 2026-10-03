@@ -17,6 +17,8 @@ import {
 import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
 import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, STRATEGIC_INVESTMENT_RATE_V1, siteKnowledgePointsV1, siteTurnoverGrowthPercentV1 } from '../src/engine/investmentCapacityV1.ts';
 import { COP_GENERAL_DOMAIN_V5, companyHasCopMembershipV5, reciprocalCopPeersV5 } from '../src/engine/copNetworkV5.ts';
+import { executeRiskPhaseV4 } from '../src/engine/riskPhaseV4.ts';
+import { evaluateFinalDisruptionV1 } from '../src/engine/disruptionPlusV1.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -136,12 +138,52 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   const beforeSite=site.turnover;
   const beforeCompany=company.turnover;
   company.strategicInvestmentFund=25;
+  company.round=2;
   session.round=2;
   prepareNextRoundV2(session);
   assert.ok(site.turnover>beforeSite,'site turnover must grow at the start of a round');
   assert.ok(company.turnover>beforeCompany,'company turnover must reflect knowledge-driven site growth');
+  assert.equal(company.lastKnowledgeGrowth?.round,2,'round-start knowledge growth must be attributed to the visible company round');
+  assert.ok((company.lastKnowledgeGrowth?.total||0)>0,'round-start knowledge dividend must be retained for the UI');
   assert.equal(STRATEGIC_INVESTMENT_RATE_V1,0.03,'round SIF contribution must be 3% of turnover');
   assert.equal(company.strategicInvestmentFund,Math.round((25+company.turnover*STRATEGIC_INVESTMENT_RATE_V1)*10)/10,'SIF budget must be calculated after turnover growth');
+}
+
+// Newbie workforce risk must depend only on knowledge the player can see.
+{
+  const { session,company }=makeSession('newbie');
+  const domains=['engineering','hr','marketing','operations','finance'] as const;
+  for(const site of company.sites)for(const domain of domains){site.teamCapability[domain]=3;site.codifiedKnowledge[domain]=9;}
+  const originalRandom=Math.random;
+  try{
+    Math.random=()=>0;
+    const summary=executeRiskPhaseV4(session,company);
+    assert.ok(summary.siteChecks?.some(check=>check.knowledgeLost),'Newbie site risk must not be silently protected by hidden Local Codified Knowledge');
+  }finally{Math.random=originalRandom;}
+}
+{
+  const { session,company }=makeSession('expert');
+  const domains=['engineering','hr','marketing','operations','finance'] as const;
+  for(const site of company.sites)for(const domain of domains){site.teamCapability[domain]=3;site.codifiedKnowledge[domain]=9;}
+  const originalRandom=Math.random;
+  try{
+    Math.random=()=>0;
+    const summary=executeRiskPhaseV4(session,company);
+    assert.equal(summary.siteChecks?.some(check=>check.knowledgeLost),false,'Expert site risk should retain visible codification protection');
+  }finally{Math.random=originalRandom;}
+}
+
+// Automation must carry through to the Final Disruption, not stop at ordinary Events.
+{
+  const { session,company }=makeSession('newbie');
+  const site=company.sites.find(candidate=>!candidate.isClosed)!;
+  company.disruptionCard={id:'AUTO-FINAL',title:'Automation final test',description:'Test',siteId:site.id,siteName:site.name,domains:[{domain:'engineering',difficulty:9}],impact:100,originalCompanyId:company.id,swapCount:0};
+  company.automatedDomains=[];
+  const before=evaluateFinalDisruptionV1(session,company,{})!;
+  company.automatedDomains=['engineering'];
+  const after=evaluateFinalDisruptionV1(session,company,{})!;
+  assert.equal(after.domainResults[0].automationBonus,session.config.automation_bonus);
+  assert.equal(after.domainResults[0].totalKnowledge-before.domainResults[0].totalKnowledge,session.config.automation_bonus,'Final Disruption must include the same Automation bonus as ordinary challenges');
 }
 
 // SIF can fund a local investment and each site can absorb at most three local KM activities per round.
