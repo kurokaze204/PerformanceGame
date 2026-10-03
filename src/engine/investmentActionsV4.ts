@@ -172,22 +172,30 @@ export function executeInvestmentActionV4(session: GameSessionV2, company: Compa
   }
 
   if (type === 'UPDATE_INTRANET') {
-    if (!domain) return { success: false, message: 'Choose a domain.' };
-    if (!intranetKnowledgeReadyV4(company, domain)) return { success: false, message: 'This knowledge has not yet demonstrated enough recurring or critical value to justify corporate publication. Use it in work, share it, or run an AAR first.' };
-    const remaining = session.config.max_intranet_domain_growth_per_round - company.intranetRoundGrowth[domain];
-    if (remaining <= 0) return { success: false, message: 'This Intranet domain has reached its growth limit for the round.' };
-    const expertSkills = company.experts.flatMap((e) => !e.isVacant ? e.domains.filter((x) => x.domain === domain).map((x) => ({ score: x.score, atHQ: e.location === 'HQ' })) : []);
-    const highestSite = Math.max(...company.sites.filter((s) => !s.isClosed).map((s) => Math.max(s.teamCapability[domain], s.codifiedKnowledge[domain])), 0);
-    const highestExpert = Math.max(0, ...expertSkills.map((x) => x.score));
-    const sourceCeiling = Math.max(highestSite, highestExpert, 0);
-    if (company.intranet[domain] >= sourceCeiling) return { success: false, message: 'No deeper organisational knowledge is currently available to publish.' };
-    const bestSourceIsHQExpert = expertSkills.some((x) => x.atHQ && x.score === sourceCeiling);
-    const increment = bestSourceIsHQExpert ? session.config.hq_expert_intranet_increment : session.config.normal_intranet_increment;
-    const growth = Math.min(increment, remaining, sourceCeiling - company.intranet[domain]);
+    if (!siteId || !domain) return { success: false, message: 'Choose a source site and domain.' };
+    if (Object.values(company.intranetRoundGrowth).some((value) => Number(value) > 0)) {
+      return { success: false, message: 'The Corporate Intranet has already been updated this round. It can be updated again next round.' };
+    }
+    const sourceSite = findSite();
+    if (!sourceSite) return { success: false, message: 'Source site not found.' };
+    const sourceScore = session.experienceMode === 'newbie'
+      ? sourceSite.teamCapability[domain]
+      : Math.max(sourceSite.teamCapability[domain], sourceSite.codifiedKnowledge[domain]);
+    const before = company.intranet[domain];
+    if (sourceScore <= before) {
+      return { success: false, message: `${sourceSite.name} has ${domain} knowledge ${sourceScore}; the Corporate Intranet is already at ${before}. Choose a stronger site or another domain.` };
+    }
     const fundingFailure = fundingError(baseCost); if (fundingFailure) return fundingFailure;
-    company.intranet[domain] += growth; company.intranetRoundGrowth[domain] += growth;
+    const growth = sourceScore - before;
+    company.intranet[domain] = sourceScore;
+    company.intranetRoundGrowth[domain] = growth;
     const investmentAttribution = finish(baseCost);
-    return { success: true, message: `${domain} Corporate Intranet increased +${growth} to ${company.intranet[domain]}. Cost $${baseCost}k.${fundingSuffix}`, costTurnover: baseCost, investmentAttribution };
+    return {
+      success: true,
+      message: `Published ${sourceSite.name}'s ${domain} knowledge to the Corporate Intranet. ${domain} ${before} → ${sourceScore}. Cost ${baseCost}k.${fundingSuffix}`,
+      costTurnover: baseCost,
+      investmentAttribution,
+    };
   }
 
   if (type === 'LESSONS_LEARNED') {

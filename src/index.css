@@ -26,6 +26,39 @@
 }
 
 :root { --tpg-header-height: 88px; }
+
+/* The board is height-limited on ordinary laptop screens. Scale fixed board
+   ornaments relative to the board container so 100% browser zoom never makes
+   cards and city labels look oversized or collide. */
+.tpg-board-shell { container-type: inline-size; }
+
+@container (max-width: 1150px) {
+  .tpg-event-deck {
+    scale: .78;
+    transform-origin: top left;
+  }
+  .tpg-site-label {
+    scale: .82;
+    transform-origin: top center;
+  }
+  .tpg-hq-marker,
+  .tpg-expert-marker {
+    scale: .85;
+    transform-origin: center;
+  }
+  .tpg-disruption-mini-board {
+    scale: .82;
+    transform-origin: bottom left;
+  }
+}
+
+@container (max-width: 900px) {
+  .tpg-event-deck { scale: .68; }
+  .tpg-site-label { scale: .72; }
+  .tpg-hq-marker,
+  .tpg-expert-marker { scale: .76; }
+  .tpg-disruption-mini-board { scale: .72; }
+}
 button, [role="button"] { transition-property: transform,filter,background-color,border-color,color,opacity; transition-duration: 120ms; }
 .tpg-click-ack { transform: scale(.965) !important; filter: brightness(1.22) !important; }
 html.tpg-network-busy,

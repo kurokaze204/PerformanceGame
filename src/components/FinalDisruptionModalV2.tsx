@@ -6,11 +6,11 @@ import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import{evaluateFinalDisruptionV1,finalDisruptionChanceV1,type FinalDisruptionSelectionsV1}from'../engine/disruptionPlusV1.ts';
 import{formatCurrency}from'../utils/format.ts';
 
-interface Props{session:GameSessionV2;company:CompanyV2;onResolveFinalDisruption:()=>Promise<void>|void;onOpenAAR:()=>void;}
+interface Props{session:GameSessionV2;company:CompanyV2;participantId?:string;readOnly?:boolean;onResolveFinalDisruption:()=>Promise<void>|void;onOpenAAR:()=>void;}
 
 const ScoreChip:React.FC<{label:string;value:number;muted?:boolean}>=({label,value,muted})=><div className={'rounded-lg border px-2 py-1.5 text-center '+(muted?'border-slate-800 bg-slate-950/50 text-slate-600':'border-slate-700 bg-slate-950 text-slate-200')}><div className="text-[8px] uppercase font-black tracking-wide">{label}</div><div className="text-lg font-black">{value}</div></div>;
 
-export const FinalDisruptionModalV2:React.FC<Props>=({session,company,onOpenAAR})=>{
+export const FinalDisruptionModalV2:React.FC<Props>=({session,company,participantId,readOnly=false,onOpenAAR})=>{
  const card=company.disruptionCard;
  const stored=((session as any).finalDisruptionResults||[]) as any[];
  const companyResult=stored.find(result=>result.companyId===company.id);
@@ -26,10 +26,10 @@ export const FinalDisruptionModalV2:React.FC<Props>=({session,company,onOpenAAR}
  const expertsFor=(domain:KnowledgeDomain)=>company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>skill.domain===domain));
  const chooseExpert=(domain:KnowledgeDomain,expertId:string)=>setSelections(current=>({...current,[domain]:{expertId:expertId||undefined}}));
  const resolve=async()=>{
-  if(busy||resolved)return;
+  if(busy||resolved||readOnly)return;
   setBusy(true);setMessage('');
   try{
-   const response=await fetch('/api/sessions/'+session.id+'/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,actionType:'FINAL_DISRUPTION_RESOLVE',params:{selections,useConsultant}})});
+   const response=await fetch('/api/sessions/'+session.id+'/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,participantId,actionType:'FINAL_DISRUPTION_RESOLVE',params:{selections,useConsultant}})});
    const data=await response.json();
    if(!response.ok||data.success===false){setMessage(data.message||data.error||'Could not resolve the Disruption.');setBusy(false);return}
    setMessage('Disruption resolved.');setBusy(false);
@@ -41,6 +41,7 @@ export const FinalDisruptionModalV2:React.FC<Props>=({session,company,onOpenAAR}
     <div><div className="text-[10px] uppercase tracking-[.18em] text-amber-300 font-black">Final round</div><h2 className="text-2xl font-black text-white">Disruption</h2></div>
     <div className="text-right"><div className="text-[9px] uppercase text-slate-500 font-black">Current turnover</div><div className="text-xl font-black text-emerald-300">{formatCurrency(company.turnover)}</div></div>
    </div>
+   {readOnly&&<div className="mt-3 rounded-xl border border-amber-700 bg-amber-950/35 px-3 py-2 text-center text-xs font-black text-amber-200">READ ONLY · Your CEO controls the Final Challenge</div>}
    {!resolved?<div className="mt-4 grid lg:grid-cols-[280px_minmax(0,1fr)] gap-4">
     <section className="rounded-[20px] border-[5px] border-amber-300 bg-[#171109] p-5 shadow-xl">
      <div className="text-[11px] font-black tracking-[.18em] text-amber-200">DISRUPTION</div>
@@ -56,15 +57,15 @@ export const FinalDisruptionModalV2:React.FC<Props>=({session,company,onOpenAAR}
       const enough=result.totalKnowledge>=result.difficulty;
       return <div key={result.domain} className="rounded-2xl border-2 bg-[#0b0d12] p-4" style={{borderColor:DOMAIN_INFO[result.domain].color,boxShadow:`inset 0 0 0 1px ${DOMAIN_INFO[result.domain].color}22`}}>
        <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:DOMAIN_INFO[result.domain].color}}/><b className="text-base text-white">{DOMAIN_INFO[result.domain].label}</b></div><div className={'text-3xl font-black '+(enough?'text-emerald-300':'text-white')}>{result.totalKnowledge}<span className="text-slate-600">/</span>{result.difficulty}</div></div>
-       <div className="mt-3 grid grid-cols-4 gap-1.5"><ScoreChip label="Site" value={result.local}/><ScoreChip label="Corporate" value={result.corporate}/><ScoreChip label="Expert" value={result.expertScore}/><ScoreChip label="CoP breadth" value={result.copScore} muted={!result.copScore}/></div><div className="mt-2 text-[10px] text-slate-400">Depth {result.depthKnowledge} + breadth {result.breadthBonus}{result.copScore?` + CoP ${result.copScore}`:''} = {result.totalKnowledge}</div>
-       <label className="mt-3 block text-[9px] uppercase tracking-wide text-slate-500 font-black">Expert translator<select value={selected} onChange={event=>chooseExpert(result.domain,event.target.value)} disabled={!experts.length} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm normal-case text-white disabled:opacity-50">{!experts.length&&<option value="">No relevant expert available</option>}{experts.map(expert=>{const score=expert.domains.find(skill=>skill.domain===result.domain)?.score||0;return <option key={expert.id} value={expert.id}>{expert.name} · knowledge {score}</option>})}</select></label>
+       <div className="mt-3 grid grid-cols-5 gap-1.5"><ScoreChip label="Site" value={result.local}/><ScoreChip label="Corporate" value={result.corporate}/><ScoreChip label="Expert" value={result.expertScore}/><ScoreChip label="CoP" value={result.copScore} muted={!result.copScore}/><ScoreChip label="Auto" value={result.automationBonus||0} muted={!result.automationBonus}/></div><div className="mt-2 text-[10px] text-slate-400">Depth {result.depthKnowledge} + breadth {result.breadthBonus}{result.copScore?` + CoP ${result.copScore}`:''}{result.automationBonus?` + Auto ${result.automationBonus}`:''} = {result.totalKnowledge}</div>
+       <label className="mt-3 block text-[9px] uppercase tracking-wide text-slate-500 font-black">Expert translator<select value={selected} onChange={event=>chooseExpert(result.domain,event.target.value)} disabled={readOnly||!experts.length} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm normal-case text-white disabled:opacity-50">{!experts.length&&<option value="">No relevant expert available</option>}{experts.map(expert=>{const score=expert.domains.find(skill=>skill.domain===result.domain)?.score||0;return <option key={expert.id} value={expert.id}>{expert.name} · knowledge {score}</option>})}</select></label>
        {result.copScore>0&&<div className="mt-2 text-[10px] text-emerald-300">CoP access: +{result.copScore}{result.copSourceCompanyName?' from '+result.copSourceCompanyName:''}</div>}
       </div>})}</div>
-     <button type="button" aria-pressed={useConsultant} onClick={()=>setUseConsultant(value=>!value)} disabled={knowledgeComplete} className={'w-full rounded-2xl border-2 p-4 text-left disabled:opacity-40 '+(useConsultant?'border-amber-300 bg-amber-950/35':'border-amber-800 bg-[#171109]')}>
+     <button type="button" aria-pressed={useConsultant} onClick={()=>setUseConsultant(value=>!value)} disabled={readOnly||knowledgeComplete} className={'w-full rounded-2xl border-2 p-4 text-left disabled:opacity-40 '+(useConsultant?'border-amber-300 bg-amber-950/35':'border-amber-800 bg-[#171109]')}>
       <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><span aria-hidden="true" className={'grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 '+(useConsultant?'border-amber-200 bg-amber-300 text-slate-950':'border-slate-500 bg-slate-950')}>{useConsultant&&<Check className="h-4 w-4" strokeWidth={4}/>}</span><BriefcaseBusiness className="h-6 w-6 text-amber-300"/><div><div className="text-sm font-black text-white">Emergency Consultant</div><div className="text-[11px] text-slate-400">{knowledgeComplete?'No knowledge gap to fill.':'Fills every remaining knowledge gap.'}</div></div></div><div className="text-right"><div className="text-2xl font-black text-amber-200">{formatCurrency(evaluation.consultantCost)}</div><div className="text-[10px] text-slate-400">{evaluation.consultantPercent.toFixed(0)}% of company turnover</div></div></div>
      </button>
      {!knowledgeComplete&&<div className={'rounded-xl border px-4 py-2 text-center text-sm font-black '+(useConsultant?'border-emerald-700 bg-emerald-950/25 text-emerald-300':'border-violet-800 bg-violet-950/25 text-violet-200')}>{useConsultant?'Consultant fills the gap · 100% chance to resolve':`Chance without external help: ${chanceWithoutConsultant}%`}</div>}
-     <button onClick={resolve} disabled={busy} className="tpg-action tpg-action-primary w-full !h-14 !text-base disabled:opacity-50">{busy?'RESOLVING…':useConsultant||knowledgeComplete?'RESOLVE DISRUPTION':'TRY YOUR LUCK WITHOUT EXTERNAL HELP'}</button>
+     <button onClick={resolve} disabled={busy||readOnly} className="tpg-action tpg-action-primary w-full !h-14 !text-base disabled:opacity-50">{busy?'RESOLVING…':useConsultant||knowledgeComplete?'RESOLVE DISRUPTION':'TRY YOUR LUCK WITHOUT EXTERNAL HELP'}</button>
      {message&&<div className="text-center text-xs font-bold text-amber-200">{message}</div>}
     </section>
    </div>:<div className="mt-8 mx-auto max-w-2xl">

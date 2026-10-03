@@ -13,6 +13,10 @@ interface Props {
   onAcknowledgeResolution: (data:any)=>Promise<void>|void;
   onRedrawEvent?: (eventId:string)=>Promise<void>|void;
   canHorizonRedraw?: boolean;
+  diagnostic?: boolean;
+  availableModes?: ('existing'|'expert'|'network'|'reputation'|'consultant'|'risk')[];
+  teamOnlyExisting?: boolean;
+  teachingHint?: string;
 }
 
 type AllocationMap = ActiveEventV2['allocations'];

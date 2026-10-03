@@ -15,9 +15,12 @@ import {
   resolveSingleEventExplicitV2,
 } from '../src/engine/challengeResponseV2.ts';
 import { executeInvestmentActionV4, expertTravelCostV4, INVESTMENT_COSTS_V4 } from '../src/engine/investmentActionsV4.ts';
-import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, siteKnowledgePointsV1, siteTurnoverGrowthPercentV1 } from '../src/engine/investmentCapacityV1.ts';
+import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, STRATEGIC_INVESTMENT_RATE_V1, siteKnowledgePointsV1, siteTurnoverGrowthPercentV1 } from '../src/engine/investmentCapacityV1.ts';
 import { COP_GENERAL_DOMAIN_V5, companyHasCopMembershipV5, reciprocalCopPeersV5 } from '../src/engine/copNetworkV5.ts';
-import { autoplayEligibleEmptyCompaniesV1, companyAutopilotActiveV1 } from '../src/engine/emptyCompanyAutopilotV1.ts';
+import { executeRiskPhaseV4 } from '../src/engine/riskPhaseV4.ts';
+import { evaluateFinalDisruptionV1 } from '../src/engine/disruptionPlusV1.ts';
+import { PROGRAMMED_ASSEMBLY_TAG, PROGRAMMED_FAILURE_TAG, applyProgressionToCurrentEvents } from '../src/engine/eventProgressionV5.ts';
+import { claimCompanyOpenEventV1 } from '../src/engine/companyEventOpenV1.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -39,6 +42,35 @@ function makeSession(mode:'newbie'|'expert'='newbie') {
   } as GameSession);
   session.experienceMode=mode;
   return { session, company };
+}
+
+// Round 1 is a fixed two-step teaching sequence in both Newbie and Expert.
+for(const mode of ['newbie','expert'] as const){
+  const {session,company}=makeSession(mode);
+  session.round=1;company.round=1;
+  const events=drawRoundEventsV2(session,company,{count:mode==='expert'?3:2});
+  session.activeEvents[company.id]=events;
+  applyProgressionToCurrentEvents(session,company);
+
+  assert.ok(events[0].card.tags.includes(PROGRAMMED_FAILURE_TAG),`${mode} Round 1 card 1 must be the knowledge-location diagnostic`);
+  assert.ok(events[1].card.tags.includes(PROGRAMMED_ASSEMBLY_TAG),`${mode} Round 1 card 2 must be the knowledge-assembly lesson`);
+  assert.equal(events[1].card.type,'opportunity');
+  assert.equal(events[1].card.domains.length,2,'assembly lesson must require two knowledge domains');
+
+  const localDomain=events[1].card.tags.find(tag=>tag.startsWith('tutorial-local-domain:'))!.split(':')[1] as any;
+  const expertDomain=events[1].card.tags.find(tag=>tag.startsWith('tutorial-expert-domain:'))!.split(':')[1] as any;
+  const expertId=events[1].card.tags.find(tag=>tag.startsWith('tutorial-expert:'))!.split(':')[1];
+  events[1].allocations[localDomain]={useTeamCapability:true};
+  events[1].allocations[expertDomain]={useTeamCapability:true,expertId};
+  assert.equal(evaluateEventDomainKnowledgeExplicitV2(session,company,events[1],localDomain).winChancePercent,100,'local domain should become certain when the team is selected');
+  assert.equal(evaluateEventDomainKnowledgeExplicitV2(session,company,events[1],expertDomain).winChancePercent,100,'expert domain should become certain when local knowledge and the relevant expert are combined');
+
+  const secondClick=claimCompanyOpenEventV1(session,company.id,events[1].instanceId);
+  assert.equal(secondClick.winnerEventInstanceId,events[0].instanceId,'clicking another Round 1 card must still open teaching card 1 first');
+  events[0].isResolved=true;
+  delete (company as any).uiOpenEventInstanceId;
+  const laterClick=claimCompanyOpenEventV1(session,company.id,(events[2]||events[1]).instanceId);
+  assert.equal(laterClick.winnerEventInstanceId,events[1].instanceId,'teaching card 2 must open before any later Expert card');
 }
 
 
@@ -80,6 +112,41 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   }
 }
 
+// Corporate Intranet publishing copies one chosen site's available knowledge and can only be used once per round.
+{
+  const { session, company }=makeSession('newbie');
+  session.phase='investment';
+  company.actionsRemaining=5;
+  const source=company.sites.find(site=>!site.isClosed)!;
+  const second=company.sites.find(site=>!site.isClosed&&site.id!==source.id)!;
+  source.teamCapability.operations=4;
+  source.codifiedKnowledge.operations=5;
+  company.intranet.operations=1;
+  second.teamCapability.hr=4;
+  company.intranet.hr=0;
+
+  const first=executeInvestmentActionV4(session,company,{type:'UPDATE_INTRANET',companyId:company.id,siteId:source.id,domain:'operations'});
+  assert.equal(first.success,true,'Newbie Intranet update must not require hidden publication evidence');
+  assert.equal(company.intranet.operations,4,'Newbie Intranet must copy visible Team Capability, not hidden local codified knowledge');
+  assert.equal(company.intranetRoundGrowth.operations,3,'Intranet round growth must record the copied increase');
+
+  const secondUpdate=executeInvestmentActionV4(session,company,{type:'UPDATE_INTRANET',companyId:company.id,siteId:second.id,domain:'hr'});
+  assert.equal(secondUpdate.success,false,'Corporate Intranet can only be updated once per round');
+  assert.match(String(secondUpdate.message),/already been updated this round/i);
+}
+{
+  const { session, company }=makeSession('expert');
+  session.phase='investment';
+  company.actionsRemaining=5;
+  const source=company.sites.find(site=>!site.isClosed)!;
+  source.teamCapability.operations=2;
+  source.codifiedKnowledge.operations=4;
+  company.intranet.operations=1;
+  const result=executeInvestmentActionV4(session,company,{type:'UPDATE_INTRANET',companyId:company.id,siteId:source.id,domain:'operations'});
+  assert.equal(result.success,true);
+  assert.equal(company.intranet.operations,4,'Expert Intranet publishing must use the richer local Team/Codified site score');
+}
+
 // SIF starts at a fixed $25k without reducing turnover.
 {
   const { company }=makeSession();
@@ -89,7 +156,7 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   assert.equal(company.turnover,before,'creating the SIF must not transfer money out of site turnover');
 }
 
-// Round-start site growth is driven by local knowledge plus experts, then the 5% SIF budget is added from the new turnover.
+// Round-start site growth is driven by local knowledge plus experts, then the 3% SIF budget is added from the new turnover.
 {
   const { session,company }=makeSession('expert');
   const site=company.sites[0];
@@ -102,11 +169,52 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   const beforeSite=site.turnover;
   const beforeCompany=company.turnover;
   company.strategicInvestmentFund=25;
+  company.round=2;
   session.round=2;
   prepareNextRoundV2(session);
   assert.ok(site.turnover>beforeSite,'site turnover must grow at the start of a round');
   assert.ok(company.turnover>beforeCompany,'company turnover must reflect knowledge-driven site growth');
-  assert.equal(company.strategicInvestmentFund,Math.round((25+company.turnover*0.05)*10)/10,'SIF budget must be calculated after turnover growth');
+  assert.equal(company.lastKnowledgeGrowth?.round,2,'round-start knowledge growth must be attributed to the visible company round');
+  assert.ok((company.lastKnowledgeGrowth?.total||0)>0,'round-start knowledge dividend must be retained for the UI');
+  assert.equal(STRATEGIC_INVESTMENT_RATE_V1,0.03,'round SIF contribution must be 3% of turnover');
+  assert.equal(company.strategicInvestmentFund,Math.round((25+company.turnover*STRATEGIC_INVESTMENT_RATE_V1)*10)/10,'SIF budget must be calculated after turnover growth');
+}
+
+// Newbie workforce risk must depend only on knowledge the player can see.
+{
+  const { session,company }=makeSession('newbie');
+  const domains=['engineering','hr','marketing','operations','finance'] as const;
+  for(const site of company.sites)for(const domain of domains){site.teamCapability[domain]=3;site.codifiedKnowledge[domain]=9;}
+  const originalRandom=Math.random;
+  try{
+    Math.random=()=>0;
+    const summary=executeRiskPhaseV4(session,company);
+    assert.ok(summary.siteChecks?.some(check=>check.knowledgeLost),'Newbie site risk must not be silently protected by hidden Local Codified Knowledge');
+  }finally{Math.random=originalRandom;}
+}
+{
+  const { session,company }=makeSession('expert');
+  const domains=['engineering','hr','marketing','operations','finance'] as const;
+  for(const site of company.sites)for(const domain of domains){site.teamCapability[domain]=3;site.codifiedKnowledge[domain]=9;}
+  const originalRandom=Math.random;
+  try{
+    Math.random=()=>0;
+    const summary=executeRiskPhaseV4(session,company);
+    assert.equal(summary.siteChecks?.some(check=>check.knowledgeLost),false,'Expert site risk should retain visible codification protection');
+  }finally{Math.random=originalRandom;}
+}
+
+// Automation must carry through to the Final Disruption, not stop at ordinary Events.
+{
+  const { session,company }=makeSession('newbie');
+  const site=company.sites.find(candidate=>!candidate.isClosed)!;
+  company.disruptionCard={id:'AUTO-FINAL',title:'Automation final test',description:'Test',siteId:site.id,siteName:site.name,domains:[{domain:'engineering',difficulty:9}],impact:100,originalCompanyId:company.id,swapCount:0};
+  company.automatedDomains=[];
+  const before=evaluateFinalDisruptionV1(session,company,{})!;
+  company.automatedDomains=['engineering'];
+  const after=evaluateFinalDisruptionV1(session,company,{})!;
+  assert.equal(after.domainResults[0].automationBonus,session.config.automation_bonus);
+  assert.equal(after.domainResults[0].totalKnowledge-before.domainResults[0].totalKnowledge,session.config.automation_bonus,'Final Disruption must include the same Automation bonus as ordinary challenges');
 }
 
 // SIF can fund a local investment and each site can absorb at most three local KM activities per round.
@@ -400,88 +508,8 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   }
 }
 
-// Empty multiplayer companies enter simple autopilot after Round 1 and stop blocking the room.
-{
-  const staffed=createInitialCompanyV2('Staffed Co','staffed-co',DEFAULT_CONFIG);
-  const empty=createInitialCompanyV2('Empty Co','empty-co',DEFAULT_CONFIG);
-  const domain='engineering' as const;
-  const event:ActiveEvent={
-    instanceId:'AUTO-EVENT',
-    card:{id:'AUTO-EVENT',type:'problem',scope:'local',title:'Autopilot challenge',description:'Smoke test',domains:[{domain,difficulty:5}],impact:10,tags:['test']},
-    targetSiteId:empty.sites[0].id,
-    allocations:{[domain]:{}} as any,
-    isResolved:false,
-  };
-  const session=asSessionV2({
-    id:'AUTO',
-    title:'Autopilot Smoke',
-    round:2,
-    phase:'respond',
-    isPaused:false,
-    isFinalDisruptionActive:false,
-    companies:[staffed,empty],
-    activeEvents:{[staffed.id]:[],[empty.id]:[event]},
-    copMemberships:[],
-    copMessages:[{
-      id:'cop-request-auto',
-      fromCompanyId:staffed.id,
-      toCompanyId:empty.id,
-      message:'Will you join our general business CoP?',
-      round:2,
-      createdAt:new Date().toISOString(),
-      kind:'request',
-    }],
-    participants:[{id:'p1',sessionId:'AUTO',name:'Player',companyId:staffed.id,role:'participant',lastSeen:new Date().toISOString()}],
-    config:{...DEFAULT_CONFIG},
-    createdAt:new Date().toISOString(),
-    updatedAt:new Date().toISOString(),
-  } as any);
-  (staffed as any).roundPhase='events';
-  (empty as any).roundPhase='events';
-  assert.equal(companyAutopilotActiveV1(session,staffed.id),false,'a staffed company must never be autopiloted');
-  assert.equal(companyAutopilotActiveV1(session,empty.id),true,'a zero-player company must be autopiloted from Round 2');
-  const results=autoplayEligibleEmptyCompaniesV1(session);
-  assert.equal(results.length,1);
-  assert.equal(results[0].companyId,empty.id);
-  assert.equal((empty as any).roundPhase,'waiting','autopilot company must finish its round');
-  assert.ok((session.activeEvents[empty.id]||[]).every(candidate=>candidate.isResolved),'autopilot must resolve remaining Events');
-  assert.equal((staffed as any).roundPhase,'events','autopilot must not advance the staffed company');
-  const copReply=(session.copMessages||[]).find(message=>message.replyToId==='cop-request-auto');
-  assert.equal(copReply?.response,'accepted','autopilot must accept an unanswered CoP request at its first opportunity');
-  assert.ok(session.copMemberships.some(membership=>membership.companyId===empty.id&&membership.activeRound>=session.round),'autopilot must register the accepted CoP membership before routine investments');
-}
-
-// Company 1 is a permanent human anchor, even if a stale/manual setting tries to enable autopilot.
-{
-  const anchorCompany=createInitialCompanyV2('Anchor Co','anchor-co',DEFAULT_CONFIG);
-  const secondCompany=createInitialCompanyV2('Second Co','second-co',DEFAULT_CONFIG);
-  const session=asSessionV2({
-    id:'AUTO-ANCHOR',title:'Autopilot Anchor Smoke',round:3,phase:'respond',isPaused:false,isFinalDisruptionActive:false,
-    companies:[anchorCompany,secondCompany],activeEvents:{[anchorCompany.id]:[],[secondCompany.id]:[]},copMemberships:[],participants:[],
-    config:{...DEFAULT_CONFIG},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
-  } as any);
-  anchorCompany.autopilotEnabled=true;
-  assert.equal(companyAutopilotActiveV1(session,anchorCompany.id),false,'Company 1 must never enter autopilot');
-  secondCompany.autopilotEnabled=false;
-  assert.equal(companyAutopilotActiveV1(session,secondCompany.id),false,'facilitator must be able to switch autopilot off');
-  secondCompany.autopilotEnabled=true;
-  assert.equal(companyAutopilotActiveV1(session,secondCompany.id),true,'an empty non-anchor company may be autopiloted when enabled');
-}
-
-// During Round 1, empty companies wait until a staffed company has actually finished.
-{
-  const staffed=createInitialCompanyV2('Round One Staffed','round1-staffed',DEFAULT_CONFIG);
-  const empty=createInitialCompanyV2('Round One Empty','round1-empty',DEFAULT_CONFIG);
-  const session=asSessionV2({
-    id:'AUTO-R1',title:'Round 1 Autopilot Smoke',round:1,phase:'respond',isPaused:false,isFinalDisruptionActive:false,
-    companies:[staffed,empty],activeEvents:{[staffed.id]:[],[empty.id]:[]},copMemberships:[],
-    participants:[{id:'p2',sessionId:'AUTO-R1',name:'Player',companyId:staffed.id,role:'participant',lastSeen:new Date().toISOString()}],
-    config:{...DEFAULT_CONFIG},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
-  } as any);
-  (staffed as any).roundPhase='events';(empty as any).roundPhase='events';
-  assert.equal(companyAutopilotActiveV1(session,empty.id),false,'empty companies must not auto-start before staffed teams complete Round 1');
-  (staffed as any).roundPhase='waiting';
-  assert.equal(companyAutopilotActiveV1(session,empty.id),true,'finishing a staffed company in Round 1 must activate empty-company autopilot');
-}
+// Empty companies intentionally have no automation in the CEO model. They neither
+// advance themselves nor block staffed companies, so there is no autopilot engine
+// to test or maintain.
 
 console.log('Core V2 smoke tests passed.');

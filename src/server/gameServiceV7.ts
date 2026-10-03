@@ -71,7 +71,7 @@ async function addExpansionCompany(session:GameSessionV2){
   const index=session.companies.length;
   const name=COMPANY_NAMES[index]||`Company ${index+1}`;
   const company=createInitialCompanyV2(name,`comp-${index+1}-${session.id.toLowerCase()}`,session.config);
-  company.autopilotEnabled=true;
+
   diversifyInitialKnowledge(company);
   recalculateCompanySPOFV2(company,session.config);
   session.companies.push(company);
@@ -88,7 +88,7 @@ export async function joinSessionV2(sessionId:string,name:string,companyId?:stri
   if(!session)throw new Error('Session not found.');
   if(role!=='participant'||companyId||session.populationMode!=='expand')return baseJoinSessionV2(sessionId,name,companyId,role);
   const counts=new Map(session.companies.map(c=>[c.id,0]));
-  for(const p of session.participants.filter(p=>p.role==='participant'))counts.set(p.companyId,(counts.get(p.companyId)||0)+1);
+  for(const p of session.participants.filter(p=>p.role!=='facilitator'))counts.set(p.companyId,(counts.get(p.companyId)||0)+1);
   let target=session.companies.find(c=>(counts.get(c.id)||0)<session.maxPlayersPerCompany);
   if(!target){
     if(session.companies.length>=MAX_COMPANIES)throw new Error(`This game already has the maximum of ${MAX_COMPANIES} companies.`);

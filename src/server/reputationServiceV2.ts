@@ -30,9 +30,9 @@ function applyCompanyDelta(company: any, delta: number): void {
 export async function resolveWithReputationV2(sessionId: string, companyId: string, eventInstanceId: string) {
   const session = await getSessionV2(sessionId.toUpperCase());
   if (!session) return { success: false, message: 'Session not found.' };
-  if (session.phase !== 'respond') return { success: false, message: 'Reputation can only be used while responding to an event.', session };
   const company = session.companies.find((c) => c.id === companyId);
   if (!company) return { success: false, message: 'Company not found.', session };
+  if (company.roundPhase !== 'events') return { success: false, message: 'Reputation can only be used while responding to an event.', session };
   if (company.reputationPoints <= 0) return { success: false, message: 'No reputation points remain.', session };
   const event = (session.activeEvents[company.id] || []).find((e) => e.instanceId === eventInstanceId);
   if (!event) return { success: false, message: 'Event not found.', session };
@@ -48,6 +48,6 @@ export async function resolveWithReputationV2(sessionId: string, companyId: stri
   await saveSessionV2(session);
   const result = { success:true,turnoverChange,interventionCost:0,consultantDetails:[],domainResults:event.domainResults,reputationUsed:true,reputationRemaining:company.reputationPoints,flavourText };
   await captureResolvedEvent(session, company, event, 100, result);
-  await logGameEvent({sessionId:session.id,companyId:company.id,eventType:'REPUTATION_USED',round:session.round,phase:session.phase,title:'Called in a favour',description:flavourText,payload:{eventInstanceId,cardId:event.card.id,reputationRemaining:company.reputationPoints,flavourText}});
+  await logGameEvent({sessionId:session.id,companyId:company.id,eventType:'REPUTATION_USED',round:company.round,phase:'respond',title:'Called in a favour',description:flavourText,payload:{eventInstanceId,cardId:event.card.id,reputationRemaining:company.reputationPoints,flavourText}});
   return { success: true, session, result, flavourText };
 }

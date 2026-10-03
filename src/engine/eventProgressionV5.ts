@@ -3,6 +3,7 @@ import type { DomainScoreMap, EventCard, EventType, KnowledgeDomain, SimulationC
 
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
 export const PROGRAMMED_FAILURE_TAG = 'tutorial-programmed-failure';
+export const PROGRAMMED_ASSEMBLY_TAG = 'tutorial-knowledge-assembly';
 
 const EARLY_CARDS: EventCard[] = [
   { id:'LEARN-P-OPS', type:'problem', scope:'local', title:'Late Dispatch at a Local Site', description:'A routine scheduling mistake has delayed several customer deliveries. The financial exposure is small, making this a safe chance to learn how local knowledge affects a response.', domains:[{domain:'operations',difficulty:2}], impact:18, tags:['learning','routine','operations'] },
@@ -93,6 +94,66 @@ export function buildProgrammedOpeningFailure(company:CompanyV2,mode:ExperienceM
   return {card,targetSiteId:gap.targetSite.id,gap};
 }
 
+
+export function buildProgrammedAssemblyOpportunity(
+  company:CompanyV2,
+  mode:ExperienceMode='newbie',
+  avoidDomain?:KnowledgeDomain,
+):{card:EventCard;targetSiteId:string;expertId:string;localDomain:KnowledgeDomain;expertDomain:KnowledgeDomain}{
+  const allowed=openingDomains(mode);
+  const activeSites=company.sites.filter(site=>!site.isClosed);
+  const expertCandidates=company.experts
+    .filter(expert=>!expert.isVacant)
+    .flatMap(expert=>expert.domains
+      .filter(skill=>allowed.includes(skill.domain))
+      .map(skill=>({expert,skill})));
+  const preferred=expertCandidates.find(candidate=>candidate.skill.domain!==avoidDomain)||expertCandidates[0];
+  if(!preferred)throw new Error('Opening knowledge-assembly lesson requires a relevant expert.');
+
+  const expertDomain=preferred.skill.domain;
+  const expertSite=preferred.expert.location!=='HQ'
+    ?activeSites.find(site=>site.id===preferred.expert.location)
+    :undefined;
+  const targetSite=expertSite||activeSites[0];
+  if(!targetSite)throw new Error('Opening knowledge-assembly lesson requires an active site.');
+
+  const localCandidates=allowed.filter(domain=>domain!==expertDomain&&domain!==avoidDomain);
+  const localPool=localCandidates.length?localCandidates:allowed.filter(domain=>domain!==expertDomain);
+  const localDomain=[...localPool].sort((a,b)=>(targetSite.teamCapability[b]||0)-(targetSite.teamCapability[a]||0))[0]||allowed[0];
+
+  // Make the lesson legible: one domain is comfortably local; the other needs
+  // the site's basic knowledge plus a Deep Expert to reach certainty.
+  targetSite.teamCapability[localDomain]=Math.max(4,targetSite.teamCapability[localDomain]||0);
+  targetSite.teamCapability[expertDomain]=1;
+  if(mode==='expert'){
+    targetSite.codifiedKnowledge[localDomain]=Math.min(targetSite.teamCapability[localDomain],targetSite.codifiedKnowledge[localDomain]||1);
+    targetSite.codifiedKnowledge[expertDomain]=1;
+  }
+
+  const localLabel=localDomain==='hr'?'Human Resources':localDomain[0].toUpperCase()+localDomain.slice(1);
+  const expertLabel=expertDomain==='hr'?'Human Resources':expertDomain[0].toUpperCase()+expertDomain.slice(1);
+  const card:EventCard={
+    id:`TUTORIAL-ASSEMBLE-${localDomain.toUpperCase()}-${expertDomain.toUpperCase()}`,
+    type:'opportunity',
+    scope:'local',
+    title:'LEARNING: Assemble the Right Knowledge',
+    description:`${targetSite.name} has a valuable customer opportunity. The local team can handle the ${localLabel} side, but the ${expertLabel} requirement needs deeper specialist knowledge.`,
+    domains:[
+      {domain:localDomain,difficulty:4},
+      {domain:expertDomain,difficulty:preferred.skill.score+1},
+    ],
+    impact:20,
+    tags:[
+      PROGRAMMED_ASSEMBLY_TAG,'learning','knowledge-assembly',
+      `tutorial-local-domain:${localDomain}`,
+      `tutorial-expert-domain:${expertDomain}`,
+      `tutorial-expert:${preferred.expert.id}`,
+      `tutorial-target:${targetSite.id}`,
+    ],
+  };
+  return{card,targetSiteId:targetSite.id,expertId:preferred.expert.id,localDomain,expertDomain};
+}
+
 function pressureMove(moveNumber:number, config:SimulationConfig, experienceMode:ExperienceMode='newbie'):number {
   if(experienceMode!=='expert') return moveNumber;
   const movesPerStep=Math.max(1,Math.round(config.event_expert_moves_per_pressure_step ?? 6));
@@ -150,6 +211,11 @@ export function applyProgressionToCurrentEvents(session:GameSessionV2, company:C
     const moveNumber=firstMove+index;
     if(session.round===1&&moveNumber===1){
       const tutorial=buildProgrammedOpeningFailure(company,session.experienceMode);
+      event.card=tutorial.card;
+      event.targetSiteId=tutorial.targetSiteId;
+    } else if(session.round===1&&moveNumber===2){
+      const openingDomain=events[0]?.card.tags?.find(tag=>tag.startsWith('tutorial-domain:'))?.slice('tutorial-domain:'.length) as KnowledgeDomain|undefined;
+      const tutorial=buildProgrammedAssemblyOpportunity(company,session.experienceMode,openingDomain);
       event.card=tutorial.card;
       event.targetSiteId=tutorial.targetSiteId;
     } else {
