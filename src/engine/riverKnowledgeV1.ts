@@ -7,7 +7,7 @@ import { recordSiteKmActivityV1, roundInvestmentMoneyV1, siteCanTakeKmActivityV1
 export function riverSiteKnowledgeScore(site:CompanyV2['sites'][number],domain:KnowledgeDomain,mode:ExperienceMode='expert'):number{
   // Newbie deliberately collapses local knowledge into Team Capability so players
   // do not have to reason about a second hidden local codification metric.
-  return mode==='newbie'
+  return mode==='newbie'||mode==='km_week'
     ? (site.teamCapability[domain]||0)
     : Math.max(site.teamCapability[domain]||0,site.codifiedKnowledge[domain]||0);
 }
