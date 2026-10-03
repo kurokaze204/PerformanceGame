@@ -645,7 +645,10 @@ export function executeRiskPhaseV2(sessionInput: GameSession, companyInput: Comp
 
   const checkedSites = shuffle(company.sites.filter((site) => !site.isClosed)).slice(0, 2);
   for (const site of checkedSites) {
-    const vulnerableDomains = DOMAINS.filter((domain) => site.teamCapability[domain] > site.codifiedKnowledge[domain] && site.teamCapability[domain] > 1);
+    const vulnerableDomains = DOMAINS.filter((domain) =>
+      site.teamCapability[domain] > 1 &&
+      (session.experienceMode === 'newbie' || site.teamCapability[domain] > site.codifiedKnowledge[domain]),
+    );
     if (!vulnerableDomains.length) {
       siteChecks.push({ siteId: site.id, siteName: site.name, domain: null, previousScore: null, newScore: null, knowledgeLost: false });
       continue;
