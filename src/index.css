@@ -255,6 +255,19 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
   }
 }
 
+
+/* KM Week: the facedown Challenge card is a deliberate "start play" affordance,
+   and the revealed action card flips into focus. */
+.kmw-start-card { transform-style: preserve-3d; }
+.kmw-card-reveal {
+  transform-origin: center center;
+  animation: kmw-card-reveal .34s cubic-bezier(.2,.75,.2,1);
+}
+@keyframes kmw-card-reveal {
+  0% { transform: perspective(900px) rotateY(-82deg) scale(.96); opacity: .3; }
+  100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
