@@ -256,6 +256,12 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
 }
 
 
+@keyframes kmw-aar-slide-in {
+  from { transform: translateX(100%); opacity: .65; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.kmw-aar-slide-in { animation: kmw-aar-slide-in .28s cubic-bezier(.2,.75,.2,1) both; }
+
 /* KM Week knowledge movement: draw the eye to the River before capability moves. */
 .kmw-knowledge-spark {
   position: fixed;
