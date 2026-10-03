@@ -81,6 +81,10 @@ assert.ok(kmWeekBoardSource.includes("guidedTargetInvestment!=='TRAIN_EXPERT'")&
 assert.equal(kmWeekBoardSource.includes('disabled={guided} className="mt-1 w-full rounded-lg'),false,'Guided selectors must remain explorable while the tutorial constrains the intended move');
 assert.ok(kmWeekBoardSource.includes('any valid transfer will work'),'Guided Knowledge Transfer must make clear that the player may choose any valid source, destination and domain');
 assert.ok(kmWeekBoardSource.includes('actionError'),'Rejected KM Week actions must explain the problem inline rather than appearing to do nothing');
+assert.ok(kmWeekBoardSource.includes('Score briefing · Round 4 Invest')&&kmWeekBoardSource.includes('Only the total score matters'),'The first free-play Invest must explain the scorecard and multiple paths to success');
+assert.ok(kmWeekBoardSource.includes('Your Goal card')&&kmWeekBoardSource.includes('One idea for this Invest'),'The Round 4 score briefing must explain the Goal card and give a light-touch next-step suggestion');
+assert.ok(kmWeekBoardSource.includes('fixed inset-0 z-[120] bg-black/70')&&kmWeekBoardSource.includes("scoreBriefOpen?'relative z-[135]"),'The score briefing must darken the board while keeping the Score Pad and Goal card highlighted');
+assert.ok(kmWeekBoardSource.includes("state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1"),'The score briefing must trigger at the first free-play Invest round only');
 assert.ok(kmWeekBoardSource.includes('animateKnowledgeSpark')&&riverSource.includes('data-river-target'),'KM Week investments must send a visual knowledge spark toward the River');
 assert.ok(globalCssSource.includes('.kmw-knowledge-spark')&&globalCssSource.includes('transition-duration: 1.2s'),'KM Week River changes must use the glowing spark and 1.2 second movement');
 assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1")&&kmWeekBoardSource.includes('const duration=firstGuidedRound?1700:850'),'The first guided River cue must run at half speed');
