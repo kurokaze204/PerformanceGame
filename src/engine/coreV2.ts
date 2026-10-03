@@ -684,7 +684,12 @@ export function prepareCompanyNextRoundV2(sessionInput: GameSession, companyInpu
     }
   });
   company.actionsRemaining = session.config.actions_per_round;
-  applyKnowledgeTurnoverGrowthV1(company);
+  const growthChanges=applyKnowledgeTurnoverGrowthV1(company);
+  company.lastKnowledgeGrowth={
+    round:companyRound,
+    total:roundInvestmentMoneyV1(growthChanges.reduce((sum,change)=>sum+(change.after-change.before),0)),
+    sites:growthChanges.map(change=>({siteId:change.siteId,amount:roundInvestmentMoneyV1(change.after-change.before),growthPercent:change.growthPercent})),
+  };
   company.strategicInvestmentFund = roundInvestmentMoneyV1(company.strategicInvestmentFund + strategicInvestmentContributionV1(company));
   company.intranetRoundGrowth = emptyScores(0);
   company.auditedSiteId = null;
