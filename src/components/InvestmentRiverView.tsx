@@ -21,6 +21,7 @@ interface Props{
  previewExpertDelta?:number;
  previewHQDelta?:number;
  thresholdLine?:{value:number;label:string};
+ compact?:boolean;
 }
 
 const KM_WEEK:KnowledgeDomain[]=['operations','hr','marketing'];
@@ -30,7 +31,7 @@ const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',ad
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false})=>{
  const domains=mode==='expert'?EXPERT:mode==='km_week'?KM_WEEK:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
  const experts=company.experts.filter(expert=>!expert.isVacant);
@@ -58,12 +59,12 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const domainIndex=domains.indexOf(selectedDomain);
  const referenceSite=referenceSiteId?sites.find(site=>site.id===referenceSiteId):undefined;
  const referencePath=referenceHQ?data.map((item,di)=>`${di?'L':'M'} ${x(di)+28} ${y(company.intranet[item.domain]||0)}`).join(' '):referenceSite?data.map((item,di)=>{const si=item.scores.findIndex(entry=>entry.site.id===referenceSite.id);if(si<0)return'';const domainSelected=item.domain===selectedDomain;const siteSpread=showSiteLabels&&domainSelected?18:9;const px=clamp(x(di)+(si-(item.scores.length-1)/2)*siteSpread,padL+6,W-padR-6);return `${di?'L':'M'} ${px} ${y(item.scores[si].score)}`}).filter(Boolean).join(' '):'';
- return <div className="h-full min-h-[260px] rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-inner">
-  <div className="flex items-center justify-between gap-3 px-1">
+ return <div className={`${compact?'h-full min-h-[170px] rounded-xl p-2':'h-full min-h-[260px] rounded-2xl p-3'} border border-slate-700 bg-slate-950/95 shadow-inner`}>
+  {!compact&&<div className="flex items-center justify-between gap-3 px-1">
    <div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>
    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span className="text-slate-50">● Site</span>{mode!=='km_week'&&<span className="text-sky-300">◆ HQ</span>}<span className="text-amber-300">● Expert</span>{thresholdLine&&<span className="text-yellow-300">┄ Shock cut-off</span>}</div>
-  </div>
-  <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[220px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
+  </div>}
+  <svg viewBox={`0 0 ${W} ${H}`} className={`${compact?'h-full min-h-[150px]':'mt-1 h-[calc(100%-42px)] min-h-[220px]'} w-full`} role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
    {ticks.map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
    {highlightDomain&&domainIndex>=0&&<rect x={Math.max(padL-42,x(domainIndex)-72)} y={padT-12} width="144" height={H-padT-padB+28} rx="16" fill="#facc15" fillOpacity=".06" stroke="#facc15" strokeOpacity=".38" strokeWidth="2"/>}
    <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>
