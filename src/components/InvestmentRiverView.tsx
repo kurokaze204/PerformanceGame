@@ -22,6 +22,7 @@ interface Props{
  previewHQDelta?:number;
 }
 
+const KM_WEEK:KnowledgeDomain[]=['operations','hr','marketing'];
 const NEWBIE:KnowledgeDomain[]=['engineering','hr','marketing','operations'];
 const EXPERT:KnowledgeDomain[]=[...NEWBIE,'finance'];
 const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',adelaide:'ADL',perth:'PER',darwin:'DRW',HQ:'HQ'};
@@ -29,7 +30,7 @@ const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
 export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0})=>{
- const domains=mode==='expert'?EXPERT:NEWBIE;
+ const domains=mode==='expert'?EXPERT:mode==='km_week'?KM_WEEK:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
  const experts=company.experts.filter(expert=>!expert.isVacant);
  const data=useMemo(()=>domains.map(domain=>{
@@ -40,7 +41,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const selectedSitePreview=selectedSiteId?sites.find(site=>site.id===selectedSiteId)?.teamCapability[selectedDomain]||0:0;
  const selectedExpertPreview=selectedExpertId?expertMarks.find(mark=>mark.expert.id===selectedExpertId&&mark.domain===selectedDomain)?.score||0:0;
  const selectedHQPreview=company.intranet[selectedDomain]||0;
- const rawMax=Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0),selectedSitePreview+previewSiteDelta,selectedExpertPreview+previewExpertDelta,selectedHQPreview+previewHQDelta);
+ const rawMax=mode==='km_week'?5:Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0),selectedSitePreview+previewSiteDelta,selectedExpertPreview+previewExpertDelta,selectedHQPreview+previewHQDelta);
  const niceStep=(max:number)=>{const raw=Math.max(1,max/4),power=Math.pow(10,Math.floor(Math.log10(raw))),scaled=raw/power;return(scaled<=1?1:scaled<=2?2:scaled<=5?5:10)*power};
  const tickStep=niceStep(rawMax),maxY=Math.max(tickStep,Math.ceil(rawMax/tickStep)*tickStep);
  const ticks=Array.from({length:Math.floor(maxY/tickStep)+1},(_,index)=>index*tickStep);
