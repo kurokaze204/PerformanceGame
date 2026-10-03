@@ -138,5 +138,5 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
     return <SharedEventResolutionV1 session={session} company={company} event={displayEvent} onContinue={()=>acknowledgeCompanyResolution({session})}/>;
   }
 
-  return <div ref={decisionRootRef}>{readOnly&&<div className="mb-2 rounded-xl border border-amber-700 bg-amber-950/35 px-3 py-2 text-center text-xs font-black text-amber-200">READ ONLY · Your CEO controls this company</div>}<OptimisticEventDecisionCardV1 {...props} event={displayEvent} onAcknowledgeResolution={interceptContinue}/></div>;
+  return <div ref={decisionRootRef}>{readOnly&&<div className="mb-2 rounded-xl border border-amber-700 bg-amber-950/35 px-3 py-2 text-center text-xs font-black text-amber-200">READ ONLY · Your CEO controls this company</div>}<OptimisticEventDecisionCardV1 {...props} event={displayEvent} diagnostic={Boolean(isOpeningLesson)} onAcknowledgeResolution={interceptContinue}/></div>;
 };
