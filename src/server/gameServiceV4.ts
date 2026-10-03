@@ -80,7 +80,7 @@ export async function createNewSessionV2(sessionId:string,title:string,companyNa
   return company;
  });
  const session=asSessionV2({id,title,round:1,phase:'respond',isPaused:false,isFinalDisruptionActive:false,companies,activeEvents:{},copMemberships:[],config,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()} as GameSession);
- session.experienceMode=options.experienceMode==='expert'?'expert':'newbie';
+ session.experienceMode=options.experienceMode==='expert'?'expert':options.experienceMode==='km_week'?'km_week':'newbie';
  session.gameDurationMinutes=clamp(Number(options.gameDurationMinutes||60),20,240);
  session.finalWindowMinutes=10;session.minutesPerMove=8;session.maxPlayersPerCompany=clamp(Number(options.maxPlayersPerCompany||6),1,20);session.participants=[];
  session.soloMode=Boolean(options.soloMode);
