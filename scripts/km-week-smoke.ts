@@ -119,6 +119,7 @@ assert.ok((company.kmWeek?.score.business||0)>=0&&(company.kmWeek?.score.busines
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE_SHOCK'});
 assert.equal(result.success,true,result.message);
 assert.equal(company.kmWeek?.stage,'complete');
+assert.equal(session.finalDisruptionResolved,true,'completed KM Week session should be marked complete');
 assert.equal(company.kmWeek?.shockChecks.length,5);
 assert.ok((company.kmWeek?.score.total||0)>0);
 
