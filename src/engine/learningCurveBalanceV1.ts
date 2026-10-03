@@ -13,6 +13,16 @@ export interface LearningCurveProfile {
 }
 
 export const LEARNING_CURVE_PROFILES: Record<ExperienceMode, LearningCurveProfile> = {
+  km_week: {
+    defaultActionsPerRound: 1,
+    showLocalCodifiedKnowledge: false,
+    expertEarlyBonus: 2,
+    expertMiddlePenalty: 1,
+    expertLateSpecialistBonus: 2,
+    expertEarlyThroughRound: 2,
+    expertMiddleThroughRound: 4,
+    specialistThreshold: 4,
+  },
   newbie: {
     defaultActionsPerRound: 5,
     showLocalCodifiedKnowledge: false,
