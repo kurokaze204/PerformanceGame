@@ -60,7 +60,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  return <div className="h-full min-h-[260px] rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-inner">
   <div className="flex items-center justify-between gap-3 px-1">
    <div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>
-   <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span className="text-slate-50">● Site</span><span className="text-sky-300">◆ HQ</span><span className="text-amber-300">● Expert</span></div>
+   <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span className="text-slate-50">● Site</span>{mode!=='km_week'&&<span className="text-sky-300">◆ HQ</span>}<span className="text-amber-300">● Expert</span></div>
   </div>
   <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[220px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
    {ticks.map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
@@ -90,7 +90,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
         <text x={labelX} y={labelYs[si]} textAnchor={labelAnchor} fill={source?'#6ee7b7':target?'#fde047':'#f8fafc'} fontSize="13" fontWeight={target||source?'900':'800'} paintOrder="stroke" stroke="#020617" strokeWidth="3" strokeLinejoin="round">{abbrev(site.id)}</text>
        </g>
      })}
-     {(()=>{
+     {mode!=='km_week'&&(()=>{
        const hqScore=company.intranet[item.domain]||0;
        const hqSelected=domainSelected&&highlightHQ;
        const hqReference=referenceHQ;
@@ -102,6 +102,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
         <rect x={px-5} y={py-5} width="10" height="10" transform={`rotate(45 ${px} ${py})`} fill="#38bdf8" stroke={hqReference?'#fde047':hqSelected?'#e0f2fe':'#075985'} strokeWidth={hqReference?2.5:2}/>
         {hqSelected&&<text x={px+10} y={py-8} fill="#7dd3fc" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">HQ · {hqScore}</text>}
        </g>
+     })()}
      })()}
      {domainExperts.map((mark,ei)=>{
        const {px,py}=expertPoints[ei];
