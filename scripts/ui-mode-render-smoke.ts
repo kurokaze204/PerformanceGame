@@ -59,6 +59,7 @@ assert.ok(firstLessonSource.includes('Knowledge Transfer')&&firstLessonSource.in
 
 assert.ok(appBoardSource.includes("actionType:'FINISH_INVESTING'"),'Invest completion must use the dedicated per-company FINISH_INVESTING action');
 const kmWeekBoardSource=readFileSync(new URL('../src/components/KMWeekBoardV1.tsx',import.meta.url),'utf8');
+const globalCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoardSource.includes('<KMWeekBoardV1'),'KM Week sessions must use their dedicated play surface');
 assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}/3`"),'KM Week board must expose the three guided and three free-play progression');
 assert.ok(kmWeekBoardSource.includes('<InvestmentRiverView company={company} mode="km_week"'),'KM Week must keep the Knowledge River central');
@@ -74,6 +75,11 @@ assert.ok(kmWeekBoardSource.includes('CLICK HERE TO START'),'KM Week must stage 
 assert.ok(kmWeekBoardSource.includes('border-dashed border-violet-500/70'),'KM Week Challenge start area must read as an active play zone rather than furniture');
 assert.ok(kmWeekBoardSource.includes('bg-black/20'),'Opening a Challenge must dim the rest of the board by 20 percent');
 assert.ok(kmWeekBoardSource.includes('kmw-card-reveal'),'Opening a Challenge must animate the event card into the decision view');
+assert.ok(kmWeekBoardSource.includes('CEO briefing · Before Challenge')&&kmWeekBoardSource.includes('CEO briefing · Before Invest'),'The first guided round must explain Challenge and Invest before play');
+assert.ok(kmWeekBoardSource.includes("guidedTargetInvestment!=='TRAIN_EXPERT'")&&kmWeekBoardSource.includes("guidedTargetInvestment!=='LOCAL_TRAINING'")&&kmWeekBoardSource.includes("guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'"),'Guided Invest must show all three strategy choices and grey out the two not being taught');
+assert.equal(kmWeekBoardSource.includes('disabled={guided} className="mt-1 w-full rounded-lg'),false,'Guided selectors must remain explorable while the tutorial constrains the intended move');
+assert.ok(kmWeekBoardSource.includes('animateKnowledgeSpark')&&kmWeekBoardSource.includes('data-river-target'),'KM Week investments must send a visual knowledge spark toward the River');
+assert.ok(globalCssSource.includes('.kmw-knowledge-spark')&&globalCssSource.includes('transition-duration: 1.2s'),'KM Week River changes must use the glowing spark and 1.2 second movement');
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
 assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
 
