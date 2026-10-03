@@ -39,6 +39,11 @@ const appBoardSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.ur
 assert.equal(appBoardSource.includes("fetch('/api/sessions/default')"),false,'fresh startup must not replace the setup form with a default-session bootstrap');
 const joinModalSource=readFileSync(new URL('../src/components/SessionJoinModalV2.tsx',import.meta.url),'utf8');
 assert.ok(joinModalSource.includes('await Promise.resolve(onJoinSession('),'game creation must await the actual join before leaving the setup state');
+assert.ok(joinModalSource.includes("km_week:{title:'KM Week'"),'Setup must offer KM Week beside Newbie and Expert');
+assert.ok(joinModalSource.includes('grid grid-cols-3 gap-2'),'Game mode selector must present three peer choices');
+assert.ok(joinModalSource.includes('role="tabpanel"'),'Selected game mode must open a connected description panel below the buttons');
+assert.ok(joinModalSource.includes("next==='km_week'?30"),'Solo KM Week must default to the 30-minute format');
+assert.ok(joinModalSource.includes("if(next==='km_week')setDuration(30)"),'Multiplayer KM Week must default to the 30-minute format');
 
 const chartsSource=readFileSync(new URL('../src/components/CompanyChartsOverlay.tsx',import.meta.url),'utf8');
 assert.ok(chartsSource.includes("top-[var(--tpg-header-height)]"),'Charts overlay must start below the persistent game header');
