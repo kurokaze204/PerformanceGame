@@ -180,4 +180,20 @@ assert.ok(appBoardEventSource.includes("Read only ·"),'followers must have a vi
 assert.ok(appBoardEventSource.includes('company.controllerParticipantId===participant.id'),'write controls must derive from the authoritative company CEO');
 assert.equal(appBoardEventSource.includes('/advance-phase'),false,'player UI must not expose global phase advancement');
 
+// Player-legibility audit: important mechanics must be visible without adding permanent instruction walls.
+const eventDecisionSource=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
+assert.ok(eventPlaytestSource.includes('diagnostic={Boolean(isOpeningLesson)}'),'opening Newbie challenge must be explicitly marked as diagnostic');
+assert.ok(eventDecisionSource.includes('Normal probability rules start with the next challenge.'),'diagnostic challenge must explain that its outcome is not a normal probability roll');
+assert.ok(eventDecisionSource.includes('D {e.depthKnowledge} · B +{e.breadthBonus}'),'ordinary Event scoring must expose compact depth/breadth values');
+assert.ok(eventDecisionSource.includes('A relevant expert unlocks the full score.'),'Corporate Intranet must reveal when absorptive capacity limits usable knowledge');
+assert.ok(eventDecisionSource.includes('Each consultant engagement increases the future rate by 35%.'),'consultant UI must reveal escalating future rates');
+
+assert.ok(finalDisruptionSource.includes('label="Auto"'),'Final Disruption must visibly include Automation in its score');
+assert.ok(appBoardEventSource.includes('Knowledge dividend'),'turnover UI must identify knowledge-driven round growth');
+assert.ok(appBoardEventSource.includes('3% of current company turnover is added to the SIF'),'SIF tooltip must state the replenishment rule');
+assert.ok(investPanelSource.includes('Horizon Scan scope')&&investPanelSource.includes('All upcoming Events'),'Newbie Horizon Scan must not ask the player for a meaningless domain');
+const expertModalSource=readFileSync(new URL('../src/components/ExpertModal.tsx',import.meta.url),'utf8');
+assert.ok(expertModalSource.includes('SPOF gap ≥ ${config.spof_gap}'),'SPOF tooltip must use the configured threshold rather than a stale hard-coded value');
+assert.ok(riskSource.includes('Team Capability above 1 can lose one point'),'Newbie Knowledge Risk must explain its visible workforce-risk rule');
+
 console.log('Mode-aware UI render smoke tests passed.');
