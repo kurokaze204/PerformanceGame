@@ -60,12 +60,16 @@ assert.ok(firstLessonSource.includes('Knowledge Transfer')&&firstLessonSource.in
 assert.ok(appBoardSource.includes("actionType:'FINISH_INVESTING'"),'Invest completion must use the dedicated per-company FINISH_INVESTING action');
 const kmWeekBoardSource=readFileSync(new URL('../src/components/KMWeekBoardV1.tsx',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoardSource.includes('<KMWeekBoardV1'),'KM Week sessions must use their dedicated play surface');
-assert.ok(kmWeekBoardSource.includes('Guided game · Move')&&kmWeekBoardSource.includes('Free play · Round'),'KM Week board must expose the three guided and three free-play progression');
+assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}/3`"),'KM Week board must expose the three guided and three free-play progression');
 assert.ok(kmWeekBoardSource.includes('<InvestmentRiverView company={company} mode="km_week"'),'KM Week must keep the Knowledge River central');
 assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'KM Week must limit strategic investment to the agreed three interventions');
-assert.ok(kmWeekBoardSource.includes('Business Shock')&&kmWeekBoardSource.includes('Your specialists are unavailable.'),'KM Week must end with the short resilience stress test');
+assert.ok(kmWeekBoardSource.includes('Business Shock')&&kmWeekBoardSource.includes('Your company experts are unavailable.'),'KM Week must end with the short resilience stress test');
 assert.ok(kmWeekBoardSource.includes('Business Performance')&&kmWeekBoardSource.includes('Knowledge Flow')&&kmWeekBoardSource.includes('Resilience'),'KM Week must show the board-game score pad');
 assert.ok(kmWeekBoardSource.includes('Depth')&&kmWeekBoardSource.includes('Breadth')&&kmWeekBoardSource.includes('Flow'),'KM Week debrief must name the River concepts after players experience them');
+assert.ok(kmWeekBoardSource.includes('COMMIT RESPONSE'),'KM Week Challenge choices must require an explicit commit');
+assert.ok(kmWeekBoardSource.includes('Current phase'),'KM Week board must make the current phase explicit');
+assert.ok(kmWeekBoardSource.includes('Company experts'),'KM Week must use the business-facing Company experts label');
+assert.ok(kmWeekBoardSource.includes('Score pad')&&kmWeekBoardSource.includes('ToolTip'),'KM Week score categories must explain how points are earned');
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
 assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
 
