@@ -55,7 +55,7 @@ function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
  if(turn===1)return{title:'1. Solve the business problem',text:'Brisbane needs Operations 4. Priya has Operations 4. Select Priya below, then commit your response.',invest:'After the Challenge, you will deepen Priya’s expertise.'};
  if(turn===2)return{title:'2. Solve it again',text:'Another Operations problem has appeared in Brisbane. Use Priya again, then commit your response.',invest:'Afterwards you will use Local Training so Brisbane learns from her.'};
- return{title:'3. The problem moves',text:'A similar Operations issue has appeared in Perth. Use Priya, then commit your response.',invest:'Afterwards you will move Brisbane knowledge to Perth.'};
+ return{title:'3. The problem moves',text:'A similar Operations issue has appeared in Perth. Use Priya, then commit your response.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
 }
 
 const ToolTip:React.FC<{text:string}>=({text})=><span className="group relative inline-flex"><Info className="h-3.5 w-3.5 cursor-help text-slate-500"/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
