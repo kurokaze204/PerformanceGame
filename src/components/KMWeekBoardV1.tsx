@@ -168,19 +168,26 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   const rect=target.getBoundingClientRect();
   const endX=rect.left+rect.width/2,endY=rect.top+rect.height/2;
   const dx=endX-startX,dy=endY-startY;
-  const swing=Math.min(120,Math.max(55,Math.abs(dx)*0.16));
+  const rise=Math.min(165,Math.max(85,Math.abs(dx)*0.18));
+  const loop=Math.min(75,Math.max(42,Math.abs(dx)*0.075));
   const spark=document.createElement('div');
   spark.className='kmw-knowledge-spark';
   spark.style.left=`${startX-9}px`;
   spark.style.top=`${startY-9}px`;
   document.body.appendChild(spark);
+  const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1;
+  const duration=firstGuidedRound?1700:850;
   const animation=spark.animate([
    {transform:'translate(0px,0px) scale(.8)',opacity:0},
-   {transform:`translate(${dx*.12}px,${dy*.15}px) scale(1.15)`,opacity:1,offset:.14},
-   {transform:`translate(${dx*.38+swing}px,${dy*.34}px) scale(1)`,opacity:1,offset:.42},
-   {transform:`translate(${dx*.70-swing*.55}px,${dy*.72}px) scale(.95)`,opacity:1,offset:.72},
-   {transform:`translate(${dx}px,${dy}px) scale(.45)`,opacity:0}
-  ],{duration:850,easing:'cubic-bezier(.35,.02,.25,1)',fill:'forwards'});
+   {transform:`translate(${dx*.10}px,${-rise*.58}px) scale(1.18)`,opacity:1,offset:.10},
+   {transform:`translate(${dx*.34}px,${-rise}px) scale(1.12)`,opacity:1,offset:.26},
+   {transform:`translate(${dx*.62}px,${-rise*.72+dy*.18}px) scale(1.02)`,opacity:1,offset:.43},
+   {transform:`translate(${dx*.84}px,${dy*.40}px) scale(.98)`,opacity:1,offset:.60},
+   {transform:`translate(${dx-loop}px,${dy*.82}px) scale(.96)`,opacity:1,offset:.74},
+   {transform:`translate(${dx-loop*.55}px,${dy+loop*.45}px) scale(.92)`,opacity:1,offset:.84},
+   {transform:`translate(${dx+loop*.60}px,${dy+loop*.32}px) scale(.86)`,opacity:.95,offset:.92},
+   {transform:`translate(${dx}px,${dy}px) scale(.42)`,opacity:0}
+  ],{duration,easing:'cubic-bezier(.33,.02,.22,1)',fill:'forwards'});
   try{await animation.finished}catch{}
   spark.remove();
   await new Promise(resolve=>setTimeout(resolve,70));
