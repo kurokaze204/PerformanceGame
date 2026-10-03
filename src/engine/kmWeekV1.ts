@@ -147,6 +147,7 @@ export function initialiseKMWeekCompanyV1(company:CompanyV2){
     knowledgeTransfers:0,
     meaningfulTransfers:0,
     investmentHistory:[],
+    turnoverHistory:[{label:'START',turnover:company.turnover}],
     shockChecks:[],
     shockResolved:false,
     score:emptyScore(),
@@ -178,6 +179,7 @@ export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
   if(!session.kmWeekGoalId){session.kmWeekGoalId=hashGoal(session.id);changed=true;}
   for(const company of session.companies){
     if(!company.kmWeek){initialiseKMWeekCompanyV1(company);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
+    else if(!company.kmWeek.turnoverHistory){company.kmWeek.turnoverHistory=[{label:'CURRENT',turnover:company.turnover}];changed=true;}
   }
   return changed;
 }
@@ -305,6 +307,9 @@ export function resolveKMWeekChallengeV1(
   challenge.travelCost=travelCost||undefined;
   challenge.turnoverChange=turnoverChange;
   applyTurnover(company,turnoverChange);
+  const challengeIndex=state.challenges.findIndex(item=>item.id===challenge.id)+1;
+  const challengeLabel=state.stage==='guided'?`G${state.guidedTurn} C`:`R${state.freeRound} C${challengeIndex}`;
+  state.turnoverHistory.push({label:challengeLabel,turnover:company.turnover});
   if(won&&state.stage==='free')state.freeSuccesses+=1;
   const travelText=travelCost?` Expert travel -${travelCost}k.`:'';
   state.lastMessage=won
@@ -377,6 +382,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     roundLabel:state.stage==='guided'?`Guided ${state.guidedTurn}`:`Free ${state.freeRound}`,
     type,domain,expertId,siteId,sourceSiteId,targetSiteId,before,after,meaningfulFlow,
   });
+  state.turnoverHistory.push({label:state.stage==='guided'?`G${state.guidedTurn} I`:`R${state.freeRound} I`,turnover:company.turnover});
   state.lastMessage=`${investmentLabel(type)} complete: ${before} → ${after}. Cost $${cost}k.`;
 
   if(state.stage==='guided'){
