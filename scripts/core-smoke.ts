@@ -19,6 +19,8 @@ import { INITIAL_STRATEGIC_INVESTMENT_FUND_V1, SITE_KM_ACTIVITY_LIMIT_V1, STRATE
 import { COP_GENERAL_DOMAIN_V5, companyHasCopMembershipV5, reciprocalCopPeersV5 } from '../src/engine/copNetworkV5.ts';
 import { executeRiskPhaseV4 } from '../src/engine/riskPhaseV4.ts';
 import { evaluateFinalDisruptionV1 } from '../src/engine/disruptionPlusV1.ts';
+import { PROGRAMMED_ASSEMBLY_TAG, PROGRAMMED_FAILURE_TAG, applyProgressionToCurrentEvents } from '../src/engine/eventProgressionV5.ts';
+import { claimCompanyOpenEventV1 } from '../src/engine/companyEventOpenV1.ts';
 import { asSessionV2 } from '../src/types/gameV2.ts';
 import type { ActiveEvent, EventCard, GameSession } from '../src/types/game.ts';
 
@@ -40,6 +42,35 @@ function makeSession(mode:'newbie'|'expert'='newbie') {
   } as GameSession);
   session.experienceMode=mode;
   return { session, company };
+}
+
+// Round 1 is a fixed two-step teaching sequence in both Newbie and Expert.
+for(const mode of ['newbie','expert'] as const){
+  const {session,company}=makeSession(mode);
+  session.round=1;company.round=1;
+  const events=drawRoundEventsV2(session,company,{count:mode==='expert'?3:2});
+  session.activeEvents[company.id]=events;
+  applyProgressionToCurrentEvents(session,company);
+
+  assert.ok(events[0].card.tags.includes(PROGRAMMED_FAILURE_TAG),`${mode} Round 1 card 1 must be the knowledge-location diagnostic`);
+  assert.ok(events[1].card.tags.includes(PROGRAMMED_ASSEMBLY_TAG),`${mode} Round 1 card 2 must be the knowledge-assembly lesson`);
+  assert.equal(events[1].card.type,'opportunity');
+  assert.equal(events[1].card.domains.length,2,'assembly lesson must require two knowledge domains');
+
+  const localDomain=events[1].card.tags.find(tag=>tag.startsWith('tutorial-local-domain:'))!.split(':')[1] as any;
+  const expertDomain=events[1].card.tags.find(tag=>tag.startsWith('tutorial-expert-domain:'))!.split(':')[1] as any;
+  const expertId=events[1].card.tags.find(tag=>tag.startsWith('tutorial-expert:'))!.split(':')[1];
+  events[1].allocations[localDomain]={useTeamCapability:true};
+  events[1].allocations[expertDomain]={useTeamCapability:true,expertId};
+  assert.equal(evaluateEventDomainKnowledgeExplicitV2(session,company,events[1],localDomain).winChancePercent,100,'local domain should become certain when the team is selected');
+  assert.equal(evaluateEventDomainKnowledgeExplicitV2(session,company,events[1],expertDomain).winChancePercent,100,'expert domain should become certain when local knowledge and the relevant expert are combined');
+
+  const secondClick=claimCompanyOpenEventV1(session,company.id,events[1].instanceId);
+  assert.equal(secondClick.winnerEventInstanceId,events[0].instanceId,'clicking another Round 1 card must still open teaching card 1 first');
+  events[0].isResolved=true;
+  delete (company as any).uiOpenEventInstanceId;
+  const laterClick=claimCompanyOpenEventV1(session,company.id,(events[2]||events[1]).instanceId);
+  assert.equal(laterClick.winnerEventInstanceId,events[1].instanceId,'teaching card 2 must open before any later Expert card');
 }
 
 
