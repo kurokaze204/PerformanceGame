@@ -9,12 +9,12 @@ type Props={session:GameSessionV2;company:CompanyV2};
 const COMPANY_COLORS=['#facc15','#38bdf8','#a78bfa','#34d399','#fb7185','#fb923c','#22d3ee','#c084fc'];
 
 const scoreItems=(company:CompanyV2)=>[
- {label:'Business',value:company.kmWeek?.score.business||0,max:12,icon:<CircleDollarSign className="h-3.5 w-3.5"/>},
+ {label:'Business Performance',value:company.kmWeek?.score.business||0,max:12,icon:<CircleDollarSign className="h-3.5 w-3.5"/>},
  {label:'Expertise',value:company.kmWeek?.score.expertise||0,max:6,icon:<Brain className="h-3.5 w-3.5"/>},
- {label:'Local',value:company.kmWeek?.score.localCapability||0,max:9,icon:<Users className="h-3.5 w-3.5"/>},
- {label:'Flow',value:company.kmWeek?.score.knowledgeFlow||0,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
+ {label:'Local capability',value:company.kmWeek?.score.localCapability||0,max:9,icon:<Users className="h-3.5 w-3.5"/>},
+ {label:'Knowledge Flow',value:company.kmWeek?.score.knowledgeFlow||0,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
  {label:'Resilience',value:company.kmWeek?.score.resilience||0,max:5,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
- {label:'Goal',value:company.kmWeek?.score.goal||0,max:5,icon:<Target className="h-3.5 w-3.5"/>},
+ {label:'KM Week goal',value:company.kmWeek?.score.goal||0,max:5,icon:<Target className="h-3.5 w-3.5"/>},
 ];
 
 function beforeCompany(company:CompanyV2):CompanyV2{
