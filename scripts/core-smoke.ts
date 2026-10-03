@@ -79,6 +79,41 @@ for(const from of ['melbourne','sydney','brisbane','adelaide','perth','darwin'])
   }
 }
 
+// Corporate Intranet publishing copies one chosen site's available knowledge and can only be used once per round.
+{
+  const { session, company }=makeSession('newbie');
+  session.phase='investment';
+  company.actionsRemaining=5;
+  const source=company.sites.find(site=>!site.isClosed)!;
+  const second=company.sites.find(site=>!site.isClosed&&site.id!==source.id)!;
+  source.teamCapability.operations=4;
+  source.codifiedKnowledge.operations=5;
+  company.intranet.operations=1;
+  second.teamCapability.hr=4;
+  company.intranet.hr=0;
+
+  const first=executeInvestmentActionV4(session,company,{type:'UPDATE_INTRANET',companyId:company.id,siteId:source.id,domain:'operations'});
+  assert.equal(first.success,true,'Newbie Intranet update must not require hidden publication evidence');
+  assert.equal(company.intranet.operations,4,'Newbie Intranet must copy visible Team Capability, not hidden local codified knowledge');
+  assert.equal(company.intranetRoundGrowth.operations,3,'Intranet round growth must record the copied increase');
+
+  const secondUpdate=executeInvestmentActionV4(session,company,{type:'UPDATE_INTRANET',companyId:company.id,siteId:second.id,domain:'hr'});
+  assert.equal(secondUpdate.success,false,'Corporate Intranet can only be updated once per round');
+  assert.match(String(secondUpdate.message),/already been updated this round/i);
+}
+{
+  const { session, company }=makeSession('expert');
+  session.phase='investment';
+  company.actionsRemaining=5;
+  const source=company.sites.find(site=>!site.isClosed)!;
+  source.teamCapability.operations=2;
+  source.codifiedKnowledge.operations=4;
+  company.intranet.operations=1;
+  const result=executeInvestmentActionV4(session,company,{type:'UPDATE_INTRANET',companyId:company.id,siteId:source.id,domain:'operations'});
+  assert.equal(result.success,true);
+  assert.equal(company.intranet.operations,4,'Expert Intranet publishing must use the richer local Team/Codified site score');
+}
+
 // SIF starts at a fixed $25k without reducing turnover.
 {
   const { company }=makeSession();
