@@ -20,6 +20,7 @@ interface Props{
  previewSiteDelta?:number;
  previewExpertDelta?:number;
  previewHQDelta?:number;
+ thresholdLine?:{value:number;label:string};
 }
 
 const KM_WEEK:KnowledgeDomain[]=['operations','hr','marketing'];
@@ -29,7 +30,7 @@ const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',ad
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine})=>{
  const domains=mode==='expert'?EXPERT:mode==='km_week'?KM_WEEK:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
  const experts=company.experts.filter(expert=>!expert.isVacant);
@@ -60,12 +61,19 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  return <div className="h-full min-h-[260px] rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-inner">
   <div className="flex items-center justify-between gap-3 px-1">
    <div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>
-   <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span className="text-slate-50">● Site</span>{mode!=='km_week'&&<span className="text-sky-300">◆ HQ</span>}<span className="text-amber-300">● Expert</span></div>
+   <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span className="text-slate-50">● Site</span>{mode!=='km_week'&&<span className="text-sky-300">◆ HQ</span>}<span className="text-amber-300">● Expert</span>{thresholdLine&&<span className="text-yellow-300">┄ Shock cut-off</span>}</div>
   </div>
   <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-[calc(100%-42px)] min-h-[220px] w-full" role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
    {ticks.map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
    {highlightDomain&&domainIndex>=0&&<rect x={Math.max(padL-42,x(domainIndex)-72)} y={padT-12} width="144" height={H-padT-padB+28} rx="16" fill="#facc15" fillOpacity=".06" stroke="#facc15" strokeOpacity=".38" strokeWidth="2"/>}
-   <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>{referencePath&&<><path d={referencePath} fill="none" stroke="#fde047" strokeWidth="9" strokeOpacity=".12" strokeLinecap="round" strokeLinejoin="round"/><path d={referencePath} fill="none" stroke="#fde047" strokeWidth="2.5" strokeDasharray="7 6" strokeLinecap="round" strokeLinejoin="round"/></>}
+   <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>
+   {thresholdLine&&<g data-kmw-shock-cutoff>
+    <line x1={padL} x2={W-padR} y1={y(thresholdLine.value)} y2={y(thresholdLine.value)} stroke="#facc15" strokeWidth="9" strokeOpacity=".10"/>
+    <line x1={padL} x2={W-padR} y1={y(thresholdLine.value)} y2={y(thresholdLine.value)} stroke="#fde047" strokeWidth="3" strokeDasharray="10 8"/>
+    <rect x={W-padR-145} y={y(thresholdLine.value)-25} width="140" height="20" rx="10" fill="#422006" stroke="#facc15" strokeWidth="1.5"/>
+    <text x={W-padR-75} y={y(thresholdLine.value)-11} textAnchor="middle" fill="#fef08a" fontSize="11" fontWeight="900">{thresholdLine.label}</text>
+   </g>}
+   {referencePath&&<><path d={referencePath} fill="none" stroke="#fde047" strokeWidth="9" strokeOpacity=".12" strokeLinecap="round" strokeLinejoin="round"/><path d={referencePath} fill="none" stroke="#fde047" strokeWidth="2.5" strokeDasharray="7 6" strokeLinecap="round" strokeLinejoin="round"/></>}
    {data.map((item,di)=>{
     const domainExperts=expertMarks.filter(mark=>mark.domain===item.domain);
     const domainSelected=item.domain===selectedDomain;
