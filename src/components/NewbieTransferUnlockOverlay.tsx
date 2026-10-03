@@ -23,5 +23,5 @@ export const NewbieTransferUnlockOverlay:React.FC<Props>=({session,company,onCon
      <div className="rounded-2xl border border-violet-700 bg-violet-950/25 px-4 py-3"><div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-violet-300"/><b className="text-sm text-white">Corporate Intranet</b></div><div className="mt-1 text-xs text-slate-400">Make knowledge available across the company.</div></div>
    </div>
    <button type="button" onClick={onContinue} className="mt-5 w-full rounded-xl bg-violet-600 py-3.5 text-base font-black text-white hover:bg-violet-500">NEXT CHALLENGE <ArrowRight className="ml-1 inline h-5 w-5"/></button>
- </div></div>;
+ </div>;
 };
