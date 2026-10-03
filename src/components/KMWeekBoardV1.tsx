@@ -85,6 +85,37 @@ const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selec
 
 const ResponseButton:React.FC<{selected:boolean;disabled?:boolean;children:React.ReactNode;onClick:()=>void}>=({selected,disabled,children,onClick})=><button type="button" disabled={disabled} onClick={onClick} className={`relative w-full rounded-xl border-2 px-3 py-2.5 text-left text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-35 ${selected?'border-amber-300 bg-amber-950/45 text-amber-100':'border-slate-700 bg-slate-950 text-slate-200 hover:border-slate-500'}`}>{children}<span className={`absolute right-3 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full border-2 ${selected?'border-amber-300 bg-amber-400 text-slate-950':'border-slate-600 bg-slate-900'}`}>{selected?'✓':''}</span></button>;
 
+const ChallengeKnowledgeBars:React.FC<{
+ requirement:number;
+ local:number;
+ expert:number;
+ expertName?:string;
+ appliedMethod?:ResponseMethod;
+}>=({requirement,local,expert,expertName,appliedMethod})=>{
+ const applied=appliedMethod==='local'?local:appliedMethod==='expert'?expert:0;
+ const requirementMet=appliedMethod!=='risk'&&applied>=requirement;
+ const pct=(value:number)=>`${Math.max(0,Math.min(100,(value/5)*100))}%`;
+ return <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2" data-kmw-knowledge-bars>
+  <div className="space-y-1.5">
+   <div className="grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2">
+    <span className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Requirement</span>
+    <div className="h-2.5 overflow-hidden rounded-full bg-slate-800"><div className={`h-full rounded-full transition-colors duration-300 ${requirementMet?'bg-emerald-400':'bg-rose-500'}`} style={{width:pct(requirement)}}/></div>
+    <b className={`text-[10px] ${requirementMet?'text-emerald-300':'text-rose-300'}`}>{requirement}</b>
+   </div>
+   <div className={`grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2 rounded-md px-1 py-0.5 transition ${appliedMethod==='local'?'bg-sky-950/40 ring-1 ring-sky-700':'opacity-70'}`}>
+    <span className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Local</span>
+    <div className="h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-sky-400" style={{width:pct(local)}}/></div>
+    <b className="text-[10px] text-sky-300">{local}</b>
+   </div>
+   <div className={`grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2 rounded-md px-1 py-0.5 transition ${appliedMethod==='expert'?'bg-amber-950/40 ring-1 ring-amber-700':'opacity-70'}`}>
+    <span className="truncate text-[8px] font-black uppercase tracking-[.12em] text-slate-500" title={expertName||'Expert'}>{expertName?expertName.split(' ')[0]:'Expert'}</span>
+    <div className="h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-amber-400" style={{width:pct(expert)}}/></div>
+    <b className="text-[10px] text-amber-300">{expert}</b>
+   </div>
+  </div>
+ </div>;
+};
+
 export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnly,controllerName,onSessionUpdate,onToast,onLeave,onTransferCeo})=>{
  const state=company.kmWeek;
  const[busy,setBusy]=useState(false);
@@ -340,6 +371,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        {activeChallenge&&activeChallenge.status==='open'&&<div className="mt-2 rounded-xl border border-slate-700 bg-black/20 p-2.5">
         <div className="flex items-start justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">{siteName(company,activeChallenge.siteId)} · {domainLabel(activeChallenge.domain)}</div><div className="mt-0.5 text-sm font-black text-white">{activeChallenge.title}</div></div><div className="text-right text-[9px] font-bold text-slate-500">Needs <b className="text-base text-white">{activeChallenge.difficulty}</b><br/>Local <b className={`text-base ${localScore>=activeChallenge.difficulty?'text-emerald-300':'text-amber-300'}`}>{localScore}</b></div></div>
         <p className="mt-1 text-[10px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
+        <ChallengeKnowledgeBars requirement={activeChallenge.difficulty} local={localScore} expert={activeExpertScore} expertName={activeExpert?.name} appliedMethod={pendingResponse?.challengeId===activeChallenge.id?pendingResponse.method:undefined}/>
         <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2">
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="mt-0.5 text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="mt-0.5 text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
