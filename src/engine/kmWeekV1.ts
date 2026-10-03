@@ -343,7 +343,6 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!skill)return{success:false,message:'Choose an expert and one of their knowledge domains.'};
-    if(state.stage==='guided'&&(domain!=='operations'||expert!==expertForDomain(company,'operations')))return{success:false,message:'Train Priya in Operations for this guided move.'};
     if(skill.score>=KM_WEEK_MAX_KNOWLEDGE)return{success:false,message:`${expert.name} is already at the KM Week maximum of 5.`};
     cost=15;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
     before=skill.score;skill.score=Math.min(KM_WEEK_MAX_KNOWLEDGE,skill.score+1);after=skill.score;expertId=expert.id;expert.state='Training';
@@ -352,7 +351,6 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const site=company.sites.find(item=>item.id===payload?.siteId&&!item.isClosed);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!site||!skill)return{success:false,message:'Choose an expert, their domain and a site.'};
-    if(state.stage==='guided'&&(domain!=='operations'||site.id!=='brisbane'||expert!==expertForDomain(company,'operations')))return{success:false,message:'Use Priya to train the Brisbane Operations team for this guided move.'};
     if(expert.location!==site.id)return{success:false,message:`${expert.name} is currently in ${company.sites.find(item=>item.id===expert.location)?.name||expert.location}. Use the expert on a Challenge there first, or choose their current site.`};
     if((site.teamCapability[domain]||0)>=skill.score)return{success:false,message:'The local team is already at this expert’s teaching ceiling.'};
     cost=10;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
@@ -361,7 +359,6 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const source=company.sites.find(item=>item.id===payload?.sourceSiteId&&!item.isClosed);
     const target=company.sites.find(item=>item.id===payload?.targetSiteId&&!item.isClosed);
     if(!source||!target||source.id===target.id)return{success:false,message:'Choose two different sites.'};
-    if(state.stage==='guided'&&(domain!=='operations'||source.id!=='brisbane'||target.id!=='perth'))return{success:false,message:'Transfer Brisbane Operations knowledge to Perth for this guided move.'};
     const sourceScore=source.teamCapability[domain]||0;
     const targetScore=target.teamCapability[domain]||0;
     if(sourceScore<=targetScore)return{success:false,message:`${source.name} must know more than ${target.name} in this domain before it can teach them.`};
