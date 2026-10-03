@@ -35,7 +35,6 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   const decisionRootRef=useRef<HTMLDivElement|null>(null);
   const isOpeningDiagnostic=session.round===1&&event.card.tags?.includes(PROGRAMMED_FAILURE_TAG);
   const isAssemblyLesson=session.round===1&&event.card.tags?.includes(PROGRAMMED_ASSEMBLY_TAG);
-  const isNewbieOpeningLesson=session.experienceMode==='newbie'&&Boolean(isOpeningDiagnostic);
   const lessonKey=`tpg_transfer_unlock_${session.id}_${company.id}`;
   const sharedResolution=(event as any).uiResolutionData;
   const displayEvent=useMemo<ActiveEventV2>(()=>{
@@ -91,7 +90,7 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   };
 
   const interceptContinue=async(data:any)=>{
-    if(isNewbieOpeningLesson&&!localStorage.getItem(lessonKey)){setPendingContinue(data);return;}
+    if(isOpeningDiagnostic&&!localStorage.getItem(lessonKey)){setPendingContinue(data);return;}
     await acknowledgeCompanyResolution(data);
   };
 
