@@ -6,6 +6,7 @@ import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
 import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SITE_IDS}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
+import{KMWeekDebriefV1}from'./KMWeekDebriefV1.tsx';
 import{formatCurrency}from'../utils/format.ts';
 
 interface Props{
@@ -320,7 +321,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
   {challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')&&<div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 top-[66px] z-40 bg-black/20"/>}
 
-  <main className="mx-auto max-w-[1500px] p-3 xl:flex xl:h-[calc(100vh-66px)] xl:flex-col xl:overflow-hidden">
+  {state.stage==='complete'?<KMWeekDebriefV1 session={session} company={company}/>:<main className="mx-auto max-w-[1500px] p-3 xl:flex xl:h-[calc(100vh-66px)] xl:flex-col xl:overflow-hidden">
    <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
     <div className="rounded-xl border-2 border-indigo-700 bg-indigo-950/45 px-3 py-1.5 text-[10px] font-black text-indigo-100">{phaseTitle(company)}</div>
     <PhaseStep number="1" label="Challenge" active={(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'} done={challengeStepDone}/>
@@ -441,6 +442,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      {standings.length>1&&<Card className="shrink-0 p-2.5"><div className="text-[8px] font-black uppercase tracking-[.14em] text-violet-300">Workshop standings</div><div className="mt-1 grid grid-cols-2 gap-1">{standings.map((entry,index)=><div key={entry.id} className={`flex items-center rounded-lg border px-2 py-1 text-[9px] ${entry.id===company.id?'border-violet-500 bg-violet-950/25':'border-slate-800 bg-slate-950'}`}><span className="w-4 font-black text-slate-500">{index+1}</span><span className="min-w-0 flex-1 truncate font-bold text-slate-300">{entry.name}</span><b className="text-white">{entry.score}</b></div>)}</div></Card>}
     </aside>
    </div>
-  </main>
+  </main>}
  </div>;
 };
