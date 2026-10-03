@@ -44,18 +44,18 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
 
 const FREE_ROUNDS: KMWeekChallenge[][] = [
   [
-    {id:'F1-HR-MEL',title:'Roster gap',story:'A sudden staffing gap threatens a critical Melbourne shift.',siteId:'melbourne',domain:'hr',difficulty:2,impact:30,status:'open'},
-    {id:'F1-MKT-BNE',title:'Campaign launch',story:'Brisbane must respond to a fast-moving customer opportunity.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:35,status:'open'},
+    {id:'F1-HR-MEL',title:'Roster gap',story:'A sudden staffing gap threatens a critical Melbourne shift.',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F1-HR-PER',title:'Recruitment surge',story:'Perth needs the same HR capability at the same time. One specialist cannot cover both sites.',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
   ],
   [
-    {id:'F2-OPS-PER',title:'Maintenance backlog',story:'Perth has a growing maintenance backlog that is starting to hit output.',siteId:'perth',domain:'operations',difficulty:2,impact:40,status:'open'},
-    {id:'F2-HR-PER',title:'Recruitment surge',story:'Perth needs to scale a new team faster than its local experience allows.',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F2-HR-MEL',title:'Workforce handover',story:'Melbourne needs HR capability again. What did the organisation retain from last round?',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F2-MKT-BNE',title:'Campaign launch',story:'Brisbane must respond to a fast-moving customer opportunity.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
   ],
   [
-    {id:'F3-MKT-MEL',title:'Product launch',story:'Melbourne has one chance to land a high-value new market launch.',siteId:'melbourne',domain:'marketing',difficulty:2,impact:45,status:'open'},
-    {id:'F3-OPS-BNE',title:'Process failure',story:'A recurring process failure is now threatening Brisbane customer delivery.',siteId:'brisbane',domain:'operations',difficulty:3,impact:45,status:'open'},
+    {id:'F3-MKT-BNE',title:'Customer response',story:'Brisbane faces another Marketing decision under time pressure.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
+    {id:'F3-OPS-PER',title:'Maintenance backlog',story:'Perth has a growing Operations backlog that is starting to hit output.',siteId:'perth',domain:'operations',difficulty:2,impact:45,status:'open'},
   ],
-];
+]
 
 function guidedChallenge(turn:number):KMWeekChallenge{
   if(turn===1)return {id:'G1',title:'Production line stopped',story:'Brisbane has an urgent Operations problem. The local team is out of its depth.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
