@@ -191,7 +191,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  };
 
  const guidedTargetInvestment:KMWeekInvestment|undefined=guided?(state.guidedTurn===1?'TRAIN_EXPERT':state.guidedTurn===2?'LOCAL_TRAINING':'KNOWLEDGE_TRANSFER'):undefined;
- const permittedInvestments:KMWeekInvestment[]=['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER'];
  const source=company.sites.find(site=>site.id===sourceSiteId);
  const target=company.sites.find(site=>site.id===targetSiteId);
  const investmentPreview=investment==='TRAIN_EXPERT'
