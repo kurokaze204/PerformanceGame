@@ -81,6 +81,9 @@ assert.ok(kmWeekBoardSource.includes("guidedTargetInvestment!=='TRAIN_EXPERT'")&
 assert.equal(kmWeekBoardSource.includes('disabled={guided} className="mt-1 w-full rounded-lg'),false,'Guided selectors must remain explorable while the tutorial constrains the intended move');
 assert.ok(kmWeekBoardSource.includes('any valid transfer will work'),'Guided Knowledge Transfer must make clear that the player may choose any valid source, destination and domain');
 assert.ok(kmWeekBoardSource.includes('actionError'),'Rejected KM Week actions must explain the problem inline rather than appearing to do nothing');
+assert.ok(kmWeekBoardSource.includes('data-kmw-knowledge-bars')&&kmWeekBoardSource.includes('Requirement')&&kmWeekBoardSource.includes('Local'),'KM Week Challenge detail must visualise requirement and local knowledge as horizontal bars');
+assert.ok(kmWeekBoardSource.includes("requirementMet?'bg-emerald-400':'bg-rose-500'"),'The Challenge requirement bar must turn green when the selected knowledge meets the requirement');
+assert.ok(kmWeekBoardSource.includes("appliedMethod==='expert'")&&kmWeekBoardSource.includes('bg-amber-400'),'Selecting an expert must visibly apply the expert knowledge bar');
 assert.ok(kmWeekBoardSource.includes('Score briefing · Round 4 Invest')&&kmWeekBoardSource.includes('Only the total score matters'),'The first free-play Invest must explain the scorecard and multiple paths to success');
 assert.ok(kmWeekBoardSource.includes('Your Goal card')&&kmWeekBoardSource.includes('One idea for this Invest'),'The Round 4 score briefing must explain the Goal card and give a light-touch next-step suggestion');
 assert.ok(kmWeekBoardSource.includes('fixed inset-0 z-[120] bg-black/70')&&kmWeekBoardSource.includes("scoreBriefOpen?'relative z-[135]"),'The score briefing must darken the board while keeping the Score Pad and Goal card highlighted');
