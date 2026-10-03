@@ -83,6 +83,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[selectedDomain,setSelectedDomain]=useState<KnowledgeDomain>('operations');
  const[selectedChallengeId,setSelectedChallengeId]=useState('');
  const[pendingResponse,setPendingResponse]=useState<PendingResponse>(null);
+ const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
  const[expertId,setExpertId]=useState('');
  const[sourceSiteId,setSourceSiteId]=useState('brisbane');
@@ -107,6 +108,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(!selected)setSelectedChallengeId(open?.id||state.challenges[0]?.id||'');
   if(!open||pendingResponse&&!state.challenges.some(challenge=>challenge.id===pendingResponse.challengeId&&challenge.status==='open'))setPendingResponse(null);
  },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound,state?.challenges.map(challenge=>`${challenge.id}:${challenge.status}`).join('|')]);
+
+ useEffect(()=>{
+  const challengePhase=state?.phase==='challenge'&&(state?.stage==='guided'||state?.stage==='free');
+  setChallengeFocusOpen(!challengePhase);
+  setPendingResponse(null);
+ },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
 
  useEffect(()=>{
   if(!state)return;
@@ -183,7 +190,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const investStepDone=state.stage==='shock'||shockDone;
 
  return <div className="min-h-screen bg-[#071019] text-slate-100 xl:h-screen xl:overflow-hidden">
-  <header className="z-[100] border-b-2 border-amber-950/60 bg-[#09131f]/98 px-3 py-2 shadow-xl xl:h-[66px]">
+  <header className="relative z-[100] border-b-2 border-amber-950/60 bg-[#09131f]/98 px-3 py-2 shadow-xl xl:h-[66px]">
    <div className="mx-auto flex h-full max-w-[1500px] items-center gap-2">
     <div className="mr-auto min-w-0"><div className="text-[8px] font-black uppercase tracking-[.22em] text-emerald-300">The Performance Gap · KM Week</div><div className="flex min-w-0 items-center gap-2"><Building2 className="h-5 w-5 shrink-0 text-amber-300"/><h1 className="truncate text-lg font-black text-white">{company.name}</h1><span className="hidden rounded-md border border-slate-700 px-1.5 py-0.5 text-[9px] font-black text-slate-500 sm:inline">{session.id}</span>{readOnly?<span className="hidden rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400 lg:inline">Watching · CEO {controllerName}</span>:<span className="hidden rounded-full border border-amber-600 bg-amber-950/50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-200 lg:inline"><Crown className="mr-1 inline h-3 w-3"/>CEO · You</span>}</div></div>
     <div className="flex h-12 min-w-[112px] flex-col justify-center rounded-xl border-2 border-emerald-800 bg-emerald-950/25 px-3"><div className="text-[8px] font-black uppercase text-emerald-400">Turnover</div><div className="text-base font-black leading-none text-emerald-200">{money(company.turnover)}</div></div>
@@ -193,6 +200,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <button onClick={onLeave} className="h-12 min-w-[92px] rounded-xl border-2 border-rose-800 bg-rose-950/30 px-3 text-xs font-black text-rose-200 hover:border-rose-500"><LogOut className="mr-1 inline h-4 w-4"/>Leave</button>
    </div>
   </header>
+
+  {challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')&&<div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 top-[66px] z-40 bg-black/20"/>}
 
   <main className="mx-auto max-w-[1500px] p-3 xl:flex xl:h-[calc(100vh-66px)] xl:flex-col xl:overflow-hidden">
    <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
@@ -222,7 +231,16 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     </div>
 
     <aside className="space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-2">
-     <Card className="border-violet-700 bg-[linear-gradient(145deg,#1b1731,#101827)] p-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className="flex min-h-[360px] shrink-0 items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 xl:min-h-0 xl:flex-1">
+      <button type="button" onClick={()=>setChallengeFocusOpen(true)} className="group kmw-start-card relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
+       <div className="absolute inset-2 rounded-[13px] border border-violet-400/35"/>
+       <div className="text-[9px] font-black uppercase tracking-[.24em] text-violet-300">The Performance Gap</div>
+       <div className="mt-5 text-2xl font-black tracking-[.08em] text-white">CHALLENGE</div>
+       <div className="mt-5 rounded-full border-2 border-amber-300 bg-amber-950/45 px-4 py-2 text-xs font-black text-amber-100">CLICK HERE TO START</div>
+       <div className="mt-3 text-[9px] font-bold text-slate-500">{phaseTitle(company)}</div>
+      </button>
+     </div>:<div className={`${challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')?'relative z-[60] kmw-card-reveal':''}`}>
+     <Card className={`border-violet-700 bg-[linear-gradient(145deg,#1b1731,#101827)] p-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto ${challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')?'ring-4 ring-violet-400/20 shadow-[0_20px_60px_rgba(0,0,0,.55)]':''}`}>
       <div className="flex items-center justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-violet-300">Your move</div><h2 className="text-xl font-black text-white">{currentPhaseLabel(company)}</h2></div><div className="rounded-lg border border-violet-700 bg-violet-950/30 px-2 py-1 text-[9px] font-black uppercase text-violet-200">{phaseTitle(company)}</div></div>
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&<>
@@ -265,6 +283,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
       {state.stage==='complete'&&<div className="mt-3 text-center"><Sparkles className="mx-auto h-10 w-10 text-emerald-300"/><h3 className="mt-2 text-2xl font-black text-white">{state.score.total} points</h3><p className="mt-1 text-xs text-slate-400">The score is useful. The shape of your River is the real result.</p><div className="mt-2 flex justify-center gap-2 text-[10px] font-black uppercase tracking-[.12em]"><span className="rounded-full border border-amber-700 bg-amber-950/30 px-2 py-1 text-amber-200">Depth</span><span className="rounded-full border border-sky-700 bg-sky-950/30 px-2 py-1 text-sky-200">Breadth</span><span className="rounded-full border border-emerald-700 bg-emerald-950/30 px-2 py-1 text-emerald-200">Flow</span></div><div className="mt-3 grid grid-cols-5 gap-1">{state.shockChecks.map(check=><div key={check.id} className={`rounded-lg border p-2 ${check.passed?'border-emerald-700 bg-emerald-950/25':'border-rose-800 bg-rose-950/25'}`}><div className="text-[8px] font-black text-slate-500">{SITE_ABBR[check.siteId]}</div><div className={`text-[9px] font-black ${check.passed?'text-emerald-300':'text-rose-300'}`}>{check.passed?'READY':'GAP'}</div></div>)}</div><div className="mt-3 rounded-xl border border-violet-700 bg-violet-950/20 p-3"><div className="text-[9px] font-black uppercase tracking-[.14em] text-violet-300">The strategy you just played</div><div className="mt-2 text-[11px] font-black text-white">Expert Education → Experts → Local Training → Site Users → Knowledge Transfer</div><p className="mt-2 text-[10px] text-slate-500">Newbie mode opens the rest of the knowledge system.</p></div></div>}
      </Card>
+     </div>}
 
      <Card className="shrink-0 p-2.5">
       <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
