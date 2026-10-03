@@ -56,7 +56,7 @@ const TurnoverGraph:React.FC<{companies:CompanyV2[];colors:string[]}>=({companie
 
 const AARQuestions:React.FC<{open:boolean;onClose:()=>void}>=({open,onClose})=>!open?null:<>
  <button type="button" aria-label="Close After Action Review Questions" onClick={onClose} className="fixed inset-x-0 bottom-0 top-[66px] z-[180] bg-black/55"/>
- <aside className="fixed bottom-0 right-0 top-[66px] z-[190] w-[min(440px,94vw)] border-l-2 border-violet-500 bg-[#0b1220] p-5 shadow-2xl">
+ <aside className="kmw-aar-slide-in fixed bottom-0 right-0 top-[66px] z-[190] w-[min(440px,94vw)] border-l-2 border-violet-500 bg-[#0b1220] p-5 shadow-2xl">
   <div className="flex items-start justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-violet-300">After Action Review</div><h2 className="mt-1 text-2xl font-black text-white">Four questions. Keep it simple.</h2></div><button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-700 bg-slate-950 text-slate-300" aria-label="Close questions"><X className="h-5 w-5"/></button></div>
   <p className="mt-3 text-xs leading-relaxed text-slate-400">Use the scorecards, turnover graph and before/after Rivers as evidence. The point is learning, not defending the score.</p>
   <div className="mt-5 space-y-3">
