@@ -6,6 +6,7 @@ import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
 import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SITE_IDS}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
+import type{RiverGhostPreview}from'./InvestmentRiverView.tsx';
 import{KMWeekDebriefV1}from'./KMWeekDebriefV1.tsx';
 import{formatCurrency}from'../utils/format.ts';
 
@@ -66,9 +67,10 @@ function scoreBriefSuggestion(goalId:string){
  return 'Your Goal rewards a balanced network. Look for your weakest site and use Local Training or Knowledge Transfer to strengthen it.';
 }
 
-const ToolTip:React.FC<{text:string}>=({text})=><span className="group relative inline-flex"><Info className="h-3.5 w-3.5 cursor-help text-slate-500"/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
+const ToolTip:React.FC<{text:string;onHoverChange?:(active:boolean)=>void}>=({text,onHoverChange})=><span className="group relative inline-flex" onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={onHoverChange?0:undefined}><Info className="h-3.5 w-3.5 cursor-help text-slate-500"/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
 
-const ScoreCell:React.FC<{label:string;value:number;max:string;icon:React.ReactNode;tip:string}>=({label,value,max,icon,tip})=><div className="relative flex min-w-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2 py-1.5"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-700 bg-slate-900 text-slate-300">{icon}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-1 text-[10px] font-black text-slate-400">{label}<ToolTip text={tip}/></span><span className="text-lg font-black leading-none tabular-nums text-white">{value}<span className="ml-1 text-[9px] text-slate-600">/{max}</span></span></span></div>;
+type ScoreGhostKind='expertise'|'local'|'flow'|'resilience';
+const ScoreCell:React.FC<{label:string;value:number;max:string;icon:React.ReactNode;tip:string;ghost?:ScoreGhostKind;onGhost?:(ghost:ScoreGhostKind|null)=>void}>=({label,value,max,icon,tip,ghost,onGhost})=><div className="relative flex min-w-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2 py-1.5"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-700 bg-slate-900 text-slate-300">{icon}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-1 text-[10px] font-black text-slate-400">{label}<ToolTip text={tip} onHoverChange={ghost&&onGhost?(active)=>onGhost(active?ghost:null):undefined}/></span><span className="text-lg font-black leading-none tabular-nums text-white">{value}<span className="ml-1 text-[9px] text-slate-600">/{max}</span></span></span></div>;
 
 const PhaseStep:React.FC<{label:string;active:boolean;done:boolean;number:string}>=({label,active,done,number})=><div className={`flex items-center gap-2 rounded-xl border-2 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.08em] ${active?'border-amber-300 bg-amber-950/40 text-amber-100':done?'border-emerald-800 bg-emerald-950/25 text-emerald-300':'border-slate-800 bg-slate-950/60 text-slate-600'}`}><span className={`grid h-5 w-5 place-items-center rounded-full border ${active?'border-amber-300':done?'border-emerald-600':'border-slate-700'}`}>{done?<CheckCircle2 className="h-3 w-3"/>:number}</span>{label}</div>;
 
@@ -127,6 +129,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
+ const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
+ const[riverFrozenCompany,setRiverFrozenCompany]=useState<CompanyV2|null>(null);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
  const[expertId,setExpertId]=useState('');
  const[sourceSiteId,setSourceSiteId]=useState('brisbane');
@@ -265,6 +269,24 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     ?specialist&&localTrainingSite?`${localTrainingSite.name} ${domainLabel(specialistDomain)}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min(5,(localTrainingSite.teamCapability[specialistDomain]||0)+1)}`:'Choose a company expert'
     :source&&target?`${source.name} ${domainLabel(selectedDomain)} ${source.teamCapability[selectedDomain]||0} → ${target.name} ${target.teamCapability[selectedDomain]||0}`:'Choose two sites';
 
+ const scoreGhostPreview:RiverGhostPreview|undefined=(()=>{
+  if(scoreGhost==='expertise'&&specialist){
+   const score=specialistScore(company,specialistDomain);
+   return score<5?{kind:'expert',domain:specialistDomain,expertId:specialist.id,delta:1}:undefined;
+  }
+  if(scoreGhost==='local'&&specialist&&localTrainingSite){
+   const current=localTrainingSite.teamCapability[specialistDomain]||0;
+   const ceiling=specialistScore(company,specialistDomain);
+   return current<ceiling&&current<5?{kind:'site',domain:specialistDomain,siteId:localTrainingSite.id,delta:1}:undefined;
+  }
+  if(scoreGhost==='flow'&&source&&target){
+   const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;
+   return from>to&&to<5?{kind:'transfer',domain:selectedDomain,sourceSiteId:source.id,targetSiteId:target.id,delta:1}:undefined;
+  }
+  if(scoreGhost==='resilience')return{kind:'threshold',value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK READY · ${KM_WEEK_SHOCK_CUTOFF}`};
+  return undefined;
+ })();
+
  const invest=async(event:React.MouseEvent<HTMLButtonElement>)=>{
   let payload:any,targetKey='';
   if(investment==='TRAIN_EXPERT'){
@@ -282,7 +304,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     targetKey=`site:${targetSiteId}:${selectedDomain}`;
   }
   const startX=event.clientX,startY=event.clientY;
-  await post(payload,()=>animateKnowledgeSpark(startX,startY,targetKey));
+  setRiverFrozenCompany(structuredClone(company));
+  await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+  const ok=await post(payload,async()=>{
+   await animateKnowledgeSpark(startX,startY,targetKey);
+   setRiverFrozenCompany(null);
+   await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+  });
+  if(!ok)setRiverFrozenCompany(null);
  };
 
  const challengeDone=state.challenges.length>0&&state.challenges.every(challenge=>challenge.status!=='open');
@@ -335,7 +364,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <div className="space-y-3 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-3">
      <Card className="p-3 xl:min-h-0 xl:flex-1">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Knowledge River</div><h2 className="text-lg font-black text-white">Where is the capability now?</h2></div><div className="flex gap-1">{KM_WEEK_DOMAINS.map(domain=><button key={domain} onClick={()=>setSelectedDomain(domain)} className={`rounded-full border-2 px-2.5 py-1 text-[9px] font-black ${selectedDomain===domain?'border-amber-300 bg-amber-950/40 text-amber-100':'border-slate-700 bg-slate-950 text-slate-400'}`}>{domainLabel(domain)}</button>)}</div></div>
-      <div className="h-[360px] xl:h-[calc(100%-42px)] xl:min-h-[285px]"><InvestmentRiverView company={company} mode="km_week" selectedDomain={selectedDomain} highlightDomain thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+      <div className="h-[360px] xl:h-[calc(100%-42px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
      </Card>
 
      <div className="grid shrink-0 gap-2 md:grid-cols-3">
@@ -418,10 +447,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
       <div className="mt-2 grid grid-cols-2 gap-1.5">
        <ScoreCell label="Business Performance" value={state.score.business} max="12" icon={<CircleDollarSign className="h-3.5 w-3.5"/>} tip="2 points for each successful free-play Challenge. Improve this by solving business problems successfully."/>
-       <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability. Each expert scores 1 point per knowledge level above 3. Use Train Expert to improve it."/>
-       <ScoreCell label="Local capability" value={state.score.localCapability} max="9" icon={<Users className="h-3.5 w-3.5"/>} tip="1 point for every site/domain combination that reaches Knowledge 2 or higher. Improve it with Local Training and Knowledge Transfer."/>
-       <ScoreCell label="Knowledge Flow" value={state.score.knowledgeFlow} max="6" icon={<Workflow className="h-3.5 w-3.5"/>} tip="Rewards useful knowledge movement. Transfers score, with an extra point when a transfer lifts a site across the useful Knowledge 2 threshold."/>
-       <ScoreCell label="Resilience" value={state.score.resilience} max="5" icon={<ShieldCheck className="h-3.5 w-3.5"/>} tip="Scored in the final Business Shock: 1 point for each test your sites can handle without company experts."/>
+       <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability. Each expert scores 1 point per knowledge level above 3. Use Train Expert to improve it. Hover here to preview the next +1 on the River." ghost="expertise" onGhost={setScoreGhost}/>
+       <ScoreCell label="Local capability" value={state.score.localCapability} max="9" icon={<Users className="h-3.5 w-3.5"/>} tip="1 point for every site/domain combination that reaches Knowledge 2 or higher. Improve it with Local Training. Hover here to preview the selected expert teaching their current site." ghost="local" onGhost={setScoreGhost}/>
+       <ScoreCell label="Knowledge Flow" value={state.score.knowledgeFlow} max="6" icon={<Workflow className="h-3.5 w-3.5"/>} tip="Rewards useful knowledge movement. Transfers score, with an extra point when a transfer lifts a site across the useful Knowledge 2 threshold. Hover here to preview the selected From → To transfer." ghost="flow" onGhost={setScoreGhost}/>
+       <ScoreCell label="Resilience" value={state.score.resilience} max="5" icon={<ShieldCheck className="h-3.5 w-3.5"/>} tip="Scored in the final Business Shock: 1 point for each test your sites can handle without company experts. Hover here to see the main resilience cut-off on the River." ghost="resilience" onGhost={setScoreGhost}/>
        <ScoreCell label="KM Week goal" value={state.score.goal} max="5" icon={<Target className="h-3.5 w-3.5"/>} tip={`Complete the shared goal “${goal.title}” for 5 points. ${goal.description}`}/>
       </div>
      </Card>
