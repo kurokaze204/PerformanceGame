@@ -27,7 +27,7 @@ export type KnowledgeStrategy =
   | 'transfer_best_practice'
   | 'no_particular_strategy';
 
-export type ExperienceMode = 'newbie' | 'expert';
+export type ExperienceMode = 'km_week' | 'newbie' | 'expert';
 export type PopulationMode = 'expand' | 'balanced';
 export type GameEndMode = 'time' | 'rounds';
 export type CompanyRoundPhase = 'events' | 'investment' | 'risk';
