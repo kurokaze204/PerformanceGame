@@ -70,6 +70,10 @@ assert.ok(kmWeekBoardSource.includes('COMMIT RESPONSE'),'KM Week Challenge choic
 assert.ok(kmWeekBoardSource.includes('Current phase'),'KM Week board must make the current phase explicit');
 assert.ok(kmWeekBoardSource.includes('Company experts'),'KM Week must use the business-facing Company experts label');
 assert.ok(kmWeekBoardSource.includes('Score pad')&&kmWeekBoardSource.includes('ToolTip'),'KM Week score categories must explain how points are earned');
+assert.ok(kmWeekBoardSource.includes('CLICK HERE TO START'),'KM Week must stage each Challenge behind an explicit facedown event card');
+assert.ok(kmWeekBoardSource.includes('border-dashed border-violet-500/70'),'KM Week Challenge start area must read as an active play zone rather than furniture');
+assert.ok(kmWeekBoardSource.includes('bg-black/20'),'Opening a Challenge must dim the rest of the board by 20 percent');
+assert.ok(kmWeekBoardSource.includes('kmw-card-reveal'),'Opening a Challenge must animate the event card into the decision view');
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
 assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
 
