@@ -103,7 +103,6 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
         {hqSelected&&<text x={px+10} y={py-8} fill="#7dd3fc" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">HQ · {hqScore}</text>}
        </g>
      })()}
-     })()}
      {domainExperts.map((mark,ei)=>{
        const {px,py}=expertPoints[ei];
        const selected=domainSelected&&mark.expert.id===selectedExpertId;
