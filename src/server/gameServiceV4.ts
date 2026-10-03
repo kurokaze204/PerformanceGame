@@ -7,6 +7,7 @@ import { createInitialCompanyV2, drawRoundEventsV2 } from '../engine/coreV2.ts';
 import { interventionUnlocked } from '../engine/experienceModeV3.ts';
 import { isInvestmentActionV4 } from '../engine/investmentActionsV4.ts';
 import { initialiseSoloCoPPeerV5 } from '../engine/copNetworkV5.ts';
+import { initialiseKMWeekSessionV1 } from '../engine/kmWeekV1.ts';
 import { saveParticipant, saveSessionV2 } from './dbV2.ts';
 import {
   advancePhaseV2 as legacyAdvancePhaseV2,
@@ -87,9 +88,13 @@ export async function createNewSessionV2(sessionId:string,title:string,companyNa
  session.gameEndMode=session.experienceMode==='expert'&&options.gameEndMode==='rounds'?'rounds':'time';
  session.finalRoundCount=clamp(Number(options.finalRoundCount||30),1,200);
  session.timerStartedAt=null;session.timerEndsAt=null;session.timerPausedSecondsRemaining=session.gameDurationMinutes*60;session.riskResults=null;
- dealCompanyDisruptionsV1(session);
- initialiseSoloCoPPeerV5(session);
- setNextPair(session);for(const company of session.companies)session.activeEvents[company.id]=drawRoundEventsV2(session,company);
+ if(session.experienceMode==='km_week'){
+  initialiseKMWeekSessionV1(session);
+ }else{
+  dealCompanyDisruptionsV1(session);
+  initialiseSoloCoPPeerV5(session);
+  setNextPair(session);for(const company of session.companies)session.activeEvents[company.id]=drawRoundEventsV2(session,company);
+ }
  await saveSessionV2(session);return session;
 }
 
