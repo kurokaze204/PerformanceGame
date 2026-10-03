@@ -4,12 +4,17 @@ export type CapabilityGroup = 'internal' | 'expert' | 'network' | 'foresight';
 
 export function capabilityUnlocked(mode: ExperienceMode, round: number, group: CapabilityGroup) {
   if (mode === 'expert') return true;
+  if (mode === 'km_week') return group === 'internal' || group === 'expert';
   if (group === 'internal' || group === 'expert') return round >= 1;
   if (group === 'network') return round >= 2;
   return round >= 3;
 }
 
 export function interventionUnlocked(mode: ExperienceMode, round: number, actionType: string) {
+  // KM Week deliberately exposes only the three interventions in its
+  // Build & Spread Expertise strategy.
+  if (mode === 'km_week') return ['TRAIN_EXPERT','KNOWLEDGE_TRANSFER','SITE_KNOWLEDGE_SHARING'].includes(actionType);
+
   // Local Codified Knowledge is intentionally removed from the Newbie decision model.
   // The deeper tacit/codified distinction remains available in Expert mode.
   if (mode === 'newbie' && actionType === 'CODIFY_SITE') return false;
