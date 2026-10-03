@@ -86,10 +86,6 @@ function activeExperts(company:CompanyV2){
   return company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
 }
 
-function expertForDomain(company:CompanyV2,domain:KnowledgeDomain){
-  return activeExperts(company).find(expert=>expert.domains.some(skill=>skill.domain===domain));
-}
-
 function applyStartingBoard(company:CompanyV2){
   for(const site of company.sites){
     site.isClosed=!KM_WEEK_SITE_IDS.includes(site.id as any);
