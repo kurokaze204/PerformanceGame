@@ -128,6 +128,8 @@ assert.ok((company.kmWeek?.score.business||0)>=0&&(company.kmWeek?.score.busines
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE_SHOCK'});
 assert.equal(result.success,true,result.message);
 assert.equal(company.kmWeek?.stage,'complete');
+assert.ok((company.kmWeek?.turnoverHistory.length||0)>6,'KM Week must preserve turnover history for the AAR-lite graph');
+assert.equal(company.kmWeek?.turnoverHistory[0].label,'START','KM Week turnover history must begin with the starting company');
 assert.equal(session.finalDisruptionResolved,true,'completed KM Week session should be marked complete');
 assert.equal(company.kmWeek?.shockChecks.length,5);
 assert.ok((company.kmWeek?.score.total||0)>0);
