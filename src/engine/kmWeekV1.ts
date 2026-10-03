@@ -163,6 +163,7 @@ export function initialiseKMWeekSessionV1(session:GameSessionV2){
   for(const company of session.companies){
     initialiseKMWeekCompanyV1(company);
     session.activeEvents[company.id]=[];
+    syncScore(session,company);
   }
 }
 
@@ -171,7 +172,7 @@ export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
   let changed=false;
   if(!session.kmWeekGoalId){session.kmWeekGoalId=hashGoal(session.id);changed=true;}
   for(const company of session.companies){
-    if(!company.kmWeek){initialiseKMWeekCompanyV1(company);session.activeEvents[company.id]=[];changed=true;}
+    if(!company.kmWeek){initialiseKMWeekCompanyV1(company);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
   }
   return changed;
 }
