@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type { KnowledgeDomain } from '../types/game.ts';
 import type { ActiveEventV2, CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import { PROGRAMMED_ASSEMBLY_TAG, PROGRAMMED_FAILURE_TAG } from '../engine/eventProgressionV5.ts';
