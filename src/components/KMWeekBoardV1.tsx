@@ -58,6 +58,13 @@ function currentGuidedCopy(company:CompanyV2){
  return{title:'3. The problem moves',text:'A similar Operations issue has appeared in Perth. Use Priya, then commit your response.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
 }
 
+function scoreBriefSuggestion(goalId:string){
+ if(goalId==='deep-bench')return 'Your Goal rewards expert depth. If an expert is still below Knowledge 5, Train Expert is the shortest route toward those 5 Goal points.';
+ if(goalId==='local-heroes')return 'Your Goal rewards solving Challenges locally. Local Training or Knowledge Transfer can strengthen a site so you rely less on travelling experts.';
+ if(goalId==='broad-base')return 'Your Goal rewards breadth. Look for a site/domain sitting below Knowledge 2 and use Local Training or Knowledge Transfer to lift it.';
+ return 'Your Goal rewards a balanced network. Look for your weakest site and use Local Training or Knowledge Transfer to strengthen it.';
+}
+
 const ToolTip:React.FC<{text:string}>=({text})=><span className="group relative inline-flex"><Info className="h-3.5 w-3.5 cursor-help text-slate-500"/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
 
 const ScoreCell:React.FC<{label:string;value:number;max:string;icon:React.ReactNode;tip:string}>=({label,value,max,icon,tip})=><div className="relative flex min-w-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2 py-1.5"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-700 bg-slate-900 text-slate-300">{icon}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-1 text-[10px] font-black text-slate-400">{label}<ToolTip text={tip}/></span><span className="text-lg font-black leading-none tabular-nums text-white">{value}<span className="ml-1 text-[9px] text-slate-600">/{max}</span></span></span></div>;
@@ -87,6 +94,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[pendingResponse,setPendingResponse]=useState<PendingResponse>(null);
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
+ const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
  const[expertId,setExpertId]=useState('');
  const[sourceSiteId,setSourceSiteId]=useState('brisbane');
@@ -94,7 +102,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[now,setNow]=useState(Date.now());
 
  const members=session.participants.filter(item=>item.role!=='facilitator'&&item.companyId===company.id);
- const goal=KM_WEEK_GOALS[session.kmWeekGoalId||'local-heroes'];
+ const goalId=session.kmWeekGoalId||'local-heroes';
+ const goal=KM_WEEK_GOALS[goalId];
+ const scoreSuggestion=scoreBriefSuggestion(goalId);
  const sites=KM_WEEK_SITE_IDS.map(id=>company.sites.find(site=>site.id===id)).filter((site):site is CompanyV2['sites'][number]=>Boolean(site));
  const experts=company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
  const specialist=expertId?experts.find(item=>item.id===expertId):specialistFor(company,selectedDomain);
@@ -121,6 +131,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  useEffect(()=>{
   if(state?.stage==='guided'&&state.phase==='invest'&&state.guidedTurn===1)setFirstInvestBriefDismissed(false);
  },[state?.stage,state?.phase,state?.guidedTurn]);
+
+ useEffect(()=>{
+  if(state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1)return;
+  const key=`tpg:kmw-score-brief:${session.id}:${company.id}`;
+  if(localStorage.getItem(key)!=='seen')setScoreBriefOpen(true);
+ },[state?.stage,state?.phase,state?.freeRound,session.id,company.id]);
 
  useEffect(()=>{
   if(!state)return;
@@ -247,6 +263,23 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>
   </header>
 
+  {scoreBriefOpen&&<>
+   <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/70"/>
+   <div className="fixed left-1/2 top-1/2 z-[145] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-5 shadow-[0_24px_80px_rgba(0,0,0,.72)] xl:left-[38%]">
+    <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Score briefing · Round 4 Invest</div>
+    <h2 className="mt-2 text-2xl font-black text-white">Nice work — your company is improving.</h2>
+    <p className="mt-2 text-sm leading-relaxed text-slate-200">Your Score Pad is already showing the effect of the choices you have made. <b className="text-amber-200">Only the total score matters</b>, so there is no single “right” way to build the company. You can earn points through business performance, deeper expertise, stronger local capability, knowledge flow, resilience and the Goal card.</p>
+    <div className="mt-3 rounded-xl border border-slate-700 bg-slate-950/75 p-3">
+     <div className="text-[9px] font-black uppercase tracking-[.14em] text-violet-300">Your Goal card</div>
+     <div className="mt-1 text-base font-black text-white">{goal.title} · 5 points</div>
+     <p className="mt-1 text-xs leading-relaxed text-slate-400">{goal.description}</p>
+     <p className="mt-2 text-xs leading-relaxed text-emerald-200"><b>One idea for this Invest:</b> {scoreSuggestion}</p>
+    </div>
+    <p className="mt-3 text-[11px] leading-relaxed text-slate-400">That is only a suggestion. From here, choose the investment that fits the company you want to build.</p>
+    <button type="button" onClick={()=>{localStorage.setItem(`tpg:kmw-score-brief:${session.id}:${company.id}`,'seen');setScoreBriefOpen(false)}} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">GOT IT — LET ME INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+   </div>
+  </>}
+
   {challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')&&<div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 top-[66px] z-40 bg-black/20"/>}
 
   <main className="mx-auto max-w-[1500px] p-3 xl:flex xl:h-[calc(100vh-66px)] xl:flex-col xl:overflow-hidden">
@@ -340,6 +373,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      </Card>
      </div>}
 
+     <div className={scoreBriefOpen?'relative z-[135] rounded-[22px] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}>
      <Card className="shrink-0 p-2.5">
       <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
       <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -353,6 +387,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      </Card>
 
      <div className="grid shrink-0 grid-cols-2 gap-2">
+      <div className={scoreBriefOpen?'relative z-[135] rounded-[22px] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}>
       <Card className="rotate-[.2deg] border-amber-700 bg-[linear-gradient(150deg,#34220d,#17130d)] p-2.5">
        <div className="flex items-center gap-1.5"><Target className="h-4 w-4 text-amber-300"/><div className="text-[8px] font-black uppercase tracking-[.14em] text-amber-300">Goal · 5 pts</div></div><h3 className="mt-1 text-sm font-black text-white">{goal.title}</h3><p className="mt-1 text-[9px] leading-snug text-amber-100/70">{goal.description}</p><div className={`mt-1.5 text-[9px] font-black ${state.score.goal?'text-emerald-300':'text-amber-300'}`}>{state.score.goal?'ACHIEVED · +5':'IN PLAY'}</div>
       </Card>
