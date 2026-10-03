@@ -184,7 +184,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      </div>
 
      {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&<Card className="border-violet-800 bg-[#0d1320] p-4">
-      {guided&&<div className="mb-3 rounded-2xl border-2 border-amber-500 bg-amber-950/25 p-3"><div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Guided move {state.guidedTurn} of 3</div><div className="mt-1 font-black text-white">{guidedCopy.title}</div><p className="mt-1 text-xs text-slate-300">{guidedCopy.text}</p><p className="mt-2 text-[11px] font-bold text-amber-200">{guidedCopy.invest}</p></div>}
+      {guided&&<div className="mb-3 rounded-2xl border-2 border-amber-500 bg-amber-950/25 p-3"><div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Guided move {state.guidedTurn} of 3</span><span className="rounded-full border border-amber-700 bg-black/20 px-2 py-0.5 text-[8px] font-black uppercase tracking-[.14em] text-amber-200">Read to your team</span></div><div className="mt-1 font-black text-white">{guidedCopy.title}</div><p className="mt-1 text-xs text-slate-300">{guidedCopy.text}</p><p className="mt-2 text-[11px] font-bold text-amber-200">{guidedCopy.invest}</p></div>}
       <div className="grid gap-3 md:grid-cols-2">{state.challenges.map(challenge=><ChallengeCard key={challenge.id} challenge={challenge} company={company} guided={guided} usedExpertIds={state.usedExpertIds} busy={busy} readOnly={readOnly} onResolve={resolve}/>)}</div>
      </Card>}
 
