@@ -269,7 +269,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      <Card className="shrink-0 p-2.5">
       <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
       <div className="mt-2 grid grid-cols-2 gap-1.5">
-       <ScoreCell label="Business" value={state.score.business} max="12" icon={<CircleDollarSign className="h-3.5 w-3.5"/>} tip="2 points for each successful free-play Challenge. Improve this by solving business problems successfully."/>
+       <ScoreCell label="Business performance" value={state.score.business} max="12" icon={<CircleDollarSign className="h-3.5 w-3.5"/>} tip="2 points for each successful free-play Challenge. Improve this by solving business problems successfully."/>
        <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability. Each expert scores 1 point per knowledge level above 3. Use Train Expert to improve it."/>
        <ScoreCell label="Local capability" value={state.score.localCapability} max="9" icon={<Users className="h-3.5 w-3.5"/>} tip="1 point for every site/domain combination that reaches Knowledge 2 or higher. Improve it with Local Training and Knowledge Transfer."/>
        <ScoreCell label="Knowledge flow" value={state.score.knowledgeFlow} max="6" icon={<Workflow className="h-3.5 w-3.5"/>} tip="Rewards useful knowledge movement. Transfers score, with an extra point when a transfer lifts a site across the useful Knowledge 2 threshold."/>
