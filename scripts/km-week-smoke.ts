@@ -8,6 +8,7 @@ import {
   KM_WEEK_SITE_IDS,
 } from '../src/engine/kmWeekV1.ts';
 import type { GameSessionV2 } from '../src/types/gameV2.ts';
+import { riverSiteKnowledgeScore } from '../src/engine/riverKnowledgeV1.ts';
 
 const config={...DEFAULT_CONFIG,actions_per_round:1};
 const company=createInitialCompanyV2('Apex Technologies','kmw-company',config);
@@ -52,6 +53,9 @@ assert.equal(company.kmWeek?.phase,'challenge');
 assert.deepEqual(company.sites.filter(site=>!site.isClosed).map(site=>site.id),[...KM_WEEK_SITE_IDS]);
 for(const site of company.sites.filter(site=>!site.isClosed)){
   for(const domain of KM_WEEK_DOMAINS)assert.ok((site.teamCapability[domain]||0)>=0&&(site.teamCapability[domain]||0)<=5);
+}
+for(const site of company.sites.filter(site=>!site.isClosed)){
+  for(const domain of KM_WEEK_DOMAINS)assert.equal(riverSiteKnowledgeScore(site,domain,'km_week'),site.teamCapability[domain]||0,'KM Week River must exactly match the visible site score');
 }
 assert.deepEqual(company.experts.map(expert=>expert.domains[0].domain),['operations','hr','marketing']);
 
