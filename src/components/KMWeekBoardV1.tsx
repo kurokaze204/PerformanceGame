@@ -72,6 +72,7 @@ const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selec
   <div className="flex items-center justify-between gap-2"><span className="truncate text-[9px] font-black uppercase tracking-[.12em] text-emerald-300">{site?.name} · {domainLabel(challenge.domain)}</span>{done&&<span className={`text-[9px] font-black ${challenge.status==='success'?'text-emerald-300':'text-rose-300'}`}>{challenge.status==='success'?'SOLVED':'MISSED'}</span>}</div>
   <div className="mt-1 truncate text-xs font-black text-white">{challenge.title}</div>
   <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-slate-500"><span>Needs <b className="text-white">{challenge.difficulty}</b></span><span>Local <b className={local>=challenge.difficulty?'text-emerald-300':'text-amber-300'}>{local}</b></span></div>
+  <div className="mt-1 flex items-center gap-2 border-t border-slate-800 pt-1 text-[9px] font-black"><span className="text-emerald-300">WIN +{money(challenge.impact)}</span><span className="text-rose-300">LOSE -{money(challenge.impact)}</span>{done&&challenge.travelCost&&<span className="ml-auto text-amber-300">Travel -{money(challenge.travelCost)}</span>}</div>
  </button>;
 };
 
@@ -144,6 +145,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const activeExpert=activeChallenge?specialistFor(company,activeChallenge.domain):undefined;
  const activeExpertScore=activeChallenge&&activeExpert?activeExpert.domains.find(skill=>skill.domain===activeChallenge.domain)?.score||0:0;
  const expertUsed=Boolean(activeExpert&&state.usedExpertIds.includes(activeExpert.id));
+ const activeExpertTravelCost=activeChallenge&&activeExpert&&activeExpert.location!==activeChallenge.siteId?2:0;
 
  const post=async(payload:any,beforeApply?:()=>Promise<void>)=>{
   if(readOnly){onToast(`Read only · ${controllerName||'Your CEO'} controls this company.`);return false}
@@ -289,9 +291,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        {activeChallenge&&activeChallenge.status==='open'&&<div className="mt-2 rounded-xl border border-slate-700 bg-black/20 p-2.5">
         <div className="flex items-start justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">{siteName(company,activeChallenge.siteId)} · {domainLabel(activeChallenge.domain)}</div><div className="mt-0.5 text-sm font-black text-white">{activeChallenge.title}</div></div><div className="text-right text-[9px] font-bold text-slate-500">Needs <b className="text-base text-white">{activeChallenge.difficulty}</b><br/>Local <b className={`text-base ${localScore>=activeChallenge.difficulty?'text-emerald-300':'text-amber-300'}`}>{localScore}</b></div></div>
         <p className="mt-1 text-[10px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
+        <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2">
+         <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="mt-0.5 text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
+         <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="mt-0.5 text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
+        </div>
+        <div className="mt-1.5 text-[9px] leading-relaxed text-slate-500">Knowledge determines whether the local team or an expert can solve this confidently. Moving an expert from another site costs an additional <b className="text-amber-300">$2k</b>.</div>
         <div className="mt-2 space-y-1.5">
          {!guided&&<ResponseButton selected={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='local'} disabled={localScore<activeChallenge.difficulty} onClick={()=>setPendingResponse({challengeId:activeChallenge.id,method:'local',label:`Use ${siteName(company,activeChallenge.siteId)} local team`})}>USE LOCAL TEAM <span className="ml-1 text-slate-500">Knowledge {localScore}</span></ResponseButton>}
-         {activeExpert&&<ResponseButton selected={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'} disabled={activeExpertScore<activeChallenge.difficulty||expertUsed} onClick={()=>setPendingResponse({challengeId:activeChallenge.id,method:'expert',expertId:activeExpert.id,label:`Send ${activeExpert.name}`})}>SEND {activeExpert.name.toUpperCase()} <span className="ml-1 text-slate-500">Knowledge {activeExpertScore}{expertUsed?' · already used':''}</span></ResponseButton>}
+         {activeExpert&&<ResponseButton selected={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'} disabled={activeExpertScore<activeChallenge.difficulty||expertUsed} onClick={()=>setPendingResponse({challengeId:activeChallenge.id,method:'expert',expertId:activeExpert.id,label:`Send ${activeExpert.name}${activeExpertTravelCost?` · ${activeExpertTravelCost}k travel`:''}`})}>SEND {activeExpert.name.toUpperCase()} <span className="ml-1 text-slate-500">Knowledge {activeExpertScore}{expertUsed?' · already used':activeExpertTravelCost?` · travel -${activeExpertTravelCost}k`:' · already on site'}</span></ResponseButton>}
          {!guided&&<ResponseButton selected={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'} onClick={()=>setPendingResponse({challengeId:activeChallenge.id,method:'risk',label:'Take the risk'})}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">Roll d6</span></ResponseButton>}
         </div>
         <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-[10px] text-slate-500">{pendingResponse?.challengeId===activeChallenge.id?<><span className="font-black text-amber-300">Selected:</span> {pendingResponse.label}</>:<>Select a response above. Nothing happens until you commit.</>}</div>
