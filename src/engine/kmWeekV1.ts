@@ -445,5 +445,8 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
     return{success:false,message:'Unknown KM Week action.'};
   }
   syncScore(session,company);
+  const staffedIds=new Set(session.participants.filter(participant=>participant.role!=='facilitator').map(participant=>participant.companyId));
+  const relevant=staffedIds.size?session.companies.filter(candidate=>staffedIds.has(candidate.id)):session.companies;
+  if(relevant.length&&relevant.every(candidate=>candidate.kmWeek?.stage==='complete'))session.finalDisruptionResolved=true;
   return{...result,session};
 }
