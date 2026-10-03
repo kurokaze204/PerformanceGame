@@ -61,6 +61,7 @@ assert.ok(appBoardSource.includes("actionType:'FINISH_INVESTING'"),'Invest compl
 const kmWeekBoardSource=readFileSync(new URL('../src/components/KMWeekBoardV1.tsx',import.meta.url),'utf8');
 const globalCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 const riverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
+const kmWeekDebriefSource=readFileSync(new URL('../src/components/KMWeekDebriefV1.tsx',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoardSource.includes('<KMWeekBoardV1'),'KM Week sessions must use their dedicated play surface');
 assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}/3`"),'KM Week board must expose the three guided and three free-play progression');
 assert.ok(kmWeekBoardSource.includes('<InvestmentRiverView company={company} mode="km_week"'),'KM Week must keep the Knowledge River central');
@@ -70,6 +71,11 @@ assert.ok(kmWeekBoardSource.includes('Business Performance')&&kmWeekBoardSource.
 assert.ok(kmWeekBoardSource.includes('Depth')&&kmWeekBoardSource.includes('Breadth')&&kmWeekBoardSource.includes('Flow'),'KM Week debrief must name the River concepts after players experience them');
 assert.ok(kmWeekBoardSource.includes('COMMIT RESPONSE'),'KM Week Challenge choices must require an explicit commit');
 assert.ok(kmWeekBoardSource.includes('Current phase'),'KM Week board must make the current phase explicit');
+assert.ok(kmWeekBoardSource.includes('<KMWeekDebriefV1 session={session} company={company}/>'),'Completed KM Week games must move into the AAR-lite dashboard');
+assert.ok(kmWeekDebriefSource.includes('AAR-lite · Discuss together')&&kmWeekDebriefSource.includes('Before')&&kmWeekDebriefSource.includes('After'),'KM Week AAR-lite must compare each company score and before/after Rivers');
+assert.ok(kmWeekDebriefSource.includes('TurnoverGraph')&&kmWeekDebriefSource.includes('COMPANY_COLORS'),'KM Week AAR-lite must graph all company turnover using the same company colours as the comparison cards');
+assert.ok(kmWeekDebriefSource.includes('AFTER ACTION REVIEW QUESTIONS')&&kmWeekDebriefSource.includes('What did you plan?')&&kmWeekDebriefSource.includes('What actually happened?')&&kmWeekDebriefSource.includes('Why do you think it was different?')&&kmWeekDebriefSource.includes('What can you alter next time so it works better?'),'KM Week AAR-lite must expose the four Newbie AAR questions in a slide-in panel');
+assert.ok(riverSource.includes('compact?:boolean'),'Knowledge River must support compact side-by-side AAR comparisons');
 assert.ok(kmWeekBoardSource.includes('Company experts'),'KM Week must use the business-facing Company experts label');
 assert.ok(kmWeekBoardSource.includes('Score pad')&&kmWeekBoardSource.includes('ToolTip'),'KM Week score categories must explain how points are earned');
 assert.ok(kmWeekBoardSource.includes('CLICK HERE TO START'),'KM Week must stage each Challenge behind an explicit facedown event card');
