@@ -87,6 +87,13 @@ assert.ok(investmentRiverSource.includes('fontSize="13"'),'Invest River labels m
 assert.ok(investPanelSource.includes("interventionIds:['aar','knowledge-transfer']"),'AAR and Knowledge Transfer must share one investment strategy group');
 assert.ok(investPanelSource.includes("interventionIds:['train-expert','local-training']"),'Expert development and Local Training must share one investment strategy group');
 assert.ok(investPanelSource.includes("interventionIds:['update-intranet','corporate-training']"),'Corporate Intranet and Corporate Training must share one investment strategy group');
+assert.ok(investPanelSource.includes("'update-intranet':['UPDATE_INTRANET',{siteId,domain}]"),'Corporate Intranet update must submit an explicit source site and domain');
+assert.ok(investPanelSource.includes("const needsIntranetSourceSite=selectedId==='update-intranet';"),'Corporate Intranet must expose a source-site selector');
+assert.ok(investPanelSource.includes("One Intranet update per round."),'Corporate Intranet controls must state the once-per-round limit');
+assert.ok(investPanelSource.includes("intranetUpdatedThisRound=Object.values(company.intranetRoundGrowth)"),'Corporate Intranet UI must enforce the once-per-round limit');
+assert.ok(investPanelSource.includes("riverSiteKnowledgeScore(selectedSite,domain,session.experienceMode)"),'Corporate Intranet preview must use the selected site knowledge visible for the current mode');
+assert.equal(investPanelSource.includes('higher if stronger source knowledge exists'),false,'Corporate Intranet preview must not use the old hidden-source rule');
+
 assert.ok(investPanelSource.includes("interventionIds:['horizon-scan','join-cop']"),'Horizon Scan and Community of Practice must share one investment strategy group');
 assert.ok(investPanelSource.includes('data-investment-strategy={strategy.id}'),'Investment strategy groups must be visibly grouped and colour coded');
 assert.ok(investPanelSource.includes('Choose an investment'),'Invest must keep investment choices beside the River');
