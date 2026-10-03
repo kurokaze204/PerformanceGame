@@ -15,6 +15,15 @@ export const KM_WEEK_DOMAINS: KnowledgeDomain[] = ['operations','hr','marketing'
 export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
 export const KM_WEEK_MAX_KNOWLEDGE = 5;
 
+export const KM_WEEK_SHOCK_SPECS:{id:string;siteId:string;domain:KnowledgeDomain;difficulty:number}[]=[
+  {id:'S1',siteId:'brisbane',domain:'operations',difficulty:2},
+  {id:'S2',siteId:'perth',domain:'operations',difficulty:1},
+  {id:'S3',siteId:'melbourne',domain:'hr',difficulty:2},
+  {id:'S4',siteId:'brisbane',domain:'marketing',difficulty:2},
+  {id:'S5',siteId:'perth',domain:'marketing',difficulty:2},
+];
+export const KM_WEEK_SHOCK_CUTOFF=Math.max(...KM_WEEK_SHOCK_SPECS.map(check=>check.difficulty));
+
 export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
   'local-heroes': {
     id:'local-heroes',
@@ -404,14 +413,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
 export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek;
   if(!state||state.stage!=='shock'||state.shockResolved)return{success:false,message:'The Business Shock is not ready.'};
-  const specs:{id:string;siteId:string;domain:KnowledgeDomain;difficulty:number}[]=[
-    {id:'S1',siteId:'brisbane',domain:'operations',difficulty:2},
-    {id:'S2',siteId:'perth',domain:'operations',difficulty:1},
-    {id:'S3',siteId:'melbourne',domain:'hr',difficulty:2},
-    {id:'S4',siteId:'brisbane',domain:'marketing',difficulty:2},
-    {id:'S5',siteId:'perth',domain:'marketing',difficulty:2},
-  ];
-  const checks:KMWeekShockCheck[]=specs.map(spec=>{
+  const checks:KMWeekShockCheck[]=KM_WEEK_SHOCK_SPECS.map(spec=>{
     const site=company.sites.find(item=>item.id===spec.siteId);
     return{...spec,passed:Boolean(site&&(site.teamCapability[spec.domain]||0)>=spec.difficulty)};
   });
