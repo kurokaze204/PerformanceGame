@@ -9,12 +9,12 @@ type Props={session:GameSessionV2;company:CompanyV2};
 const COMPANY_COLORS=['#facc15','#38bdf8','#a78bfa','#34d399','#fb7185','#fb923c','#22d3ee','#c084fc'];
 
 const scoreItems=(company:CompanyV2)=>[
- {label:'Business',value:company.kmWeek?.score.business||0,icon:<CircleDollarSign className="h-3.5 w-3.5"/>},
- {label:'Expertise',value:company.kmWeek?.score.expertise||0,icon:<Brain className="h-3.5 w-3.5"/>},
- {label:'Local',value:company.kmWeek?.score.localCapability||0,icon:<Users className="h-3.5 w-3.5"/>},
- {label:'Flow',value:company.kmWeek?.score.knowledgeFlow||0,icon:<Workflow className="h-3.5 w-3.5"/>},
- {label:'Resilience',value:company.kmWeek?.score.resilience||0,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
- {label:'Goal',value:company.kmWeek?.score.goal||0,icon:<Target className="h-3.5 w-3.5"/>},
+ {label:'Business',value:company.kmWeek?.score.business||0,max:12,icon:<CircleDollarSign className="h-3.5 w-3.5"/>},
+ {label:'Expertise',value:company.kmWeek?.score.expertise||0,max:6,icon:<Brain className="h-3.5 w-3.5"/>},
+ {label:'Local',value:company.kmWeek?.score.localCapability||0,max:9,icon:<Users className="h-3.5 w-3.5"/>},
+ {label:'Flow',value:company.kmWeek?.score.knowledgeFlow||0,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
+ {label:'Resilience',value:company.kmWeek?.score.resilience||0,max:5,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
+ {label:'Goal',value:company.kmWeek?.score.goal||0,max:5,icon:<Target className="h-3.5 w-3.5"/>},
 ];
 
 function beforeCompany(company:CompanyV2):CompanyV2{
@@ -24,7 +24,7 @@ function beforeCompany(company:CompanyV2):CompanyV2{
 
 const MiniScorePad:React.FC<{company:CompanyV2;color:string}>=({company,color})=><section className="rounded-2xl border-2 bg-slate-950/75 p-3" style={{borderColor:color}}>
  <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><div className="text-xs font-black text-white">Score Pad</div><div className="ml-auto text-2xl font-black text-white">{company.kmWeek?.score.total||0}</div></div>
- <div className="mt-2 grid grid-cols-2 gap-1.5">{scoreItems(company).map(item=><div key={item.label} className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-1.5"><span className="text-slate-500">{item.icon}</span><span className="min-w-0 flex-1 truncate text-[9px] font-black text-slate-500">{item.label}</span><b className="text-sm text-white">{item.value}</b></div>)}</div>
+ <div className="mt-2 grid grid-cols-2 gap-1.5">{scoreItems(company).map(item=><div key={item.label} className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-1.5"><span className="text-slate-500">{item.icon}</span><span className="min-w-0 flex-1 truncate text-[9px] font-black text-slate-500">{item.label}</span><b className="text-sm text-white">{item.value}<span className="ml-0.5 text-[8px] text-slate-600">/{item.max}</span></b></div>)}</div>
 </section>;
 
 const TurnoverGraph:React.FC<{companies:CompanyV2[];colors:string[]}>=({companies,colors})=>{
@@ -41,7 +41,6 @@ const TurnoverGraph:React.FC<{companies:CompanyV2[];colors:string[]}>=({companie
  const min=Math.max(0,rawMin-padding),max=rawMax+padding,span=Math.max(1,max-min);
  const W=1080,H=245,left=70,right=30,top=24,bottom=42,innerW=W-left-right,innerH=H-top-bottom;
  const y=(value:number)=>top+innerH-((value-min)/span)*innerH;
- const maxPoints=Math.max(2,...histories.map(history=>history.length));
  const x=(index:number,count:number)=>left+(count<=1?innerW/2:index*innerW/(count-1));
  const ticks=Array.from({length:4},(_,i)=>min+(span*i/3));
  const longest=histories.reduce((a,b)=>a.length>=b.length?a:b,[] as {label:string;turnover:number}[]);
@@ -82,7 +81,7 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
  const colors=companies.map((_,index)=>COMPANY_COLORS[index%COMPANY_COLORS.length]);
  return <main className="mx-auto h-[calc(100vh-66px)] max-w-[1500px] overflow-auto p-3 text-slate-100">
   <section className="rounded-2xl border-2 border-violet-700 bg-[linear-gradient(145deg,#19152d,#101827)] p-4">
-   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><div className="text-[9px] font-black uppercase tracking-[.18em] text-violet-300">AAR-lite · Discuss together</div><h2 className="mt-1 text-2xl font-black text-white">The score is finished. The learning starts here.</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, so nobody sees another team’s strategy while they are still playing.</p>}</div><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div>
+   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><div className="text-[9px] font-black uppercase tracking-[.18em] text-violet-300">AAR-lite · Discuss together</div><h2 className="mt-1 text-2xl font-black text-white">The score is finished. The learning starts here.</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, so nobody sees another team’s strategy while they are still playing.</p>}</div><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div>
   </section>
 
   <div className="mt-3 space-y-3">
