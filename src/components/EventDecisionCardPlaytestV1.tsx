@@ -116,6 +116,6 @@ export const EventDecisionCardPlaytestV1:React.FC<Props>=(props)=>{
   }
 
   const availableModes=isOpeningDiagnostic?['existing'] as const:isAssemblyLesson?['existing','expert'] as const:undefined;
-  const teachingHint=isAssemblyLesson?'Click each domain. Use Team Capability; add the relevant expert where local knowledge is not enough.':undefined;
+  const teachingHint=isAssemblyLesson?'This customer opportunity depends on two different capability areas. Review both requirements before you commit your response.':undefined;
   return <div ref={decisionRootRef}>{readOnly&&<div className="mb-2 rounded-xl border border-amber-700 bg-amber-950/35 px-3 py-2 text-center text-xs font-black text-amber-200">READ ONLY · Your CEO controls this company</div>}<OptimisticEventDecisionCardV1 {...props} event={displayEvent} diagnostic={Boolean(isOpeningDiagnostic)} availableModes={availableModes?[...availableModes]:undefined} teamOnlyExisting={Boolean(isAssemblyLesson)} teachingHint={teachingHint} onAcknowledgeResolution={interceptContinue}/></div>;
 };
