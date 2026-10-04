@@ -136,7 +136,11 @@ assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guid
 assert.ok(kmWeekBoardSource.includes('dx-loop')&&kmWeekBoardSource.includes('dx+loop*.60'),'The knowledge spark path must arc past and loop back to the River target');
 assert.ok(kmWeekBoardSource.includes('{duration:300,easing:\'ease-out\'')&&kmWeekBoardSource.includes('requestAnimationFrame(()=>requestAnimationFrame'),'The knowledge spark must fade for 0.3 seconds and fully disappear before River state animation begins');
 assert.ok(kmWeekBoardSource.includes('setRiverFrozenCompany(structuredClone(company))')&&kmWeekBoardSource.includes('company={riverFrozenCompany||company}'),'The River must freeze its pre-invest state so websocket updates cannot animate it before the knowledge globe finishes');
-assert.ok(kmWeekBoardSource.includes('setRiverFrozenCompany(null)')&&kmWeekBoardSource.includes('await animateKnowledgeSpark'),'The frozen River must only release after the knowledge globe has completed its travel and fade');
+assert.ok(kmWeekBoardSource.includes('await animateKnowledgeSpark')&&kmWeekBoardSource.includes('setRiverFrozenCompany(structuredClone(nextCompany))'),'After the globe finishes, only the River must receive the updated company state');
+assert.ok(kmWeekBoardSource.includes('window.setTimeout(resolve,1300)'),'The Invest screen must remain visible until the 1.2 second River transition has fully completed');
+assert.ok(kmWeekBoardSource.includes('onPresentationHoldChange?.(true)')&&kmWeekBoardSource.includes('onPresentationHoldChange?.(false)'),'KM Week must hold and release presentation state around the knowledge movement sequence');
+assert.ok(appBoardSource.includes('const setKMWeekPresentationHold=(hold:boolean)=>')&&appBoardSource.includes('if(deferUpdates.current){pendingSession.current=d.session;return}'),'AppBoard must defer incoming session broadcasts while KM Week is presenting the River change');
+assert.ok(appBoardSource.includes('onPresentationHoldChange={setKMWeekPresentationHold}'),'KM Week board must be wired to the AppBoard presentation hold');
 assert.ok(kmWeekBoardSource.includes('If you solve it')&&kmWeekBoardSource.includes('If you fail'),'KM Week Challenge cards must show the business win and loss before a decision');
 assert.ok(kmWeekBoardSource.includes('Moving an expert from another site costs an additional')&&kmWeekBoardSource.includes('travel -
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
