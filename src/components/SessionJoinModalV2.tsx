@@ -45,6 +45,7 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,initialMode='sol
  const[soloFinalRoundCount,setSoloFinalRoundCount]=useState(30);
  const[createError,setCreateError]=useState<string|null>(null);
  const[creating,setCreating]=useState(false);
+ const[namePromptOpen,setNamePromptOpen]=useState(false);
  const hasName=playerName.trim().length>0;
  const rememberName=()=>{try{localStorage.setItem('tpg_entered_player_name',playerName.trim())}catch{}};
  const multiplayerOptions:CreateOptions={experienceMode,gameDurationMinutes:duration,maxPlayersPerCompany:maxPlayers,actionsPerRound,populationMode,gameEndMode:experienceMode==='expert'?gameEndMode:'time',finalRoundCount};
@@ -75,7 +76,20 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,initialMode='sol
  };
 
  const activeArchive=useMemo(()=>archiveGames,[archiveGames]);
- return <div className="fixed inset-0 z-[250] bg-[#080b12]/95 p-3 sm:p-5 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="join-title">
+ return <>
+  {namePromptOpen&&<div className="fixed inset-0 z-[420] grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="name-required-title">
+   <div className="w-full max-w-sm rounded-2xl border-2 border-indigo-500 bg-slate-950 p-5 shadow-2xl">
+    <div className="text-[10px] font-black uppercase tracking-[.18em] text-indigo-300">Before you start</div>
+    <h2 id="name-required-title" className="mt-2 text-xl font-black text-white">What should we call you?</h2>
+    <p className="mt-2 text-sm leading-relaxed text-slate-400">Enter your name so the game can identify you.</p>
+    <input autoFocus value={playerName} onChange={e=>setPlayerName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&playerName.trim()){setNamePromptOpen(false);void createAndJoin({code:makeGameCode(),name:'Solo Performance Gap',count:1,options:soloOptions,publicGame:false,autoStart:soloOptions.gameEndMode==='time',soloMode:true})}}} className="control mt-4" placeholder="e.g. Sarah Jenkins"/>
+    <div className="mt-4 grid grid-cols-2 gap-2">
+     <button type="button" onClick={()=>setNamePromptOpen(false)} className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-xs font-black text-slate-300">CANCEL</button>
+     <button type="button" disabled={!hasName||creating} onClick={()=>{setNamePromptOpen(false);void createAndJoin({code:makeGameCode(),name:'Solo Performance Gap',count:1,options:soloOptions,publicGame:false,autoStart:soloOptions.gameEndMode==='time',soloMode:true})}} className="rounded-xl bg-indigo-600 px-4 py-3 text-xs font-black text-white disabled:opacity-40">START GAME</button>
+    </div>
+   </div>
+  </div>}
+  <div className="fixed inset-0 z-[250] bg-[#080b12]/95 p-3 sm:p-5 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="join-title">
   <div className="relative mx-auto w-full max-w-6xl rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
    {onClose&&<button onClick={onClose} className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-xl border border-slate-700 bg-slate-950 text-slate-400 hover:text-white" aria-label="Close"><X className="h-4 w-4"/></button>}
    <div className="grid lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -96,7 +110,7 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,initialMode='sol
       <div className="grid sm:grid-cols-2 gap-3">{soloExperienceMode==='expert'&&soloGameEndMode==='rounds'?<Field label="Rounds before Final Challenge"><input type="number" min={1} max={200} value={soloFinalRoundCount} onChange={e=>setSoloFinalRoundCount(Math.max(1,Math.min(200,Number(e.target.value))))} className="control"/></Field>:<Field label="Game length"><select value={soloDuration} onChange={e=>setSoloDuration(Number(e.target.value))} className="control"><option value={30}>30 minutes</option><option value={45}>45 minutes</option><option value={60}>60 minutes</option><option value={90}>90 minutes</option></select></Field>}<Field label="Actions each round"><input type="number" min={1} max={10} value={soloActionsPerRound} onChange={e=>setSoloActionsPerRound(Math.max(1,Math.min(10,Number(e.target.value))))} className="control"/></Field></div>
       <Summary>{soloExperienceMode==='newbie'?`Recommended first game: ${soloDuration} minutes with ${soloActionsPerRound} Actions per round. Knowledge-management capabilities are introduced gradually.`:soloGameEndMode==='rounds'?`Expert game: full model from Round 1, with the Final Challenge after Round ${soloFinalRoundCount}.`:`Expert game: full model from Round 1, ${soloDuration} minutes, ${soloActionsPerRound} Actions per round.`}</Summary>
       {!hasName&&<Hint>Enter your name to start.</Hint>}{createError&&<ErrorText>{createError}</ErrorText>}
-      <button disabled={!hasName||creating} onClick={()=>void createAndJoin({code:makeGameCode(),name:'Solo Performance Gap',count:1,options:soloOptions,publicGame:false,autoStart:soloOptions.gameEndMode==='time',soloMode:true})} className="primary text-base disabled:opacity-40"><Sparkles className="h-5 w-5"/>{creating?'STARTING…':'START SOLO GAME'}</button>
+      <button disabled={creating} onClick={()=>{if(!hasName){setNamePromptOpen(true);return}void createAndJoin({code:makeGameCode(),name:'Solo Performance Gap',count:1,options:soloOptions,publicGame:false,autoStart:soloOptions.gameEndMode==='time',soloMode:true})}} className="primary text-base disabled:opacity-40"><Sparkles className="h-5 w-5"/>{creating?'STARTING…':'START SOLO GAME'}</button>
      </div>}
 
      {mode==='join'&&<div className="mt-6 space-y-5">
@@ -136,7 +150,8 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,initialMode='sol
     </aside>
    </div>
   </div>
- </div>;
+ </div>
+ </>;
 };
 
 const ModeChoice:React.FC<{active:boolean;icon:React.ReactNode;title:string;subtitle:string;onClick:()=>void}>=({active,icon,title,subtitle,onClick})=><button onClick={onClick} role="tab" aria-selected={active} className={`rounded-2xl border-2 p-4 text-left transition ${active?'border-indigo-400 bg-indigo-950/50':'border-slate-700 bg-slate-950 hover:border-slate-500'}`}><div className={`flex h-9 w-9 items-center justify-center rounded-xl ${active?'bg-indigo-600 text-white':'bg-slate-900 text-slate-400'}`}>{icon}</div><div className="mt-3 font-black text-white">{title}</div><div className="mt-0.5 text-[11px] text-slate-500">{subtitle}</div></button>;
