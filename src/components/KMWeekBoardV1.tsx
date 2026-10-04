@@ -20,6 +20,7 @@ interface Props{
  onToast:(message:string,durationMs?:number)=>void;
  onLeave:()=>void;
  onTransferCeo?:(participantId:string)=>void;
+ onPresentationHoldChange?:(hold:boolean)=>void;
 }
 
 type ResponseMethod='local'|'expert'|'risk';
@@ -143,7 +144,7 @@ const ChallengeKnowledgeBars:React.FC<{
  </div>;
 };
 
-export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnly,controllerName,onSessionUpdate,onToast,onLeave,onTransferCeo})=>{
+export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnly,controllerName,onSessionUpdate,onToast,onLeave,onTransferCeo,onPresentationHoldChange})=>{
  const state=company.kmWeek;
  const[busy,setBusy]=useState(false);
  const[actionError,setActionError]=useState('');
@@ -251,7 +252,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const responseReady=Boolean(riskSelected||confidentResponseReady);
  const activeExpertTravelCost=activeChallenge&&activeExpert&&activeExpert.location!==activeChallenge.siteId?2:0;
 
- const post=async(payload:any,beforeApply?:()=>Promise<void>)=>{
+ const post=async(payload:any,beforeApply?:(nextSession:GameSessionV2)=>Promise<void>)=>{
   if(readOnly){onToast(`Read only · ${controllerName||'Your CEO'} controls this company.`);return false}
   if(busy)return false;
   setBusy(true);
@@ -274,7 +275,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     }
     setActionError(message);onToast(message);return false
    }
-   if(data.session){if(beforeApply)await beforeApply();onSessionUpdate(data.session);}
+   if(data.session){if(beforeApply)await beforeApply(data.session);onSessionUpdate(data.session);}
    if(data.message)onToast(data.message,4500);
    return true;
   }catch{setActionError('Could not complete that move.');onToast('Could not complete that move.');return false}
@@ -426,14 +427,26 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     targetKey=`site:${targetSiteId}:${selectedDomain}`;
   }
   const startX=event.clientX,startY=event.clientY;
+  onPresentationHoldChange?.(true);
   setRiverFrozenCompany(structuredClone(company));
   await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
-  const ok=await post(payload,async()=>{
+  const ok=await post(payload,async nextSession=>{
    await animateKnowledgeSpark(startX,startY,targetKey);
-   setRiverFrozenCompany(null);
-   await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+
+   // Keep the Invest screen frozen while only the River receives the new
+   // company state. This gives the player time to watch the capability change
+   // before the next Challenge appears.
+   const nextCompany=nextSession.companies.find(item=>item.id===company.id);
+   if(nextCompany){
+    setRiverFrozenCompany(structuredClone(nextCompany));
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+    await new Promise<void>(resolve=>window.setTimeout(resolve,1300));
+   }
+
+   onPresentationHoldChange?.(false);
   });
-  if(!ok)setRiverFrozenCompany(null);
+  if(!ok)onPresentationHoldChange?.(false);
+  setRiverFrozenCompany(null);
  };
 
  const challengeDone=state.challenges.length>0&&state.challenges.every(challenge=>challenge.status!=='open');
