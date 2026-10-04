@@ -95,8 +95,8 @@ const ChallengeKnowledgeBars:React.FC<{
  expertName?:string;
  appliedMethod?:ResponseMethod;
 }>=({requirement,local,expert,expertName,appliedMethod})=>{
- const applied=appliedMethod==='local'?local:appliedMethod==='expert'?expert:0;
- const requirementMet=appliedMethod!=='risk'&&applied>=requirement;
+ const applied=appliedMethod==='local'?local:appliedMethod==='expert'?expert+(local>0?1:0):appliedMethod==='risk'?local:0;
+ const requirementMet=applied>=requirement;
  const pct=(value:number)=>`${Math.max(0,Math.min(100,(value/5)*100))}%`;
  const SegmentBar:React.FC<{value:number;filled:number;tone:'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={`${tone} knowledge ${value} of 5; ${filled} applied`}>
   {Array.from({length:5},(_,index)=>{
@@ -207,6 +207,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const localScore=activeChallenge&&localSite?localSite.teamCapability[activeChallenge.domain]||0:0;
  const activeExpert=activeChallenge?specialistFor(company,activeChallenge.domain):undefined;
  const activeExpertScore=activeChallenge&&activeExpert?activeExpert.domains.find(skill=>skill.domain===activeChallenge.domain)?.score||0:0;
+ const selectedKnowledge=pendingResponse?.challengeId!==activeChallenge?.id?0:
+  pendingResponse.method==='local'?localScore:
+  pendingResponse.method==='expert'?activeExpertScore+(localScore>0?1:0):
+  pendingResponse.method==='risk'?localScore:0;
  const expertUsed=Boolean(activeExpert&&state.usedExpertIds.includes(activeExpert.id));
  const activeExpertTravelCost=activeChallenge&&activeExpert&&activeExpert.location!==activeChallenge.siteId?2:0;
 
@@ -409,7 +413,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        <div className={`mt-2 grid gap-2 ${state.challenges.length>1?'grid-cols-2':'grid-cols-1'}`}>{state.challenges.map(challenge=><ChallengeToken key={challenge.id} challenge={challenge} company={company} selected={challenge.id===activeChallenge?.id} onClick={()=>{setSelectedChallengeId(challenge.id);setPendingResponse(null)}}/>)}</div>
 
        {activeChallenge&&activeChallenge.status==='open'&&<div className="mt-2 rounded-xl border border-slate-700 bg-black/20 p-2.5">
-        <div className="flex items-start justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">{siteName(company,activeChallenge.siteId)} · {domainLabel(activeChallenge.domain)}</div><div className="mt-0.5 text-sm font-black text-white">{activeChallenge.title}</div></div><div className="text-right text-[9px] font-bold text-slate-500">Needs <b className="text-base text-white">{activeChallenge.difficulty}</b><br/>Local <b className={`text-base ${localScore>=activeChallenge.difficulty?'text-emerald-300':'text-amber-300'}`}>{localScore}</b></div></div>
+        <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">{siteName(company,activeChallenge.siteId)} · {domainLabel(activeChallenge.domain)}</div><div className="mt-0.5 text-sm font-black text-white">{activeChallenge.title}</div></div><div className="shrink-0 text-right"><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Selected knowledge</div><div className={`mt-0.5 text-[34px] font-black leading-none tracking-[-.05em] tabular-nums ${selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-white'}`}>{selectedKnowledge}<span className="text-[20px] text-slate-500">/{activeChallenge.difficulty}</span></div></div></div>
         <p className="mt-1 text-[10px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
         <ChallengeKnowledgeBars requirement={activeChallenge.difficulty} local={localScore} expert={activeExpertScore} expertName={activeExpert?.name} appliedMethod={pendingResponse?.challengeId===activeChallenge.id?pendingResponse.method:undefined}/>
         <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2">
