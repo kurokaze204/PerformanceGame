@@ -329,11 +329,13 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   let expertState:ResponseSelectionState=current?.method==='risk'?'none':current?.expertSelection||'none';
   const sourceState=source==='local'?localState:expertState;
   const sourceScore=source==='local'?localScore:activeExpertScore;
-  const otherScore=source==='local'?(expertUsed?0:activeExpertScore):localScore;
+  const otherState=source==='local'?expertState:localState;
+  const otherScore=source==='local'?activeExpertScore:localScore;
 
   let nextState:ResponseSelectionState;
   if(sourceState==='breadth')nextState='depth';
   else if(sourceState==='depth')nextState='none';
+  else if(otherState!=='depth')nextState='depth';
   else nextState=sourceScore>=otherScore?'depth':'breadth';
 
   if(source==='local'){
