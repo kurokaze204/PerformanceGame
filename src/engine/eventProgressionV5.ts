@@ -6,11 +6,11 @@ export const PROGRAMMED_FAILURE_TAG = 'tutorial-programmed-failure';
 export const PROGRAMMED_ASSEMBLY_TAG = 'tutorial-knowledge-assembly';
 
 const EARLY_CARDS: EventCard[] = [
-  { id:'LEARN-P-OPS', type:'problem', scope:'local', title:'Late Dispatch at a Local Site', description:'A routine scheduling mistake has delayed several customer deliveries. The financial exposure is small, making this a safe chance to learn how local knowledge affects a response.', domains:[{domain:'operations',difficulty:2}], impact:18, tags:['learning','routine','operations'] },
+  { id:'LEARN-P-OPS', type:'problem', scope:'local', title:'Late Dispatch at a Local Site', description:'A routine scheduling mistake has delayed several customer deliveries. The site must recover the schedule before penalties and customer complaints escalate.', domains:[{domain:'operations',difficulty:2}], impact:18, tags:['learning','routine','operations'] },
   { id:'LEARN-P-HR', type:'problem', scope:'local', title:'Unexpected Shift Absence', description:'Several people call in sick before a busy shift. Supervisors need to reorganise coverage without disrupting normal production.', domains:[{domain:'hr',difficulty:2}], impact:16, tags:['learning','routine','hr'] },
   { id:'LEARN-P-FIN', type:'problem', scope:'local', title:'Supplier Invoice Dispute', description:'A supplier disputes a small batch of invoices. The issue is contained, but resolving it quickly avoids unnecessary local cash-flow friction.', domains:[{domain:'finance',difficulty:2}], impact:20, tags:['learning','routine','finance'] },
-  { id:'LEARN-P-ENG', type:'problem', scope:'local', title:'Minor Equipment Calibration Drift', description:'A production instrument is producing inconsistent readings. The site can keep operating, but local technical knowledge will determine how quickly the fault is corrected.', domains:[{domain:'engineering',difficulty:2}], impact:22, tags:['learning','routine','engineering'] },
-  { id:'LEARN-O-MKT', type:'opportunity', scope:'local', title:'Small Regional Customer Enquiry', description:'A local customer asks whether the site can handle a modest additional order. It is a low-risk opportunity to practise matching knowledge to a commercial decision.', domains:[{domain:'marketing',difficulty:2}], impact:18, tags:['learning','routine','marketing'] },
+  { id:'LEARN-P-ENG', type:'problem', scope:'local', title:'Minor Equipment Calibration Drift', description:'A production instrument is producing inconsistent readings. The site can keep operating briefly, but the fault must be corrected before quality is affected.', domains:[{domain:'engineering',difficulty:2}], impact:22, tags:['learning','routine','engineering'] },
+  { id:'LEARN-O-MKT', type:'opportunity', scope:'local', title:'Small Regional Customer Enquiry', description:'A local customer asks whether the site can handle a modest additional order. A quick, credible response could secure repeat work.', domains:[{domain:'marketing',difficulty:2}], impact:18, tags:['learning','routine','marketing'] },
   { id:'LEARN-O-OPS', type:'opportunity', scope:'local', title:'Simple Process Improvement', description:'Operators identify a straightforward change to staging and handover that could save time each week with little implementation risk.', domains:[{domain:'operations',difficulty:2}], impact:20, tags:['learning','routine','operations'] },
   { id:'LEARN-O-HR', type:'opportunity', scope:'local', title:'Local Cross-Skilling Offer', description:'A nearby training provider offers a subsidised short course that could improve workforce flexibility at one site.', domains:[{domain:'hr',difficulty:2}], impact:16, tags:['learning','routine','hr'] },
   { id:'LEARN-O-FIN', type:'opportunity', scope:'local', title:'Early-Payment Discount', description:'A supplier offers a modest discount for changing payment timing. It is useful, but not important enough to threaten the business if declined.', domains:[{domain:'finance',difficulty:2}], impact:17, tags:['learning','routine','finance'] },
@@ -85,8 +85,8 @@ export function buildProgrammedOpeningFailure(company:CompanyV2,mode:ExperienceM
     id:`TUTORIAL-ISOLATED-${gap.domain.toUpperCase()}`,
     type:'problem',
     scope:'local',
-    title:'LEARNING: A Problem Another Site Knows How to Solve',
-    description:`${gap.targetSite.name} faces a contained ${domainLabel.toLowerCase()} problem. This opening challenge deliberately tests only knowledge the site can reach today. Elsewhere in the company, ${gap.sourceSite.name} already has stronger ${domainLabel} knowledge — but that knowledge is not yet available here through the Corporate Intranet.`,
+    title:`${domainLabel} issue at ${gap.targetSite.name}`,
+    description:`${gap.targetSite.name} faces a contained ${domainLabel.toLowerCase()} problem that must be resolved before it disrupts normal operations. A stronger ${domainLabel} capability exists elsewhere in the company, but it is not immediately available at the affected site.`,
     domains:[{domain:gap.domain,difficulty:99}],
     impact:18,
     tags:[PROGRAMMED_FAILURE_TAG,'learning','knowledge-isolation',`tutorial-domain:${gap.domain}`,`tutorial-source:${gap.sourceSite.id}`,`tutorial-target:${gap.targetSite.id}`],
@@ -136,8 +136,8 @@ export function buildProgrammedAssemblyOpportunity(
     id:`TUTORIAL-ASSEMBLE-${localDomain.toUpperCase()}-${expertDomain.toUpperCase()}`,
     type:'opportunity',
     scope:'local',
-    title:'LEARNING: Assemble the Right Knowledge',
-    description:`${targetSite.name} has a valuable customer opportunity. The local team can handle the ${localLabel} side, but the ${expertLabel} requirement needs deeper specialist knowledge.`,
+    title:'Priority Customer Contract Request',
+    description:`${targetSite.name} has 48 hours to respond to a high-value customer request combining ${localLabel} and ${expertLabel} requirements. A credible response is needed before the customer awards the work.`,
     domains:[
       {domain:localDomain,difficulty:4},
       {domain:expertDomain,difficulty:preferred.skill.score+1},
@@ -189,9 +189,10 @@ export function progressEventCard(fallback:EventCard, moveNumber:number, config:
   const startingMultiplier=(isLearning||isEscalation)?1:initialMultiplier;
   card.impact=Math.max(5,Math.round(card.impact*startingMultiplier*valueFactor));
   card.domains=card.domains.map(req=>({ ...req, difficulty:Math.min(progressiveDifficultyCap,Math.max(1,Math.round(req.difficulty+(pressureNumber-1)*difficultyGrowth))) }));
-  const tier=pressureNumber<=2?'LEARNING':pressureNumber<=4?'MATERIAL':pressureNumber<=6?'HIGH STAKES':'CRITICAL';
-  card.title=`${tier}: ${card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,'')}`;
-  card.description=`${card.description} This is move ${moveNumber}; the financial stakes and knowledge difficulty increase as the simulation develops.`;
+  // Difficulty and financial escalation belong in the numbers, not in the
+  // business narrative. Challenge titles/descriptions should read like events a
+  // CEO might actually encounter, never like simulation instructions.
+  card.title=card.title.replace(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):\s*/,'');
   return card;
 }
 
