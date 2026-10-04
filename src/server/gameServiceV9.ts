@@ -704,12 +704,15 @@ export async function knowledgeActionV2(sessionId:string,companyId:string,payloa
       const session=await baseGetSessionV2(sessionId.toUpperCase());
       if(!session)return{success:false,message:'Session not found.'};
       ensureCompanyState(session);
-      ensureKMWeekSessionV1(session);
+      const kmWeekHealed=ensureKMWeekSessionV1(session);
       const result:any=applyKMWeekActionV1(session,companyId,payload);
-      if(result.success){
+      // KM Week's clock is advisory. Persist the 0:00 freeze even when the
+      // attempted move is invalid so an expired global timer can never strand
+      // the company behind a stale running-clock state.
+      if(result.success||kmWeekHealed){
         syncSessionSummary(session);
         await saveSessionV2(session);
-        broadcastV2(session,'KM_WEEK_UPDATED',{companyId,actionType:payload?.type});
+        if(result.success)broadcastV2(session,'KM_WEEK_UPDATED',{companyId,actionType:payload?.type});
       }
       return{...result,session};
     });
