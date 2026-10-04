@@ -75,7 +75,7 @@ const ScoreCell:React.FC<{label:string;value:number;max:string;icon:React.ReactN
 
 const PhaseStep:React.FC<{label:string;active:boolean;done:boolean;number:string}>=({label,active,done,number})=><div className={`flex items-center gap-2 rounded-xl border-2 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.08em] ${active?'border-amber-300 bg-amber-950/40 text-amber-100':done?'border-emerald-800 bg-emerald-950/25 text-emerald-300':'border-slate-800 bg-slate-950/60 text-slate-600'}`}><span className={`grid h-5 w-5 place-items-center rounded-full border ${active?'border-amber-300':done?'border-emerald-600':'border-slate-700'}`}>{done?<CheckCircle2 className="h-3 w-3"/>:number}</span>{label}</div>;
 
-const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selected:boolean;onClick:()=>void}>=({challenge,company,selected,onClick})=>{
+const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selected:boolean;draft?:Exclude<PendingResponse,null>;onClick:()=>void}>=({challenge,company,selected,draft,onClick})=>{
  const site=company.sites.find(item=>item.id===challenge.siteId);
  const local=site?.teamCapability[challenge.domain]||0;
  const done=challenge.status!=='open';
@@ -84,6 +84,7 @@ const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selec
   <div className="mt-1 truncate text-xs font-black text-white">{challenge.title}</div>
   <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-slate-500"><span>Needs <b className="text-white">{challenge.difficulty}</b></span><span>Local <b className={local>=challenge.difficulty?'text-emerald-300':'text-amber-300'}>{local}</b></span></div>
   <div className="mt-1 flex items-center gap-2 border-t border-slate-800 pt-1 text-[9px] font-black"><span className="text-emerald-300">WIN +{money(challenge.impact)}</span><span className="text-rose-300">LOSE -{money(challenge.impact)}</span>{done&&challenge.travelCost&&<span className="ml-auto text-amber-300">Travel -{money(challenge.travelCost)}</span>}</div>
+  {!done&&draft&&<div className="mt-1 truncate rounded-md border border-sky-900/70 bg-sky-950/25 px-1.5 py-1 text-[8px] font-black uppercase tracking-[.08em] text-sky-300">Draft · {draft.label}</div>}
  </button>;
 };
 
@@ -148,7 +149,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[actionError,setActionError]=useState('');
  const[selectedDomain,setSelectedDomain]=useState<KnowledgeDomain>('operations');
  const[selectedChallengeId,setSelectedChallengeId]=useState('');
- const[pendingResponse,setPendingResponse]=useState<PendingResponse>(null);
+ const[challengeDrafts,setChallengeDrafts]=useState<Record<string,Exclude<PendingResponse,null>>>({});
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
@@ -178,13 +179,17 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   const open=state.challenges.find(challenge=>challenge.status==='open');
   const selected=state.challenges.find(challenge=>challenge.id===selectedChallengeId&&challenge.status==='open');
   if(!selected)setSelectedChallengeId(open?.id||state.challenges[0]?.id||'');
-  if(!open||pendingResponse&&!state.challenges.some(challenge=>challenge.id===pendingResponse.challengeId&&challenge.status==='open'))setPendingResponse(null);
+  const openIds=new Set(state.challenges.filter(challenge=>challenge.status==='open').map(challenge=>challenge.id));
+  setChallengeDrafts(current=>{
+   const next=Object.fromEntries(Object.entries(current).filter(([challengeId])=>openIds.has(challengeId)));
+   return Object.keys(next).length===Object.keys(current).length?current:next;
+  });
  },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound,state?.challenges.map(challenge=>`${challenge.id}:${challenge.status}`).join('|')]);
 
  useEffect(()=>{
   const challengePhase=state?.phase==='challenge'&&(state?.stage==='guided'||state?.stage==='free');
   setChallengeFocusOpen(!challengePhase);
-  setPendingResponse(null);
+  setChallengeDrafts({});
  },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
 
  useEffect(()=>{
@@ -217,6 +222,18 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const guided=state.stage==='guided';
  const guidedCopy=currentGuidedCopy(company);
  const activeChallenge=state.challenges.find(challenge=>challenge.id===selectedChallengeId)||state.challenges.find(challenge=>challenge.status==='open')||state.challenges[0];
+ const pendingResponse:PendingResponse=activeChallenge?challengeDrafts[activeChallenge.id]||null:null;
+ const setPendingResponse=(next:PendingResponse)=>{
+  setChallengeDrafts(current=>{
+   const challengeId=next?.challengeId||activeChallenge?.id;
+   if(!challengeId)return current;
+   if(!next){
+    if(!current[challengeId])return current;
+    const copy={...current};delete copy[challengeId];return copy;
+   }
+   return{...current,[next.challengeId]:next};
+  });
+ };
  const localSite=activeChallenge?company.sites.find(item=>item.id===activeChallenge.siteId):undefined;
  const localScore=activeChallenge&&localSite?localSite.teamCapability[activeChallenge.domain]||0:0;
  const activeExpert=activeChallenge?specialistFor(company,activeChallenge.domain):undefined;
@@ -341,8 +358,28 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const commitResponse=async()=>{
   if(!pendingResponse)return;
   if(!pendingResponse.method)return;
-  const ok=await post({type:'KM_WEEK_RESOLVE',challengeId:pendingResponse.challengeId,method:pendingResponse.method,expertId:pendingResponse.expertId,includeLocalBreadth:pendingResponse.localSelection==='breadth',includeExpertBreadth:pendingResponse.expertSelection==='breadth'});
-  if(ok)setPendingResponse(null);
+  const committed=pendingResponse;
+  const ok=await post({type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth'});
+  if(ok){
+   setChallengeDrafts(current=>{
+    const next={...current};
+    delete next[committed.challengeId];
+    if(committed.expertId&&committed.expertSelection!=='none'){
+     for(const [challengeId,draft] of Object.entries(next)){
+      if(draft.expertId!==committed.expertId||draft.expertSelection==='none')continue;
+      const localSelection=draft.localSelection;
+      next[challengeId]={
+       ...draft,
+       method:localSelection==='depth'?'local':undefined,
+       expertId:undefined,
+       expertSelection:'none',
+       label:localSelection==='depth'?'Local depth':localSelection==='breadth'?'Local breadth · choose a new Depth source':'Expert already committed · choose another response',
+      };
+     }
+    }
+    return next;
+   });
+  }
  };
 
  const guidedTargetInvestment:KMWeekInvestment|undefined=guided?(state.guidedTurn===1?'TRAIN_EXPERT':state.guidedTurn===2?'LOCAL_TRAINING':'KNOWLEDGE_TRANSFER'):undefined;
@@ -481,7 +518,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         {guided?<><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><div className="mt-1 text-sm font-black text-white">{guidedCopy.title}</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guidedCopy.text}</p></>:<><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">Challenge phase</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">Resolve both Challenges. Select a Challenge, choose how you will respond, then press <b className="text-white">COMMIT RESPONSE</b>.</p></>}
        </div>
 
-       <div className={`mt-2 grid gap-2 ${state.challenges.length>1?'grid-cols-2':'grid-cols-1'}`}>{state.challenges.map(challenge=><ChallengeToken key={challenge.id} challenge={challenge} company={company} selected={challenge.id===activeChallenge?.id} onClick={()=>{setSelectedChallengeId(challenge.id);setPendingResponse(null)}}/>)}</div>
+       <div className={`mt-2 grid gap-2 ${state.challenges.length>1?'grid-cols-2':'grid-cols-1'}`}>{state.challenges.map(challenge=><ChallengeToken key={challenge.id} challenge={challenge} company={company} selected={challenge.id===activeChallenge?.id} draft={challengeDrafts[challenge.id]} onClick={()=>setSelectedChallengeId(challenge.id)}/>)}</div>
 
        {activeChallenge&&activeChallenge.status==='open'&&<div className="mt-2 rounded-xl border border-slate-700 bg-black/20 p-2.5">
         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">{siteName(company,activeChallenge.siteId)} · {domainLabel(activeChallenge.domain)}</div><div className="mt-0.5 text-sm font-black text-white">{activeChallenge.title}</div></div><div className="shrink-0 text-right"><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Selected knowledge</div><div className={`mt-0.5 text-[34px] font-black leading-none tracking-[-.05em] tabular-nums ${selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-white'}`}>{selectedKnowledge}<span className="text-[20px] text-slate-500">/{activeChallenge.difficulty}</span></div>{pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'&&<div className="mt-1 text-[10px] font-black text-amber-300">RISK {riskOdds.chancePercent}% · {riskOdds.requiredRoll<=1?'ANY ROLL':riskOdds.requiredRoll>6?'NO WINNING ROLL':`NEED ${riskOdds.requiredRoll}+`}</div>}</div></div>
