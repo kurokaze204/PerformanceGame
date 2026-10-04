@@ -54,23 +54,23 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
 
 const FREE_ROUNDS: KMWeekChallenge[][] = [
   [
-    {id:'F1-HR-MEL',title:'Roster gap',story:'A sudden staffing gap threatens a critical Melbourne shift.',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
-    {id:'F1-HR-PER',title:'Recruitment surge',story:'Perth needs the same HR capability at the same time. One specialist cannot cover both sites.',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F1-HR-MEL',title:'Weekend supervisor shortage',story:'Two Melbourne shift supervisors call in sick before a high-volume weekend run. Coverage must be reorganised without breaching fatigue limits.',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F1-HR-PER',title:'Seasonal hiring backlog',story:'Perth’s seasonal intake is behind schedule and several production roles remain unfilled days before demand peaks.',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
   ],
   [
-    {id:'F2-HR-MEL',title:'Workforce handover',story:'Melbourne needs HR capability again. What did the organisation retain from last round?',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
-    {id:'F2-MKT-BNE',title:'Campaign launch',story:'Brisbane must respond to a fast-moving customer opportunity.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
+    {id:'F2-HR-MEL',title:'Roster compliance dispute',story:'Melbourne employees challenge a new overtime roster, claiming fatigue and allowance rules have been applied inconsistently.',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F2-MKT-BNE',title:'Competitor launch response',story:'A competitor launches a discounted product into Brisbane’s strongest customer segment and several key accounts ask for an immediate response.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
   ],
   [
-    {id:'F3-MKT-BNE',title:'Customer response',story:'Brisbane faces another Marketing decision under time pressure.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
+    {id:'F3-MKT-BNE',title:'Major account renewal at risk',story:'A long-standing Brisbane customer questions recent service levels and is reconsidering its annual contract.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
     {id:'F3-OPS-PER',title:'Maintenance backlog',story:'Perth has a growing Operations backlog that is starting to hit output.',siteId:'perth',domain:'operations',difficulty:2,impact:45,status:'open'},
   ],
 ]
 
 function guidedChallenge(turn:number):KMWeekChallenge{
-  if(turn===1)return {id:'G1',title:'Production line stopped',story:'Brisbane has an urgent Operations problem. The local team is out of its depth.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
-  if(turn===2)return {id:'G2',title:'Quality problem returns',story:'The immediate crisis is over, but another Operations problem appears in Brisbane.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
-  return {id:'G3',title:'Perth handover failure',story:'A similar Operations issue has now appeared in Perth.',siteId:'perth',domain:'operations',difficulty:4,impact:35,status:'open',guided:true};
+  if(turn===1)return {id:'G1',title:'Packaging line shutdown',story:'A conveyor-control fault has stopped Brisbane’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
+  if(turn===2)return {id:'G2',title:'Batch quality hold',story:'After production restarts, quality checks find inconsistent fill weights across two Brisbane batches. Shipments are on hold until the cause is identified and corrected.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
+  return {id:'G3',title:'Perth shift handover breakdown',story:'Incomplete maintenance and dispatch notes leave Perth’s afternoon shift unable to safely release several urgent customer orders.',siteId:'perth',domain:'operations',difficulty:4,impact:35,status:'open',guided:true};
 }
 
 function cloneChallenges(items:KMWeekChallenge[]):KMWeekChallenge[]{
@@ -177,6 +177,13 @@ export function initialiseKMWeekSessionV1(session:GameSessionV2){
 export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
   if(session.experienceMode!=='km_week')return false;
   let changed=false;
+  // KM Week is time-boxed for facilitation, not hard-stopped. Once the clock
+  // reaches zero, freeze it at 0:00 and let the company finish its current game.
+  if(session.timerEndsAt&&new Date(session.timerEndsAt).getTime()<=Date.now()){
+    session.timerEndsAt=null;
+    session.timerPausedSecondsRemaining=0;
+    changed=true;
+  }
   if(!session.kmWeekGoalId){session.kmWeekGoalId=hashGoal(session.id);changed=true;}
   for(const company of session.companies){
     if(!company.kmWeek){initialiseKMWeekCompanyV1(company);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
