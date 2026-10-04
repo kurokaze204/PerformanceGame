@@ -103,6 +103,10 @@ assert.ok(kmWeekBoardSource.includes('Selected knowledge')&&kmWeekBoardSource.in
 assert.ok(kmWeekBoardSource.includes("pendingResponse.method==='expert'?activeExpertScore+(localScore>0?1:0)"),'KM Week selected knowledge must calculate expert depth plus one local breadth point like the main game');
 assert.ok(kmWeekBoardSource.includes('grid grid-cols-5 gap-1')&&kmWeekBoardSource.includes('bg-transparent'),'Unselected KM Week knowledge capability must render as hollow segmented bars');
 assert.ok(kmWeekBoardSource.includes("const localFilled=appliedMethod==='local'?local:appliedMethod==='expert'?Math.min(local,1):0")&&kmWeekBoardSource.includes("const expertFilled=appliedMethod==='expert'?expert:0"),'Selecting Local must fill local capability; selecting an expert must fill expert depth while leaving local breadth mostly hollow');
+assert.ok(kmWeekBoardSource.includes("type ResponseSelectionState='none'|'depth'|'breadth'"),'KM Week Challenge response selectors must support unselected, depth and breadth states');
+assert.ok(kmWeekBoardSource.includes("breadth?<span aria-hidden=\"true\" className=\"absolute inset-y-0 left-0 w-1/2 bg-sky-400\""),'Breadth selection must use a left-half-filled selector');
+assert.ok(kmWeekBoardSource.includes("pendingResponse.method==='expert'&&localScore>0?'breadth':'none'"),'Selecting an expert must keep available local knowledge visibly in play as breadth');
+assert.ok(kmWeekBoardSource.includes("selectionState={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'?'depth':'none'}"),'The chosen expert must remain the depth-selected response');
 assert.equal(kmWeekBoardSource.includes("bg-amber-950/40 ring-1 ring-amber-700"),false,'Expert selection must not use the old brown row highlight');
 assert.ok(riverSource.includes('data-kmw-shock-cutoff')&&riverSource.includes('strokeDasharray="10 8"'),'Business Shock must draw a yellow dotted cut-off line across the Knowledge River');
 assert.ok(kmWeekBoardSource.includes('KM_WEEK_SHOCK_CUTOFF')&&kmWeekBoardSource.includes('Look at the River:'),'KM Week Business Shock must explain the River cut-off before resolution');
