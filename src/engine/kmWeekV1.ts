@@ -1,7 +1,6 @@
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import type { ExpertV2 } from '../types/gameV2.ts';
 import type { KnowledgeDomain } from '../types/game.ts';
-import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 import type {
   KMWeekChallenge,
   KMWeekCompanyState,
@@ -281,6 +280,7 @@ export function resolveKMWeekChallengeV1(
   method:'local'|'expert'|'risk',
   expertId?:string,
   includeLocalBreadth=false,
+  includeExpertBreadth=false,
 ){
   const state=company.kmWeek;
   if(!state||state.phase!=='challenge'||state.stage==='shock'||state.stage==='complete')return{success:false,message:'No normal Challenge is ready to resolve.'};
@@ -296,9 +296,26 @@ export function resolveKMWeekChallengeV1(
   let expert:ExpertV2|undefined;
   let travelCost=0;
   if(method==='local'){
-    won=(site.teamCapability[challenge.domain]||0)>=challenge.difficulty;
-    if(!won)return{success:false,message:`${site.name} only has ${site.teamCapability[challenge.domain]||0}; this Challenge needs ${challenge.difficulty}. Choose another response.`};
-    if(state.stage==='free')state.localSuccesses+=1;
+    const localKnowledge=site.teamCapability[challenge.domain]||0;
+    let breadth=0;
+    if(includeExpertBreadth){
+      expert=company.experts.find(item=>item.id===expertId&&!item.isVacant);
+      if(!expert)return{success:false,message:'Choose an available expert for breadth.'};
+      const skill=expert.domains.find(item=>item.domain===challenge.domain);
+      if(!skill||skill.score<=0)return{success:false,message:`${expert.name} cannot contribute breadth in this domain.`};
+      if(state.stage==='free'&&state.usedExpertIds.includes(expert.id))return{success:false,message:`${expert.name} has already handled a Challenge this round.`};
+      breadth=1;
+    }
+    const total=localKnowledge+breadth;
+    won=total>=challenge.difficulty;
+    if(!won)return{success:false,message:`${site.name} provides depth ${localKnowledge}${breadth?' plus expert breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.`};
+    if(expert){
+      travelCost=expert.location===site.id?0:2;
+      expert.location=site.id;
+      expert.state='Supporting Event';
+      if(state.stage==='free')state.usedExpertIds.push(expert.id);
+    }
+    if(state.stage==='free'&&!includeExpertBreadth)state.localSuccesses+=1;
   }else if(method==='expert'){
     expert=company.experts.find(item=>item.id===expertId&&!item.isVacant);
     if(!expert)return{success:false,message:'Choose an available expert.'};
@@ -306,11 +323,12 @@ export function resolveKMWeekChallengeV1(
     if(!skill)return{success:false,message:`${expert.name} does not hold this knowledge domain.`};
     if(state.stage==='free'&&state.usedExpertIds.includes(expert.id))return{success:false,message:`${expert.name} has already handled a Challenge this round.`};
     const localKnowledge=site.teamCapability[challenge.domain]||0;
-    const composed=composeKnowledgeSources(includeLocalBreadth&&localKnowledge>0?[skill.score,localKnowledge]:[skill.score]);
-    won=composed.total>=challenge.difficulty;
+    const breadth=includeLocalBreadth&&localKnowledge>0?1:0;
+    const total=skill.score+breadth;
+    won=total>=challenge.difficulty;
     if(!won){
       const breadthHint=!includeLocalBreadth&&localKnowledge>0?' Select the Local Team as breadth to add +1.':'';
-      return{success:false,message:`${expert.name} provides depth ${skill.score}${includeLocalBreadth?` plus local breadth +${composed.breadth}`:''}; total selected knowledge ${composed.total}/${challenge.difficulty}.${breadthHint}`};
+      return{success:false,message:`${expert.name} provides depth ${skill.score}${breadth?' plus local breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.${breadthHint}`};
     }
     travelCost=expert.location===site.id?0:2;
     expert.location=site.id;
@@ -469,7 +487,7 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
   const type=String(payload?.type||'');
   let result:{success:boolean;message:string};
   if(type==='KM_WEEK_RESOLVE'){
-    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth));
+    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth),Boolean(payload?.includeExpertBreadth));
   }else if(type==='KM_WEEK_INVEST'){
     result=investKMWeekV1(session,company,payload);
   }else if(type==='KM_WEEK_RESOLVE_SHOCK'){
