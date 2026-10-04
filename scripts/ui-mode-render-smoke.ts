@@ -42,6 +42,10 @@ assert.ok(appBoardSource.includes('/keepalive')&&appBoardSource.includes("keepal
 assert.ok(appBoardSource.includes('Date.now()-lastServerActivity.current<ACTIVE_GAME_KEEPALIVE_MS'),'Normal game activity must postpone the keepalive rather than producing unnecessary pings');
 const joinModalSource=readFileSync(new URL('../src/components/SessionJoinModalV2.tsx',import.meta.url),'utf8');
 assert.ok(joinModalSource.includes('await Promise.resolve(onJoinSession('),'game creation must await the actual join before leaving the setup state');
+assert.ok(joinModalSource.includes("const[namePromptOpen,setNamePromptOpen]=useState(false)"),'Solo setup must keep an explicit missing-name prompt state');
+assert.ok(joinModalSource.includes("if(!hasName){setNamePromptOpen(true);return}")&&joinModalSource.includes("disabled={creating}"),'Start Solo Game must remain clickable without a name and open the name prompt instead of silently disabling');
+assert.ok(joinModalSource.includes('What should we call you?')&&joinModalSource.includes('Enter your name so the game can identify you.'),'Missing-name prompt must clearly tell the player what is required');
+assert.ok(joinModalSource.includes('autoFocus value={playerName}')&&joinModalSource.includes('START GAME'),'Missing-name prompt must let the player enter their name and continue directly');
 assert.ok(joinModalSource.includes("km_week:{title:'KM Week'"),'Setup must offer KM Week beside Newbie and Expert');
 assert.ok(joinModalSource.includes('grid grid-cols-3 gap-2'),'Game mode selector must present three peer choices');
 assert.ok(joinModalSource.includes('role="tabpanel"'),'Selected game mode must open a connected description panel below the buttons');
