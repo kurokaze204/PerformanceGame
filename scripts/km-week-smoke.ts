@@ -64,9 +64,9 @@ assert.deepEqual(kmWeekRiskOddsV1(1,2),{requiredRoll:3,successfulFaces:4,chanceP
 assert.deepEqual(kmWeekRiskOddsV1(0,4),{requiredRoll:6,successfulFaces:1,chancePercent:17},'Risk odds must fall as the knowledge deficit grows');
 
 const opsExpert=()=>company.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
-const resolveGuided=()=>{
+const resolveGuided=(includeLocalBreadth=false)=>{
   const challenge=company.kmWeek!.challenges[0];
-  const result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:challenge.id,method:'expert',expertId:opsExpert().id});
+  const result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:challenge.id,method:'expert',expertId:opsExpert().id,includeLocalBreadth});
   assert.equal(result.success,true,result.message);
   assert.equal(company.kmWeek?.phase,'invest');
 };
@@ -75,8 +75,11 @@ const openingTurnover=company.turnover;
 // Match the main-game composition rule: Expert depth 4 + one independent local
 // source = 5 total selected knowledge, so a difficulty-5 Challenge succeeds.
 company.kmWeek!.challenges[0].difficulty=5;
-resolveGuided();
-assert.equal(company.kmWeek?.challenges[0].status,'success','Expert depth plus local breadth must use the main-game selected-knowledge calculation');
+let breadthResult=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:company.kmWeek!.challenges[0].id,method:'expert',expertId:opsExpert().id});
+assert.equal(breadthResult.success,false,'Local breadth must not be assumed when an expert is selected');
+assert.match(breadthResult.message,/Select the Local Team as breadth/,'The player must be prompted to select Local explicitly for breadth');
+resolveGuided(true);
+assert.equal(company.kmWeek?.challenges[0].status,'success','Explicitly selected local breadth must add +1 to expert depth');
 assert.equal(company.kmWeek?.challenges[0].travelCost,2,'Expert travel between sites must cost $2k');
 assert.equal(company.kmWeek?.challenges[0].turnoverChange,28,'A +$30k Challenge solved by a travelling expert must net +$28k turnover');
 assert.equal(company.turnover,openingTurnover+28,'Challenge value and travel cost must both flow through company turnover');
