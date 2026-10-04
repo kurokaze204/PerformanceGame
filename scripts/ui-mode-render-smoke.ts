@@ -71,6 +71,8 @@ assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoar
 assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}/3`"),'KM Week board must expose the three guided and three free-play progression');
 assert.ok(kmWeekBoardSource.includes('<InvestmentRiverView company={riverFrozenCompany||company} mode="km_week"'),'KM Week must keep the Knowledge River central while supporting animation sequencing');
 assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'KM Week must limit strategic investment to the agreed three interventions');
+assert.ok(kmWeekBoardSource.includes('Training site')&&kmWeekBoardSource.includes("'+$2k travel'"),'KM Week Local Training must let the player choose another site and show the fixed travel fee');
+assert.ok(kmWeekBoardSource.includes('Travel $2k · total $12k')&&kmWeekBoardSource.includes('No travel · total $10k'),'KM Week Local Training preview must make travel and total cost explicit');
 assert.ok(kmWeekBoardSource.includes('Business Shock')&&kmWeekBoardSource.includes('Your company experts are unavailable.'),'KM Week must end with the short resilience stress test');
 assert.equal(eventV4Source.includes('2-domain lesson'),false,'Newbie and Expert Challenge cards must not label business events as lessons');
 assert.equal(eventV4Source.includes('Diagnostic complete'),false,'Newbie and Expert Challenge cards must not describe business events as diagnostics');
