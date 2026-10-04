@@ -37,6 +37,9 @@ for(const mode of ['newbie','expert'] as const){
 }
 const appBoardSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
 assert.equal(appBoardSource.includes("fetch('/api/sessions/default')"),false,'fresh startup must not replace the setup form with a default-session bootstrap');
+assert.ok(appBoardSource.includes('ACTIVE_GAME_KEEPALIVE_MS=14*60*1000'),'An open game must send a keepalive after 14 minutes without server activity');
+assert.ok(appBoardSource.includes('/keepalive')&&appBoardSource.includes("keepalive:true"),'Browser keepalive must use the active session endpoint and survive page lifecycle transitions');
+assert.ok(appBoardSource.includes('Date.now()-lastServerActivity.current<ACTIVE_GAME_KEEPALIVE_MS'),'Normal game activity must postpone the keepalive rather than producing unnecessary pings');
 const joinModalSource=readFileSync(new URL('../src/components/SessionJoinModalV2.tsx',import.meta.url),'utf8');
 assert.ok(joinModalSource.includes('await Promise.resolve(onJoinSession('),'game creation must await the actual join before leaving the setup state');
 assert.ok(joinModalSource.includes("km_week:{title:'KM Week'"),'Setup must offer KM Week beside Newbie and Expert');
