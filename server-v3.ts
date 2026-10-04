@@ -38,7 +38,7 @@ import {
   committedProbability,
   setStrategyResponse,
 } from './src/server/analyticsHooksV2.ts';
-import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary, saveSessionV2 } from './src/server/dbV2.ts';
+import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary, saveSessionV2, sessionStoreModeV2 } from './src/server/dbV2.ts';
 import { listPublicSessionsV1, saveSessionAccessV1, verifySessionFacilitatorPasswordV1 } from './src/server/sessionAccessV1.ts';
 import { savePlayerOptInV1 } from './src/server/playerOptInV1.ts';
 import { resolveWithReputationV2 } from './src/server/reputationServiceV2.ts';
@@ -73,7 +73,7 @@ async function startServer() {
     return true;
   };
 
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok', engine: 'core-v2.3', time: new Date().toISOString() }));
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', engine: 'core-v2.3', sessionStore: sessionStoreModeV2(), time: new Date().toISOString() }));
   app.get('/api/sessions', async (_req, res) => res.json(await listSessionsV2()));
   app.get('/api/public-games', async (req,res) => res.json(await listPublicSessionsV1(req.query.archived==='true')));
   app.get('/api/sessions/default', async (_req, res) => res.json(await initializeDefaultSessionV2()));
