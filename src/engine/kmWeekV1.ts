@@ -280,6 +280,7 @@ export function resolveKMWeekChallengeV1(
   challengeId:string,
   method:'local'|'expert'|'risk',
   expertId?:string,
+  includeLocalBreadth=false,
 ){
   const state=company.kmWeek;
   if(!state||state.phase!=='challenge'||state.stage==='shock'||state.stage==='complete')return{success:false,message:'No normal Challenge is ready to resolve.'};
@@ -304,9 +305,13 @@ export function resolveKMWeekChallengeV1(
     const skill=expert.domains.find(item=>item.domain===challenge.domain);
     if(!skill)return{success:false,message:`${expert.name} does not hold this knowledge domain.`};
     if(state.stage==='free'&&state.usedExpertIds.includes(expert.id))return{success:false,message:`${expert.name} has already handled a Challenge this round.`};
-    const composed=composeKnowledgeSources([skill.score,site.teamCapability[challenge.domain]||0]);
+    const localKnowledge=site.teamCapability[challenge.domain]||0;
+    const composed=composeKnowledgeSources(includeLocalBreadth&&localKnowledge>0?[skill.score,localKnowledge]:[skill.score]);
     won=composed.total>=challenge.difficulty;
-    if(!won)return{success:false,message:`${expert.name} provides depth ${skill.score} plus local breadth +${composed.breadth}; total selected knowledge ${composed.total}/${challenge.difficulty}.`};
+    if(!won){
+      const breadthHint=!includeLocalBreadth&&localKnowledge>0?' Select the Local Team as breadth to add +1.':'';
+      return{success:false,message:`${expert.name} provides depth ${skill.score}${includeLocalBreadth?` plus local breadth +${composed.breadth}`:''}; total selected knowledge ${composed.total}/${challenge.difficulty}.${breadthHint}`};
+    }
     travelCost=expert.location===site.id?0:2;
     expert.location=site.id;
     expert.state='Supporting Event';
@@ -464,7 +469,7 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
   const type=String(payload?.type||'');
   let result:{success:boolean;message:string};
   if(type==='KM_WEEK_RESOLVE'){
-    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId);
+    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth));
   }else if(type==='KM_WEEK_INVEST'){
     result=investKMWeekV1(session,company,payload);
   }else if(type==='KM_WEEK_RESOLVE_SHOCK'){
