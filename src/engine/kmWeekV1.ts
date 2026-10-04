@@ -1,6 +1,7 @@
 import type { CompanyV2, GameSessionV2 } from '../types/gameV2.ts';
 import type { ExpertV2 } from '../types/gameV2.ts';
 import type { KnowledgeDomain } from '../types/game.ts';
+import { composeKnowledgeSources } from './knowledgeCompositionV1.ts';
 import type {
   KMWeekChallenge,
   KMWeekCompanyState,
@@ -284,8 +285,9 @@ export function resolveKMWeekChallengeV1(
     const skill=expert.domains.find(item=>item.domain===challenge.domain);
     if(!skill)return{success:false,message:`${expert.name} does not hold this knowledge domain.`};
     if(state.stage==='free'&&state.usedExpertIds.includes(expert.id))return{success:false,message:`${expert.name} has already handled a Challenge this round.`};
-    won=skill.score>=challenge.difficulty;
-    if(!won)return{success:false,message:`${expert.name} has Knowledge ${skill.score}; this Challenge needs ${challenge.difficulty}.`};
+    const composed=composeKnowledgeSources([skill.score,site.teamCapability[challenge.domain]||0]);
+    won=composed.total>=challenge.difficulty;
+    if(!won)return{success:false,message:`${expert.name} provides depth ${skill.score} plus local breadth +${composed.breadth}; total selected knowledge ${composed.total}/${challenge.difficulty}.`};
     travelCost=expert.location===site.id?0:2;
     expert.location=site.id;
     expert.state='Supporting Event';
