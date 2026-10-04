@@ -98,6 +98,16 @@ const ChallengeKnowledgeBars:React.FC<{
  const applied=appliedMethod==='local'?local:appliedMethod==='expert'?expert:0;
  const requirementMet=appliedMethod!=='risk'&&applied>=requirement;
  const pct=(value:number)=>`${Math.max(0,Math.min(100,(value/5)*100))}%`;
+ const SegmentBar:React.FC<{value:number;filled:number;tone:'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={`${tone} knowledge ${value} of 5; ${filled} applied`}>
+  {Array.from({length:5},(_,index)=>{
+   const available=index<value;
+   const applied=index<filled;
+   const colour=tone==='local'?'border-sky-400 bg-sky-400':'border-amber-400 bg-amber-400';
+   return <span key={index} className={`h-2.5 rounded-full border-2 transition-all duration-200 ${available?(applied?colour:tone==='local'?'border-sky-500/85 bg-transparent':'border-amber-500/85 bg-transparent'):'border-slate-800 bg-transparent'}`}/>;
+  })}
+ </div>;
+ const localFilled=appliedMethod==='local'?local:appliedMethod==='expert'?Math.min(local,1):0;
+ const expertFilled=appliedMethod==='expert'?expert:0;
  return <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2" data-kmw-knowledge-bars>
   <div className="space-y-1.5">
    <div className="grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2">
@@ -105,14 +115,14 @@ const ChallengeKnowledgeBars:React.FC<{
     <div className="h-2.5 overflow-hidden rounded-full bg-slate-800"><div className={`h-full rounded-full transition-colors duration-300 ${requirementMet?'bg-emerald-400':'bg-rose-500'}`} style={{width:pct(requirement)}}/></div>
     <b className={`text-[10px] ${requirementMet?'text-emerald-300':'text-rose-300'}`}>{requirement}</b>
    </div>
-   <div className={`grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2 rounded-md px-1 py-0.5 transition ${appliedMethod==='local'?'bg-sky-950/40 ring-1 ring-sky-700':'opacity-70'}`}>
+   <div className="grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2 px-1 py-0.5">
     <span className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Local</span>
-    <div className="h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-sky-400" style={{width:pct(local)}}/></div>
+    <SegmentBar value={local} filled={localFilled} tone="local"/>
     <b className="text-[10px] text-sky-300">{local}</b>
    </div>
-   <div className={`grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2 rounded-md px-1 py-0.5 transition ${appliedMethod==='expert'?'bg-amber-950/40 ring-1 ring-amber-700':'opacity-70'}`}>
+   <div className="grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2 px-1 py-0.5">
     <span className="truncate text-[8px] font-black uppercase tracking-[.12em] text-slate-500" title={expertName||'Expert'}>{expertName?expertName.split(' ')[0]:'Expert'}</span>
-    <div className="h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-amber-400" style={{width:pct(expert)}}/></div>
+    <SegmentBar value={expert} filled={expertFilled} tone="expert"/>
     <b className="text-[10px] text-amber-300">{expert}</b>
    </div>
   </div>
