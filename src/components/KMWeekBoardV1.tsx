@@ -23,7 +23,8 @@ interface Props{
 }
 
 type ResponseMethod='local'|'expert'|'risk';
-type PendingResponse={challengeId:string;method:ResponseMethod;expertId?:string;includeLocalBreadth?:boolean;label:string}|null;
+type ResponseSelectionState='none'|'depth'|'breadth';
+type PendingResponse={challengeId:string;method?:ResponseMethod;expertId?:string;localSelection:ResponseSelectionState;expertSelection:ResponseSelectionState;label:string}|null;
 
 const SITE_ABBR:Record<string,string>={melbourne:'MEL',brisbane:'BNE',perth:'PER'};
 const money=(value:number)=>formatCurrency(value);
@@ -55,8 +56,8 @@ function currentPhaseLabel(company:CompanyV2){
 
 function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
- if(turn===1)return{title:'1. Solve the business problem',text:'Brisbane needs Operations 4. Priya has Operations 4. Select Priya below, then commit your response.',invest:'After the Challenge, you will deepen Priya’s expertise.'};
- if(turn===2)return{title:'2. Solve it again',text:'Another Operations problem has appeared in Brisbane. Use Priya again, then commit your response.',invest:'Afterwards you will use Local Training so Brisbane learns from her.'};
+ if(turn===1)return{title:'1. Solve the business problem',text:'Brisbane needs Operations 4. Build the response yourself: select Priya for depth, then select the Local Team if you want its knowledge to contribute breadth.',invest:'After the Challenge, you will deepen Priya’s expertise.'};
+ if(turn===2)return{title:'2. Solve it again',text:'Another Operations problem has appeared in Brisbane. Select the knowledge sources you want in the response; Local can contribute breadth alongside Priya’s depth.',invest:'Afterwards you will use Local Training so Brisbane learns from her.'};
  return{title:'3. The problem moves',text:'A similar Operations issue has appeared in Perth. Use Priya, then commit your response.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
 }
 
@@ -86,7 +87,6 @@ const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selec
  </button>;
 };
 
-type ResponseSelectionState='none'|'depth'|'breadth';
 const ResponseButton:React.FC<{selectionState:ResponseSelectionState;disabled?:boolean;children:React.ReactNode;onClick:()=>void}>=({selectionState,disabled,children,onClick})=>{
  const depth=selectionState==='depth',breadth=selectionState==='breadth';
  return <button type="button" disabled={disabled} onClick={onClick} className={`relative w-full rounded-xl border-2 px-3 py-2.5 text-left text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-35 ${depth?'border-amber-300 bg-amber-950/45 text-amber-100':'border-slate-700 bg-slate-950 text-slate-200 hover:border-slate-500'}`}>
@@ -102,11 +102,14 @@ const ChallengeKnowledgeBars:React.FC<{
  local:number;
  expert:number;
  expertName?:string;
- appliedMethod?:ResponseMethod;
- localBreadthSelected?:boolean;
-}>=({requirement,local,expert,expertName,appliedMethod,localBreadthSelected=false})=>{
- const applied=appliedMethod==='local'?local:appliedMethod==='expert'?expert+(localBreadthSelected&&local>0?1:0):appliedMethod==='risk'?local:0;
- const requirementMet=applied>=requirement;
+ localSelection:ResponseSelectionState;
+ expertSelection:ResponseSelectionState;
+ riskSelected?:boolean;
+}>=({requirement,local,expert,expertName,localSelection,expertSelection,riskSelected=false})=>{
+ const depth=localSelection==='depth'?local:expertSelection==='depth'?expert:0;
+ const breadth=(localSelection==='breadth'&&local>0?1:0)+(expertSelection==='breadth'&&expert>0?1:0);
+ const applied=riskSelected?local:depth+breadth;
+ const requirementMet=!riskSelected&&applied>=requirement;
  const pct=(value:number)=>`${Math.max(0,Math.min(100,(value/5)*100))}%`;
  const SegmentBar:React.FC<{value:number;filled:number;tone:'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={`${tone} knowledge ${value} of 5; ${filled} applied`}>
   {Array.from({length:5},(_,index)=>{
@@ -116,8 +119,8 @@ const ChallengeKnowledgeBars:React.FC<{
    return <span key={index} className={`h-2.5 rounded-full border-2 transition-all duration-200 ${available?(applied?colour:tone==='local'?'border-sky-500/85 bg-transparent':'border-amber-500/85 bg-transparent'):'border-slate-800 bg-transparent'}`}/>;
   })}
  </div>;
- const localFilled=appliedMethod==='local'?local:appliedMethod==='expert'&&localBreadthSelected?Math.min(local,1):0;
- const expertFilled=appliedMethod==='expert'?expert:0;
+ const localFilled=localSelection==='depth'?local:localSelection==='breadth'?Math.min(local,1):0;
+ const expertFilled=expertSelection==='depth'?expert:expertSelection==='breadth'?Math.min(expert,1):0;
  return <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2" data-kmw-knowledge-bars>
   <div className="space-y-1.5">
    <div className="grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2">
@@ -218,13 +221,17 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const localScore=activeChallenge&&localSite?localSite.teamCapability[activeChallenge.domain]||0:0;
  const activeExpert=activeChallenge?specialistFor(company,activeChallenge.domain):undefined;
  const activeExpertScore=activeChallenge&&activeExpert?activeExpert.domains.find(skill=>skill.domain===activeChallenge.domain)?.score||0:0;
- const activeExpertSelectedKnowledge=activeExpertScore+(localScore>0?1:0);
  const riskOdds=activeChallenge?kmWeekRiskOddsV1(localScore,activeChallenge.difficulty):{requiredRoll:7,successfulFaces:0,chancePercent:0};
- const selectedKnowledge=pendingResponse?.challengeId!==activeChallenge?.id?0:
-  pendingResponse.method==='local'?localScore:
-  pendingResponse.method==='expert'?activeExpertScore+(pendingResponse.includeLocalBreadth&&localScore>0?1:0):
-  pendingResponse.method==='risk'?localScore:0;
+ const activePending=pendingResponse?.challengeId===activeChallenge?.id?pendingResponse:null;
+ const localSelection:ResponseSelectionState=activePending?.localSelection||'none';
+ const expertSelection:ResponseSelectionState=activePending?.expertSelection||'none';
+ const riskSelected=activePending?.method==='risk';
+ const selectedDepth=localSelection==='depth'?localScore:expertSelection==='depth'?activeExpertScore:0;
+ const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0);
+ const selectedKnowledge=riskSelected?localScore:selectedDepth+selectedBreadth;
  const expertUsed=Boolean(activeExpert&&state.usedExpertIds.includes(activeExpert.id));
+ const confidentResponseReady=Boolean(activePending?.method&&(activePending.method==='local'||activePending.method==='expert')&&selectedKnowledge>=activeChallenge!.difficulty);
+ const responseReady=Boolean(riskSelected||confidentResponseReady);
  const activeExpertTravelCost=activeChallenge&&activeExpert&&activeExpert.location!==activeChallenge.siteId?2:0;
 
  const post=async(payload:any,beforeApply?:()=>Promise<void>)=>{
@@ -295,9 +302,46 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
  };
 
+ const cycleKnowledgeSource=(source:'local'|'expert')=>{
+  if(!activeChallenge)return;
+  const current=pendingResponse?.challengeId===activeChallenge.id?pendingResponse:null;
+  let localState:ResponseSelectionState=current?.method==='risk'?'none':current?.localSelection||'none';
+  let expertState:ResponseSelectionState=current?.method==='risk'?'none':current?.expertSelection||'none';
+  const sourceState=source==='local'?localState:expertState;
+  const sourceScore=source==='local'?localScore:activeExpertScore;
+  const otherScore=source==='local'?(expertUsed?0:activeExpertScore):localScore;
+
+  let nextState:ResponseSelectionState;
+  if(sourceState==='breadth')nextState='depth';
+  else if(sourceState==='depth')nextState='none';
+  else nextState=sourceScore>=otherScore?'depth':'breadth';
+
+  if(source==='local'){
+   localState=nextState;
+   if(nextState==='depth'&&expertState==='depth')expertState='none';
+  }else{
+   expertState=nextState;
+   if(nextState==='depth'&&localState==='depth')localState='none';
+  }
+
+  const method:ResponseMethod|undefined=localState==='depth'?'local':expertState==='depth'?'expert':undefined;
+  const parts:string[]=[];
+  if(localState!=='none')parts.push(`Local ${localState}`);
+  if(expertState!=='none'&&activeExpert)parts.push(`${activeExpert.name} ${expertState}`);
+  setPendingResponse({
+   challengeId:activeChallenge.id,
+   method,
+   expertId:expertState!=='none'?activeExpert?.id:undefined,
+   localSelection:localState,
+   expertSelection:expertState,
+   label:parts.length?parts.join(' + '):'No knowledge source selected',
+  });
+ };
+
  const commitResponse=async()=>{
   if(!pendingResponse)return;
-  const ok=await post({type:'KM_WEEK_RESOLVE',challengeId:pendingResponse.challengeId,method:pendingResponse.method,expertId:pendingResponse.expertId,includeLocalBreadth:Boolean(pendingResponse.includeLocalBreadth)});
+  if(!pendingResponse.method)return;
+  const ok=await post({type:'KM_WEEK_RESOLVE',challengeId:pendingResponse.challengeId,method:pendingResponse.method,expertId:pendingResponse.expertId,includeLocalBreadth:pendingResponse.localSelection==='breadth',includeExpertBreadth:pendingResponse.expertSelection==='breadth'});
   if(ok)setPendingResponse(null);
  };
 
@@ -442,7 +486,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        {activeChallenge&&activeChallenge.status==='open'&&<div className="mt-2 rounded-xl border border-slate-700 bg-black/20 p-2.5">
         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">{siteName(company,activeChallenge.siteId)} · {domainLabel(activeChallenge.domain)}</div><div className="mt-0.5 text-sm font-black text-white">{activeChallenge.title}</div></div><div className="shrink-0 text-right"><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Selected knowledge</div><div className={`mt-0.5 text-[34px] font-black leading-none tracking-[-.05em] tabular-nums ${selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-white'}`}>{selectedKnowledge}<span className="text-[20px] text-slate-500">/{activeChallenge.difficulty}</span></div>{pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'&&<div className="mt-1 text-[10px] font-black text-amber-300">RISK {riskOdds.chancePercent}% · {riskOdds.requiredRoll<=1?'ANY ROLL':riskOdds.requiredRoll>6?'NO WINNING ROLL':`NEED ${riskOdds.requiredRoll}+`}</div>}</div></div>
         <p className="mt-1 text-[10px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
-        <ChallengeKnowledgeBars requirement={activeChallenge.difficulty} local={localScore} expert={activeExpertScore} expertName={activeExpert?.name} appliedMethod={pendingResponse?.challengeId===activeChallenge.id?pendingResponse.method:undefined} localBreadthSelected={Boolean(pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'&&pendingResponse.includeLocalBreadth)}/>
+        <ChallengeKnowledgeBars requirement={activeChallenge.difficulty} local={localScore} expert={activeExpertScore} expertName={activeExpert?.name} localSelection={localSelection} expertSelection={expertSelection} riskSelected={riskSelected}/>
         <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2">
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="mt-0.5 text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="mt-0.5 text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
@@ -450,29 +494,23 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         <div className="mt-1.5 text-[9px] leading-relaxed text-slate-500">Knowledge at or above the requirement is a confident response. If Local is below it, <b className="text-slate-300">Take the Risk</b> uses Local knowledge + a d6 and requires a 2-point safety margin. Moving an expert from another site costs an additional <b className="text-amber-300">$2k</b>.</div>
         <div className="mt-2 space-y-1.5">
          <ResponseButton
-          selectionState={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='local'?'depth':pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'&&pendingResponse.includeLocalBreadth?'breadth':'none'}
-          disabled={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'?localScore<=0:guided||localScore<activeChallenge.difficulty}
-          onClick={()=>{
-           const current=pendingResponse?.challengeId===activeChallenge.id?pendingResponse:null;
-           if(current?.method==='expert'){
-            const includeLocalBreadth=!current.includeLocalBreadth;
-            setPendingResponse({...current,includeLocalBreadth,label:`Send ${activeExpert?.name||'expert'}${includeLocalBreadth?' + local breadth':''}${activeExpertTravelCost?` · Travel -$${activeExpertTravelCost}k`:''}`});
-           }else{
-            setPendingResponse({challengeId:activeChallenge.id,method:'local',label:`Use ${siteName(company,activeChallenge.siteId)} local team`});
-           }
-          }}>
-          USE LOCAL TEAM <span className="ml-1 text-slate-500">{pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'?(pendingResponse.includeLocalBreadth?`Breadth +1 from Knowledge ${localScore}`:`Click to add breadth +1`):localScore>=activeChallenge.difficulty?`Knowledge ${localScore} · guaranteed`:`Knowledge ${localScore} · needs ${activeChallenge.difficulty}`}</span>
+          selectionState={localSelection}
+          disabled={localScore<=0}
+          onClick={()=>cycleKnowledgeSource('local')}>
+          USE LOCAL TEAM <span className="ml-1 text-slate-500">{localSelection==='depth'?`Knowledge ${localScore} · Depth`:localSelection==='breadth'?`Knowledge ${localScore} · Breadth +1`:localScore>0?`Knowledge ${localScore} · Click to select`:'Knowledge 0'}</span>
          </ResponseButton>
-         {activeExpert&&<ResponseButton selectionState={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'?'depth':'none'} disabled={activeExpertSelectedKnowledge<activeChallenge.difficulty||expertUsed} onClick={()=>{
-          const current=pendingResponse?.challengeId===activeChallenge.id?pendingResponse:null;
-          const keepExplicitLocal=Boolean(current&&(current.method==='local'||current.includeLocalBreadth)&&localScore>0);
-          setPendingResponse({challengeId:activeChallenge.id,method:'expert',expertId:activeExpert.id,includeLocalBreadth:keepExplicitLocal,label:`Send ${activeExpert.name}${keepExplicitLocal?' + local breadth':''}${activeExpertTravelCost?` · Travel -$${activeExpertTravelCost}k`:''}`});
-         }}><span className="block">SEND {activeExpert.name.toUpperCase()}</span><span className="mt-0.5 block text-[10px] font-bold text-slate-500">Knowledge {activeExpertScore}{expertUsed?' - Already used':activeExpertTravelCost?` - Travel -$${activeExpertTravelCost}k`:' - Already on site'}</span></ResponseButton>}
-         {!guided&&<ResponseButton selectionState={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'?'depth':'none'} onClick={()=>setPendingResponse({challengeId:activeChallenge.id,method:'risk',label:`Take the risk · ${riskOdds.chancePercent}%`})}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · need {riskOdds.requiredRoll<=1?'any roll':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
+         {activeExpert&&<ResponseButton
+          selectionState={expertSelection}
+          disabled={expertUsed||activeExpertScore<=0}
+          onClick={()=>cycleKnowledgeSource('expert')}>
+          <span className="block">SEND {activeExpert.name.toUpperCase()}</span>
+          <span className="mt-0.5 block text-[10px] font-bold text-slate-500">Knowledge {activeExpertScore}{expertSelection==='depth'?' - Depth':expertSelection==='breadth'?' - Breadth +1':expertUsed?' - Already used':activeExpertTravelCost?` - Travel -$${activeExpertTravelCost}k`:' - Already on site'}</span>
+         </ResponseButton>}
+         {!guided&&<ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:'none',expertSelection:'none',label:`Take the risk · ${riskOdds.chancePercent}%`})}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · need {riskOdds.requiredRoll<=1?'any roll':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
         </div>
-        <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-[10px] text-slate-500">{pendingResponse?.challengeId===activeChallenge.id?<><span className="font-black text-amber-300">Selected:</span> {pendingResponse.label}</>:<>Select a response above. Nothing happens until you commit.</>}</div>
+        <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-[10px] text-slate-500">{activePending?<><span className="font-black text-amber-300">Selected:</span> {activePending.label}{!riskSelected&&!activePending.method&&<span className="ml-1 text-slate-600">· choose a Depth source</span>}</>:<>Select a response above. Nothing happens until you commit.</>}</div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
-        <button type="button" onClick={()=>void commitResponse()} disabled={!pendingResponse||pendingResponse.challengeId!==activeChallenge.id||busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':'COMMIT RESPONSE'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+        <button type="button" onClick={()=>void commitResponse()} disabled={!responseReady||busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':'COMMIT RESPONSE'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>}
 
        {challengeDone&&<div className="mt-3 rounded-xl border-2 border-emerald-700 bg-emerald-950/25 p-3 text-xs font-black text-emerald-200">Challenges complete. Moving to Invest…</div>}
