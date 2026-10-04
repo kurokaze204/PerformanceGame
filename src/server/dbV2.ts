@@ -12,6 +12,10 @@ const pool = process.env.DATABASE_URL ? new Pool({
 const memory = new Map<string, GameSessionV2>();
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
 
+export function sessionStoreModeV2(): 'postgres'|'memory' {
+  return pool?'postgres':'memory';
+}
+
 export { deleteParticipant, logGameEvent, getGameEventLogs, saveParticipant };
 
 export interface CompanyMetricSnapshot {
