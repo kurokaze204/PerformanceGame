@@ -4,6 +4,7 @@ import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import {
   applyKMWeekActionV1,
   initialiseKMWeekSessionV1,
+  ensureKMWeekSessionV1,
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
 } from '../src/engine/kmWeekV1.ts';
@@ -81,7 +82,15 @@ assert.equal(result.success,true,result.message);
 assert.equal(opsExpert().domains[0].score,5);
 assert.equal(company.kmWeek?.guidedTurn,2);
 
+// The KM Week clock is facilitation guidance, not a hard game lock. Reproduce
+// the playtest case where Guided 2 is still underway after 0:00.
+session.timerEndsAt=new Date(Date.now()-1000).toISOString();
+session.timerPausedSecondsRemaining=null;
+assert.equal(ensureKMWeekSessionV1(session),true);
+assert.equal(session.timerEndsAt,null,'expired KM Week timer must be frozen rather than left running');
+assert.equal(session.timerPausedSecondsRemaining,0,'expired KM Week timer must remain visibly at zero');
 resolveGuided();
+assert.equal(company.kmWeek?.phase,'invest','Guided Challenge must still resolve after the KM Week clock reaches zero');
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:opsExpert().id,siteId:'brisbane',domain:'operations'});
 assert.equal(result.success,true,result.message);
 assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.operations,2);
