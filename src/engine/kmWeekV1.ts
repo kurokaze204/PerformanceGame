@@ -25,6 +25,18 @@ export const KM_WEEK_SHOCK_SPECS:{id:string;siteId:string;domain:KnowledgeDomain
 ];
 export const KM_WEEK_SHOCK_CUTOFF=Math.max(...KM_WEEK_SHOCK_SPECS.map(check=>check.difficulty));
 
+export function kmWeekRiskOddsV1(localKnowledge:number,difficulty:number){
+  // Risk uses the local team's knowledge plus a d6, but requires a two-point
+  // safety margin above the normal Challenge requirement.
+  const requiredRoll=difficulty+2-localKnowledge;
+  const successfulFaces=Math.max(0,Math.min(6,7-requiredRoll));
+  return{
+    requiredRoll,
+    successfulFaces,
+    chancePercent:Math.round((successfulFaces/6)*100),
+  };
+}
+
 export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
   'local-heroes': {
     id:'local-heroes',
@@ -303,7 +315,8 @@ export function resolveKMWeekChallengeV1(
   }else{
     roll=Math.floor(Math.random()*6)+1;
     const team=site.teamCapability[challenge.domain]||0;
-    won=team+roll>=challenge.difficulty+2;
+    const odds=kmWeekRiskOddsV1(team,challenge.difficulty);
+    won=roll>=odds.requiredRoll;
     if(won&&state.stage==='free')state.riskSuccesses+=1;
   }
 
