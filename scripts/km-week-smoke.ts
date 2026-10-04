@@ -97,9 +97,13 @@ assert.equal(session.timerEndsAt,null,'expired KM Week timer must be frozen rath
 assert.equal(session.timerPausedSecondsRemaining,0,'expired KM Week timer must remain visibly at zero');
 resolveGuided();
 assert.equal(company.kmWeek?.phase,'invest','Guided Challenge must still resolve after the KM Week clock reaches zero');
-result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:opsExpert().id,siteId:'brisbane',domain:'operations'});
+const beforeRemoteTraining=company.turnover;
+const expertBaseBeforeTraining=opsExpert().location;
+result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:opsExpert().id,siteId:'melbourne',domain:'operations'});
 assert.equal(result.success,true,result.message);
-assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.operations,2);
+assert.equal(company.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,2,'Local Training must allow an expert to teach another site');
+assert.equal(company.turnover,beforeRemoteTraining-12,'Remote KM Week Local Training must cost $10k plus the fixed $2k travel fee');
+assert.equal(opsExpert().location,expertBaseBeforeTraining,'Temporary Local Training travel must not permanently relocate the expert');
 assert.equal(company.kmWeek?.guidedTurn,3);
 
 resolveGuided();
