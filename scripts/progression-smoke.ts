@@ -37,7 +37,8 @@ assert.ok(move4.impact>move3.impact,'financial exposure should increase each new
 assert.ok(move4.domains[0].difficulty>=move3.domains[0].difficulty,'difficulty should not fall as moves progress');
 
 const learning=progressEventCard(base,1,DEFAULT_CONFIG,'newbie');
-assert.ok(learning.title.startsWith('LEARNING:'));
+assert.equal(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):/.test(learning.title),false,'Challenge titles must remain business situations, not simulation tiers');
+assert.equal(learning.description.includes('This is move'),false,'Challenge descriptions must not expose simulation progression mechanics');
 assert.ok(learning.impact<=25,'first move should remain cheap');
 assert.ok(learning.domains.every(d=>d.difficulty<=3),'first move should remain simple');
 
@@ -60,7 +61,7 @@ const capped=capProgressedEventImpact(oversized,company,localSite.id,DEFAULT_CON
 assert.ok(capped.impact<=Math.max(5,Math.round(localSite.turnover*0.35)),'local event impact should be capped to the tuned share of site turnover');
 
 const critical=progressEventCard(base,13,DEFAULT_CONFIG,'newbie');
-assert.ok(critical.title.startsWith('CRITICAL:'));
+assert.equal(/^(LEARNING|MATERIAL|HIGH STAKES|CRITICAL):/.test(critical.title),false,'Late-game Challenge titles must remain business situations, not simulation tiers');
 assert.ok(critical.domains.every(d=>d.difficulty<=9),'difficulty must respect the tuned ceiling');
 
 // Round 1 regression: dealt Events may be clicked in either order. The teaching
@@ -78,6 +79,8 @@ const tutorialSession=await createNewSessionV2('TUTORIAL-FAIL-SMOKE','Tutorial F
 const tutorialCompany=tutorialSession.companies[0];
 const tutorialEvent=(tutorialSession.activeEvents[tutorialCompany.id]||[]).find(event=>event.card.tags?.includes(PROGRAMMED_FAILURE_TAG));
 assert.ok(tutorialEvent,'a fresh Newbie game must include the opening knowledge-isolation teaching Event');
+assert.equal(/^LEARNING:/.test(tutorialEvent!.card.title),false,'Opening Challenge title must describe the business situation rather than the lesson');
+assert.equal(/deliberately tests|opening challenge/i.test(tutorialEvent!.card.description),false,'Opening Challenge description must stay in the business world');
 const tutorialResolution:any=await resolveEventV2(tutorialSession.id,tutorialCompany.id,tutorialEvent!.instanceId);
 assert.equal(tutorialResolution.success,true,'programmed tutorial Event should resolve through the shared Event path');
 assert.equal(tutorialResolution.eventSuccess,false,'programmed opening knowledge-isolation Event must remain a forced failure');
