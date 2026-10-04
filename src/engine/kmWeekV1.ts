@@ -406,9 +406,9 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const site=company.sites.find(item=>item.id===payload?.siteId&&!item.isClosed);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!site||!skill)return{success:false,message:'Choose an expert, their domain and a site.'};
-    if(expert.location!==site.id)return{success:false,message:`${expert.name} is currently in ${company.sites.find(item=>item.id===expert.location)?.name||expert.location}. Use the expert on a Challenge there first, or choose their current site.`};
     if((site.teamCapability[domain]||0)>=skill.score)return{success:false,message:'The local team is already at this expert’s teaching ceiling.'};
-    cost=10;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
+    const travelCost=expert.location===site.id?0:2;
+    cost=10+travelCost;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
     before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+1,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.state='Knowledge Transfer';
   }else{
     const source=company.sites.find(item=>item.id===payload?.sourceSiteId&&!item.isClosed);
