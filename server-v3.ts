@@ -74,6 +74,12 @@ async function startServer() {
   };
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', engine: 'core-v2.3', sessionStore: sessionStoreModeV2(), time: new Date().toISOString() }));
+  app.get('/api/sessions/:id/keepalive', async (req, res) => {
+    const session=await getSessionV2(req.params.id.toUpperCase());
+    if(!session)return res.status(404).json({error:'Session not found.',sessionStore:sessionStoreModeV2()});
+    res.set('Cache-Control','no-store');
+    res.json({status:'ok',sessionId:session.id,sessionStore:sessionStoreModeV2(),time:new Date().toISOString()});
+  });
   app.get('/api/sessions', async (_req, res) => res.json(await listSessionsV2()));
   app.get('/api/public-games', async (req,res) => res.json(await listPublicSessionsV1(req.query.archived==='true')));
   app.get('/api/sessions/default', async (_req, res) => res.json(await initializeDefaultSessionV2()));
