@@ -58,7 +58,7 @@ function currentPhaseLabel(company:CompanyV2){
 function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
  if(turn===1)return{title:'1. Solve the business problem',text:'Brisbane needs Operations 4. Build the response yourself: select Priya for depth, then select the Local Team if you want its knowledge to contribute breadth.',invest:'After the Challenge, you will deepen Priya’s expertise.'};
- if(turn===2)return{title:'2. Solve it again',text:'Another Operations problem has appeared in Brisbane. Select the knowledge sources you want in the response; Local can contribute breadth alongside Priya’s depth.',invest:'Afterwards you will use Local Training so Brisbane learns from her.'};
+ if(turn===2)return{title:'2. Solve it again',text:'Another Operations problem has appeared in Brisbane. Select the knowledge sources you want in the response; Local can contribute breadth alongside Priya’s depth.',invest:'Now use Local Training. Brisbane is the obvious target, but you can send Priya to another site; training away from her current site adds $2k travel.'};
  return{title:'3. The problem moves',text:'A similar Operations issue has appeared in Perth. Use Priya, then commit your response.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
 }
 
