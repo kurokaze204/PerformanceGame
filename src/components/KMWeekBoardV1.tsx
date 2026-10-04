@@ -456,7 +456,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
            const current=pendingResponse?.challengeId===activeChallenge.id?pendingResponse:null;
            if(current?.method==='expert'){
             const includeLocalBreadth=!current.includeLocalBreadth;
-            setPendingResponse({...current,includeLocalBreadth,label:`Send ${activeExpert?.name||'expert'}${includeLocalBreadth?' + local breadth':''}${activeExpertTravelCost?` · Travel -${activeExpertTravelCost}k`:''}`});
+            setPendingResponse({...current,includeLocalBreadth,label:`Send ${activeExpert?.name||'expert'}${includeLocalBreadth?' + local breadth':''}${activeExpertTravelCost?` · Travel -$${activeExpertTravelCost}k`:''}`});
            }else{
             setPendingResponse({challengeId:activeChallenge.id,method:'local',label:`Use ${siteName(company,activeChallenge.siteId)} local team`});
            }
@@ -466,8 +466,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          {activeExpert&&<ResponseButton selectionState={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='expert'?'depth':'none'} disabled={activeExpertSelectedKnowledge<activeChallenge.difficulty||expertUsed} onClick={()=>{
           const current=pendingResponse?.challengeId===activeChallenge.id?pendingResponse:null;
           const keepExplicitLocal=Boolean(current&&(current.method==='local'||current.includeLocalBreadth)&&localScore>0);
-          setPendingResponse({challengeId:activeChallenge.id,method:'expert',expertId:activeExpert.id,includeLocalBreadth:keepExplicitLocal,label:`Send ${activeExpert.name}${keepExplicitLocal?' + local breadth':''}${activeExpertTravelCost?` · Travel -${activeExpertTravelCost}k`:''}`});
-         }}><span className="block">SEND {activeExpert.name.toUpperCase()}</span><span className="mt-0.5 block text-[10px] font-bold text-slate-500">Knowledge {activeExpertScore}{expertUsed?' - Already used':activeExpertTravelCost?` - Travel -${activeExpertTravelCost}k`:' - Already on site'}</span></ResponseButton>}
+          setPendingResponse({challengeId:activeChallenge.id,method:'expert',expertId:activeExpert.id,includeLocalBreadth:keepExplicitLocal,label:`Send ${activeExpert.name}${keepExplicitLocal?' + local breadth':''}${activeExpertTravelCost?` · Travel -$${activeExpertTravelCost}k`:''}`});
+         }}><span className="block">SEND {activeExpert.name.toUpperCase()}</span><span className="mt-0.5 block text-[10px] font-bold text-slate-500">Knowledge {activeExpertScore}{expertUsed?' - Already used':activeExpertTravelCost?` - Travel -$${activeExpertTravelCost}k`:' - Already on site'}</span></ResponseButton>}
          {!guided&&<ResponseButton selectionState={pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'?'depth':'none'} onClick={()=>setPendingResponse({challengeId:activeChallenge.id,method:'risk',label:`Take the risk · ${riskOdds.chancePercent}%`})}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · need {riskOdds.requiredRoll<=1?'any roll':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
         </div>
         <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-[10px] text-slate-500">{pendingResponse?.challengeId===activeChallenge.id?<><span className="font-black text-amber-300">Selected:</span> {pendingResponse.label}</>:<>Select a response above. Nothing happens until you commit.</>}</div>
