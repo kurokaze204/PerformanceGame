@@ -329,8 +329,8 @@ const EVENT_CARD_TEMPLATES: EventCardTemplate[] = [
   },
   {
     id: 'ENT-PROB-DISRUPTION-SWAP', type: 'problem', scope: 'enterprise',
-    title: 'Strategic Environment Shift',
-    description: 'The assumptions behind your long-range plan change abruptly. After this Event, exchange your known Disruption with another company and reassess the capability you need.',
+    title: 'Major Customer and Market Forecast Reversal',
+    description: 'New customer forecasts and competitor moves invalidate several assumptions behind the current strategic plan, forcing an urgent reassessment of the risks the company is preparing for.',
     domains: [{ domain: 'operations', difficulty: 5 }, { domain: 'marketing', difficulty: 5 }],
     tags: ['strategic-change', 'disruption-swap', 'network-opportunity']
   },
