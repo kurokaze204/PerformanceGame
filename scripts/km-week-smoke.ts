@@ -68,7 +68,11 @@ const resolveGuided=()=>{
 };
 
 const openingTurnover=company.turnover;
+// Match the main-game composition rule: Expert depth 4 + one independent local
+// source = 5 total selected knowledge, so a difficulty-5 Challenge succeeds.
+company.kmWeek!.challenges[0].difficulty=5;
 resolveGuided();
+assert.equal(company.kmWeek?.challenges[0].status,'success','Expert depth plus local breadth must use the main-game selected-knowledge calculation');
 assert.equal(company.kmWeek?.challenges[0].travelCost,2,'Expert travel between sites must cost $2k');
 assert.equal(company.kmWeek?.challenges[0].turnoverChange,28,'A +$30k Challenge solved by a travelling expert must net +$28k turnover');
 assert.equal(company.turnover,openingTurnover+28,'Challenge value and travel cost must both flow through company turnover');
