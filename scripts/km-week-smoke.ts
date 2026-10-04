@@ -7,6 +7,7 @@ import {
   ensureKMWeekSessionV1,
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
+  kmWeekRiskOddsV1,
 } from '../src/engine/kmWeekV1.ts';
 import type { GameSessionV2 } from '../src/types/gameV2.ts';
 import { riverSiteKnowledgeScore } from '../src/engine/riverKnowledgeV1.ts';
@@ -59,6 +60,8 @@ for(const site of company.sites.filter(site=>!site.isClosed)){
   for(const domain of KM_WEEK_DOMAINS)assert.equal(riverSiteKnowledgeScore(site,domain,'km_week'),site.teamCapability[domain]||0,'KM Week River must exactly match the visible site score');
 }
 assert.deepEqual(company.experts.map(expert=>expert.domains[0].domain),['operations','hr','marketing']);
+assert.deepEqual(kmWeekRiskOddsV1(1,2),{requiredRoll:3,successfulFaces:4,chancePercent:67},'Local 1 against Requirement 2 must show a 67% risk chance requiring 3+ on d6');
+assert.deepEqual(kmWeekRiskOddsV1(0,4),{requiredRoll:6,successfulFaces:1,chancePercent:17},'Risk odds must fall as the knowledge deficit grows');
 
 const opsExpert=()=>company.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
 const resolveGuided=()=>{
