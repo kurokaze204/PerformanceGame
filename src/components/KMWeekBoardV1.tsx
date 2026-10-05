@@ -489,7 +489,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
   {challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')&&<div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 top-[66px] z-40 bg-black/20"/>}
 
-  {state.stage==='complete'?<KMWeekDebriefV1 session={session} company={company}/>:<main className="mx-auto max-w-[1500px] p-3 xl:flex xl:h-[calc(100vh-66px)] xl:flex-col xl:overflow-hidden">
+  {state.stage==='complete'?<KMWeekDebriefV1 session={session} company={company}/>:<main className="mx-auto max-w-[1500px] p-3 min-[700px]:flex min-[700px]:h-[calc(100dvh-66px)] min-[700px]:flex-col min-[700px]:overflow-hidden">
    <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
     <div className="rounded-xl border-2 border-indigo-700 bg-indigo-950/45 px-3 py-1.5 text-[10px] font-black text-indigo-100">{phaseTitle(company)}</div>
     <PhaseStep number="1" label="Challenge" active={(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'} done={challengeStepDone}/>
@@ -499,25 +499,25 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <div className="ml-auto rounded-xl border border-amber-800 bg-amber-950/20 px-3 py-1.5 text-xs font-black text-amber-100"><span className="mr-2 text-[9px] uppercase text-amber-500">Current phase</span>{currentPhaseLabel(company)}</div>
    </div>
 
-   <div className="grid gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_410px]">
-    <div className="space-y-3 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-3">
-     <Card className="p-3 xl:min-h-0 xl:flex-1">
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Knowledge River</div><h2 className="text-lg font-black text-white">Where is the capability now?</h2></div><div className="flex gap-1">{KM_WEEK_DOMAINS.map(domain=><button key={domain} onClick={()=>setSelectedDomain(domain)} className={`rounded-full border-2 px-2.5 py-1 text-[9px] font-black ${selectedDomain===domain?'border-amber-300 bg-amber-950/40 text-amber-100':'border-slate-700 bg-slate-950 text-slate-400'}`}>{domainLabel(domain)}</button>)}</div></div>
-      <div className="h-[360px] xl:h-[calc(100%-42px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+   <div className="grid gap-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:grid-cols-[minmax(0,1fr)_310px] lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_410px]">
+    <div className="space-y-3 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2 xl:gap-3">
+     <Card className="p-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-2 xl:p-3">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Knowledge River</div><h2 className="text-lg font-black text-white min-[700px]:text-sm lg:text-base xl:text-lg">Where is the capability now?</h2></div><div className="flex gap-1">{KM_WEEK_DOMAINS.map(domain=><button key={domain} onClick={()=>setSelectedDomain(domain)} className={`rounded-full border-2 px-2.5 py-1 text-[9px] font-black ${selectedDomain===domain?'border-amber-300 bg-amber-950/40 text-amber-100':'border-slate-700 bg-slate-950 text-slate-400'}`}>{domainLabel(domain)}</button>)}</div></div>
+      <div className="h-[360px] min-[700px]:h-[calc(100%-36px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-42px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
      </Card>
 
-     <div className="grid shrink-0 gap-2 md:grid-cols-3">
-      {sites.map((site,index)=><Card key={site.id} className={`relative overflow-hidden p-3 ${index===0?'rotate-[-.2deg]':index===2?'rotate-[.2deg]':''}`}>
+     <div className="grid shrink-0 gap-2 md:grid-cols-3 min-[700px]:gap-1.5 xl:gap-2">
+      {sites.map((site,index)=><Card key={site.id} className={`relative overflow-hidden p-3 min-[700px]:p-2 xl:p-3 ${index===0?'rotate-[-.2deg]':index===2?'rotate-[.2deg]':''}`}>
        <div className="absolute right-2 top-2 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[8px] font-black text-slate-500">{SITE_ABBR[site.id]}</div>
-       <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-emerald-300"/><h3 className="text-sm font-black text-white">{site.name}</h3></div>
-       <div className="mt-2 space-y-1.5">{KM_WEEK_DOMAINS.map(domain=><button key={domain} onClick={()=>setSelectedDomain(domain)} className="flex w-full items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1 text-left"><span className="w-16 truncate text-[9px] font-black text-slate-400">{domainLabel(domain)}</span><KnowledgePips value={site.teamCapability[domain]||0} domain={domain} compact/><b className="ml-auto text-xs text-white">{site.teamCapability[domain]||0}</b></button>)}</div>
-       <div className="mt-2 border-t border-slate-800 pt-1.5 text-[9px] font-bold text-slate-500">Expert here: <span className="text-amber-200">{experts.filter(expert=>expert.location===site.id).map(expert=>expert.name.split(' ')[0]).join(', ')||'—'}</span></div>
+       <div className="flex items-center gap-2 min-[700px]:gap-1.5"><MapPin className="h-4 w-4 text-emerald-300 min-[700px]:h-3.5 min-[700px]:w-3.5"/><h3 className="text-sm font-black text-white min-[700px]:text-xs xl:text-sm">{site.name}</h3></div>
+       <div className="mt-2 space-y-1.5 min-[700px]:mt-1.5 min-[700px]:space-y-1 xl:mt-2 xl:space-y-1.5">{KM_WEEK_DOMAINS.map(domain=><button key={domain} onClick={()=>setSelectedDomain(domain)} className="flex w-full items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1 text-left min-[700px]:gap-1 min-[700px]:px-1.5 min-[700px]:py-0.5 xl:gap-2 xl:px-2 xl:py-1"><span className="w-16 truncate text-[9px] font-black text-slate-400">{domainLabel(domain)}</span><KnowledgePips value={site.teamCapability[domain]||0} domain={domain} compact/><b className="ml-auto text-xs text-white">{site.teamCapability[domain]||0}</b></button>)}</div>
+       <div className="mt-2 border-t border-slate-800 pt-1.5 text-[9px] font-bold text-slate-500 min-[700px]:mt-1 min-[700px]:pt-1 min-[700px]:text-[8px] xl:mt-2 xl:pt-1.5 xl:text-[9px]">Expert here: <span className="text-amber-200">{experts.filter(expert=>expert.location===site.id).map(expert=>expert.name.split(' ')[0]).join(', ')||'—'}</span></div>
       </Card>)}
      </div>
     </div>
 
-    <aside className="space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-2">
-     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className="flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 xl:min-h-0 xl:flex-1">
+    <aside className="space-y-2 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2">
+     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className="flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-3 xl:p-5">
       {state.stage==='guided'&&state.guidedTurn===1&&<div className="mb-4 max-w-[350px] rounded-2xl border border-amber-700/70 bg-amber-950/20 p-3 text-left shadow-lg"><div className="text-[9px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Challenge</div><p className="mt-2 text-[11px] leading-relaxed text-slate-200">Welcome! You are the new CEO of <b className="text-white">{company.name}</b>. It’s a business with promise but also some challenges to overcome. There are islands of excellence and a few experts you can rely on to meet the challenges, but your role is to build up knowledge so every site performs well. Business goes on while you make improvements, so you will have to use the expertise you have to solve daily events. In fact, here comes one right now. <b className="text-amber-200">Click the card below to see what it is.</b></p></div>}
       <button type="button" onClick={()=>setChallengeFocusOpen(true)} className="group kmw-start-card relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
        <div className="absolute inset-2 rounded-[13px] border border-violet-400/35"/>
@@ -527,7 +527,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        <div className="mt-3 text-[9px] font-bold text-slate-500">{phaseTitle(company)}</div>
       </button>
      </div>:<div className={`${challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')?'relative z-[60] kmw-card-reveal':''}`}>
-     <Card className={`border-violet-700 bg-[linear-gradient(145deg,#1b1731,#101827)] p-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto ${challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')?'ring-4 ring-violet-400/20 shadow-[0_20px_60px_rgba(0,0,0,.55)]':''}`}>
+     <Card className={`border-violet-700 bg-[linear-gradient(145deg,#1b1731,#101827)] p-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:overflow-y-auto ${challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')?'ring-4 ring-violet-400/20 shadow-[0_20px_60px_rgba(0,0,0,.55)]':''}`}>
       <div className="flex items-center justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-violet-300">Your move</div><h2 className="text-xl font-black text-white">{currentPhaseLabel(company)}</h2></div><div className="rounded-lg border border-violet-700 bg-violet-950/30 px-2 py-1 text-[9px] font-black uppercase text-violet-200">{phaseTitle(company)}</div></div>
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&<>
