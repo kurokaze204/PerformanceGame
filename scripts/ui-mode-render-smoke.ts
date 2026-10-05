@@ -74,6 +74,9 @@ const eventProgressionSource=readFileSync(new URL('../src/engine/eventProgressio
 assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoardSource.includes('<KMWeekBoardV1'),'KM Week sessions must use their dedicated play surface');
 assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}/3`"),'KM Week board must expose the three guided and three free-play progression');
 assert.ok(kmWeekBoardSource.includes('<InvestmentRiverView company={riverFrozenCompany||company} mode="km_week"'),'KM Week must keep the Knowledge River central while supporting animation sequencing');
+assert.ok(kmWeekBoardSource.includes("min-[700px]:grid-cols-[minmax(0,1fr)_310px]")&&kmWeekBoardSource.includes("lg:grid-cols-[minmax(0,1fr)_350px]"),'Tablet-width KM Week must use the desktop-style River/controls two-column layout instead of stacking vertically');
+assert.ok(kmWeekBoardSource.includes("min-[700px]:min-h-[210px]")&&kmWeekBoardSource.includes("min-[700px]:p-2 xl:p-3"),'Tablet-width KM Week must compact the River and site cards so the controls remain visible beside them');
+assert.ok(kmWeekBoardSource.includes("min-[700px]:overflow-y-auto"),'The tablet Challenge/Invest panel must scroll internally rather than pushing below the River');
 assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'KM Week must limit strategic investment to the agreed three interventions');
 assert.ok(kmWeekBoardSource.includes('Training site')&&kmWeekBoardSource.includes("'+$2k travel'"),'KM Week Local Training must let the player choose another site and show the fixed travel fee');
 assert.ok(kmWeekBoardSource.includes('Travel $2k · total $12k')&&kmWeekBoardSource.includes('No travel · total $10k'),'KM Week Local Training preview must make travel and total cost explicit');
