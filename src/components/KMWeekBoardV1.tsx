@@ -592,7 +592,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       </>}
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'&&<>
-       <>
        <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5"><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?<><span>{guidedCopy.invest}</span><br/><span className="font-black text-amber-200">Guided move: choose {guidedTargetInvestment==='TRAIN_EXPERT'?'Train Expert':guidedTargetInvestment==='LOCAL_TRAINING'?'Local Training':'Knowledge Transfer'}.</span></>:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
        <div className="mt-2 grid grid-cols-3 gap-1.5">
         <button disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>setInvestment('TRAIN_EXPERT')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}><GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+1 depth · $15k</div></button>
@@ -605,7 +604,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
         <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>
-       </>}
       </>}
 
       {state.stage==='shock'&&<div className="mt-2">
