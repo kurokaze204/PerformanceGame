@@ -208,7 +208,10 @@ export function kmWeekGoalV1(session:GameSessionV2):KMWeekGoal{
 }
 
 function localCapabilityPoints(company:CompanyV2){
-  return activeSites(company).reduce((sum,site)=>sum+KM_WEEK_DOMAINS.filter(domain=>(site.teamCapability[domain]||0)>=2).length,0);
+  // Reward the actual strength of the local River, not only threshold crossings.
+  // Two local knowledge levels = 1 point, capped at the existing 9-point score box.
+  const total=activeSites(company).reduce((sum,site)=>sum+KM_WEEK_DOMAINS.reduce((siteSum,domain)=>siteSum+(site.teamCapability[domain]||0),0),0);
+  return Math.min(9,Math.floor(total/2));
 }
 
 function expertisePoints(company:CompanyV2){
@@ -235,7 +238,7 @@ export function calculateKMWeekScoreV1(session:GameSessionV2,company:CompanyV2):
     business:state.freeSuccesses*2,
     expertise:expertisePoints(company),
     localCapability:localCapabilityPoints(company),
-    knowledgeFlow:state.knowledgeTransfers+state.meaningfulTransfers,
+    knowledgeFlow:Math.min(6,state.knowledgeTransfers+state.meaningfulTransfers),
     resilience:state.shockChecks.filter(check=>check.passed).length,
     goal:goalAchieved(session,company)?5:0,
     total:0,
@@ -418,9 +421,11 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const targetScore=target.teamCapability[domain]||0;
     if(sourceScore<=targetScore)return{success:false,message:`${source.name} must know more than ${target.name} in this domain before it can teach them.`};
     cost=8;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
-    before=targetScore;target.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,targetScore+1,sourceScore);after=target.teamCapability[domain];
+    const uplift=Math.max(1,Math.ceil((sourceScore-targetScore)/2));
+    before=targetScore;target.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,targetScore+uplift,sourceScore);after=target.teamCapability[domain];
+    const actualUplift=after-before;
     sourceSiteId=source.id;targetSiteId=target.id;meaningfulFlow=before<2&&after>=2;
-    if(state.stage==='free'){state.knowledgeTransfers+=1;if(meaningfulFlow)state.meaningfulTransfers+=1;}
+    if(state.stage==='free'){state.knowledgeTransfers+=actualUplift;if(meaningfulFlow)state.meaningfulTransfers+=1;}
   }
 
   state.investmentHistory.push({
@@ -436,6 +441,10 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
       company.round=state.guidedTurn;
       setChallengePhase(company,[guidedChallenge(state.guidedTurn)]);
     }else{
+      company.initialRiverSnapshot={
+        sites:structuredClone(company.sites),
+        experts:structuredClone(company.experts),
+      };
       state.stage='free';
       state.freeRound=1;
       company.round=4;
@@ -466,15 +475,58 @@ export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   if(!state||state.stage!=='shock'||state.shockResolved)return{success:false,message:'The Business Shock is not ready.'};
   const checks:KMWeekShockCheck[]=KM_WEEK_SHOCK_SPECS.map(spec=>{
     const site=company.sites.find(item=>item.id===spec.siteId);
-    return{...spec,passed:Boolean(site&&(site.teamCapability[spec.domain]||0)>=spec.difficulty)};
+    const localKnowledge=site?.teamCapability[spec.domain]||0;
+    const passed=localKnowledge>=spec.difficulty;
+    return{...spec,localKnowledge,passed,resolution:passed?'ready':undefined,recovered:passed};
   });
   state.shockChecks=checks;
   state.shockResolved=true;
-  state.stage='complete';
   state.phase='challenge';
   company.roundPhase='risk';
   const passed=checks.filter(check=>check.passed).length;
-  state.lastMessage=`Your organisation handled ${passed} of ${checks.length} Business Shock tests without its specialists.`;
+  const gaps=checks.length-passed;
+  state.lastMessage=gaps
+    ? `${passed} of ${checks.length} sites are ready. You have ${gaps} shortfall${gaps===1?'':'s'} to handle before finishing the Shock.`
+    : `All ${checks.length} Business Shock tests are covered by local capability.`;
+  syncScore(session,company);
+  return{success:true,message:state.lastMessage};
+}
+
+export function handleKMWeekShockGapV1(session:GameSessionV2,company:CompanyV2,checkId:string,choice:'risk'|'accept'){
+  const state=company.kmWeek;
+  if(!state||state.stage!=='shock'||!state.shockResolved)return{success:false,message:'Run the Business Shock first.'};
+  const check=state.shockChecks.find(item=>item.id===checkId);
+  if(!check||check.passed)return{success:false,message:'That Shock test does not have a shortfall.'};
+  if(check.resolution)return{success:false,message:'That shortfall has already been handled.'};
+  if(choice==='accept'){
+    check.resolution='accept';
+    check.recovered=false;
+    state.lastMessage='You accepted the capability gap.';
+  }else{
+    const odds=kmWeekRiskOddsV1(check.localKnowledge,check.difficulty);
+    const roll=Math.floor(Math.random()*6)+1;
+    check.resolution='risk';
+    check.dieRoll=roll;
+    check.recovered=roll>=odds.requiredRoll;
+    state.lastMessage=check.recovered
+      ? `Emergency response succeeded on a roll of ${roll}.`
+      : `Emergency response failed on a roll of ${roll}.`;
+  }
+  syncScore(session,company);
+  return{success:true,message:state.lastMessage};
+}
+
+export function completeKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
+  const state=company.kmWeek;
+  if(!state||state.stage!=='shock'||!state.shockResolved)return{success:false,message:'Run the Business Shock first.'};
+  const unresolved=state.shockChecks.some(check=>!check.passed&&!check.resolution);
+  if(unresolved)return{success:false,message:'Handle each Business Shock shortfall before continuing.'};
+  state.stage='complete';
+  state.phase='challenge';
+  company.roundPhase='risk';
+  const ready=state.shockChecks.filter(check=>check.passed).length;
+  const recovered=state.shockChecks.filter(check=>!check.passed&&check.recovered).length;
+  state.lastMessage=`${ready} ready from local capability, ${recovered} recovered through emergency response.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
 }
@@ -492,6 +544,10 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
     result=investKMWeekV1(session,company,payload);
   }else if(type==='KM_WEEK_RESOLVE_SHOCK'){
     result=resolveKMWeekShockV1(session,company);
+  }else if(type==='KM_WEEK_SHOCK_GAP'){
+    result=handleKMWeekShockGapV1(session,company,String(payload?.checkId||''),payload?.choice==='accept'?'accept':'risk');
+  }else if(type==='KM_WEEK_COMPLETE_SHOCK'){
+    result=completeKMWeekShockV1(session,company);
   }else{
     return{success:false,message:'Unknown KM Week action.'};
   }
