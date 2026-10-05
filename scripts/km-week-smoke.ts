@@ -113,6 +113,26 @@ assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.hr,1
 assert.equal(company.kmWeek?.stage,'free');
 assert.equal(company.kmWeek?.freeRound,1);
 assert.equal(company.kmWeek?.challenges.length,2);
+assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,2,'AAR Before River must snapshot each company after its guided investments, at the start of free play');
+{
+  const mel=company.sites.find(site=>site.id==='melbourne')!,bne=company.sites.find(site=>site.id==='brisbane')!;
+  const melBefore=mel.teamCapability.marketing,bneBefore=bne.teamCapability.marketing;
+  mel.teamCapability.marketing=5;bne.teamCapability.marketing=1;
+  const beforeFlow=company.kmWeek!.knowledgeTransfers;
+  const transfer=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',sourceSiteId:'melbourne',targetSiteId:'brisbane',domain:'marketing'});
+  assert.equal(transfer.success,true,transfer.message);
+  assert.equal(bne.teamCapability.marketing,3,'Knowledge Transfer must move half the 4-point gap, not only +1');
+  assert.equal(company.kmWeek!.knowledgeTransfers,beforeFlow+2,'Knowledge Flow score must count the number of knowledge levels actually moved');
+  // Re-open the first free Challenge phase for the remainder of this smoke test.
+  mel.teamCapability.marketing=melBefore;bne.teamCapability.marketing=bneBefore;
+  company.kmWeek!.stage='free';company.kmWeek!.freeRound=1;company.round=4;
+  company.kmWeek!.phase='challenge';company.roundPhase='events';
+  company.kmWeek!.challenges=[
+    {id:'F1-HR-MEL',title:'Weekend supervisor shortage',story:'',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F1-HR-PER',title:'Seasonal hiring backlog',story:'',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
+  ];
+  company.kmWeek!.knowledgeTransfers=beforeFlow;
+}
 
 for(let round=1;round<=3;round++){
   const challenges=[...company.kmWeek!.challenges];
@@ -150,11 +170,19 @@ assert.equal(company.kmWeek?.stage,'shock');
 assert.ok((company.kmWeek?.score.business||0)>=0&&(company.kmWeek?.score.business||0)<=12);
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE_SHOCK'});
 assert.equal(result.success,true,result.message);
+assert.equal(company.kmWeek?.stage,'shock','Business Shock must show its result before leaving for the debrief');
+assert.equal(company.kmWeek?.shockChecks.length,5);
+assert.ok(company.kmWeek!.shockChecks.every(check=>Number.isFinite(check.localKnowledge)),'Business Shock result must record the local capability tested at each site');
+for(const check of company.kmWeek!.shockChecks.filter(check=>!check.passed)){
+  const handled=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_SHOCK_GAP',checkId:check.id,choice:'accept'});
+  assert.equal(handled.success,true,handled.message);
+}
+result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_COMPLETE_SHOCK'});
+assert.equal(result.success,true,result.message);
 assert.equal(company.kmWeek?.stage,'complete');
 assert.ok((company.kmWeek?.turnoverHistory.length||0)>6,'KM Week must preserve turnover history for the AAR-lite graph');
 assert.equal(company.kmWeek?.turnoverHistory[0].label,'START','KM Week turnover history must begin with the starting company');
 assert.equal(session.finalDisruptionResolved,true,'completed KM Week session should be marked complete');
-assert.equal(company.kmWeek?.shockChecks.length,5);
 assert.ok((company.kmWeek?.score.total||0)>0);
 
 console.log('KM Week smoke passed');
