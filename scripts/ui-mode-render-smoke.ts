@@ -103,6 +103,9 @@ assert.ok(riverSource.includes('data-kmw-score-ghost="expertise"')&&riverSource.
 assert.ok(kmWeekBoardSource.includes('ghost="expertise"')&&kmWeekBoardSource.includes('ghost="local"')&&kmWeekBoardSource.includes('ghost="flow"')&&kmWeekBoardSource.includes('ghost="resilience"'),'Score Pad tooltips must drive River previews for the actionable knowledge scores and resilience');
 assert.ok(kmWeekBoardSource.includes('Company experts'),'KM Week must use the business-facing Company experts label');
 assert.ok(kmWeekBoardSource.includes('Score pad')&&kmWeekBoardSource.includes('ToolTip'),'KM Week score categories must explain how points are earned');
+assert.ok(kmWeekBoardSource.includes('<ToolTip large text={tip}')&&kmWeekBoardSource.includes("large?'h-7 w-7 rounded-full"),'Score Pad help controls must use the same 28px circular target size as the score topic icons');
+assert.ok(kmWeekBoardSource.includes('<span className="min-w-0 flex-1">')&&kmWeekBoardSource.includes('<ToolTip large text={tip}'),'Score Pad help controls must sit at the right-hand end of each score box');
+assert.ok(kmWeekBoardSource.includes('tabIndex={0}')&&kmWeekBoardSource.includes('role="button" aria-label="More information"'),'Tooltip controls must be focusable/tappable on iPad rather than hover-only');
 assert.ok(kmWeekBoardSource.includes('CLICK HERE TO START'),'KM Week must stage each Challenge behind an explicit facedown event card');
 assert.ok(kmWeekBoardSource.includes('border-dashed border-violet-500/70'),'KM Week Challenge start area must read as an active play zone rather than furniture');
 assert.ok(kmWeekBoardSource.includes('bg-black/20'),'Opening a Challenge must dim the rest of the board by 20 percent');
