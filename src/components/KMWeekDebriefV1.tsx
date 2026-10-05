@@ -92,8 +92,8 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
      <div className="mb-2 flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:color}}/><h3 className="text-lg font-black text-white">{item.name}</h3>{item.id===company.id&&<span className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">Your company</span>}</div>
      <div className="grid gap-3 xl:grid-cols-[240px_minmax(0,1fr)_minmax(0,1fr)]">
       <MiniScorePad company={item} color={color}/>
-      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="engineering" compact/></div></div>
-      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="engineering" compact/></div></div>
+      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" compact/></div></div>
+      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After free play</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" compact/></div></div>
      </div>
     </section>
    })}
