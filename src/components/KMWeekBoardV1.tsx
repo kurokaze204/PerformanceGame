@@ -470,6 +470,22 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>
   </header>
 
+  {state.stage==='guided'&&state.phase==='invest'&&state.guidedTurn===1&&!firstInvestBriefDismissed&&<>
+   <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/75"/>
+   <div className="fixed left-1/2 top-1/2 z-[145] w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-5 shadow-[0_24px_80px_rgba(0,0,0,.72)]">
+    <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Before your first investment</div>
+    <h2 className="mt-2 text-2xl font-black text-white">The next three investments are guided.</h2>
+    <p className="mt-2 text-sm leading-relaxed text-slate-200">For the next three rounds you will solve a Challenge, make one guided investment, then watch the Knowledge River change.</p>
+    <div className="mt-4 grid gap-2">
+     <div className="flex items-center gap-3 rounded-xl border border-amber-800 bg-amber-950/25 px-3 py-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-amber-500 bg-amber-950 text-xs font-black text-amber-200">1</span><div><b className="text-sm text-white">Train Expert</b><div className="text-[11px] text-slate-400">Build deeper expertise.</div></div></div>
+     <div className="flex items-center gap-3 rounded-xl border border-sky-800 bg-sky-950/20 px-3 py-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-sky-500 bg-sky-950 text-xs font-black text-sky-200">2</span><div><b className="text-sm text-white">Local Training</b><div className="text-[11px] text-slate-400">Build capability at a site.</div></div></div>
+     <div className="flex items-center gap-3 rounded-xl border border-emerald-800 bg-emerald-950/20 px-3 py-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-emerald-500 bg-emerald-950 text-xs font-black text-emerald-200">3</span><div><b className="text-sm text-white">Knowledge Transfer</b><div className="text-[11px] text-slate-400">Spread capability between sites.</div></div></div>
+    </div>
+    <p className="mt-3 text-[11px] leading-relaxed text-slate-400">After the third guided investment, the board opens up and the investment choice is yours.</p>
+    <button type="button" onClick={()=>setFirstInvestBriefDismissed(true)} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">SHOW ME THE FIRST INVESTMENT <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+   </div>
+  </>}
+
   {scoreBriefOpen&&<>
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/70"/>
    <div className="fixed left-1/2 top-1/2 z-[145] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-5 shadow-[0_24px_80px_rgba(0,0,0,.72)] xl:left-[38%]">
@@ -571,7 +587,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       </>}
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'&&<>
-       {state.stage==='guided'&&state.guidedTurn===1&&!firstInvestBriefDismissed?<div className="mt-3 rounded-2xl border-2 border-amber-600 bg-[linear-gradient(145deg,#2a1a0d,#141522)] p-4 shadow-xl"><div className="text-[9px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Invest</div><p className="mt-2 text-[11px] leading-relaxed text-slate-200">OK, you managed to deal with today’s emergencies. Now it’s time to start building our company capability. Over time we want to avoid relying on individual experts, but right now it looks like they are a big part of the solution. Follow the instructions here to start us on the track to recovery.</p><button type="button" onClick={()=>setFirstInvestBriefDismissed(true)} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">CONTINUE TO INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button></div>:<>
+       <>
        <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5"><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?<><span>{guidedCopy.invest}</span><br/><span className="font-black text-amber-200">Guided move: choose {guidedTargetInvestment==='TRAIN_EXPERT'?'Train Expert':guidedTargetInvestment==='LOCAL_TRAINING'?'Local Training':'Knowledge Transfer'}.</span></>:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
        <div className="mt-2 grid grid-cols-3 gap-1.5">
         <button disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>setInvestment('TRAIN_EXPERT')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}><GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+1 depth · $15k</div></button>
