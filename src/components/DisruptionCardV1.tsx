@@ -27,22 +27,22 @@ export const DisruptionDealOverlay:React.FC<{session:GameSessionV2;company:Compa
  const[revealed,setRevealed]=useState(false);
  const card=company.disruptionCard;
  if(!card)return <div className="w-full max-w-xl mx-auto mt-12 rounded-3xl border-2 border-amber-500 bg-slate-950 p-6 text-center"><h2 className="text-2xl font-black text-white">Preparing your Disruption…</h2></div>;
- return <div className="w-full max-w-2xl mx-auto mt-8 rounded-3xl border-2 border-amber-500 bg-[#0d0f15]/95 p-6 shadow-2xl">
+ return <div className="w-full max-w-2xl mx-auto mt-1 rounded-3xl border-2 border-amber-500 bg-[#0d0f15]/95 p-3 shadow-2xl sm:p-4 xl:mt-8 xl:p-6">
    <div className="text-[11px] uppercase tracking-[.2em] text-amber-300 font-black">Before you choose your strategy</div>
-   <h2 className="mt-1 text-3xl font-black text-white">Your known Disruption</h2>
-   <p className="mt-2 text-sm text-slate-300">This is the major threat your company expects to face. You have the whole game to build the capability to handle it.</p>
-   <div className="mt-6 flex items-center justify-center min-h-[300px]">
-    {!revealed?<button onClick={()=>setRevealed(true)} className="relative h-[260px] w-[186px] rounded-[18px] border-[5px] border-amber-300 bg-[radial-gradient(circle_at_50%_24%,#6b4517_0%,#2a1808_55%,#0a0806_100%)] shadow-[0_20px_45px_rgba(0,0,0,.55)]"><div className="absolute inset-4 rounded-xl border-2 border-amber-200/30"/><div className="absolute -left-3 -top-3 h-full w-full rounded-[18px] border border-amber-700 bg-[#120d08] -z-10"/><b className="inline-block -rotate-45 text-xl tracking-[.16em] text-amber-100">DISRUPTION</b><span className="absolute left-0 right-0 bottom-5 text-[10px] font-black uppercase tracking-widest text-amber-300">Click to deal</span></button>
-    :<div className="w-[360px] max-w-full rounded-[20px] border-[5px] border-amber-300 bg-[#171109] p-5 shadow-[0_20px_45px_rgba(0,0,0,.55)]">
+   <h2 className="mt-1 text-2xl font-black text-white xl:text-3xl">Your known Disruption</h2>
+   <p className="mt-1 text-xs leading-relaxed text-slate-300 sm:text-sm xl:mt-2">This is the major threat your company expects to face. You have the whole game to build the capability to handle it.</p>
+   <div className="mt-3 flex min-h-[210px] items-center justify-center sm:min-h-[230px] xl:mt-6 xl:min-h-[300px]">
+    {!revealed?<button onClick={()=>setRevealed(true)} className="relative h-[200px] w-[144px] rounded-[18px] border-[5px] border-amber-300 sm:h-[220px] sm:w-[158px] xl:h-[260px] xl:w-[186px] bg-[radial-gradient(circle_at_50%_24%,#6b4517_0%,#2a1808_55%,#0a0806_100%)] shadow-[0_20px_45px_rgba(0,0,0,.55)]"><div className="absolute inset-4 rounded-xl border-2 border-amber-200/30"/><div className="absolute -left-3 -top-3 h-full w-full rounded-[18px] border border-amber-700 bg-[#120d08] -z-10"/><b className="inline-block -rotate-45 text-xl tracking-[.16em] text-amber-100">DISRUPTION</b><span className="absolute left-0 right-0 bottom-5 text-[10px] font-black uppercase tracking-widest text-amber-300">Click to deal</span></button>
+    :<div className="w-[330px] max-w-full rounded-[20px] border-[5px] border-amber-300 bg-[#171109] p-3 shadow-[0_20px_45px_rgba(0,0,0,.55)] sm:w-[350px] sm:p-4 xl:w-[360px] xl:p-5">
       <div className="text-[11px] font-black tracking-[.18em] text-amber-200">DISRUPTION</div>
-      <h3 className="mt-2 text-xl font-black leading-tight text-white">{card.title}</h3>
-      <div className="mt-3 rounded-xl border border-amber-800 bg-black/25 px-3 py-2"><div className="text-[9px] uppercase tracking-wider text-amber-400 font-black">Site</div><div className="text-lg font-black text-white">{card.siteName}</div></div>
-      <p className="mt-3 text-xs leading-relaxed text-slate-200">To survive this final challenge you need to increase your knowledge score in these domains:</p>
-      <div className="mt-2 grid grid-cols-2 gap-2">{card.domains.map(req=><DomainLine key={req.domain} domain={req.domain} difficulty={req.difficulty}/>)}</div>
-      <p className="mt-3 text-xs leading-relaxed text-slate-400">Build these capabilities deliberately. Your strategic environment may change during the game.</p>
+      <h3 className="mt-1 text-lg font-black leading-tight text-white xl:mt-2 xl:text-xl">{card.title}</h3>
+      <div className="mt-2 rounded-xl border border-amber-800 bg-black/25 px-3 py-1.5 xl:mt-3 xl:py-2"><div className="text-[9px] uppercase tracking-wider text-amber-400 font-black">Site</div><div className="text-lg font-black text-white">{card.siteName}</div></div>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-200 xl:mt-3 xl:text-xs">To survive this final challenge you need to increase your knowledge score in these domains:</p>
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5 xl:mt-2 xl:gap-2">{card.domains.map(req=><DomainLine key={req.domain} domain={req.domain} difficulty={req.difficulty}/>)}</div>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-400 xl:mt-3 xl:text-xs">Build these capabilities deliberately. Your strategic environment may change during the game.</p>
      </div>}
    </div>
-   {revealed&&<button onClick={onContinue} className="mt-5 w-full rounded-xl bg-amber-400 py-3.5 font-black text-slate-950 flex items-center justify-center gap-2">CHOOSE MY STRATEGY <ArrowRight className="h-4 w-4"/></button>}
+   {revealed&&<button onClick={onContinue} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 py-3 font-black text-slate-950 xl:mt-5 xl:py-3.5">CHOOSE MY STRATEGY <ArrowRight className="h-4 w-4"/></button>}
    <div className="mt-3 text-center text-[10px] text-slate-500">{session.experienceMode==='newbie'?'Both domains match expertise already present in your company.':'Expert mode may test capability beyond your current experts.'}</div>
   </div>;
 };
