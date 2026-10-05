@@ -69,6 +69,7 @@ const kmWeekBoardSource=readFileSync(new URL('../src/components/KMWeekBoardV1.ts
 const globalCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 const riverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
 const kmWeekDebriefSource=readFileSync(new URL('../src/components/KMWeekDebriefV1.tsx',import.meta.url),'utf8');
+assert.ok(kmWeekDebriefSource.includes('Before free play')&&kmWeekDebriefSource.includes('selectedDomain="operations"'),'KM Week AAR Before River must use each company’s post-guided snapshot and a valid KM Week domain');
 const eventV4Source=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
 const eventProgressionSource=readFileSync(new URL('../src/engine/eventProgressionV5.ts',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoardSource.includes('<KMWeekBoardV1'),'KM Week sessions must use their dedicated play surface');
@@ -82,7 +83,7 @@ assert.ok(kmWeekBoardSource.includes("min-[700px]:overflow-y-auto"),'The tablet 
 assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'KM Week must limit strategic investment to the agreed three interventions');
 assert.ok(kmWeekBoardSource.includes('Training site')&&kmWeekBoardSource.includes("'+$2k travel'"),'KM Week Local Training must let the player choose another site and show the fixed travel fee');
 assert.ok(kmWeekBoardSource.includes('Travel $2k · total $12k')&&kmWeekBoardSource.includes('No travel · total $10k'),'KM Week Local Training preview must make travel and total cost explicit');
-assert.ok(kmWeekBoardSource.includes('Business Shock')&&kmWeekBoardSource.includes('Your company experts are unavailable.'),'KM Week must end with the short resilience stress test');
+assert.ok(kmWeekBoardSource.includes('Business Shock')&&kmWeekBoardSource.includes('Can your sites cope without the experts?'),'KM Week must end with a clearly explained local-capability resilience test');
 assert.equal(eventV4Source.includes('2-domain lesson'),false,'Newbie and Expert Challenge cards must not label business events as lessons');
 assert.equal(eventV4Source.includes('Diagnostic complete'),false,'Newbie and Expert Challenge cards must not describe business events as diagnostics');
 assert.equal(eventProgressionSource.includes("card.title=\`\${tier}:"),false,'Challenge titles must not expose simulation pressure tiers');
@@ -139,7 +140,9 @@ assert.ok(kmWeekBoardSource.includes("if(sourceState==='breadth')nextState='dept
 assert.ok(kmWeekBoardSource.includes("includeLocalBreadth:pendingResponse.localSelection==='breadth'")&&kmWeekBoardSource.includes("includeExpertBreadth:pendingResponse.expertSelection==='breadth'"),'Commit Response must send both explicit breadth roles to the server');
 assert.equal(kmWeekBoardSource.includes("bg-amber-950/40 ring-1 ring-amber-700"),false,'Expert selection must not use the old brown row highlight');
 assert.ok(riverSource.includes('data-kmw-shock-cutoff')&&riverSource.includes('strokeDasharray="10 8"'),'Business Shock must draw a yellow dotted cut-off line across the Knowledge River');
-assert.ok(kmWeekBoardSource.includes('KM_WEEK_SHOCK_CUTOFF')&&kmWeekBoardSource.includes('Look at the River:'),'KM Week Business Shock must explain the River cut-off before resolution');
+assert.ok(kmWeekBoardSource.includes('Local {check.localKnowledge} · requires {check.difficulty}')&&kmWeekBoardSource.includes('RUN BUSINESS SHOCK'),'KM Week Business Shock must show every local requirement before resolution');
+assert.ok(kmWeekBoardSource.includes('TAKE THE RISK · {odds.chancePercent}%')&&kmWeekBoardSource.includes('ACCEPT THE GAP'),'Business Shock shortfalls must offer an explicit emergency response or acceptance choice');
+assert.ok(kmWeekBoardSource.includes('<b className="text-white">Result:</b>')&&kmWeekBoardSource.includes('CONTINUE TO SCORE & DEBRIEF'),'Business Shock must show results before the player leaves for the debrief');
 assert.ok(kmWeekBoardSource.includes("requirementMet?'bg-emerald-400':'bg-rose-500'"),'The Challenge requirement bar must turn green when the selected knowledge meets the requirement');
 assert.ok(kmWeekBoardSource.includes("appliedMethod==='expert'")&&kmWeekBoardSource.includes('bg-amber-400'),'Selecting an expert must visibly apply the expert knowledge bar');
 assert.ok(kmWeekBoardSource.includes('Score briefing · Round 4 Invest')&&kmWeekBoardSource.includes('Only the total score matters'),'The first free-play Invest must explain the scorecard and multiple paths to success');
