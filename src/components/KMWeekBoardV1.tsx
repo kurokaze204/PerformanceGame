@@ -340,10 +340,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
   if(source==='local'){
    localState=nextState;
-   if(nextState==='depth'&&expertState==='depth')expertState='none';
+   if(nextState==='depth'&&expertState==='depth')expertState='breadth';
   }else{
    expertState=nextState;
-   if(nextState==='depth'&&localState==='depth')localState='none';
+   if(nextState==='depth'&&localState==='depth')localState='breadth';
   }
 
   const method:ResponseMethod|undefined=localState==='depth'?'local':expertState==='depth'?'expert':undefined;
