@@ -64,8 +64,15 @@ assert.ok(disruptionCardSource.includes('staticVertical?:boolean'),'Disruption m
 assert.ok(disruptionCardSource.includes("min-h-[44px]"),'Vertical Disruption domain rows must reserve space for long labels such as Human Resources');
 assert.ok(disruptionCardSource.includes("w-[132px] min-h-[176px]"),'Invest Disruption card must retain the same vertical proportions as the board card');
 assert.ok(disruptionCardSource.includes("[overflow-wrap:normal]"),'Disruption domain names must not split inside words');
+assert.ok(disruptionCardSource.includes("mt-1 rounded-3xl")&&disruptionCardSource.includes("min-h-[210px]")&&disruptionCardSource.includes("xl:min-h-[300px]"),'Disruption setup must use a compact tablet layout while retaining the full desktop size');
+assert.ok(disruptionCardSource.includes("h-[200px] w-[144px]")&&disruptionCardSource.includes("xl:h-[260px] xl:w-[186px]"),'The dealt Disruption card must shrink on iPad and return to desktop proportions at XL');
 assert.ok(appBoardSource.includes("companyRoundPhase==='events'"),'Board-level Event/Disruption UI must render only for the current company Events phase');
 
+const boardShellSource=readFileSync(new URL('../src/components/BoardShell.tsx',import.meta.url),'utf8');
+const strategyPromptSource=readFileSync(new URL('../src/components/StrategyPromptV2.tsx',import.meta.url),'utf8');
+assert.ok(boardShellSource.includes('overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y')&&boardShellSource.includes('pb-24'),'Board overlays must have their own touch scroller and bottom clearance above the phase bar on iPad');
+assert.ok(strategyPromptSource.includes('overflow-y-auto overscroll-contain touch-pan-y')&&strategyPromptSource.includes('items-start justify-center'),'Strategy setup must scroll inside the viewport on iPad instead of relying on page scrolling');
+assert.ok(strategyPromptSource.includes('!h-12 !text-base')&&strategyPromptSource.includes('xl:!h-14 xl:!text-lg'),'Strategy controls must compact on tablet while keeping desktop sizing at XL');
 const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
 assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||session"),'Event acknowledgement must prefer the authoritative acknowledged session before selecting the next card');
 assert.equal(appBoardCurrent.includes('advanceToInvestment'),false,'Completing one company Events must not call the legacy global Invest transition');
