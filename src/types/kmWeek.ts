@@ -56,7 +56,11 @@ export interface KMWeekShockCheck {
   siteId: string;
   domain: KnowledgeDomain;
   difficulty: number;
+  localKnowledge: number;
   passed: boolean;
+  resolution?: 'ready' | 'risk' | 'accept';
+  dieRoll?: number;
+  recovered?: boolean;
 }
 
 export interface KMWeekCompanyState {
