@@ -38,11 +38,21 @@
   }
   .tpg-game-main {
     height: calc(100dvh - var(--tpg-header-height, 88px));
+    width: 100%;
+    max-width: none !important;
+    padding-left: .25rem !important;
+    padding-right: .25rem !important;
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
+  }
+  .tpg-board-shell {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
   .tpg-board-overlay-scroll {
     pointer-events: auto !important;
