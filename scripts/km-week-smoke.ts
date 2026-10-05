@@ -4,7 +4,10 @@ import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import {
   applyKMWeekActionV1,
   initialiseKMWeekSessionV1,
+  initialiseKMWeekCompanyV1,
   ensureKMWeekSessionV1,
+  investKMWeekV1,
+  calculateKMWeekScoreV1,
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
   kmWeekRiskOddsV1,
@@ -115,23 +118,25 @@ assert.equal(company.kmWeek?.freeRound,1);
 assert.equal(company.kmWeek?.challenges.length,2);
 assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,2,'AAR Before River must snapshot each company after its guided investments, at the start of free play');
 {
-  const mel=company.sites.find(site=>site.id==='melbourne')!,bne=company.sites.find(site=>site.id==='brisbane')!;
-  const melBefore=mel.teamCapability.marketing,bneBefore=bne.teamCapability.marketing;
+  const transferCompany=createInitialCompanyV2('Transfer Test','kmw-transfer-test',config);
+  initialiseKMWeekCompanyV1(transferCompany);
+  transferCompany.kmWeek!.stage='free';
+  transferCompany.kmWeek!.phase='invest';
+  transferCompany.kmWeek!.freeRound=1;
+  const mel=transferCompany.sites.find(site=>site.id==='melbourne')!,bne=transferCompany.sites.find(site=>site.id==='brisbane')!;
   mel.teamCapability.marketing=5;bne.teamCapability.marketing=1;
-  const beforeFlow=company.kmWeek!.knowledgeTransfers;
-  const transfer=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',sourceSiteId:'melbourne',targetSiteId:'brisbane',domain:'marketing'});
+  const transfer=investKMWeekV1(session,transferCompany,{investment:'KNOWLEDGE_TRANSFER',sourceSiteId:'melbourne',targetSiteId:'brisbane',domain:'marketing'});
   assert.equal(transfer.success,true,transfer.message);
   assert.equal(bne.teamCapability.marketing,3,'Knowledge Transfer must move half the 4-point gap, not only +1');
-  assert.equal(company.kmWeek!.knowledgeTransfers,beforeFlow+2,'Knowledge Flow score must count the number of knowledge levels actually moved');
-  // Re-open the first free Challenge phase for the remainder of this smoke test.
-  mel.teamCapability.marketing=melBefore;bne.teamCapability.marketing=bneBefore;
-  company.kmWeek!.stage='free';company.kmWeek!.freeRound=1;company.round=4;
-  company.kmWeek!.phase='challenge';company.roundPhase='events';
-  company.kmWeek!.challenges=[
-    {id:'F1-HR-MEL',title:'Weekend supervisor shortage',story:'',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
-    {id:'F1-HR-PER',title:'Seasonal hiring backlog',story:'',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
-  ];
-  company.kmWeek!.knowledgeTransfers=beforeFlow;
+  assert.equal(transferCompany.kmWeek!.knowledgeTransfers,2,'Knowledge Flow score must count the number of knowledge levels actually moved');
+
+  const weaker=createInitialCompanyV2('Weaker River','kmw-weaker',config);
+  initialiseKMWeekCompanyV1(weaker);
+  const stronger=structuredClone(weaker);
+  stronger.id='kmw-stronger';
+  stronger.kmWeek=structuredClone(weaker.kmWeek);
+  stronger.sites.find(site=>site.id==='perth')!.teamCapability.operations=4;
+  assert.ok(calculateKMWeekScoreV1(session,stronger).localCapability>calculateKMWeekScoreV1(session,weaker).localCapability,'A materially stronger River must produce a higher Local capability score');
 }
 
 for(let round=1;round<=3;round++){
