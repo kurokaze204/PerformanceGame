@@ -26,6 +26,39 @@
 }
 
 :root { --tpg-header-height: 88px; }
+
+/* iPad/tablet gameplay: keep Safari's page bounce out of the game surface.
+   The board and any open board overlay become the vertical scroll owners. */
+@media (min-width: 700px) and (max-width: 1199px) {
+  .tpg-game-root {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  .tpg-game-main {
+    height: calc(100dvh - var(--tpg-header-height, 88px));
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+  .tpg-board-overlay-scroll {
+    pointer-events: auto !important;
+    overflow-y: scroll !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+  .tpg-disruption-deal {
+    max-height: min(455px, calc(100dvh - var(--tpg-header-height, 88px) - 110px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+}
 button, [role="button"] { transition-property: transform,filter,background-color,border-color,color,opacity; transition-duration: 120ms; }
 .tpg-click-ack { transform: scale(.965) !important; filter: brightness(1.22) !important; }
 html.tpg-network-busy,
