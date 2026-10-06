@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from'react';
-import{ArrowRight,Brain,Building2,CheckCircle2,CircleDollarSign,Crown,Dices,GraduationCap,Info,LogOut,MapPin,Medal,ShieldCheck,Sparkles,Target,Users,Workflow}from'lucide-react';
+import{ArrowRight,Brain,Building2,CheckCircle2,CircleDollarSign,Crown,Dices,GraduationCap,Info,LogOut,MapPin,Medal,ShieldCheck,Sparkles,Target,Users,Workflow,X}from'lucide-react';
 import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
@@ -34,6 +34,103 @@ const siteName=(company:CompanyV2,id:string)=>company.sites.find(site=>site.id==
 const challengeDisplayTitle=(company:CompanyV2,challenge:KMWeekChallenge)=>{const site=siteName(company,challenge.siteId);return challenge.title.toLowerCase().startsWith(site.toLowerCase())?challenge.title:site+' '+challenge.title};
 const specialistFor=(company:CompanyV2,domain:KnowledgeDomain)=>company.experts.find(expert=>!expert.isVacant&&expert.domains.some(skill=>skill.domain===domain));
 const specialistScore=(company:CompanyV2,domain:KnowledgeDomain)=>specialistFor(company,domain)?.domains.find(skill=>skill.domain===domain)?.score||0;
+
+
+type PerformanceHistoryPoint={label:string;turnover:number;knowledge:number};
+
+function totalKnowledge(company:CompanyV2){
+ const local=KM_WEEK_SITE_IDS.reduce((sum,siteId)=>{
+  const site=company.sites.find(item=>item.id===siteId);
+  return sum+(site?KM_WEEK_DOMAINS.reduce((siteSum,domain)=>siteSum+(site.teamCapability[domain]||0),0):0);
+ },0);
+ const expert=company.experts.filter(item=>!item.isVacant).reduce((sum,item)=>sum+item.domains.filter(skill=>KM_WEEK_DOMAINS.includes(skill.domain)).reduce((skillSum,skill)=>skillSum+skill.score,0),0);
+ return local+expert;
+}
+
+function companyPerformanceHistory(company:CompanyV2):PerformanceHistoryPoint[]{
+ const state=company.kmWeek;
+ if(!state)return[{label:'Start',turnover:company.startingTurnover||company.turnover,knowledge:totalKnowledge(company)}];
+ const investmentDeltas=state.investmentHistory.map(item=>Math.max(0,item.after-item.before));
+ const startKnowledge=Math.max(0,totalKnowledge(company)-investmentDeltas.reduce((sum,delta)=>sum+delta,0));
+ const investments=(state.turnoverHistory||[]).filter(point=>/ I$/.test(point.label));
+ const points:PerformanceHistoryPoint[]=[{label:'Start',turnover:company.startingTurnover||875,knowledge:startKnowledge}];
+ let knowledge=startKnowledge;
+ investments.forEach((point,index)=>{
+  knowledge+=investmentDeltas[index]||0;
+  points.push({label:`Month ${index+1}`,turnover:point.turnover,knowledge});
+ });
+ const shockPoints=(state.turnoverHistory||[]).filter(point=>point.label.startsWith('SHOCK '));
+ if(shockPoints.length){
+  points.push({label:'Shock',turnover:shockPoints[shockPoints.length-1].turnover,knowledge:totalKnowledge(company)});
+ }
+ return points;
+}
+
+const TurnoverKnowledgeModal:React.FC<{open:boolean;session:GameSessionV2;currentCompanyId:string;onClose:()=>void}>=({open,session,currentCompanyId,onClose})=>{
+ if(!open)return null;
+ const companies=session.companies.filter(item=>item.kmWeek);
+ const histories=companies.map(company=>companyPerformanceHistory(company));
+ const turnoverValues=histories.flatMap(history=>history.map(point=>point.turnover));
+ const knowledgeValues=histories.flatMap(history=>history.map(point=>point.knowledge));
+ const turnoverMinRaw=Math.min(...turnoverValues),turnoverMaxRaw=Math.max(...turnoverValues);
+ const turnoverPad=Math.max(20,(turnoverMaxRaw-turnoverMinRaw)*.12);
+ const turnoverMin=Math.max(0,turnoverMinRaw-turnoverPad),turnoverMax=turnoverMaxRaw+turnoverPad;
+ const knowledgeMinRaw=Math.min(...knowledgeValues),knowledgeMaxRaw=Math.max(...knowledgeValues);
+ const knowledgePad=Math.max(1,(knowledgeMaxRaw-knowledgeMinRaw)*.15);
+ const knowledgeMin=Math.max(0,Math.floor(knowledgeMinRaw-knowledgePad)),knowledgeMax=Math.ceil(knowledgeMaxRaw+knowledgePad);
+ const W=1040,H=390,left=74,right=72,top=30,bottom=52,innerW=W-left-right,innerH=H-top-bottom;
+ const maxPoints=Math.max(2,...histories.map(history=>history.length));
+ const x=(index:number)=>left+(index*innerW/Math.max(1,maxPoints-1));
+ const yTurnover=(value:number)=>top+innerH-((value-turnoverMin)/Math.max(1,turnoverMax-turnoverMin))*innerH;
+ const yKnowledge=(value:number)=>top+innerH-((value-knowledgeMin)/Math.max(1,knowledgeMax-knowledgeMin))*innerH;
+ const turnoverTicks=Array.from({length:5},(_,i)=>turnoverMin+((turnoverMax-turnoverMin)*i/4));
+ const knowledgeTicks=Array.from({length:5},(_,i)=>knowledgeMin+((knowledgeMax-knowledgeMin)*i/4));
+ const labels=Array.from({length:maxPoints},(_,i)=>{
+  const found=histories.find(history=>history[i])?.[i];
+  return found?.label||`Month ${i}`;
+ });
+ const palette=['#f59e0b','#38bdf8','#a78bfa','#34d399','#fb7185','#60a5fa','#f472b6','#a3e635'];
+ return <div className="fixed inset-0 z-[210] grid place-items-center bg-black/65 p-4" onPointerDown={onClose}>
+  <section role="dialog" aria-modal="true" aria-label="Turnover and knowledge over time" onPointerDown={event=>event.stopPropagation()} className="w-[min(1120px,96vw)] rounded-[24px] border-2 border-emerald-700 bg-[#0b1220] p-4 shadow-[0_28px_90px_rgba(0,0,0,.78)]">
+   <div className="flex items-start gap-3">
+    <div><div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Company performance over time</div><h2 className="mt-1 text-xl font-black text-white">Turnover and total knowledge by month</h2><p className="mt-1 text-[11px] text-slate-400">Solid line = turnover (left axis). Dashed line = total local + expert knowledge (right axis).</p></div>
+    <button type="button" onClick={onClose} aria-label="Close turnover chart" className="ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-500 hover:text-white"><X className="h-5 w-5"/></button>
+   </div>
+   <div className="mt-3 flex flex-wrap gap-2">
+    {companies.map((item,index)=>{
+     const current=item.id===currentCompanyId;
+     return <div key={item.id} className={'flex items-center gap-2 rounded-lg border px-2 py-1 text-[10px] font-black '+(current?'border-amber-300 bg-amber-950/25 text-white':'border-slate-700 bg-slate-950/60 text-slate-400')}>
+      <span className="h-2.5 w-5 rounded-full" style={{backgroundColor:palette[index%palette.length]}}/>{item.name}{current&&<span className="text-amber-300">YOU</span>}
+     </div>;
+    })}
+   </div>
+   <div className="mt-3 overflow-x-auto">
+    <svg viewBox={`0 0 ${W} ${H}`} className="min-w-[760px] w-full" role="img" aria-label="Monthly turnover and total knowledge for all companies">
+     {turnoverTicks.map((value,index)=><g key={'t'+index}><line x1={left} x2={W-right} y1={yTurnover(value)} y2={yTurnover(value)} stroke="#233047"/><text x={left-10} y={yTurnover(value)+4} textAnchor="end" fill="#94a3b8" fontSize="11" fontWeight="700">{money(Math.round(value))}</text></g>)}
+     {knowledgeTicks.map((value,index)=><text key={'k'+index} x={W-right+10} y={yKnowledge(value)+4} textAnchor="start" fill="#c4b5fd" fontSize="11" fontWeight="800">{Math.round(value)}</text>)}
+     <text x="18" y={top+innerH/2} transform={`rotate(-90 18 ${top+innerH/2})`} textAnchor="middle" fill="#94a3b8" fontSize="11" fontWeight="900">TURNOVER</text>
+     <text x={W-18} y={top+innerH/2} transform={`rotate(90 ${W-18} ${top+innerH/2})`} textAnchor="middle" fill="#c4b5fd" fontSize="11" fontWeight="900">TOTAL KNOWLEDGE</text>
+     {labels.map((label,index)=><g key={'x'+index}><line x1={x(index)} x2={x(index)} y1={top} y2={top+innerH} stroke="#172033"/><text x={x(index)} y={H-18} textAnchor="middle" fill="#64748b" fontSize="10" fontWeight="700">{label}</text></g>)}
+     {companies.map((item,index)=>{
+      const history=histories[index];
+      const current=item.id===currentCompanyId;
+      const color=palette[index%palette.length];
+      const turnoverPath=history.map((point,i)=>(i?'L':'M')+' '+x(i)+' '+yTurnover(point.turnover)).join(' ');
+      const knowledgePath=history.map((point,i)=>(i?'L':'M')+' '+x(i)+' '+yKnowledge(point.knowledge)).join(' ');
+      return <g key={item.id} opacity={current?1:.5}>
+       <path d={turnoverPath} fill="none" stroke={color} strokeWidth={current?5:2.5} strokeLinecap="round" strokeLinejoin="round"/>
+       <path d={knowledgePath} fill="none" stroke={color} strokeWidth={current?4:2} strokeDasharray="9 7" strokeLinecap="round" strokeLinejoin="round"/>
+       {history.map((point,i)=><g key={i}>
+        <circle cx={x(i)} cy={yTurnover(point.turnover)} r={current?5:3.5} fill={color} stroke="#020617" strokeWidth="2"><title>{item.name} · {point.label} · Turnover {money(point.turnover)}</title></circle>
+        <circle cx={x(i)} cy={yKnowledge(point.knowledge)} r={current?4.5:3} fill="#0b1220" stroke={color} strokeWidth={current?3:2}><title>{item.name} · {point.label} · Total knowledge {point.knowledge}</title></circle>
+       </g>)}
+      </g>;
+     })}
+    </svg>
+   </div>
+  </section>
+ </div>;
+};
 
 const KnowledgePips:React.FC<{value:number;domain:KnowledgeDomain;compact?:boolean}>=({value,domain,compact=false})=><div className={compact?'flex gap-1 min-[700px]:gap-0.5 xl:gap-1':'flex gap-1'} aria-label={`Knowledge ${value} of 5`}>{Array.from({length:5},(_,index)=><span key={index} title={`${index+1}`} className={`${compact?'h-2.5 w-2.5 min-[700px]:h-2 min-[700px]:w-2 xl:h-2.5 xl:w-2.5':'h-4 w-4'} rounded-full border shadow-inner ${index<value?'border-white/45':'border-slate-700 bg-slate-950'}`} style={index<value?{backgroundColor:DOMAIN_INFO[domain].color}:{}}/>)}</div>;
 
@@ -160,6 +257,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
  const[scorePadOpen,setScorePadOpen]=useState(false);
+ const[turnoverChartOpen,setTurnoverChartOpen]=useState(false);
  const[challengeAttention,setChallengeAttention]=useState(false);
  const[riskResult,setRiskResult]=useState<{roll:number;won:boolean;requiredRoll:number;performanceGap:number}|null>(null);
  const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
@@ -569,13 +667,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   <header className="relative z-[100] border-b-2 border-amber-950/60 bg-[#09131f]/98 px-3 py-2 shadow-xl xl:h-[66px]">
    <div className="mx-auto flex h-full max-w-[1500px] items-center gap-2">
     <div className="mr-auto min-w-0"><div className="text-[8px] font-black uppercase tracking-[.22em] text-emerald-300">The Performance Gap · KM Week</div><div className="flex min-w-0 items-center gap-2"><Building2 className="h-5 w-5 shrink-0 text-amber-300"/><h1 className="truncate text-lg font-black text-white">{company.name}</h1><span className="hidden rounded-md border border-slate-700 px-1.5 py-0.5 text-[9px] font-black text-slate-500 sm:inline">{session.id}</span>{readOnly?<span className="hidden rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400 lg:inline">Watching · CEO {controllerName}</span>:<span className="hidden rounded-full border border-amber-600 bg-amber-950/50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-200 lg:inline"><Crown className="mr-1 inline h-3 w-3"/>CEO · You</span>}</div></div>
-    <div className="flex h-12 min-w-[112px] flex-col justify-center rounded-xl border-2 border-emerald-800 bg-emerald-950/25 px-3"><div className="text-[8px] font-black uppercase text-emerald-400">Turnover</div><div className="text-base font-black leading-none text-emerald-200">{money(company.turnover)}</div></div>
+    <button type="button" onClick={()=>setTurnoverChartOpen(true)} aria-haspopup="dialog" className="flex h-12 min-w-[112px] flex-col justify-center rounded-xl border-2 border-emerald-800 bg-emerald-950/25 px-3 text-left transition hover:border-emerald-500 hover:bg-emerald-950/40"><div className="text-[8px] font-black uppercase text-emerald-400">Turnover</div><div className="text-base font-black leading-none text-emerald-200">{money(company.turnover)}</div></button>
     <div className="flex h-12 min-w-[82px] flex-col justify-center rounded-xl border-2 border-amber-700 bg-amber-950/25 px-3"><div className="text-[8px] font-black uppercase text-amber-400">Score</div><div className="text-base font-black leading-none text-amber-200">{state.score.total}</div></div>
     <div title={overtime?'KM Week is time-boxed, not hard-stopped. Finish the game at your own pace.':undefined} className="flex h-12 min-w-[92px] flex-col justify-center rounded-xl border-2 border-violet-800 bg-violet-950/25 px-3"><div className="text-[8px] font-black uppercase text-violet-400">Game time</div><div className={`font-black leading-none tabular-nums ${overtime?'text-xs text-amber-200':'text-base text-violet-100'}`}>{overtime?'OVERTIME':`${mm}:${ss}`}</div></div>
     {!readOnly&&members.length>1&&onTransferCeo&&<select defaultValue="" onChange={event=>{const id=event.target.value;event.currentTarget.value='';if(id)onTransferCeo(id)}} className="h-12 rounded-xl border-2 border-amber-800 bg-slate-950 px-2 text-[10px] font-black text-amber-100"><option value="">Pass CEO…</option>{members.filter(member=>member.id!==participant?.id).map(member=><option key={member.id} value={member.id}>{member.name}</option>)}</select>}
     <button onClick={onLeave} className="h-12 min-w-[92px] rounded-xl border-2 border-rose-800 bg-rose-950/30 px-3 text-xs font-black text-rose-200 hover:border-rose-500"><LogOut className="mr-1 inline h-4 w-4"/>Leave</button>
    </div>
   </header>
+
+  <TurnoverKnowledgeModal open={turnoverChartOpen} session={session} currentCompanyId={company.id} onClose={()=>setTurnoverChartOpen(false)}/>
 
   {state.stage==='guided'&&state.phase==='invest'&&state.guidedTurn===1&&!firstInvestBriefDismissed&&<>
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/75"/>
