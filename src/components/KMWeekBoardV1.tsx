@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState}from'react';
+import React,{useEffect,useMemo,useRef,useState}from'react';
 import{ArrowRight,Brain,Building2,CheckCircle2,CircleDollarSign,Crown,Dices,GraduationCap,Info,LogOut,MapPin,Medal,ShieldCheck,Sparkles,Target,Users,Workflow}from'lucide-react';
 import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
@@ -69,10 +69,10 @@ function scoreBriefSuggestion(goalId:string){
  return 'Your Goal rewards a balanced network. Look for your weakest site and use Local Training or Knowledge Transfer to strengthen it.';
 }
 
-const ToolTip:React.FC<{text:string;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
+const ToolTip:React.FC<{text:React.ReactNode;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
 
 type ScoreGhostKind='expertise'|'local'|'flow'|'resilience';
-const ScoreCell:React.FC<{label:string;value:number;max:string;icon:React.ReactNode;tip:string;ghost?:ScoreGhostKind;onGhost?:(ghost:ScoreGhostKind|null)=>void}>=({label,value,max,icon,tip,ghost,onGhost})=><div className="relative flex min-w-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2 py-1.5"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-700 bg-slate-900 text-slate-300">{icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-black text-slate-400">{label}</span><span className="text-lg font-black leading-none tabular-nums text-white">{value}<span className="ml-1 text-[9px] text-slate-600">/{max}</span></span></span><ToolTip large text={tip} onHoverChange={ghost&&onGhost?(active)=>onGhost(active?ghost:null):undefined}/></div>;
+const ScoreCell:React.FC<{label:string;value:number;max:string;icon:React.ReactNode;tip:React.ReactNode;ghost?:ScoreGhostKind;onGhost?:(ghost:ScoreGhostKind|null)=>void}>=({label,value,max,icon,tip,ghost,onGhost})=><div className="relative flex min-w-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2 py-1.5"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-700 bg-slate-900 text-slate-300">{icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-black text-slate-400">{label}</span><span className="text-lg font-black leading-none tabular-nums text-white">{value}<span className="ml-1 text-[9px] text-slate-600">/{max}</span></span></span><ToolTip large text={tip} onHoverChange={ghost&&onGhost?(active)=>onGhost(active?ghost:null):undefined}/></div>;
 
 const PhaseStep:React.FC<{label:string;active:boolean;done:boolean;number:string}>=({label,active,done,number})=><div className={`flex items-center gap-2 rounded-xl border-2 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.08em] ${active?'border-amber-300 bg-amber-950/40 text-amber-100':done?'border-emerald-800 bg-emerald-950/25 text-emerald-300':'border-slate-800 bg-slate-950/60 text-slate-600'}`}><span className={`grid h-5 w-5 place-items-center rounded-full border ${active?'border-amber-300':done?'border-emerald-600':'border-slate-700'}`}>{done?<CheckCircle2 className="h-3 w-3"/>:number}</span>{label}</div>;
 
@@ -89,11 +89,11 @@ const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selec
  </button>;
 };
 
-const ResponseButton:React.FC<{selectionState:ResponseSelectionState;disabled?:boolean;children:React.ReactNode;onClick:()=>void}>=({selectionState,disabled,children,onClick})=>{
+const ResponseButton:React.FC<{selectionState:ResponseSelectionState;disabled?:boolean;attention?:boolean;children:React.ReactNode;onClick:()=>void}>=({selectionState,disabled,attention=false,children,onClick})=>{
  const depth=selectionState==='depth',breadth=selectionState==='breadth';
- return <button type="button" disabled={disabled} onClick={onClick} className={`relative w-full rounded-xl border-2 px-3 py-2.5 text-left text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-35 ${depth?'border-amber-300 bg-amber-950/45 text-amber-100':'border-slate-700 bg-slate-950 text-slate-200 hover:border-slate-500'}`}>
+ return <button type="button" disabled={disabled} onClick={onClick} className={`relative w-full rounded-xl border-2 px-3 py-2.5 text-left text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-35 ${depth?'border-amber-300 bg-amber-950/45 text-amber-100':'border-slate-700 bg-slate-950 text-slate-200 hover:border-slate-500'} ${attention&&!disabled?'kmw-attention-button':''}`}>
   {children}
-  <span aria-label={depth?'Depth selected':breadth?'Breadth selected':'Unselected'} title={depth?'Depth selected':breadth?'Breadth selected':'Unselected'} className={`absolute right-3 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center overflow-hidden rounded-full border-2 ${depth?'border-amber-300 bg-amber-400 text-slate-950':breadth?'border-sky-400 bg-slate-900':'border-slate-600 bg-slate-900'}`}>
+  <span aria-label={depth?'Depth selected':breadth?'Breadth selected':'Unselected'} title={depth?'Depth selected':breadth?'Breadth selected':'Unselected'} className={`absolute right-3 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center overflow-hidden rounded-full border-2 ${depth?'border-amber-300 bg-amber-400 text-slate-950':breadth?'border-sky-400 bg-slate-900':'border-slate-600 bg-slate-900'} ${attention&&!disabled?'kmw-attention-circle':''}`}>
    {depth?'✓':breadth?<span aria-hidden="true" className="absolute inset-y-0 left-0 w-1/2 bg-sky-400"/>:''}
   </span>
  </button>;
@@ -154,6 +154,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
+ const[scorePadOpen,setScorePadOpen]=useState(false);
+ const[challengeAttention,setChallengeAttention]=useState(false);
  const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
  const[riverFrozenCompany,setRiverFrozenCompany]=useState<CompanyV2|null>(null);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
@@ -162,6 +164,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[targetSiteId,setTargetSiteId]=useState('perth');
  const[trainingSiteId,setTrainingSiteId]=useState('brisbane');
  const[now,setNow]=useState(Date.now());
+ const challengeDraftsRef=useRef(challengeDrafts);
 
  const members=session.participants.filter(item=>item.role!=='facilitator'&&item.companyId===company.id);
  const goalId=session.kmWeekGoalId||'local-heroes';
@@ -216,6 +219,42 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     const first=experts[0];setExpertId(first?.id||'');setSelectedDomain(first?.domains[0]?.domain||'operations');
   }
  },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound,company.id]);
+
+ useEffect(()=>{challengeDraftsRef.current=challengeDrafts},[challengeDrafts]);
+
+ useEffect(()=>{
+  if(!challengeFocusOpen||state?.phase!=='challenge'||(state?.stage!=='guided'&&state?.stage!=='free')){
+   setChallengeAttention(false);
+   return;
+  }
+  const challengeId=selectedChallengeId||state.challenges.find(challenge=>challenge.status==='open')?.id;
+  if(!challengeId)return;
+  setChallengeAttention(false);
+  let pulseTimer:number|undefined;
+  const attentionTimer=window.setTimeout(()=>{
+   const draft=challengeDraftsRef.current[challengeId];
+   const hasSelection=Boolean(draft&&(draft.localSelection!=='none'||draft.expertSelection!=='none'||draft.method==='risk'));
+   if(!hasSelection){
+    setChallengeAttention(true);
+    pulseTimer=window.setTimeout(()=>setChallengeAttention(false),4400);
+   }
+  },8000);
+  return()=>{window.clearTimeout(attentionTimer);if(pulseTimer!==undefined)window.clearTimeout(pulseTimer)};
+ },[challengeFocusOpen,state?.stage,state?.phase,state?.guidedTurn,state?.freeRound,selectedChallengeId]);
+
+ useEffect(()=>{
+  if(!scorePadOpen)return;
+  const closeOnOutside=(event:PointerEvent)=>{
+   const target=event.target as Element|null;
+   if(target?.closest('[data-kmw-scorepad]'))return;
+   setScorePadOpen(false);
+  };
+  document.addEventListener('pointerdown',closeOnOutside,true);
+  return()=>document.removeEventListener('pointerdown',closeOnOutside,true);
+ },[scorePadOpen]);
+
+ useEffect(()=>{setScorePadOpen(false)},[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
+ useEffect(()=>{if(scoreBriefOpen)setScorePadOpen(true)},[scoreBriefOpen]);
 
  if(!state)return <div className="min-h-screen bg-slate-950 text-white grid place-items-center">Preparing KM Week board…</div>;
 
@@ -324,6 +363,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
  const cycleKnowledgeSource=(source:'local'|'expert')=>{
   if(!activeChallenge)return;
+  setChallengeAttention(false);
   const current=pendingResponse?.challengeId===activeChallenge.id?pendingResponse:null;
   let localState:ResponseSelectionState=current?.method==='risk'?'none':current?.localSelection||'none';
   let expertState:ResponseSelectionState=current?.method==='risk'?'none':current?.expertSelection||'none';
@@ -522,9 +562,28 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
    <div className="grid gap-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:grid-cols-[minmax(0,1fr)_310px] lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_410px]">
     <div className="space-y-3 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2 xl:gap-3">
-     <Card className="p-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-2 xl:p-3">
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Knowledge River</div><h2 className="text-lg font-black text-white min-[700px]:text-sm lg:text-base xl:text-lg">Where is the capability now?</h2></div><div className="flex gap-1">{KM_WEEK_DOMAINS.map(domain=><button key={domain} onClick={()=>setSelectedDomain(domain)} className={`rounded-full border-2 px-2.5 py-1 text-[9px] font-black ${selectedDomain===domain?'border-amber-300 bg-amber-950/40 text-amber-100':'border-slate-700 bg-slate-950 text-slate-400'}`}>{domainLabel(domain)}</button>)}</div></div>
-      <div className="h-[360px] min-[700px]:h-[calc(100%-36px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-42px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+     <Card className="relative p-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-2 xl:p-3">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+       <div><div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Knowledge River</div><h2 className="text-lg font-black text-white min-[700px]:text-sm lg:text-base xl:text-lg">Where is the capability now?</h2></div>
+       <div data-kmw-scorepad>
+        <button type="button" aria-expanded={scorePadOpen} onClick={()=>setScorePadOpen(open=>!open)} className={`flex min-w-[176px] items-center justify-between gap-3 rounded-xl border-2 px-3 py-2 text-left text-xs font-black shadow-lg transition ${scorePadOpen?'border-amber-300 bg-amber-400 text-slate-950':'border-amber-700 bg-amber-950/35 text-amber-100 hover:border-amber-400'}`}>
+         <span className="flex items-center gap-2"><Medal className="h-4 w-4"/>SCORE PAD</span><span className={`rounded-lg border px-2 py-0.5 text-sm ${scorePadOpen?'border-slate-900/30 bg-slate-950/10':'border-amber-700 bg-slate-950/40'}`}>{state.score.total}</span>
+        </button>
+       </div>
+      </div>
+      <div className="h-[360px] min-[700px]:h-[calc(100%-44px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-46px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+      {scorePadOpen&&<div data-kmw-scorepad className={`absolute bottom-2 left-2 right-2 top-[54px] z-[90] overflow-visible rounded-[18px] border-2 border-amber-700 bg-[#101827]/[.98] p-3 shadow-[0_20px_60px_rgba(0,0,0,.7)] min-[700px]:left-auto min-[700px]:w-2/3 ${scoreBriefOpen?'z-[135] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}`}>
+       <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
+       <div className="mt-2 grid grid-cols-2 gap-1.5">
+        <ScoreCell label="Business Performance" value={state.score.business} max="12" icon={<CircleDollarSign className="h-3.5 w-3.5"/>} tip="2 points for each successful free-play Challenge. Improve this by solving business problems successfully."/>
+        <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability. Each expert scores 1 point per knowledge level above 3. Use Train Expert to improve it. Hover here to preview the next +1 on the River." ghost="expertise" onGhost={setScoreGhost}/>
+        <ScoreCell label="Local capability" value={state.score.localCapability} max="9" icon={<Users className="h-3.5 w-3.5"/>} tip="Scores the strength of the whole local River: 1 point for every 2 local knowledge levels across the nine site/domain positions, up to 9 points. Improve it with Local Training or Knowledge Transfer." ghost="local" onGhost={setScoreGhost}/>
+        <ScoreCell label="Knowledge Flow" value={state.score.knowledgeFlow} max="6" icon={<Workflow className="h-3.5 w-3.5"/>} tip="Rewards knowledge actually moved. A transfer now moves half the gap to the stronger source (rounded up), and each level moved scores here, with a bonus when the target crosses Knowledge 2." ghost="flow" onGhost={setScoreGhost}/>
+        <ScoreCell label="Resilience" value={state.score.resilience} max="5" icon={<ShieldCheck className="h-3.5 w-3.5"/>} tip="Scored in the final Business Shock: 1 point for each test your sites can handle without company experts. Hover here to see the main resilience cut-off on the River." ghost="resilience" onGhost={setScoreGhost}/>
+        <ScoreCell label="KM Week goal" value={state.score.goal} max="5" icon={<Target className="h-3.5 w-3.5"/>} tip={<span className="block text-left"><span className="block text-[9px] font-black uppercase tracking-[.14em] text-amber-300">Goal · 5 pts</span><span className="mt-1 block text-sm font-black text-white">{goal.title}</span><span className="mt-1 block text-[10px] leading-relaxed text-slate-300">{goal.description}</span><span className={`mt-2 block rounded-lg border px-2 py-1 text-[9px] font-black ${state.score.goal?'border-emerald-700 bg-emerald-950/30 text-emerald-300':'border-amber-800 bg-amber-950/25 text-amber-300'}`}>{state.score.goal?'ACHIEVED · +5':'IN PLAY'}</span></span>}/>
+       </div>
+       {standings.length>1&&<div className="mt-2 border-t border-slate-800 pt-2"><div className="text-[8px] font-black uppercase tracking-[.14em] text-violet-300">Workshop standings</div><div className="mt-1 grid grid-cols-2 gap-1">{standings.map((entry,index)=><div key={entry.id} className={`flex items-center rounded-lg border px-2 py-1 text-[9px] ${entry.id===company.id?'border-violet-500 bg-violet-950/25':'border-slate-800 bg-slate-950'}`}><span className="w-4 font-black text-slate-500">{index+1}</span><span className="min-w-0 flex-1 truncate font-bold text-slate-300">{entry.name}</span><b className="text-white">{entry.score}</b></div>)}</div></div>}
+      </div>}
      </Card>
 
      <div className="grid shrink-0 gap-2 md:grid-cols-3 min-[700px]:gap-1.5 xl:gap-2">
@@ -571,17 +630,19 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          <ResponseButton
           selectionState={localSelection}
           disabled={localScore<=0}
+          attention={challengeAttention}
           onClick={()=>cycleKnowledgeSource('local')}>
           USE LOCAL TEAM <span className="ml-1 text-slate-500">{localSelection==='depth'?`Knowledge ${localScore} · Depth`:localSelection==='breadth'?`Knowledge ${localScore} · Breadth +1`:localScore>0?`Knowledge ${localScore} · Click to select`:'Knowledge 0'}</span>
          </ResponseButton>
          {activeExpert&&<ResponseButton
           selectionState={expertSelection}
           disabled={expertUsed||activeExpertScore<=0}
+          attention={challengeAttention}
           onClick={()=>cycleKnowledgeSource('expert')}>
           <span className="block">SEND {activeExpert.name.toUpperCase()}</span>
           <span className="mt-0.5 block text-[10px] font-bold text-slate-500">Knowledge {activeExpertScore}{expertSelection==='depth'?' - Depth':expertSelection==='breadth'?' - Breadth +1':expertUsed?' - Already used':activeExpertTravelCost?` - Travel -$${activeExpertTravelCost}k`:' - Already on site'}</span>
          </ResponseButton>}
-         {!guided&&<ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:'none',expertSelection:'none',label:`Take the risk · ${riskOdds.chancePercent}%`})}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · need {riskOdds.requiredRoll<=1?'any roll':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
+         {!guided&&<ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:'none',expertSelection:'none',label:`Take the risk · ${riskOdds.chancePercent}%`})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · need {riskOdds.requiredRoll<=1?'any roll':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
         </div>
         <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-[10px] text-slate-500">{activePending?<><span className="font-black text-amber-300">Selected:</span> {activePending.label}{!riskSelected&&!activePending.method&&<span className="ml-1 text-slate-600">· choose a Depth source</span>}</>:<>Select a response above. Nothing happens until you commit.</>}</div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
@@ -631,33 +692,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      </Card>
      </div>}
 
-     <div className={scoreBriefOpen?'relative z-[135] rounded-[22px] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}>
-     <Card className="shrink-0 p-2.5">
-      <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
-      <div className="mt-2 grid grid-cols-2 gap-1.5">
-       <ScoreCell label="Business Performance" value={state.score.business} max="12" icon={<CircleDollarSign className="h-3.5 w-3.5"/>} tip="2 points for each successful free-play Challenge. Improve this by solving business problems successfully."/>
-       <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability. Each expert scores 1 point per knowledge level above 3. Use Train Expert to improve it. Hover here to preview the next +1 on the River." ghost="expertise" onGhost={setScoreGhost}/>
-       <ScoreCell label="Local capability" value={state.score.localCapability} max="9" icon={<Users className="h-3.5 w-3.5"/>} tip="Scores the strength of the whole local River: 1 point for every 2 local knowledge levels across the nine site/domain positions, up to 9 points. Improve it with Local Training or Knowledge Transfer." ghost="local" onGhost={setScoreGhost}/>
-       <ScoreCell label="Knowledge Flow" value={state.score.knowledgeFlow} max="6" icon={<Workflow className="h-3.5 w-3.5"/>} tip="Rewards knowledge actually moved. A transfer now moves half the gap to the stronger source (rounded up), and each level moved scores here, with a bonus when the target crosses Knowledge 2." ghost="flow" onGhost={setScoreGhost}/>
-       <ScoreCell label="Resilience" value={state.score.resilience} max="5" icon={<ShieldCheck className="h-3.5 w-3.5"/>} tip="Scored in the final Business Shock: 1 point for each test your sites can handle without company experts. Hover here to see the main resilience cut-off on the River." ghost="resilience" onGhost={setScoreGhost}/>
-       <ScoreCell label="KM Week goal" value={state.score.goal} max="5" icon={<Target className="h-3.5 w-3.5"/>} tip={`Complete the shared goal “${goal.title}” for 5 points. ${goal.description}`}/>
-      </div>
-     </Card>
-     </div>
-
-     <div className="grid shrink-0 grid-cols-2 gap-2">
-      <div className={scoreBriefOpen?'relative z-[135] rounded-[22px] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}>
-      <Card className="rotate-[.2deg] border-amber-700 bg-[linear-gradient(150deg,#34220d,#17130d)] p-2.5">
-       <div className="flex items-center gap-1.5"><Target className="h-4 w-4 text-amber-300"/><div className="text-[8px] font-black uppercase tracking-[.14em] text-amber-300">Goal · 5 pts</div></div><h3 className="mt-1 text-sm font-black text-white">{goal.title}</h3><p className="mt-1 text-[9px] leading-snug text-amber-100/70">{goal.description}</p><div className={`mt-1.5 text-[9px] font-black ${state.score.goal?'text-emerald-300':'text-amber-300'}`}>{state.score.goal?'ACHIEVED · +5':'IN PLAY'}</div>
-      </Card>
-      </div>
-      <Card className="p-2.5">
-       <div className="flex items-center gap-1.5"><Brain className="h-4 w-4 text-sky-300"/><div className="text-[8px] font-black uppercase tracking-[.14em] text-sky-300">Company experts</div><ToolTip text="Experts hold deep knowledge. Sending an expert can solve a Challenge, but it does not automatically increase the local team’s knowledge. That only happens through an investment such as Local Training."/></div>
-       <div className="mt-1.5 space-y-1">{experts.map(expert=>{const skill=expert.domains[0];return <button key={expert.id} onClick={()=>{setExpertId(expert.id);setSelectedDomain(skill.domain)}} className="flex w-full items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950 px-1.5 py-1 text-left"><span className="grid h-6 w-6 place-items-center rounded-full border-2 border-amber-300 bg-amber-950 text-[9px] font-black text-amber-100">{expert.name[0]}</span><span className="min-w-0 flex-1 truncate text-[9px] font-black text-white">{expert.name.split(' ')[0]} <span className="font-bold text-slate-600">· {SITE_ABBR[expert.location]||expert.location}</span></span><b className="text-xs text-amber-200">{skill.score}</b></button>})}</div>
-      </Card>
-     </div>
-
-     {standings.length>1&&<Card className="shrink-0 p-2.5"><div className="text-[8px] font-black uppercase tracking-[.14em] text-violet-300">Workshop standings</div><div className="mt-1 grid grid-cols-2 gap-1">{standings.map((entry,index)=><div key={entry.id} className={`flex items-center rounded-lg border px-2 py-1 text-[9px] ${entry.id===company.id?'border-violet-500 bg-violet-950/25':'border-slate-800 bg-slate-950'}`}><span className="w-4 font-black text-slate-500">{index+1}</span><span className="min-w-0 flex-1 truncate font-bold text-slate-300">{entry.name}</span><b className="text-white">{entry.score}</b></div>)}</div></Card>}
     </aside>
    </div>
   </main>}
