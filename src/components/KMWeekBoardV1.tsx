@@ -502,30 +502,55 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   }
   const startX=event.clientX,startY=event.clientY;
   onPresentationHoldChange?.(true);
+
+  // Build the River-only result locally so the capability change can begin
+  // the instant the orb lands, even if the server round-trip is still finishing.
+  const optimisticCompany=structuredClone(company);
+  if(investment==='TRAIN_EXPERT'){
+   const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
+   const skill=expert?.domains.find(item=>item.domain===payload.domain);
+   if(skill)skill.score=Math.min(5,skill.score+1);
+  }else if(investment==='LOCAL_TRAINING'){
+   const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
+   const site=optimisticCompany.sites.find(item=>item.id===payload.siteId);
+   const skill=expert?.domains.find(item=>item.domain===payload.domain);
+   if(expert&&site&&skill){
+    const before=site.teamCapability[payload.domain]||0;
+    site.teamCapability[payload.domain]=Math.min(5,before+1,skill.score);
+    expert.location=site.id;
+   }
+  }else{
+   const sourceSite=optimisticCompany.sites.find(item=>item.id===payload.sourceSiteId);
+   const targetSite=optimisticCompany.sites.find(item=>item.id===payload.targetSiteId);
+   if(sourceSite&&targetSite){
+    const from=sourceSite.teamCapability[payload.domain]||0;
+    const to=targetSite.teamCapability[payload.domain]||0;
+    const uplift=from>to?Math.max(1,Math.ceil((from-to)/2)):0;
+    if(uplift)targetSite.teamCapability[payload.domain]=Math.min(5,from,to+uplift);
+   }
+  }
+
   setRiverFrozenCompany(structuredClone(company));
   await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
-  // Start the knowledge movement immediately; do not wait for the round-trip
-  // to the server before giving the player visual feedback.
+
+  // Start the request and orb together. The server may finish at any point,
+  // but the main board remains held until the orb and River sequence completes.
+  let releasePresentation:()=>void=()=>{};
+  const presentationDone=new Promise<void>(resolve=>{releasePresentation=resolve});
+  const postPromise=post(payload,async()=>{await presentationDone});
   const animationPromise=animateKnowledgeSpark(startX,startY,targetKey);
-  const ok=await post(payload,async nextSession=>{
-   await animationPromise;
 
-   // Keep the Invest screen frozen while only the River receives the new
-   // company state. This gives the player time to watch the capability change
-   // before the next Challenge appears.
-   const nextCompany=nextSession.companies.find(item=>item.id===company.id);
-   if(nextCompany){
-    setRiverFrozenCompany(structuredClone(nextCompany));
-    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
-    await new Promise<void>(resolve=>window.setTimeout(resolve,1300));
-   }
+  await animationPromise;
 
-   onPresentationHoldChange?.(false);
-  });
-  if(!ok){
-   try{await animationPromise}catch{}
-   onPresentationHoldChange?.(false);
-  }
+  // Orb arrival hands straight into the River transition with no network wait.
+  setRiverFrozenCompany(optimisticCompany);
+  await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+  await new Promise<void>(resolve=>window.setTimeout(resolve,1300));
+
+  releasePresentation();
+  const ok=await postPromise;
+  if(!ok)setRiverFrozenCompany(structuredClone(company));
+  onPresentationHoldChange?.(false);
   setRiverFrozenCompany(null);
  };
 
