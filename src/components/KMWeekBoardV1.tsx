@@ -31,6 +31,7 @@ const SITE_ABBR:Record<string,string>={melbourne:'MEL',brisbane:'BNE',perth:'PER
 const money=(value:number)=>formatCurrency(value);
 const domainLabel=(domain:KnowledgeDomain)=>DOMAIN_INFO[domain].label;
 const siteName=(company:CompanyV2,id:string)=>company.sites.find(site=>site.id===id)?.name||id;
+const challengeDisplayTitle=(company:CompanyV2,challenge:KMWeekChallenge)=>{const site=siteName(company,challenge.siteId);return challenge.title.toLowerCase().startsWith(site.toLowerCase())?challenge.title:site+' '+challenge.title};
 const specialistFor=(company:CompanyV2,domain:KnowledgeDomain)=>company.experts.find(expert=>!expert.isVacant&&expert.domains.some(skill=>skill.domain===domain));
 const specialistScore=(company:CompanyV2,domain:KnowledgeDomain)=>specialistFor(company,domain)?.domains.find(skill=>skill.domain===domain)?.score||0;
 
@@ -80,11 +81,11 @@ const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selec
  const site=company.sites.find(item=>item.id===challenge.siteId);
  const local=site?.teamCapability[challenge.domain]||0;
  const done=challenge.status!=='open';
- return <button type="button" onClick={onClick} className={`min-w-0 rounded-xl border-2 p-2 text-left transition ${selected?'border-violet-300 bg-violet-950/35':done?(challenge.status==='success'?'border-emerald-800 bg-emerald-950/20':'border-rose-900 bg-rose-950/20'):'border-slate-700 bg-slate-950/70 hover:border-violet-600'}`}>
-  <div className="flex items-center justify-between gap-2"><span className="truncate text-[9px] font-black uppercase tracking-[.12em] text-emerald-300">{site?.name} · {domainLabel(challenge.domain)}</span>{done&&<span className={`text-[9px] font-black ${challenge.status==='success'?'text-emerald-300':'text-rose-300'}`}>{challenge.status==='success'?'SOLVED':'MISSED'}</span>}</div>
-  <div className="mt-1 truncate text-xs font-black text-white">{challenge.title}</div>
-  <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-slate-500"><span>Needs <b className="text-white">{challenge.difficulty}</b></span><span>Local <b className={local>=challenge.difficulty?'text-emerald-300':'text-amber-300'}>{local}</b></span></div>
-  <div className="mt-1 flex items-center gap-2 border-t border-slate-800 pt-1 text-[9px] font-black"><span className="text-emerald-300">WIN +{money(challenge.impact)}</span><span className="text-rose-300">LOSE -{money(challenge.impact)}</span>{done&&challenge.dieRoll!==undefined&&<span className={`${challenge.status==='success'?'text-emerald-300':'text-rose-300'}`}>ROLL {challenge.dieRoll}</span>}{done&&challenge.travelCost&&<span className="ml-auto text-amber-300">Travel -{money(challenge.travelCost)}</span>}</div>
+ const shell='min-w-0 rounded-xl border-2 p-2 text-left transition ';
+ const stateClass=selected?'border-violet-300 bg-violet-950/35':done?(challenge.status==='success'?'border-emerald-800 bg-emerald-950/20':'border-rose-900 bg-rose-950/20'):'border-slate-700 bg-slate-950/70 hover:border-violet-600';
+ return <button type="button" onClick={onClick} className={shell+stateClass}>
+  <div className="flex items-center justify-between gap-2"><div className="truncate text-xs font-black text-white">{challengeDisplayTitle(company,challenge)}</div>{done&&<span className={'shrink-0 text-[9px] font-black '+(challenge.status==='success'?'text-emerald-300':'text-rose-300')}>{challenge.status==='success'?'SOLVED':'MISSED'}</span>}</div>
+  <div className="mt-1 text-[10px] font-bold text-slate-500">Needs: <b className="text-white">{domainLabel(challenge.domain)} {challenge.difficulty}</b> · Local knowledge: <b className={local>=challenge.difficulty?'text-emerald-300':'text-amber-300'}>{local}</b>{done&&challenge.dieRoll!==undefined&&<span className={'ml-2 font-black '+(challenge.status==='success'?'text-emerald-300':'text-rose-300')}>ROLL {challenge.dieRoll}</span>}{done&&challenge.travelCost&&<span className="ml-2 font-black text-amber-300">Travel -{money(challenge.travelCost)}</span>}</div>
   {!done&&draft&&<div className="mt-1 truncate rounded-md border border-sky-900/70 bg-sky-950/25 px-1.5 py-1 text-[8px] font-black uppercase tracking-[.08em] text-sky-300">Draft · {draft.label}</div>}
  </button>;
 };
@@ -100,47 +101,45 @@ const ResponseButton:React.FC<{selectionState:ResponseSelectionState;disabled?:b
 };
 
 const ChallengeKnowledgeBars:React.FC<{
- requirement:number;
  local:number;
  expert:number;
  expertName?:string;
+ expertLocation?:string;
+ travelCost?:number;
  localSelection:ResponseSelectionState;
  expertSelection:ResponseSelectionState;
- riskSelected?:boolean;
-}>=({requirement,local,expert,expertName,localSelection,expertSelection,riskSelected=false})=>{
- const depth=localSelection==='depth'?local:expertSelection==='depth'?expert:0;
- const breadth=(localSelection==='breadth'&&local>0?1:0)+(expertSelection==='breadth'&&expert>0?1:0);
- const applied=riskSelected?(localSelection!=='none'?local:0):depth+breadth;
- const requirementMet=!riskSelected&&applied>=requirement;
- const pct=(value:number)=>`${Math.max(0,Math.min(100,(value/5)*100))}%`;
- const SegmentBar:React.FC<{value:number;filled:number;tone:'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={`${tone} knowledge ${value} of 5; ${filled} applied`}>
+ localDisabled?:boolean;
+ expertDisabled?:boolean;
+ attention?:boolean;
+ onLocalClick:()=>void;
+ onExpertClick?:()=>void;
+}>=({local,expert,expertName,expertLocation,travelCost=0,localSelection,expertSelection,localDisabled=false,expertDisabled=false,attention=false,onLocalClick,onExpertClick})=>{
+ const SegmentBar:React.FC<{value:number;filled:number;tone:'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={tone+' knowledge '+value+' of 5'}>
   {Array.from({length:5},(_,index)=>{
    const available=index<value;
    const applied=index<filled;
-   const colour=tone==='local'?'border-sky-400 bg-sky-400':'border-amber-400 bg-amber-400';
-   return <span key={index} className={`h-2.5 rounded-full border-2 transition-all duration-200 ${available?(applied?colour:tone==='local'?'border-sky-500/85 bg-transparent':'border-amber-500/85 bg-transparent'):'border-slate-800 bg-transparent'}`}/>;
+   const colour=tone==='local'?'border-sky-300 bg-sky-400':'border-amber-300 bg-amber-400';
+   const idle=tone==='local'?'border-sky-500/85 bg-sky-950/25':'border-amber-500/85 bg-amber-950/20';
+   return <span key={index} className={'h-4 rounded-md border-2 transition-all duration-200 '+(available?(applied?colour:idle):'border-slate-800 bg-slate-950')}/>;
   })}
  </div>;
+ const Selector:React.FC<{state:ResponseSelectionState;disabled?:boolean}>=({state,disabled=false})=>{
+  const tone=disabled?'border-slate-800 bg-slate-950':state==='depth'?'border-amber-200 bg-amber-400 text-slate-950':state==='breadth'?'border-sky-300 bg-slate-900':'border-slate-500 bg-slate-900';
+  return <span aria-label={state==='depth'?'Selected as depth':state==='breadth'?'Selected as breadth':'Not selected'} className={'relative grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-full border-2 '+tone+(attention&&!disabled?' kmw-attention-circle':'')}>{state==='depth'?'✓':state==='breadth'?<span aria-hidden="true" className="absolute inset-y-0 left-0 w-1/2 bg-sky-400"/>:''}</span>;
+ };
  const localFilled=localSelection==='depth'?local:localSelection==='breadth'?Math.min(local,1):0;
  const expertFilled=expertSelection==='depth'?expert:expertSelection==='breadth'?Math.min(expert,1):0;
- return <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2" data-kmw-knowledge-bars>
-  <div className="space-y-1.5">
-   <div className="grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2">
-    <span className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Requirement</span>
-    <div className="h-2.5 overflow-hidden rounded-full bg-slate-800"><div className={`h-full rounded-full transition-colors duration-300 ${requirementMet?'bg-emerald-400':'bg-rose-500'}`} style={{width:pct(requirement)}}/></div>
-    <b className={`text-[10px] ${requirementMet?'text-emerald-300':'text-rose-300'}`}>{requirement}</b>
-   </div>
-   <div className="grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2 px-1 py-0.5">
-    <span className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Local</span>
-    <SegmentBar value={local} filled={localFilled} tone="local"/>
-    <b className="text-[10px] text-sky-300">{local}</b>
-   </div>
-   <div className="grid grid-cols-[72px_minmax(0,1fr)_20px] items-center gap-2 px-1 py-0.5">
-    <span className="truncate text-[8px] font-black uppercase tracking-[.12em] text-slate-500" title={expertName||'Expert'}>{expertName?expertName.split(' ')[0]:'Expert'}</span>
-    <SegmentBar value={expert} filled={expertFilled} tone="expert"/>
-    <b className="text-[10px] text-amber-300">{expert}</b>
-   </div>
-  </div>
+ return <div className="mt-2 space-y-1.5" data-kmw-knowledge-bars>
+  <button type="button" disabled={localDisabled} onClick={onLocalClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 '+(localSelection!=='none'?'border-sky-500 bg-sky-950/20':'border-slate-700 bg-slate-950/70 hover:border-sky-700')+(attention&&!localDisabled?' kmw-attention-button':'')}>
+   <span><span className="block text-[10px] font-black text-white">Local team</span><span className="block text-[9px] font-bold text-sky-300">Knowledge {local}</span></span>
+   <SegmentBar value={local} filled={localFilled} tone="local"/>
+   <Selector state={localSelection} disabled={localDisabled}/>
+  </button>
+  {expertName&&<button type="button" disabled={expertDisabled} onClick={onExpertClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 '+(expertSelection!=='none'?'border-amber-400 bg-amber-950/20':'border-slate-700 bg-slate-950/70 hover:border-amber-700')+(attention&&!expertDisabled?' kmw-attention-button':'')}>
+   <span className="min-w-0"><span className="block truncate text-[10px] font-black text-white">{expertName.split(' ')[0]}{expertLocation?' · '+(SITE_ABBR[expertLocation]||expertLocation):''}</span><span className="block text-[9px] font-bold text-amber-300">Knowledge {expert}{expertDisabled?' · used':travelCost?' · $'+travelCost+'k travel':''}</span></span>
+   <SegmentBar value={expert} filled={expertFilled} tone="expert"/>
+   <Selector state={expertSelection} disabled={expertDisabled}/>
+  </button>}
  </div>;
 };
 
