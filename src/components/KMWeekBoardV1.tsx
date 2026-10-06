@@ -4,7 +4,7 @@ import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_SPECS,KM_WEEK_SITE_IDS,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_FAILURE_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 import type{RiverGhostPreview}from'./InvestmentRiverView.tsx';
 import{KMWeekDebriefV1}from'./KMWeekDebriefV1.tsx';
@@ -42,7 +42,7 @@ function phaseTitle(company:CompanyV2){
  const state=company.kmWeek;
  if(!state)return'PREPARING';
  if(state.stage==='guided')return`GUIDED ${state.guidedTurn}/3`;
- if(state.stage==='free')return`ROUND ${state.freeRound}/3`;
+ if(state.stage==='free')return`ROUND ${state.freeRound}`;
  if(state.stage==='shock')return'BUSINESS SHOCK';
  return'COMPLETE';
 }
@@ -262,6 +262,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const remaining=session.timerEndsAt?Math.max(0,Math.ceil((new Date(session.timerEndsAt).getTime()-now)/1000)):session.timerPausedSecondsRemaining??1800;
  const mm=Math.floor(remaining/60),ss=String(remaining%60).padStart(2,'0');
  const overtime=remaining<=0;
+ const finalShockWindow=state.stage==='free'&&remaining<=KM_WEEK_SHOCK_WINDOW_SECONDS;
  const guided=state.stage==='guided';
  const guidedCopy=currentGuidedCopy(company);
  const activeChallenge=state.challenges.find(challenge=>challenge.id===selectedChallengeId)||state.challenges.find(challenge=>challenge.status==='open')||state.challenges[0];
@@ -602,6 +603,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <div className="ml-auto rounded-xl border border-amber-800 bg-amber-950/20 px-3 py-1.5 text-xs font-black text-amber-100"><span className="mr-2 text-[9px] uppercase text-amber-500">Current phase</span>{currentPhaseLabel(company)}</div>
    </div>
 
+   {finalShockWindow&&<div className="mb-2 shrink-0 rounded-xl border-2 border-rose-500 bg-rose-950/35 px-3 py-2 text-[10px] font-bold leading-relaxed text-rose-100"><b className="text-rose-300">FINAL 3 MINUTES.</b> Finish this round. After your next investment, the Business Shock begins and company experts become unavailable.</div>}
+
    <div className="grid gap-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:grid-cols-[minmax(0,1fr)_310px] lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_410px]">
     <div className="space-y-3 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2 xl:gap-3">
      <Card className="relative p-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-2 xl:p-3">
@@ -705,28 +708,40 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} ({SITE_ABBR[expert.location]||expert.location}) · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
         <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span></div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
-        <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+        <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':finalShockWindow?'COMMIT FINAL INVESTMENT & FACE BUSINESS SHOCK':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>
       </>}
 
       {state.stage==='shock'&&<div className="mt-2">
-       <div className="text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-full border-4 border-rose-300 bg-rose-950"><ShieldCheck className="h-6 w-6 text-rose-200"/></div><div className="mt-2 text-[9px] font-black uppercase tracking-[.20em] text-rose-300">Business Shock</div><h3 className="mt-1 text-lg font-black text-white">Can your sites cope without the experts?</h3><p className="mt-1 text-[11px] leading-relaxed text-slate-300">Each row is a local capability test. <b className="text-white">Local knowledge must meet the requirement shown.</b> Company experts are unavailable for this Shock.</p></div>
+       <div className="rounded-2xl border-2 border-rose-700 bg-[linear-gradient(145deg,#32121d,#171827)] p-3 text-left">
+        <div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-4 border-rose-300 bg-rose-950"><ShieldCheck className="h-5 w-5 text-rose-200"/></div><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-rose-300">Business Shock · final three minutes</div><h3 className="mt-0.5 text-lg font-black text-white">The experts cannot be everywhere at once.</h3></div></div>
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-200">Five critical issues hit across the company at the same time. Your specialists are already committed elsewhere, so each site has to act using the knowledge that has actually been built locally.</p>
+        <div className="mt-2 rounded-xl border border-amber-700/70 bg-amber-950/25 p-2 text-[10px] leading-relaxed text-amber-100"><b className="text-amber-300">The consequence:</b> wherever local capability is below the requirement, the company has to bring in emergency external specialists at <b>${KM_WEEK_SHOCK_FAILURE_COST}k per capability gap</b>. That cost comes straight off turnover and will appear in the final graph.</div>
+       </div>
+
        <div className="mt-3 space-y-1.5">
-        {(state.shockResolved?state.shockChecks:KM_WEEK_SHOCK_SPECS.map(spec=>{const site=company.sites.find(item=>item.id===spec.siteId);const localKnowledge=site?.teamCapability[spec.domain]||0;return{...spec,localKnowledge,passed:localKnowledge>=spec.difficulty}})).map(check=>{
+        {!state.shockResolved?KM_WEEK_SHOCK_SPECS.map(check=>{
          const site=company.sites.find(item=>item.id===check.siteId);
-         const odds=kmWeekRiskOddsV1(check.localKnowledge,check.difficulty);
-         const resolved=state.shockResolved&&state.shockChecks.find(item=>item.id===check.id);
-         return <div key={check.id} className={`rounded-xl border p-2 text-left ${check.passed?'border-emerald-800 bg-emerald-950/20':state.shockResolved?'border-rose-800 bg-rose-950/20':'border-amber-800 bg-amber-950/15'}`}>
-          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-500">Local {check.localKnowledge} · requires {check.difficulty}</div></div><div className={`rounded-full border px-2 py-1 text-[9px] font-black ${check.passed?'border-emerald-600 text-emerald-300':'border-rose-700 text-rose-300'}`}>{check.passed?'READY':`SHORT ${Math.max(1,check.difficulty-check.localKnowledge)}`}</div></div>
-          {resolved&&!check.passed&&<div className="mt-2">
-           {!resolved.resolution?<div className="grid grid-cols-2 gap-1.5"><button type="button" onClick={()=>void post({type:'KM_WEEK_SHOCK_GAP',checkId:check.id,choice:'risk'})} disabled={busy||readOnly} className="rounded-lg border border-amber-500 bg-amber-950/35 px-2 py-2 text-[9px] font-black text-amber-200 disabled:opacity-40">TAKE THE RISK · {odds.chancePercent}%</button><button type="button" onClick={()=>void post({type:'KM_WEEK_SHOCK_GAP',checkId:check.id,choice:'accept'})} disabled={busy||readOnly} className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[9px] font-black text-slate-400 disabled:opacity-40">ACCEPT THE GAP</button></div>:<div className={`rounded-lg border px-2 py-1.5 text-[9px] font-black ${resolved.recovered?'border-sky-700 bg-sky-950/25 text-sky-200':'border-slate-700 bg-slate-950 text-slate-400'}`}>{resolved.resolution==='risk'?`${resolved.recovered?'RECOVERED':'NOT RECOVERED'} · rolled ${resolved.dieRoll}`:'GAP ACCEPTED'}</div>}
-          </div>}
+         return <div key={check.id} className="rounded-xl border border-slate-700 bg-slate-950/70 p-2 text-left">
+          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-500">Critical local capability · requires Knowledge {check.difficulty}</div></div><div className="rounded-full border border-slate-600 px-2 py-1 text-[8px] font-black text-slate-400">ABOUT TO BE TESTED</div></div>
+         </div>;
+        }):state.shockChecks.map(check=>{
+         const site=company.sites.find(item=>item.id===check.siteId);
+         return <div key={check.id} className={'rounded-xl border p-2 text-left '+(check.passed?'border-emerald-700 bg-emerald-950/25':'border-rose-700 bg-rose-950/30')}>
+          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-400">Local Knowledge {check.localKnowledge} · required {check.difficulty}</div></div><div className={'rounded-full border px-2 py-1 text-[9px] font-black '+(check.passed?'border-emerald-500 text-emerald-300':'border-rose-500 text-rose-200')}>{check.passed?'HELD LOCALLY':'CAPABILITY GAP'}</div></div>
+          {!check.passed&&<div className="mt-2 rounded-lg border border-rose-800 bg-slate-950/70 px-2 py-1.5 text-[9px] font-black text-rose-200">Emergency external specialist mobilised · -${KM_WEEK_SHOCK_FAILURE_COST}k turnover</div>}
          </div>;
         })}
        </div>
-       {!state.shockResolved?<><div className="mt-3 rounded-xl border border-yellow-700/70 bg-yellow-950/20 p-2 text-left text-[10px] leading-relaxed text-yellow-100"><b className="text-yellow-300">What happens next:</b> the Shock will lock in which sites were already ready. Any shortfall can then be handled by taking the same local-team risk roll used in normal Challenges, or accepted as a gap.</div><button onClick={()=>void post({type:'KM_WEEK_RESOLVE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-white bg-white text-sm font-black text-rose-950 disabled:opacity-40">{busy?'CHECKING…':'RUN BUSINESS SHOCK'}</button></>:<>
-        <div className="mt-3 rounded-xl border border-slate-700 bg-slate-950/70 p-2 text-left text-[10px] text-slate-300"><b className="text-white">Result:</b> {state.shockChecks.filter(check=>check.passed).length}/{state.shockChecks.length} were ready from local capability. {state.shockChecks.filter(check=>!check.passed&&check.recovered).length} shortfall{state.shockChecks.filter(check=>!check.passed&&check.recovered).length===1?' was':'s were'} recovered through emergency response. <span className="text-slate-500">Resilience points only reward what was ready before the Shock.</span></div>
-        {state.shockChecks.every(check=>check.passed||Boolean(check.resolution))?<button onClick={()=>void post({type:'KM_WEEK_COMPLETE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-emerald-300 bg-emerald-400 text-sm font-black text-emerald-950 disabled:opacity-40">{busy?'FINISHING…':'CONTINUE TO SCORE & DEBRIEF'}</button>:<div className="mt-3 text-[10px] font-black text-amber-300">Handle each shortfall before continuing.</div>}
+
+       {!state.shockResolved?<button onClick={()=>void post({type:'KM_WEEK_RESOLVE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-white bg-white text-sm font-black text-rose-950 disabled:opacity-40">{busy?'REVEALING…':'REVEAL WHAT THE COMPANY CAN HANDLE'}</button>:<>
+        {(()=>{
+         const gaps=state.shockChecks.filter(check=>!check.passed).length;
+         const ready=state.shockChecks.length-gaps;
+         const cost=gaps*KM_WEEK_SHOCK_FAILURE_COST;
+         return <div className={'mt-3 rounded-xl border-2 p-3 text-left '+(gaps?'border-rose-700 bg-rose-950/25':'border-emerald-700 bg-emerald-950/25')}><div className={'text-[9px] font-black uppercase tracking-[.14em] '+(gaps?'text-rose-300':'text-emerald-300')}>{gaps?'The cost of knowledge gaps':'The payoff from distributed knowledge'}</div><div className="mt-1 text-sm font-black text-white">{ready}/{state.shockChecks.length} critical capabilities held locally.</div><p className="mt-1 text-[10px] leading-relaxed text-slate-300">{gaps?<>{gaps} capability gap{gaps===1?'':'s'} forced emergency external support, taking <b className="text-rose-200">-{money(cost)}</b> from turnover. The organisation could keep operating, but it paid for knowledge that had not been transferred in time.</>:<>Every tested capability was available where the work happened. The company absorbed the shock without emergency external support.</>}</p></div>;
+        })()}
+        <button onClick={()=>void post({type:'KM_WEEK_COMPLETE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-emerald-300 bg-emerald-400 text-sm font-black text-emerald-950 disabled:opacity-40">{busy?'FINISHING…':'CONTINUE TO SCORE & DEBRIEF'}</button>
        </>}
       </div>}
 
