@@ -10,6 +10,7 @@ import {
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
   KM_WEEK_SHOCK_FAILURE_COST,
+  freeChallengesForRound,
   kmWeekRiskOddsV1,
 } from '../src/engine/kmWeekV1.ts';
 import type { GameSessionV2 } from '../src/types/gameV2.ts';
@@ -66,6 +67,25 @@ assert.deepEqual(company.experts.map(expert=>expert.domains[0].domain),['operati
 assert.deepEqual(kmWeekRiskOddsV1(1,2),{performanceGap:1,requiredRoll:2,successfulFaces:5,chancePercent:83},'A one-point performance gap must still carry risk and require 2+ on d6');
 assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successfulFaces:2,chancePercent:33},'Risk odds must worsen as the remaining performance gap grows');
 
+{
+  const rounds=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+1));
+  const signatures=rounds.map(cards=>cards.map(card=>card.domain+':'+card.difficulty).sort().join('|')).sort();
+  const expected=[
+    'hr:3|hr:3',
+    'hr:1|marketing:2',
+    'marketing:3|operations:3',
+    'operations:3|operations:5',
+    'marketing:4|operations:3',
+    'hr:4|marketing:3',
+  ].sort();
+  assert.deepEqual(signatures,expected,'Each six-round cycle must contain the agreed six challenge-value profiles exactly once');
+  assert.equal(rounds.filter(cards=>cards[0].domain===cards[1].domain&&cards.every(card=>card.difficulty>2)).length,2,'Each cycle must contain two same-domain expert-bottleneck rounds');
+  assert.ok(rounds.every(cards=>cards[0].siteId!==cards[1].siteId),'The two Challenges in a round must be assigned to different sites');
+  assert.equal(new Set(rounds.flat().map(card=>card.title)).size,12,'Story descriptions must not repeat within a six-round cycle');
+  const secondCycle=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+7));
+  assert.deepEqual(secondCycle.flat().length,12,'A new six-round cycle must generate another twelve Challenges from the same six value profiles');
+}
+
 const opsExpert=()=>company.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
 const resolveGuidedExpert=(includeLocalBreadth=false)=>{
   const challenge=company.kmWeek!.challenges[0];
@@ -114,8 +134,7 @@ assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.hr,1
 assert.equal(company.kmWeek?.stage,'free');
 assert.equal(company.kmWeek?.freeRound,1);
 assert.equal(company.kmWeek?.challenges.length,2);
-assert.equal(company.kmWeek?.challenges[0].domain,company.kmWeek?.challenges[1].domain,'Free Round 1 must create an expert bottleneck with two Challenges in the same domain');
-assert.ok(company.kmWeek!.challenges.every(challenge=>challenge.difficulty>2),'The first expert-bottleneck round must require more than baseline local capability');
+assert.ok(company.kmWeek!.challenges[0].siteId!==company.kmWeek!.challenges[1].siteId,'Free-play Challenges must be assigned to different sites');
 assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,2,'AAR Before River must snapshot each company after its guided investments, at the start of free play');
 {
   const transferCompany=createInitialCompanyV2('Transfer Test','kmw-transfer-test',config);
@@ -177,8 +196,7 @@ for(let round=1;round<=3;round++){
 }
 assert.equal(company.kmWeek?.stage,'free','Free play must continue beyond three rounds when time remains');
 assert.equal(company.kmWeek?.freeRound,4,'The next free-play round must open instead of forcing the Shock');
-assert.equal(company.kmWeek?.challenges[0].domain,company.kmWeek?.challenges[1].domain,'Free Round 4 must create a second same-domain expert bottleneck');
-assert.ok(company.kmWeek!.challenges.every(challenge=>challenge.difficulty>2),'The second expert-bottleneck round must require more than Knowledge 2');
+assert.ok(company.kmWeek!.challenges[0].siteId!==company.kmWeek!.challenges[1].siteId,'Every shuffled free-play round must use two different sites');
 
 // Once the clock enters the final three minutes, finish the current round and
 // the next committed investment hands directly into the Business Shock.
