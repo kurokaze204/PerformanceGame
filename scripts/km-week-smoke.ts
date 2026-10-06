@@ -114,6 +114,8 @@ assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.hr,1
 assert.equal(company.kmWeek?.stage,'free');
 assert.equal(company.kmWeek?.freeRound,1);
 assert.equal(company.kmWeek?.challenges.length,2);
+assert.equal(company.kmWeek?.challenges[0].domain,company.kmWeek?.challenges[1].domain,'Free Round 1 must create an expert bottleneck with two Challenges in the same domain');
+assert.ok(company.kmWeek!.challenges.every(challenge=>challenge.difficulty>2),'The first expert-bottleneck round must require more than baseline local capability');
 assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,2,'AAR Before River must snapshot each company after its guided investments, at the start of free play');
 {
   const transferCompany=createInitialCompanyV2('Transfer Test','kmw-transfer-test',config);
@@ -175,6 +177,8 @@ for(let round=1;round<=3;round++){
 }
 assert.equal(company.kmWeek?.stage,'free','Free play must continue beyond three rounds when time remains');
 assert.equal(company.kmWeek?.freeRound,4,'The next free-play round must open instead of forcing the Shock');
+assert.equal(company.kmWeek?.challenges[0].domain,company.kmWeek?.challenges[1].domain,'Free Round 4 must create a second same-domain expert bottleneck');
+assert.ok(company.kmWeek!.challenges.every(challenge=>challenge.difficulty>2),'The second expert-bottleneck round must require more than Knowledge 2');
 
 // Once the clock enters the final three minutes, finish the current round and
 // the next committed investment hands directly into the Business Shock.
