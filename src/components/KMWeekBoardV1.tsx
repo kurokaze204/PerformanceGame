@@ -58,7 +58,7 @@ function currentPhaseLabel(company:CompanyV2){
 function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
  if(turn===1)return{title:'1. Solve the business problem',text:'Brisbane needs Operations 4. Build the response yourself: select Priya for depth, then select the Local Team if you want its knowledge to contribute breadth.',invest:'After the Challenge, you will deepen Priya’s expertise.'};
- if(turn===2)return{title:'2. Solve it again',text:'Another Operations problem has appeared in Brisbane. Select the knowledge sources you want in the response; Local can contribute breadth alongside Priya’s depth.',invest:'Now use Local Training. Brisbane is the obvious target, but you can send Priya to another site; training away from her current site adds $2k travel.'};
+ if(turn===2)return{title:'2. Let the local team respond',text:'Another Operations problem has appeared in Brisbane. This time select the Local Team, then Take the Risk. Their knowledge reduces the performance gap, which improves the die-roll odds.',invest:'Now use Local Training. Brisbane is the obvious target, but you can send Priya to another site; training away from her current site adds $2k travel.'};
  return{title:'3. The problem moves',text:'A similar Operations issue has appeared in Perth. Use Priya, then commit your response.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
 }
 
@@ -84,7 +84,7 @@ const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selec
   <div className="flex items-center justify-between gap-2"><span className="truncate text-[9px] font-black uppercase tracking-[.12em] text-emerald-300">{site?.name} · {domainLabel(challenge.domain)}</span>{done&&<span className={`text-[9px] font-black ${challenge.status==='success'?'text-emerald-300':'text-rose-300'}`}>{challenge.status==='success'?'SOLVED':'MISSED'}</span>}</div>
   <div className="mt-1 truncate text-xs font-black text-white">{challenge.title}</div>
   <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-slate-500"><span>Needs <b className="text-white">{challenge.difficulty}</b></span><span>Local <b className={local>=challenge.difficulty?'text-emerald-300':'text-amber-300'}>{local}</b></span></div>
-  <div className="mt-1 flex items-center gap-2 border-t border-slate-800 pt-1 text-[9px] font-black"><span className="text-emerald-300">WIN +{money(challenge.impact)}</span><span className="text-rose-300">LOSE -{money(challenge.impact)}</span>{done&&challenge.travelCost&&<span className="ml-auto text-amber-300">Travel -{money(challenge.travelCost)}</span>}</div>
+  <div className="mt-1 flex items-center gap-2 border-t border-slate-800 pt-1 text-[9px] font-black"><span className="text-emerald-300">WIN +{money(challenge.impact)}</span><span className="text-rose-300">LOSE -{money(challenge.impact)}</span>{done&&challenge.dieRoll!==undefined&&<span className={`${challenge.status==='success'?'text-emerald-300':'text-rose-300'}`}>ROLL {challenge.dieRoll}</span>}{done&&challenge.travelCost&&<span className="ml-auto text-amber-300">Travel -{money(challenge.travelCost)}</span>}</div>
   {!done&&draft&&<div className="mt-1 truncate rounded-md border border-sky-900/70 bg-sky-950/25 px-1.5 py-1 text-[8px] font-black uppercase tracking-[.08em] text-sky-300">Draft · {draft.label}</div>}
  </button>;
 };
@@ -110,7 +110,7 @@ const ChallengeKnowledgeBars:React.FC<{
 }>=({requirement,local,expert,expertName,localSelection,expertSelection,riskSelected=false})=>{
  const depth=localSelection==='depth'?local:expertSelection==='depth'?expert:0;
  const breadth=(localSelection==='breadth'&&local>0?1:0)+(expertSelection==='breadth'&&expert>0?1:0);
- const applied=riskSelected?local:depth+breadth;
+ const applied=riskSelected?(localSelection!=='none'?local:0):depth+breadth;
  const requirementMet=!riskSelected&&applied>=requirement;
  const pct=(value:number)=>`${Math.max(0,Math.min(100,(value/5)*100))}%`;
  const SegmentBar:React.FC<{value:number;filled:number;tone:'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={`${tone} knowledge ${value} of 5; ${filled} applied`}>
@@ -156,6 +156,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
  const[scorePadOpen,setScorePadOpen]=useState(false);
  const[challengeAttention,setChallengeAttention]=useState(false);
+ const[riskResult,setRiskResult]=useState<{roll:number;won:boolean;requiredRoll:number;performanceGap:number}|null>(null);
  const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
  const[riverFrozenCompany,setRiverFrozenCompany]=useState<CompanyV2|null>(null);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
@@ -280,14 +281,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const localScore=activeChallenge&&localSite?localSite.teamCapability[activeChallenge.domain]||0:0;
  const activeExpert=activeChallenge?specialistFor(company,activeChallenge.domain):undefined;
  const activeExpertScore=activeChallenge&&activeExpert?activeExpert.domains.find(skill=>skill.domain===activeChallenge.domain)?.score||0:0;
- const riskOdds=activeChallenge?kmWeekRiskOddsV1(localScore,activeChallenge.difficulty):{requiredRoll:7,successfulFaces:0,chancePercent:0};
  const activePending=pendingResponse?.challengeId===activeChallenge?.id?pendingResponse:null;
  const localSelection:ResponseSelectionState=activePending?.localSelection||'none';
  const expertSelection:ResponseSelectionState=activePending?.expertSelection||'none';
  const riskSelected=activePending?.method==='risk';
+ const riskKnowledge=localSelection!=='none'?localScore:0;
+ const riskOdds=activeChallenge?kmWeekRiskOddsV1(riskKnowledge,activeChallenge.difficulty):{performanceGap:0,requiredRoll:7,successfulFaces:0,chancePercent:0};
  const selectedDepth=localSelection==='depth'?localScore:expertSelection==='depth'?activeExpertScore:0;
  const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0);
- const selectedKnowledge=riskSelected?localScore:selectedDepth+selectedBreadth;
+ const selectedKnowledge=riskSelected?riskKnowledge:selectedDepth+selectedBreadth;
  const expertUsed=Boolean(activeExpert&&state.usedExpertIds.includes(activeExpert.id));
  const confidentResponseReady=Boolean(activePending?.method&&(activePending.method==='local'||activePending.method==='expert')&&selectedKnowledge>=activeChallenge!.difficulty);
  const responseReady=Boolean(riskSelected||confidentResponseReady);
@@ -337,7 +339,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   spark.style.top=`${startY-9}px`;
   document.body.appendChild(spark);
   const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1;
-  const travelDuration=firstGuidedRound?2200:1100;
+  const travelDuration=firstGuidedRound?1400:1000;
   const travel=spark.animate([
    {transform:'translate(0px,0px) scale(.8)',opacity:0},
    {transform:`translate(${dx*.10}px,${-rise*.58}px) scale(1.18)`,opacity:1,offset:.10},
@@ -365,8 +367,20 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(!activeChallenge)return;
   setChallengeAttention(false);
   const current=pendingResponse?.challengeId===activeChallenge.id?pendingResponse:null;
-  let localState:ResponseSelectionState=current?.method==='risk'?'none':current?.localSelection||'none';
+  let localState:ResponseSelectionState=current?.localSelection||'none';
   let expertState:ResponseSelectionState=current?.method==='risk'?'none':current?.expertSelection||'none';
+  if(source==='local'&&current?.method==='risk'){
+   localState=localState==='none'?'depth':'none';
+   setPendingResponse({
+    challengeId:activeChallenge.id,
+    method:'risk',
+    expertId:undefined,
+    localSelection:localState,
+    expertSelection:'none',
+    label:`Take the risk${localState!=='none'?' + Local Team':''}`,
+   });
+   return;
+  }
   const sourceState=source==='local'?localState:expertState;
   const sourceScore=source==='local'?localScore:activeExpertScore;
   const otherState=source==='local'?expertState:localState;
@@ -404,7 +418,20 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(!pendingResponse)return;
   if(!pendingResponse.method)return;
   const committed=pendingResponse;
-  const ok=await post({type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth'});
+  const payload={type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth',useLocalRisk:committed.method==='risk'&&committed.localSelection!=='none'};
+  const beforeApply=committed.method==='risk'?async(nextSession:GameSessionV2)=>{
+   const nextCompany=nextSession.companies.find(item=>item.id===company.id);
+   const resolved=nextCompany?.kmWeek?.challenges.find(item=>item.id===committed.challengeId);
+   if(resolved?.dieRoll!==undefined){
+    const resolvedSite=nextCompany?.sites.find(item=>item.id===resolved.siteId);
+    const selectedLocal=committed.localSelection!=='none'?(resolvedSite?.teamCapability[resolved.domain]||0):0;
+    const odds=kmWeekRiskOddsV1(selectedLocal,resolved.difficulty);
+    setRiskResult({roll:resolved.dieRoll,won:resolved.status==='success',requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
+    await new Promise<void>(resolve=>window.setTimeout(resolve,1700));
+    setRiskResult(null);
+   }
+  }:undefined;
+  const ok=await post(payload,beforeApply);
   if(ok){
    setChallengeDrafts(current=>{
     const next={...current};
@@ -479,8 +506,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   onPresentationHoldChange?.(true);
   setRiverFrozenCompany(structuredClone(company));
   await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+  // Start the knowledge movement immediately; do not wait for the round-trip
+  // to the server before giving the player visual feedback.
+  const animationPromise=animateKnowledgeSpark(startX,startY,targetKey);
   const ok=await post(payload,async nextSession=>{
-   await animateKnowledgeSpark(startX,startY,targetKey);
+   await animationPromise;
 
    // Keep the Invest screen frozen while only the River receives the new
    // company state. This gives the player time to watch the capability change
@@ -494,7 +524,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
    onPresentationHoldChange?.(false);
   });
-  if(!ok)onPresentationHoldChange?.(false);
+  if(!ok){
+   try{await animationPromise}catch{}
+   onPresentationHoldChange?.(false);
+  }
   setRiverFrozenCompany(null);
  };
 
@@ -530,6 +563,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <button type="button" onClick={()=>setFirstInvestBriefDismissed(true)} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">SHOW ME THE FIRST INVESTMENT <ArrowRight className="ml-1 inline h-4 w-4"/></button>
    </div>
   </>}
+
+  {riskResult&&<div className="pointer-events-none fixed inset-0 z-[175] grid place-items-center bg-black/30">
+   <div className={`min-w-[250px] rounded-[24px] border-4 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.75)] ${riskResult.won?'border-emerald-300 bg-emerald-950':'border-rose-300 bg-rose-950'}`}>
+    <Dices className={`mx-auto h-10 w-10 ${riskResult.won?'text-emerald-200':'text-rose-200'}`}/>
+    <div className="mt-2 text-[9px] font-black uppercase tracking-[.18em] text-slate-300">Performance gap {riskResult.performanceGap} · need {riskResult.requiredRoll}+</div>
+    <div className="mt-2 text-5xl font-black text-white">{riskResult.roll}</div>
+    <div className={`mt-2 text-lg font-black ${riskResult.won?'text-emerald-200':'text-rose-200'}`}>{riskResult.won?'SUCCESS':'FAILURE'}</div>
+   </div>
+  </div>}
 
   {scoreBriefOpen&&<>
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/70"/>
@@ -625,7 +667,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="mt-0.5 text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="mt-0.5 text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
         </div>
-        <div className="mt-1.5 text-[9px] leading-relaxed text-slate-500">Knowledge at or above the requirement is a confident response. If Local is below it, <b className="text-slate-300">Take the Risk</b> uses Local knowledge + a d6 and requires a 2-point safety margin. Moving an expert from another site costs an additional <b className="text-amber-300">$2k</b>.</div>
+        <div className="mt-1.5 text-[9px] leading-relaxed text-slate-500">Knowledge at or above the requirement is a confident response. <b className="text-slate-300">Take the Risk</b> rolls a d6 against the remaining performance gap: requirement minus the selected Local Team knowledge. Moving an expert from another site costs an additional <b className="text-amber-300">$2k</b>.</div>
         <div className="mt-2 space-y-1.5">
          <ResponseButton
           selectionState={localSelection}
@@ -634,7 +676,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
           onClick={()=>cycleKnowledgeSource('local')}>
           USE LOCAL TEAM <span className="ml-1 text-slate-500">{localSelection==='depth'?`Knowledge ${localScore} · Depth`:localSelection==='breadth'?`Knowledge ${localScore} · Breadth +1`:localScore>0?`Knowledge ${localScore} · Click to select`:'Knowledge 0'}</span>
          </ResponseButton>
-         {activeExpert&&<ResponseButton
+         {activeExpert&&!(guided&&state.guidedTurn===2)&&<ResponseButton
           selectionState={expertSelection}
           disabled={expertUsed||activeExpertScore<=0}
           attention={challengeAttention}
@@ -642,7 +684,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
           <span className="block">SEND {activeExpert.name.toUpperCase()}</span>
           <span className="mt-0.5 block text-[10px] font-bold text-slate-500">Knowledge {activeExpertScore}{expertSelection==='depth'?' - Depth':expertSelection==='breadth'?' - Breadth +1':expertUsed?' - Already used':activeExpertTravelCost?` - Travel -$${activeExpertTravelCost}k`:' - Already on site'}</span>
          </ResponseButton>}
-         {!guided&&<ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:'none',expertSelection:'none',label:`Take the risk · ${riskOdds.chancePercent}%`})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · need {riskOdds.requiredRoll<=1?'any roll':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
+         {(!guided||state.guidedTurn===2)&&<ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);const riskLocalSelection:ResponseSelectionState=localSelection==='none'?'none':'depth';setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:riskLocalSelection,expertSelection:'none',label:`Take the risk${riskLocalSelection!=='none'?' + Local Team':''} · ${riskOdds.chancePercent}%`})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
         </div>
         <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-[10px] text-slate-500">{activePending?<><span className="font-black text-amber-300">Selected:</span> {activePending.label}{!riskSelected&&!activePending.method&&<span className="ml-1 text-slate-600">· choose a Depth source</span>}</>:<>Select a response above. Nothing happens until you commit.</>}</div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
@@ -660,7 +702,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         <button disabled={guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'} onClick={()=>setInvestment('KNOWLEDGE_TRANSFER')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='KNOWLEDGE_TRANSFER'?'border-emerald-300 bg-emerald-950/40':'border-slate-700 bg-slate-950'}`}><Workflow className="h-4 w-4 text-emerald-300"/><div className="mt-1 text-[10px] font-black text-white">Knowledge Transfer</div><div className="text-[9px] text-slate-500">Move half the gap · $8k</div></button>
        </div>
        <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/75 p-2.5">
-        {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
+        {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} ({SITE_ABBR[expert.location]||expert.location}) · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
         <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span></div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
         <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
