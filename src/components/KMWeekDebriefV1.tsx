@@ -1,5 +1,5 @@
 import React,{useMemo,useState}from'react';
-import{ArrowRight,Brain,CircleDollarSign,Medal,MessageSquareText,ShieldCheck,Target,Users,Workflow,X}from'lucide-react';
+import{ArrowRight,Brain,CircleDollarSign,Medal,ShieldCheck,Target,Users,Workflow,X}from'lucide-react';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import{formatCurrency}from'../utils/format.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -100,7 +100,6 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
   </div>
 
   <div className="mt-3"><TurnoverGraph companies={companies} colors={colors}/></div>
-  <div className="mt-3 flex items-center justify-between rounded-2xl border border-slate-700 bg-slate-950/75 p-4"><div><div className="text-sm font-black text-white">What would you do differently next time?</div><div className="mt-0.5 text-xs text-slate-500">Open the four AAR questions and use the evidence above to guide the conversation.</div></div><button type="button" onClick={()=>setQuestionsOpen(true)} className="rounded-xl border border-violet-500 bg-violet-950/45 px-4 py-2.5 text-xs font-black text-violet-100"><MessageSquareText className="mr-1 inline h-4 w-4"/>After Action Review Questions</button></div>
   <AARQuestions open={questionsOpen} onClose={()=>setQuestionsOpen(false)}/>
  </main>;
 };
