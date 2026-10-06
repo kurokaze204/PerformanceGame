@@ -101,6 +101,7 @@ const ResponseButton:React.FC<{selectionState:ResponseSelectionState;disabled?:b
 };
 
 const ChallengeKnowledgeBars:React.FC<{
+ requirement:number;
  local:number;
  expert:number;
  expertName?:string;
@@ -113,13 +114,13 @@ const ChallengeKnowledgeBars:React.FC<{
  attention?:boolean;
  onLocalClick:()=>void;
  onExpertClick?:()=>void;
-}>=({local,expert,expertName,expertLocation,travelCost=0,localSelection,expertSelection,localDisabled=false,expertDisabled=false,attention=false,onLocalClick,onExpertClick})=>{
- const SegmentBar:React.FC<{value:number;filled:number;tone:'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={tone+' knowledge '+value+' of 5'}>
+}>=({requirement,local,expert,expertName,expertLocation,travelCost=0,localSelection,expertSelection,localDisabled=false,expertDisabled=false,attention=false,onLocalClick,onExpertClick})=>{
+ const SegmentBar:React.FC<{value:number;filled:number;tone:'requirement'|'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={tone+' knowledge '+value+' of 5'}>
   {Array.from({length:5},(_,index)=>{
    const available=index<value;
    const applied=index<filled;
-   const colour=tone==='local'?'border-sky-300 bg-sky-400':'border-amber-300 bg-amber-400';
-   const idle=tone==='local'?'border-sky-500/85 bg-sky-950/25':'border-amber-500/85 bg-amber-950/20';
+   const colour=tone==='requirement'?'border-rose-300 bg-rose-500':tone==='local'?'border-sky-300 bg-sky-400':'border-amber-300 bg-amber-400';
+   const idle=tone==='requirement'?'border-rose-400/90 bg-rose-950/30':tone==='local'?'border-sky-500/85 bg-sky-950/25':'border-amber-500/85 bg-amber-950/20';
    return <span key={index} className={'h-4 rounded-md border-2 transition-all duration-200 '+(available?(applied?colour:idle):'border-slate-800 bg-slate-950')}/>;
   })}
  </div>;
@@ -130,6 +131,11 @@ const ChallengeKnowledgeBars:React.FC<{
  const localFilled=localSelection==='depth'?local:localSelection==='breadth'?Math.min(local,1):0;
  const expertFilled=expertSelection==='depth'?expert:expertSelection==='breadth'?Math.min(expert,1):0;
  return <div className="mt-2 space-y-1.5" data-kmw-knowledge-bars>
+  <div className="grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border border-rose-900/70 bg-rose-950/10 px-2 py-2">
+   <span><span className="block text-[10px] font-black text-white">Required</span><span className="block text-[9px] font-bold text-rose-300">Knowledge {requirement}</span></span>
+   <SegmentBar value={requirement} filled={requirement} tone="requirement"/>
+   <b className="text-center text-xs font-black text-rose-300">{requirement}</b>
+  </div>
   <button type="button" disabled={localDisabled} onClick={onLocalClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 '+(localSelection!=='none'?'border-sky-500 bg-sky-950/20':'border-slate-700 bg-slate-950/70 hover:border-sky-700')+(attention&&!localDisabled?' kmw-attention-button':'')}>
    <span><span className="block text-[10px] font-black text-white">Local team</span><span className="block text-[9px] font-bold text-sky-300">Knowledge {local}</span></span>
    <SegmentBar value={local} filled={localFilled} tone="local"/>
@@ -699,6 +705,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         </div>
         <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
         <ChallengeKnowledgeBars
+         requirement={activeChallenge.difficulty}
          local={localScore}
          expert={activeExpertScore}
          expertName={activeExpert?.name}
