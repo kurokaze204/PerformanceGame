@@ -63,8 +63,8 @@ for(const site of company.sites.filter(site=>!site.isClosed)){
   for(const domain of KM_WEEK_DOMAINS)assert.equal(riverSiteKnowledgeScore(site,domain,'km_week'),site.teamCapability[domain]||0,'KM Week River must exactly match the visible site score');
 }
 assert.deepEqual(company.experts.map(expert=>expert.domains[0].domain),['operations','hr','marketing']);
-assert.deepEqual(kmWeekRiskOddsV1(1,2),{performanceGap:1,requiredRoll:1,successfulFaces:6,chancePercent:100},'A one-point performance gap must be a 1+ roll on d6');
-assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:4,successfulFaces:3,chancePercent:50},'Risk odds must be calculated from the remaining performance gap');
+assert.deepEqual(kmWeekRiskOddsV1(1,2),{performanceGap:1,requiredRoll:2,successfulFaces:5,chancePercent:83},'A one-point performance gap must still carry risk and require 2+ on d6');
+assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successfulFaces:2,chancePercent:33},'Risk odds must worsen as the remaining performance gap grows');
 
 const opsExpert=()=>company.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
 const resolveGuidedExpert=(includeLocalBreadth=false)=>{
