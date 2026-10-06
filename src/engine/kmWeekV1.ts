@@ -25,11 +25,14 @@ export const KM_WEEK_SHOCK_SPECS:{id:string;siteId:string;domain:KnowledgeDomain
 export const KM_WEEK_SHOCK_CUTOFF=Math.max(...KM_WEEK_SHOCK_SPECS.map(check=>check.difficulty));
 
 export function kmWeekRiskOddsV1(localKnowledge:number,difficulty:number){
-  // Risk uses the local team's knowledge plus a d6, but requires a two-point
-  // safety margin above the normal Challenge requirement.
-  const requiredRoll=difficulty+2-localKnowledge;
-  const successfulFaces=Math.max(0,Math.min(6,7-requiredRoll));
+  // Risk is explicitly based on the remaining performance gap. The selected
+  // local team's knowledge reduces the gap; the d6 only has to bridge what is
+  // still missing.
+  const performanceGap=Math.max(0,difficulty-localKnowledge);
+  const requiredRoll=Math.max(1,performanceGap);
+  const successfulFaces=requiredRoll>6?0:Math.max(0,Math.min(6,7-requiredRoll));
   return{
+    performanceGap,
     requiredRoll,
     successfulFaces,
     chancePercent:Math.round((successfulFaces/6)*100),
@@ -284,6 +287,7 @@ export function resolveKMWeekChallengeV1(
   expertId?:string,
   includeLocalBreadth=false,
   includeExpertBreadth=false,
+  useLocalRisk=true,
 ){
   const state=company.kmWeek;
   if(!state||state.phase!=='challenge'||state.stage==='shock'||state.stage==='complete')return{success:false,message:'No normal Challenge is ready to resolve.'};
@@ -292,10 +296,15 @@ export function resolveKMWeekChallengeV1(
   const site=company.sites.find(item=>item.id===challenge.siteId);
   if(!site)return{success:false,message:'Challenge site not found.'};
 
-  if(state.stage==='guided'&&method!=='expert')return{success:false,message:'This guided move is teaching expert deployment. Send the Operations expert.'};
+  if(state.stage==='guided'){
+    if(state.guidedTurn===2&&method==='expert')return{success:false,message:'This guided Challenge is teaching local response and risk. Use the Local Team, then decide whether to take the chance.'};
+    if(state.guidedTurn!==2&&method!=='expert')return{success:false,message:'This guided move is teaching expert deployment. Send the Operations expert.'};
+  }
 
   let won=false;
   let roll:number|undefined;
+  let riskRequiredRoll:number|undefined;
+  let riskPerformanceGap:number|undefined;
   let expert:ExpertV2|undefined;
   let travelCost=0;
   if(method==='local'){
@@ -340,8 +349,10 @@ export function resolveKMWeekChallengeV1(
     if(state.stage==='free')state.expertSuccesses+=1;
   }else{
     roll=Math.floor(Math.random()*6)+1;
-    const team=site.teamCapability[challenge.domain]||0;
+    const team=useLocalRisk?(site.teamCapability[challenge.domain]||0):0;
     const odds=kmWeekRiskOddsV1(team,challenge.difficulty);
+    riskRequiredRoll=odds.requiredRoll;
+    riskPerformanceGap=odds.performanceGap;
     won=roll>=odds.requiredRoll;
     if(won&&state.stage==='free')state.riskSuccesses+=1;
   }
@@ -360,9 +371,10 @@ export function resolveKMWeekChallengeV1(
   state.turnoverHistory.push({label:challengeLabel,turnover:company.turnover});
   if(won&&state.stage==='free')state.freeSuccesses+=1;
   const travelText=travelCost?` Expert travel -${travelCost}k.`:'';
+  const rollText=roll!==undefined?` Dice roll ${roll}: ${won?'SUCCESS':'FAILURE'} (performance gap ${riskPerformanceGap}, needed ${riskRequiredRoll}+).`:'';
   state.lastMessage=won
-    ? `${site.name} handled “${challenge.title}”. Business +${challenge.impact}k.${travelText} Net turnover ${turnoverChange>=0?'+':''}${turnoverChange}k.`
-    : `${site.name} could not contain “${challenge.title}”. Business -${challenge.impact}k.${travelText} Net turnover -${Math.abs(turnoverChange)}k.`;
+    ? `${site.name} handled “${challenge.title}”. Business +${challenge.impact}k.${travelText}${rollText} Net turnover ${turnoverChange>=0?'+':''}${turnoverChange}k.`
+    : `${site.name} could not contain “${challenge.title}”. Business -${challenge.impact}k.${travelText}${rollText} Net turnover -${Math.abs(turnoverChange)}k.`;
   afterChallengeSet(session,company);
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
@@ -412,7 +424,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     if((site.teamCapability[domain]||0)>=skill.score)return{success:false,message:'The local team is already at this expert’s teaching ceiling.'};
     const travelCost=expert.location===site.id?0:2;
     cost=10+travelCost;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
-    before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+1,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.state='Knowledge Transfer';
+    before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+1,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.location=site.id;expert.state='Knowledge Transfer';
   }else{
     const source=company.sites.find(item=>item.id===payload?.sourceSiteId&&!item.isClosed);
     const target=company.sites.find(item=>item.id===payload?.targetSiteId&&!item.isClosed);
@@ -539,7 +551,8 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
   const type=String(payload?.type||'');
   let result:{success:boolean;message:string};
   if(type==='KM_WEEK_RESOLVE'){
-    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth),Boolean(payload?.includeExpertBreadth));
+    const useLocalRisk=payload?.useLocalRisk===undefined?true:Boolean(payload?.useLocalRisk);
+    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth),Boolean(payload?.includeExpertBreadth),useLocalRisk);
   }else if(type==='KM_WEEK_INVEST'){
     result=investKMWeekV1(session,company,payload);
   }else if(type==='KM_WEEK_RESOLVE_SHOCK'){
