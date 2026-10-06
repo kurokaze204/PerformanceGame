@@ -5,7 +5,6 @@ import {
   applyKMWeekActionV1,
   initialiseKMWeekSessionV1,
   initialiseKMWeekCompanyV1,
-  ensureKMWeekSessionV1,
   investKMWeekV1,
   calculateKMWeekScoreV1,
   KM_WEEK_DOMAINS,
