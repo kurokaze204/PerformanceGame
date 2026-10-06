@@ -14,6 +14,8 @@ import type {
 export const KM_WEEK_DOMAINS: KnowledgeDomain[] = ['operations','hr','marketing'];
 export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
 export const KM_WEEK_MAX_KNOWLEDGE = 5;
+export const KM_WEEK_SHOCK_WINDOW_SECONDS = 180;
+export const KM_WEEK_SHOCK_FAILURE_COST = 15;
 
 export const KM_WEEK_SHOCK_SPECS:{id:string;siteId:string;domain:KnowledgeDomain;difficulty:number}[]=[
   {id:'S1',siteId:'brisbane',domain:'operations',difficulty:2},
@@ -79,6 +81,18 @@ const FREE_ROUNDS: KMWeekChallenge[][] = [
     {id:'F3-MKT-BNE',title:'Major account renewal at risk',story:'A long-standing Brisbane customer questions recent service levels and is reconsidering its annual contract.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
     {id:'F3-OPS-PER',title:'Maintenance backlog',story:'Perth has a growing Operations backlog that is starting to hit output.',siteId:'perth',domain:'operations',difficulty:2,impact:45,status:'open'},
   ],
+  [
+    {id:'F4-OPS-MEL',title:'Supplier changeover error',story:'A supplier substitution reaches Melbourne production without the expected process notes, and operators are seeing inconsistent setup results.',siteId:'melbourne',domain:'operations',difficulty:2,impact:40,status:'open'},
+    {id:'F4-HR-BNE',title:'Safety-critical vacancy',story:'A Brisbane team loses a safety-critical supervisor at short notice and needs to redesign coverage without breaching competency requirements.',siteId:'brisbane',domain:'hr',difficulty:2,impact:35,status:'open'},
+  ],
+  [
+    {id:'F5-MKT-PER',title:'Distributor escalation',story:'A Perth distributor threatens to pause orders after receiving conflicting product and delivery advice from different parts of the company.',siteId:'perth',domain:'marketing',difficulty:2,impact:40,status:'open'},
+    {id:'F5-OPS-BNE',title:'Cold-storage sensor failure',story:'Brisbane loses trusted temperature readings during a high-volume run and the local team must decide how to keep production safe and moving.',siteId:'brisbane',domain:'operations',difficulty:2,impact:45,status:'open'},
+  ],
+  [
+    {id:'F6-HR-PER',title:'Industrial relations briefing',story:'Perth managers need an urgent workforce briefing after a policy change, but the usual HR specialist is unavailable.',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F6-MKT-MEL',title:'Recall communications',story:'A product issue requires Melbourne to contact customers quickly with accurate advice before rumours spread through the market.',siteId:'melbourne',domain:'marketing',difficulty:2,impact:45,status:'open'},
+  ],
 ]
 
 function guidedChallenge(turn:number):KMWeekChallenge{
@@ -89,6 +103,34 @@ function guidedChallenge(turn:number):KMWeekChallenge{
 
 function cloneChallenges(items:KMWeekChallenge[]):KMWeekChallenge[]{
   return items.map(item=>({...item}));
+}
+
+function freeChallengesForRound(round:number):KMWeekChallenge[]{
+  const template=FREE_ROUNDS[(Math.max(1,round)-1)%FREE_ROUNDS.length];
+  return template.map(item=>({...item,id:`${item.id}-R${round}`}));
+}
+
+function kmWeekSecondsRemaining(session:GameSessionV2){
+  if(session.timerEndsAt)return Math.max(0,Math.ceil((new Date(session.timerEndsAt).getTime()-Date.now())/1000));
+  if(typeof session.timerPausedSecondsRemaining==='number')return Math.max(0,session.timerPausedSecondsRemaining);
+  return Math.max(0,(session.gameDurationMinutes||30)*60);
+}
+
+function kmWeekShockWindowOpen(session:GameSessionV2){
+  return kmWeekSecondsRemaining(session)<=KM_WEEK_SHOCK_WINDOW_SECONDS;
+}
+
+function enterBusinessShock(company:CompanyV2,message='The final three minutes have begun. The Business Shock is here.'){
+  const state=company.kmWeek!;
+  state.stage='shock';
+  state.phase='challenge';
+  state.challenges=[];
+  state.usedExpertIds=[];
+  state.shockChecks=[];
+  state.shockResolved=false;
+  company.round=Math.max(company.round,3+state.freeRound)+1;
+  company.roundPhase='risk';
+  state.lastMessage=message;
 }
 
 function hashGoal(sessionId:string):KMWeekGoalId{
@@ -177,7 +219,7 @@ export function initialiseKMWeekCompanyV1(company:CompanyV2){
 export function initialiseKMWeekSessionV1(session:GameSessionV2){
   session.kmWeekGoalId=hashGoal(session.id);
   session.gameDurationMinutes=30;
-  session.finalWindowMinutes=5;
+  session.finalWindowMinutes=3;
   session.isFinalDisruptionActive=false;
   session.finalDisruptionResolved=false;
   session.riskResults=null;
@@ -199,6 +241,7 @@ export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
     changed=true;
   }
   if(!session.kmWeekGoalId){session.kmWeekGoalId=hashGoal(session.id);changed=true;}
+  if(session.finalWindowMinutes!==3){session.finalWindowMinutes=3;changed=true;}
   for(const company of session.companies){
     if(!company.kmWeek){initialiseKMWeekCompanyV1(company);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
     else if(!company.kmWeek.turnoverHistory){company.kmWeek.turnoverHistory=[{label:'CURRENT',turnover:company.turnover}];changed=true;}
@@ -238,7 +281,7 @@ export function calculateKMWeekScoreV1(session:GameSessionV2,company:CompanyV2):
   const state=company.kmWeek;
   if(!state)return emptyScore();
   const score:KMWeekScore={
-    business:state.freeSuccesses*2,
+    business:Math.min(12,state.freeSuccesses*2),
     expertise:expertisePoints(company),
     localCapability:localCapabilityPoints(company),
     knowledgeFlow:Math.min(6,state.knowledgeTransfers+state.meaningfulTransfers),
@@ -457,25 +500,24 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
         sites:structuredClone(company.sites),
         experts:structuredClone(company.experts),
       };
-      state.stage='free';
-      state.freeRound=1;
-      company.round=4;
-      setChallengePhase(company,FREE_ROUNDS[0]);
-      state.lastMessage='Guided section complete. From here, the company is yours to run.';
+      if(kmWeekShockWindowOpen(session)){
+        enterBusinessShock(company,'The guided section has ended just as the final three-minute window begins. Your organisation now has to cope without its specialists.');
+      }else{
+        state.stage='free';
+        state.freeRound=1;
+        company.round=4;
+        setChallengePhase(company,freeChallengesForRound(1));
+        state.lastMessage='Guided section complete. From here, keep playing until the final three-minute Business Shock.';
+      }
     }
   }else{
-    if(state.freeRound<3){
+    if(kmWeekShockWindowOpen(session)){
+      enterBusinessShock(company,'The clock has entered its final three minutes. The specialists are no longer available: reveal the Business Shock.');
+    }else{
       state.freeRound+=1;
       company.round=3+state.freeRound;
-      setChallengePhase(company,FREE_ROUNDS[state.freeRound-1]);
-    }else{
-      state.stage='shock';
-      state.phase='challenge';
-      company.round=7;
-      company.roundPhase='risk';
-      state.challenges=[];
-      state.usedExpertIds=[];
-      state.lastMessage='Free play complete. Turn over the Business Shock card.';
+      setChallengePhase(company,freeChallengesForRound(state.freeRound));
+      state.lastMessage=`Round ${state.freeRound} begins. Keep building capability before the final three-minute Business Shock.`;
     }
   }
   syncScore(session,company);
@@ -495,35 +537,20 @@ export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   state.shockResolved=true;
   state.phase='challenge';
   company.roundPhase='risk';
-  const passed=checks.filter(check=>check.passed).length;
-  const gaps=checks.length-passed;
-  state.lastMessage=gaps
-    ? `${passed} of ${checks.length} sites are ready. You have ${gaps} shortfall${gaps===1?'':'s'} to handle before finishing the Shock.`
-    : `All ${checks.length} Business Shock tests are covered by local capability.`;
-  syncScore(session,company);
-  return{success:true,message:state.lastMessage};
-}
 
-export function handleKMWeekShockGapV1(session:GameSessionV2,company:CompanyV2,checkId:string,choice:'risk'|'accept'){
-  const state=company.kmWeek;
-  if(!state||state.stage!=='shock'||!state.shockResolved)return{success:false,message:'Run the Business Shock first.'};
-  const check=state.shockChecks.find(item=>item.id===checkId);
-  if(!check||check.passed)return{success:false,message:'That Shock test does not have a shortfall.'};
-  if(check.resolution)return{success:false,message:'That shortfall has already been handled.'};
-  if(choice==='accept'){
-    check.resolution='accept';
-    check.recovered=false;
-    state.lastMessage='You accepted the capability gap.';
-  }else{
-    const odds=kmWeekRiskOddsV1(check.localKnowledge,check.difficulty);
-    const roll=Math.floor(Math.random()*6)+1;
-    check.resolution='risk';
-    check.dieRoll=roll;
-    check.recovered=roll>=odds.requiredRoll;
-    state.lastMessage=check.recovered
-      ? `Emergency response succeeded on a roll of ${roll}.`
-      : `Emergency response failed on a roll of ${roll}.`;
+  const failures=checks.filter(check=>!check.passed);
+  for(const check of failures){
+    applyTurnover(company,-KM_WEEK_SHOCK_FAILURE_COST);
+    const siteLabel=check.siteId.slice(0,3).toUpperCase();
+    const domainLabel=check.domain.slice(0,3).toUpperCase();
+    state.turnoverHistory.push({label:`SHOCK ${siteLabel}-${domainLabel}`,turnover:company.turnover});
   }
+
+  const passed=checks.length-failures.length;
+  const totalCost=failures.length*KM_WEEK_SHOCK_FAILURE_COST;
+  state.lastMessage=failures.length
+    ? `The shock exposed ${failures.length} local capability gap${failures.length===1?'':'s'}. Emergency external specialists cost ${totalCost}k in total.`
+    : `All ${checks.length} critical capability tests were handled locally. No emergency external support was needed.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
 }
@@ -531,14 +558,15 @@ export function handleKMWeekShockGapV1(session:GameSessionV2,company:CompanyV2,c
 export function completeKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek;
   if(!state||state.stage!=='shock'||!state.shockResolved)return{success:false,message:'Run the Business Shock first.'};
-  const unresolved=state.shockChecks.some(check=>!check.passed&&!check.resolution);
-  if(unresolved)return{success:false,message:'Handle each Business Shock shortfall before continuing.'};
   state.stage='complete';
   state.phase='challenge';
   company.roundPhase='risk';
   const ready=state.shockChecks.filter(check=>check.passed).length;
-  const recovered=state.shockChecks.filter(check=>!check.passed&&check.recovered).length;
-  state.lastMessage=`${ready} ready from local capability, ${recovered} recovered through emergency response.`;
+  const gaps=state.shockChecks.length-ready;
+  const cost=gaps*KM_WEEK_SHOCK_FAILURE_COST;
+  state.lastMessage=gaps
+    ? `${ready} of ${state.shockChecks.length} critical capabilities held locally. ${gaps} gap${gaps===1?'':'s'} required emergency external support costing ${cost}k.`
+    : `All ${state.shockChecks.length} critical capabilities held locally. The organisation absorbed the shock without external rescue.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
 }
@@ -557,8 +585,6 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
     result=investKMWeekV1(session,company,payload);
   }else if(type==='KM_WEEK_RESOLVE_SHOCK'){
     result=resolveKMWeekShockV1(session,company);
-  }else if(type==='KM_WEEK_SHOCK_GAP'){
-    result=handleKMWeekShockGapV1(session,company,String(payload?.checkId||''),payload?.choice==='accept'?'accept':'risk');
   }else if(type==='KM_WEEK_COMPLETE_SHOCK'){
     result=completeKMWeekShockV1(session,company);
   }else{
