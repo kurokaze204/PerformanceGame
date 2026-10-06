@@ -658,41 +658,41 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       <div className="flex items-center justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-violet-300">Your move</div><h2 className="text-xl font-black text-white">{currentPhaseLabel(company)}</h2></div><div className="rounded-lg border border-violet-700 bg-violet-950/30 px-2 py-1 text-[9px] font-black uppercase text-violet-200">{phaseTitle(company)}</div></div>
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&<>
-       <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5">
-        {guided?<><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><div className="mt-1 text-sm font-black text-white">{guidedCopy.title}</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guidedCopy.text}</p></>:<><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">Challenge phase</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">Resolve both Challenges. Select a Challenge, choose how you will respond, then press <b className="text-white">COMMIT RESPONSE</b>.</p></>}
-       </div>
-
-       <div className={`mt-2 grid gap-2 ${state.challenges.length>1?'grid-cols-2':'grid-cols-1'}`}>{state.challenges.map(challenge=><ChallengeToken key={challenge.id} challenge={challenge} company={company} selected={challenge.id===activeChallenge?.id} draft={challengeDrafts[challenge.id]} onClick={()=>setSelectedChallengeId(challenge.id)}/>)}</div>
+       {!guided&&<>
+        <div className="mt-2 rounded-xl border border-amber-800 bg-amber-950/15 px-2.5 py-2 text-[10px] text-slate-300">Resolve both Challenges. Pick one, choose the knowledge you will use, then commit the response.</div>
+        <div className={'mt-2 grid gap-2 '+(state.challenges.length>1?'grid-cols-2':'grid-cols-1')}>{state.challenges.map(challenge=><ChallengeToken key={challenge.id} challenge={challenge} company={company} selected={challenge.id===activeChallenge?.id} draft={challengeDrafts[challenge.id]} onClick={()=>setSelectedChallengeId(challenge.id)}/>)}</div>
+       </>}
 
        {activeChallenge&&activeChallenge.status==='open'&&<div className="mt-2 rounded-xl border border-slate-700 bg-black/20 p-2.5">
-        <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">{siteName(company,activeChallenge.siteId)} · {domainLabel(activeChallenge.domain)}</div><div className="mt-0.5 text-sm font-black text-white">{activeChallenge.title}</div></div><div className="shrink-0 text-right"><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Selected knowledge</div><div className={`mt-0.5 text-[34px] font-black leading-none tracking-[-.05em] tabular-nums ${selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-white'}`}>{selectedKnowledge}<span className="text-[20px] text-slate-500">/{activeChallenge.difficulty}</span></div>{pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'&&<div className="mt-1 text-[10px] font-black text-amber-300">RISK {riskOdds.chancePercent}% · {riskOdds.requiredRoll<=1?'ANY ROLL':riskOdds.requiredRoll>6?'NO WINNING ROLL':`NEED ${riskOdds.requiredRoll}+`}</div>}</div></div>
-        <p className="mt-1 text-[10px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
-        <ChallengeKnowledgeBars requirement={activeChallenge.difficulty} local={localScore} expert={activeExpertScore} expertName={activeExpert?.name} localSelection={localSelection} expertSelection={expertSelection} riskSelected={riskSelected}/>
-        <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 p-2">
-         <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="mt-0.5 text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
-         <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="mt-0.5 text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
+        <div className="flex items-start justify-between gap-3">
+         <div className="min-w-0">
+          {guided&&<div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">{guidedCopy.title}</div>}
+          <div className={(guided?'mt-0.5 ':'')+'text-sm font-black text-white'}>{challengeDisplayTitle(company,activeChallenge)}</div>
+          <div className="mt-1 text-[10px] font-bold text-slate-400">Needs: <b className="text-white">{domainLabel(activeChallenge.domain)} {activeChallenge.difficulty}</b> · Local knowledge: <b className={localScore>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300'}>{localScore}</b></div>
+         </div>
+         <div className="shrink-0 text-right"><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Selected knowledge</div><div className={'mt-0.5 text-[34px] font-black leading-none tracking-[-.05em] tabular-nums '+(selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-white')}>{selectedKnowledge}<span className="text-[20px] text-slate-500">/{activeChallenge.difficulty}</span></div>{pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'&&<div className="mt-1 text-[10px] font-black text-amber-300">RISK {riskOdds.chancePercent}% · {riskOdds.requiredRoll<=1?'ANY ROLL':riskOdds.requiredRoll>6?'NO WINNING ROLL':'NEED '+riskOdds.requiredRoll+'+'}</div>}</div>
         </div>
-        <div className="mt-1.5 text-[9px] leading-relaxed text-slate-500">Knowledge at or above the requirement is a confident response. <b className="text-slate-300">Take the Risk</b> rolls a d6 against the remaining performance gap: requirement minus the selected Local Team knowledge. Moving an expert from another site costs an additional <b className="text-amber-300">$2k</b>.</div>
-        <div className="mt-2 space-y-1.5">
-         <ResponseButton
-          selectionState={localSelection}
-          disabled={localScore<=0}
-          attention={challengeAttention}
-          onClick={()=>cycleKnowledgeSource('local')}>
-          USE LOCAL TEAM <span className="ml-1 text-slate-500">{localSelection==='depth'?`Knowledge ${localScore} · Depth`:localSelection==='breadth'?`Knowledge ${localScore} · Breadth +1`:localScore>0?`Knowledge ${localScore} · Click to select`:'Knowledge 0'}</span>
-         </ResponseButton>
-         {activeExpert&&<ResponseButton
-          selectionState={expertSelection}
-          disabled={expertUsed||activeExpertScore<=0}
-          attention={challengeAttention}
-          onClick={()=>cycleKnowledgeSource('expert')}>
-          <span className="block">SEND {activeExpert.name.toUpperCase()}</span>
-          <span className="mt-0.5 block text-[10px] font-bold text-slate-500">Knowledge {activeExpertScore}{expertSelection==='depth'?' - Depth':expertSelection==='breadth'?' - Breadth +1':expertUsed?' - Already used':activeExpertTravelCost?` - Travel -$${activeExpertTravelCost}k`:' - Already on site'}</span>
-         </ResponseButton>}
-         {!guided&&<ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);const riskLocalSelection:ResponseSelectionState=localSelection==='none'?'none':'depth';setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:riskLocalSelection,expertSelection:'none',label:`Take the risk${riskLocalSelection!=='none'?' + Local Team':''} · ${riskOdds.chancePercent}%`})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
+        <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
+        <ChallengeKnowledgeBars
+         local={localScore}
+         expert={activeExpertScore}
+         expertName={activeExpert?.name}
+         expertLocation={activeExpert?.location}
+         travelCost={activeExpertTravelCost}
+         localSelection={localSelection}
+         expertSelection={expertSelection}
+         localDisabled={localScore<=0}
+         expertDisabled={expertUsed||activeExpertScore<=0}
+         attention={challengeAttention}
+         onLocalClick={()=>cycleKnowledgeSource('local')}
+         onExpertClick={()=>cycleKnowledgeSource('expert')}
+        />
+        {!guided&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);const riskLocalSelection:ResponseSelectionState=localSelection==='none'?'none':'depth';setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:riskLocalSelection,expertSelection:'none',label:'Take the risk'+(riskLocalSelection!=='none'?' + Local Team':'')+' · '+riskOdds.chancePercent+'%'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+ on d6'}</span></ResponseButton></div>}
+        <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5">
+         <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
+         <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
         </div>
-        <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-[10px] text-slate-500">{activePending?<><span className="font-black text-amber-300">Selected:</span> {activePending.label}{!riskSelected&&!activePending.method&&<span className="ml-1 text-slate-600">· choose a Depth source</span>}</>:<>Select a response above. Nothing happens until you commit.</>}</div>
-        {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
+        {actionError&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
         <button type="button" onClick={()=>void commitResponse()} disabled={!responseReady||busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':'COMMIT RESPONSE'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>}
 
