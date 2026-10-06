@@ -58,7 +58,7 @@ function currentPhaseLabel(company:CompanyV2){
 function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
  if(turn===1)return{title:'1. Solve the business problem',text:'Brisbane needs Operations 4. Build the response yourself: select Priya for depth, then select the Local Team if you want its knowledge to contribute breadth.',invest:'After the Challenge, you will deepen Priya’s expertise.'};
- if(turn===2)return{title:'2. Let the local team respond',text:'Another Operations problem has appeared in Brisbane. This time select the Local Team, then Take the Risk. Their knowledge reduces the performance gap, which improves the die-roll odds.',invest:'Now use Local Training. Brisbane is the obvious target, but you can send Priya to another site; training away from her current site adds $2k travel.'};
+ if(turn===2)return{title:'2. Who should handle this one?',text:'This problem only needs Operations 1 — exactly what the Brisbane team already knows. You can use the Local Team, or still send Priya if you want to.',invest:'Now use Local Training. Brisbane is the obvious target, but you can send Priya to another site; training away from her current site adds $2k travel.'};
  return{title:'3. The problem moves',text:'A similar Operations issue has appeared in Perth. Use Priya, then commit your response.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
 }
 
@@ -679,7 +679,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
           onClick={()=>cycleKnowledgeSource('local')}>
           USE LOCAL TEAM <span className="ml-1 text-slate-500">{localSelection==='depth'?`Knowledge ${localScore} · Depth`:localSelection==='breadth'?`Knowledge ${localScore} · Breadth +1`:localScore>0?`Knowledge ${localScore} · Click to select`:'Knowledge 0'}</span>
          </ResponseButton>
-         {activeExpert&&!(guided&&state.guidedTurn===2)&&<ResponseButton
+         {activeExpert&&<ResponseButton
           selectionState={expertSelection}
           disabled={expertUsed||activeExpertScore<=0}
           attention={challengeAttention}
@@ -687,7 +687,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
           <span className="block">SEND {activeExpert.name.toUpperCase()}</span>
           <span className="mt-0.5 block text-[10px] font-bold text-slate-500">Knowledge {activeExpertScore}{expertSelection==='depth'?' - Depth':expertSelection==='breadth'?' - Breadth +1':expertUsed?' - Already used':activeExpertTravelCost?` - Travel -$${activeExpertTravelCost}k`:' - Already on site'}</span>
          </ResponseButton>}
-         {(!guided||state.guidedTurn===2)&&<ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);const riskLocalSelection:ResponseSelectionState=localSelection==='none'?'none':'depth';setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:riskLocalSelection,expertSelection:'none',label:`Take the risk${riskLocalSelection!=='none'?' + Local Team':''} · ${riskOdds.chancePercent}%`})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
+         {!guided&&<ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);const riskLocalSelection:ResponseSelectionState=localSelection==='none'?'none':'depth';setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:riskLocalSelection,expertSelection:'none',label:`Take the risk${riskLocalSelection!=='none'?' + Local Team':''} · ${riskOdds.chancePercent}%`})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':`${riskOdds.requiredRoll}+ on d6`}</span></ResponseButton>}
         </div>
         <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-[10px] text-slate-500">{activePending?<><span className="font-black text-amber-300">Selected:</span> {activePending.label}{!riskSelected&&!activePending.method&&<span className="ml-1 text-slate-600">· choose a Depth source</span>}</>:<>Select a response above. Nothing happens until you commit.</>}</div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
