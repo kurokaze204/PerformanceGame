@@ -197,7 +197,7 @@ export function freeChallengesForRound(session:GameSessionV2,company:CompanyV2,r
     return{
       id:`F-C${cycle+1}-R${safeRound}-${value.id}-${description.id}-${siteId}`,
       title:description.title,
-      story:description.story.replaceAll('{site}',siteLabel),
+      story:description.story.split('{site}').join(siteLabel),
       siteId,
       domain:value.domain,
       difficulty:value.difficulty,
