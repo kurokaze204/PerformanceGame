@@ -27,11 +27,11 @@ export const KM_WEEK_SHOCK_SPECS:{id:string;siteId:string;domain:KnowledgeDomain
 export const KM_WEEK_SHOCK_CUTOFF=Math.max(...KM_WEEK_SHOCK_SPECS.map(check=>check.difficulty));
 
 export function kmWeekRiskOddsV1(localKnowledge:number,difficulty:number){
-  // Risk is explicitly based on the remaining performance gap. The selected
-  // local team's knowledge reduces the gap; the d6 only has to bridge what is
-  // still missing.
+  // Risk is based on the remaining performance gap, but a shortfall must still
+  // carry genuine uncertainty. A one-point gap therefore needs 2+ on a d6
+  // (83%), two points need 3+ (67%), and so on.
   const performanceGap=Math.max(0,difficulty-localKnowledge);
-  const requiredRoll=Math.max(1,performanceGap);
+  const requiredRoll=performanceGap===0?1:performanceGap+1;
   const successfulFaces=requiredRoll>6?0:Math.max(0,Math.min(6,7-requiredRoll));
   return{
     performanceGap,
