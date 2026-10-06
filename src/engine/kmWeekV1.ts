@@ -539,17 +539,16 @@ export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   company.roundPhase='risk';
 
   const failures=checks.filter(check=>!check.passed);
-  for(const check of failures){
+  const failedSiteIds=[...new Set(failures.map(check=>check.siteId))];
+  for(const siteId of failedSiteIds){
     applyTurnover(company,-KM_WEEK_SHOCK_FAILURE_COST);
-    const siteLabel=check.siteId.slice(0,3).toUpperCase();
-    const domainLabel=check.domain.slice(0,3).toUpperCase();
-    state.turnoverHistory.push({label:`SHOCK ${siteLabel}-${domainLabel}`,turnover:company.turnover});
+    const siteLabel=siteId.slice(0,3).toUpperCase();
+    state.turnoverHistory.push({label:`SHOCK ${siteLabel}`,turnover:company.turnover});
   }
 
-  const passed=checks.length-failures.length;
-  const totalCost=failures.length*KM_WEEK_SHOCK_FAILURE_COST;
+  const totalCost=failedSiteIds.length*KM_WEEK_SHOCK_FAILURE_COST;
   state.lastMessage=failures.length
-    ? `The shock exposed ${failures.length} local capability gap${failures.length===1?'':'s'}. Emergency external specialists cost ${totalCost}k in total.`
+    ? `The shock exposed ${failures.length} local capability gap${failures.length===1?'':'s'} across ${failedSiteIds.length} site${failedSiteIds.length===1?'':'s'}. Emergency external support cost ${totalCost}k in total.`
     : `All ${checks.length} critical capability tests were handled locally. No emergency external support was needed.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
@@ -563,9 +562,10 @@ export function completeKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   company.roundPhase='risk';
   const ready=state.shockChecks.filter(check=>check.passed).length;
   const gaps=state.shockChecks.length-ready;
-  const cost=gaps*KM_WEEK_SHOCK_FAILURE_COST;
+  const failedSites=new Set(state.shockChecks.filter(check=>!check.passed).map(check=>check.siteId));
+  const cost=failedSites.size*KM_WEEK_SHOCK_FAILURE_COST;
   state.lastMessage=gaps
-    ? `${ready} of ${state.shockChecks.length} critical capabilities held locally. ${gaps} gap${gaps===1?'':'s'} required emergency external support costing ${cost}k.`
+    ? `${ready} of ${state.shockChecks.length} critical capabilities held locally. ${gaps} gap${gaps===1?'':'s'} across ${failedSites.size} site${failedSites.size===1?'':'s'} required emergency external support costing ${cost}k.`
     : `All ${state.shockChecks.length} critical capabilities held locally. The organisation absorbed the shock without external rescue.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
