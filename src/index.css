@@ -366,6 +366,41 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
   100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; }
 }
 
+/* KM Week delayed action cue: after 8 seconds with no knowledge source selected,
+   pulse the actionable source buttons, then their selection circles 300ms later. */
+@keyframes kmw-attention-button-pulse {
+  0%, 100% {
+    border-color: rgb(71 85 105);
+    background-color: rgb(2 6 23);
+    color: rgb(226 232 240);
+    box-shadow: none;
+  }
+  32%, 55% {
+    border-color: rgb(253 224 71);
+    background-color: rgb(250 204 21);
+    color: rgb(15 23 42);
+    box-shadow: 0 0 0 3px rgb(250 204 21 / .20), 0 0 20px rgb(250 204 21 / .38);
+  }
+}
+@keyframes kmw-attention-circle-pulse {
+  0%, 100% {
+    border-color: rgb(71 85 105);
+    background-color: rgb(15 23 42);
+    box-shadow: none;
+  }
+  32%, 55% {
+    border-color: rgb(253 224 71);
+    background-color: rgb(250 204 21);
+    box-shadow: 0 0 0 3px rgb(250 204 21 / .24), 0 0 16px rgb(250 204 21 / .55);
+  }
+}
+.kmw-attention-button {
+  animation: kmw-attention-button-pulse .8s ease-in-out 5 both;
+}
+.kmw-attention-circle {
+  animation: kmw-attention-circle-pulse .8s ease-in-out .3s 5 both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
