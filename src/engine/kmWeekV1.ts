@@ -68,35 +68,91 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
   },
 };
 
-const FREE_ROUNDS: KMWeekChallenge[][] = [
-  // Round 1 deliberately creates an expert bottleneck: both cards need HR 3.
-  // Marcus can only be used once, so local capability or risk matters immediately.
+type KMWeekFreeDomain='operations'|'hr'|'marketing';
+type KMWeekFreeValue={id:string;domain:KMWeekFreeDomain;difficulty:number;impact:number};
+type KMWeekEventDescription={id:string;title:string;story:string};
+
+// Six business-pressure patterns repeat, but their order is independently
+// shuffled for each company at the start of every six-round cycle.
+const FREE_ROUND_VALUES:KMWeekFreeValue[][]=[
   [
-    {id:'F1-HR-MEL',title:'Weekend supervisor shortage',story:'Two Melbourne shift supervisors call in sick before a high-volume weekend run. Coverage must be reorganised without breaching fatigue limits.',siteId:'melbourne',domain:'hr',difficulty:3,impact:35,status:'open'},
-    {id:'F1-HR-PER',title:'Seasonal hiring backlog',story:'Perth’s seasonal intake is behind schedule and several production roles remain unfilled days before demand peaks.',siteId:'perth',domain:'hr',difficulty:3,impact:35,status:'open'},
+    {id:'HR3A',domain:'hr',difficulty:3,impact:35},
+    {id:'HR3B',domain:'hr',difficulty:3,impact:35},
   ],
   [
-    {id:'F2-HR-MEL',title:'Roster compliance dispute',story:'Melbourne employees challenge a new overtime roster, claiming fatigue and allowance rules have been applied inconsistently.',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
-    {id:'F2-MKT-BNE',title:'Competitor launch response',story:'A competitor launches a discounted product into Brisbane’s strongest customer segment and several key accounts ask for an immediate response.',siteId:'brisbane',domain:'marketing',difficulty:3,impact:40,status:'open'},
+    {id:'HR1',domain:'hr',difficulty:1,impact:35},
+    {id:'MKT2',domain:'marketing',difficulty:2,impact:40},
   ],
   [
-    {id:'F3-MKT-BNE',title:'Major account renewal at risk',story:'A long-standing Brisbane customer questions recent service levels and is reconsidering its annual contract.',siteId:'brisbane',domain:'marketing',difficulty:3,impact:40,status:'open'},
-    {id:'F3-OPS-PER',title:'Maintenance backlog',story:'Perth has a growing Operations backlog that is starting to hit output.',siteId:'perth',domain:'operations',difficulty:3,impact:45,status:'open'},
-  ],
-  // A second deliberate bottleneck. Priya can rescue only one Operations event.
-  [
-    {id:'F4-OPS-MEL',title:'Supplier changeover error',story:'A supplier substitution reaches Melbourne production without the expected process notes, and operators are seeing inconsistent setup results.',siteId:'melbourne',domain:'operations',difficulty:4,impact:45,status:'open'},
-    {id:'F4-OPS-BNE',title:'Safety interlock investigation',story:'A repeated interlock trip stops Brisbane production. The team must diagnose whether the fault is instrumentation, setup or process-related before restarting safely.',siteId:'brisbane',domain:'operations',difficulty:3,impact:45,status:'open'},
+    {id:'MKT3A',domain:'marketing',difficulty:3,impact:40},
+    {id:'OPS3A',domain:'operations',difficulty:3,impact:45},
   ],
   [
-    {id:'F5-MKT-PER',title:'Distributor escalation',story:'A Perth distributor threatens to pause orders after receiving conflicting product and delivery advice from different parts of the company.',siteId:'perth',domain:'marketing',difficulty:4,impact:45,status:'open'},
-    {id:'F5-OPS-BNE',title:'Cold-storage sensor failure',story:'Brisbane loses trusted temperature readings during a high-volume run and the local team must decide how to keep production safe and moving.',siteId:'brisbane',domain:'operations',difficulty:3,impact:45,status:'open'},
+    {id:'OPS5',domain:'operations',difficulty:5,impact:45},
+    {id:'OPS3B',domain:'operations',difficulty:3,impact:45},
   ],
   [
-    {id:'F6-HR-PER',title:'Industrial relations briefing',story:'Perth managers need an urgent workforce briefing after a policy change, but the usual HR specialist is unavailable.',siteId:'perth',domain:'hr',difficulty:4,impact:40,status:'open'},
-    {id:'F6-MKT-MEL',title:'Recall communications',story:'A product issue requires Melbourne to contact customers quickly with accurate advice before rumours spread through the market.',siteId:'melbourne',domain:'marketing',difficulty:3,impact:45,status:'open'},
+    {id:'MKT4',domain:'marketing',difficulty:4,impact:45},
+    {id:'OPS3C',domain:'operations',difficulty:3,impact:45},
   ],
-]
+  [
+    {id:'HR4',domain:'hr',difficulty:4,impact:40},
+    {id:'MKT3B',domain:'marketing',difficulty:3,impact:45},
+  ],
+];
+
+// Eighteen story cards: six per knowledge domain. Only twelve are drawn in a
+// normal six-round cycle, so companies see different stories as well as a
+// different order of pressure patterns.
+const FREE_EVENT_DESCRIPTIONS:Record<KMWeekFreeDomain,KMWeekEventDescription[]>={
+  hr:[
+    {id:'HR-A',title:'Weekend supervisor shortage',story:'Two {site} shift supervisors call in sick before a high-volume weekend run. Coverage must be reorganised without breaching fatigue limits.'},
+    {id:'HR-B',title:'Seasonal hiring backlog',story:'The {site} seasonal intake is behind schedule and several critical roles remain unfilled days before demand peaks.'},
+    {id:'HR-C',title:'Roster compliance dispute',story:'Employees at {site} challenge a new overtime roster, claiming fatigue and allowance rules have been applied inconsistently.'},
+    {id:'HR-D',title:'Safety-critical vacancy',story:'A safety-critical supervisor at {site} leaves at short notice and the team must redesign coverage without breaching competency requirements.'},
+    {id:'HR-E',title:'Industrial relations briefing',story:'Managers at {site} need an urgent workforce briefing after a policy change, but the usual HR specialist is unavailable.'},
+    {id:'HR-F',title:'Competency sign-off gap',story:'An audit at {site} finds several people performing higher-risk work without current competency sign-off. Operations must continue while the gap is resolved.'},
+  ],
+  marketing:[
+    {id:'MKT-A',title:'Competitor launch response',story:'A competitor launches a discounted product into {site}’s strongest customer segment and several key accounts ask for an immediate response.'},
+    {id:'MKT-B',title:'Major account renewal at risk',story:'A long-standing {site} customer questions recent service levels and is reconsidering its annual contract.'},
+    {id:'MKT-C',title:'Distributor escalation',story:'A distributor supporting {site} threatens to pause orders after receiving conflicting product and delivery advice from different parts of the company.'},
+    {id:'MKT-D',title:'Recall communications',story:'A product issue requires {site} to contact customers quickly with accurate advice before rumours spread through the market.'},
+    {id:'MKT-E',title:'Tender response deadline',story:'A major customer gives {site} one day to answer a complex tender clarification that could decide whether the company stays on the shortlist.'},
+    {id:'MKT-F',title:'Pricing commitment dispute',story:'A customer at {site} produces an earlier pricing commitment that conflicts with the current offer. The account team needs a defensible response today.'},
+  ],
+  operations:[
+    {id:'OPS-A',title:'Maintenance backlog',story:'The {site} maintenance backlog has grown to the point that it is starting to constrain output and increase operational risk.'},
+    {id:'OPS-B',title:'Supplier changeover error',story:'A supplier substitution reaches {site} production without the expected process notes, and operators are seeing inconsistent setup results.'},
+    {id:'OPS-C',title:'Safety interlock investigation',story:'A repeated interlock trip stops {site} production. The team must diagnose whether the fault is instrumentation, setup or process-related before restarting safely.'},
+    {id:'OPS-D',title:'Cold-storage sensor failure',story:'The {site} team loses trusted temperature readings during a high-volume run and must decide how to keep production safe and moving.'},
+    {id:'OPS-E',title:'Batch traceability issue',story:'A traceability mismatch at {site} means the team cannot immediately confirm which production settings were used for a customer batch awaiting release.'},
+    {id:'OPS-F',title:'Shift handover breakdown',story:'Incomplete maintenance and dispatch notes leave the incoming {site} shift unable to safely release several urgent customer orders.'},
+  ],
+};
+
+function seededHash(text:string){
+  let hash=2166136261;
+  for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}
+  return hash>>>0;
+}
+
+function seededShuffle<T>(items:readonly T[],seedText:string):T[]{
+  const result=[...items];
+  let seed=seededHash(seedText)||1;
+  const random=()=>{
+    seed+=0x6D2B79F5;
+    let value=seed;
+    value=Math.imul(value^(value>>>15),value|1);
+    value^=value+Math.imul(value^(value>>>7),value|61);
+    return((value^(value>>>14))>>>0)/4294967296;
+  };
+  for(let i=result.length-1;i>0;i--){
+    const j=Math.floor(random()*(i+1));
+    [result[i],result[j]]=[result[j],result[i]];
+  }
+  return result;
+}
 
 function guidedChallenge(turn:number):KMWeekChallenge{
   if(turn===1)return {id:'G1',title:'Packaging line shutdown',story:'A conveyor-control fault has stopped Brisbane’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
@@ -108,9 +164,47 @@ function cloneChallenges(items:KMWeekChallenge[]):KMWeekChallenge[]{
   return items.map(item=>({...item}));
 }
 
-function freeChallengesForRound(round:number):KMWeekChallenge[]{
-  const template=FREE_ROUNDS[(Math.max(1,round)-1)%FREE_ROUNDS.length];
-  return template.map(item=>({...item,id:`${item.id}-R${round}`}));
+export function freeChallengesForRound(session:GameSessionV2,company:CompanyV2,round:number):KMWeekChallenge[]{
+  const safeRound=Math.max(1,round);
+  const cycle=Math.floor((safeRound-1)/FREE_ROUND_VALUES.length);
+  const position=(safeRound-1)%FREE_ROUND_VALUES.length;
+  const seedBase=`${session.id}|${company.id}|cycle:${cycle}`;
+  const shuffledProfiles=seededShuffle(FREE_ROUND_VALUES,`${seedBase}|profiles`);
+  const profile=shuffledProfiles[position];
+
+  const descriptionPools={
+    hr:seededShuffle(FREE_EVENT_DESCRIPTIONS.hr,`${seedBase}|stories:hr`),
+    marketing:seededShuffle(FREE_EVENT_DESCRIPTIONS.marketing,`${seedBase}|stories:marketing`),
+    operations:seededShuffle(FREE_EVENT_DESCRIPTIONS.operations,`${seedBase}|stories:operations`),
+  };
+
+  // Work out how many descriptions from each domain have already been consumed
+  // earlier in this six-round cycle so no story repeats within the cycle.
+  const usedBefore:Record<KMWeekFreeDomain,number>={hr:0,marketing:0,operations:0};
+  for(const prior of shuffledProfiles.slice(0,position)){
+    for(const card of prior)usedBefore[card.domain]+=1;
+  }
+
+  const sites=seededShuffle(KM_WEEK_SITE_IDS,`${seedBase}|sites:${position}`);
+  const usedThisRound:Record<KMWeekFreeDomain,number>={hr:0,marketing:0,operations:0};
+
+  return profile.map((value,index)=>{
+    const storyIndex=usedBefore[value.domain]+usedThisRound[value.domain]++;
+    const description=descriptionPools[value.domain][storyIndex%descriptionPools[value.domain].length];
+    const siteId=sites[index%sites.length];
+    const site=company.sites.find(item=>item.id===siteId);
+    const siteLabel=site?.name||siteId;
+    return{
+      id:`F-C${cycle+1}-R${safeRound}-${value.id}-${description.id}-${siteId}`,
+      title:description.title,
+      story:description.story.replaceAll('{site}',siteLabel),
+      siteId,
+      domain:value.domain,
+      difficulty:value.difficulty,
+      impact:value.impact,
+      status:'open',
+    };
+  });
 }
 
 function kmWeekSecondsRemaining(session:GameSessionV2){
@@ -508,7 +602,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
         state.stage='free';
         state.freeRound=1;
         company.round=4;
-        setChallengePhase(company,freeChallengesForRound(1));
+        setChallengePhase(company,freeChallengesForRound(session,company,1));
         state.lastMessage='Guided section complete. From here, keep playing until the final three-minute Business Shock.';
       }
     }
@@ -518,7 +612,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     }else{
       state.freeRound+=1;
       company.round=3+state.freeRound;
-      setChallengePhase(company,freeChallengesForRound(state.freeRound));
+      setChallengePhase(company,freeChallengesForRound(session,company,state.freeRound));
       state.lastMessage=`Round ${state.freeRound} begins. Keep building capability before the final three-minute Business Shock.`;
     }
   }
