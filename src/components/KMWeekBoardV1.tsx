@@ -428,8 +428,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     const selectedLocal=committed.localSelection!=='none'?(resolvedSite?.teamCapability[resolved.domain]||0):0;
     const odds=kmWeekRiskOddsV1(selectedLocal,resolved.difficulty);
     setRiskResult({roll:resolved.dieRoll,won:resolved.status==='success',requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
-    await new Promise<void>(resolve=>window.setTimeout(resolve,1700));
-    setRiskResult(null);
    }
   }:undefined;
   const ok=await post(payload,beforeApply);
@@ -565,12 +563,17 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>
   </>}
 
-  {riskResult&&<div className="pointer-events-none fixed inset-0 z-[175] grid place-items-center bg-black/30">
-   <div className={`min-w-[250px] rounded-[24px] border-4 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.75)] ${riskResult.won?'border-emerald-300 bg-emerald-950':'border-rose-300 bg-rose-950'}`}>
+  {riskResult&&<div className="fixed inset-0 z-[175] grid place-items-center bg-black/55 p-4">
+   <div role="dialog" aria-modal="true" aria-label="Risk response result" className={`w-[min(360px,calc(100vw-32px))] rounded-[24px] border-4 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.75)] ${riskResult.won?'border-emerald-300 bg-emerald-950':'border-rose-300 bg-rose-950'}`}>
     <Dices className={`mx-auto h-10 w-10 ${riskResult.won?'text-emerald-200':'text-rose-200'}`}/>
-    <div className="mt-2 text-[9px] font-black uppercase tracking-[.18em] text-slate-300">Performance gap {riskResult.performanceGap} · need {riskResult.requiredRoll}+</div>
-    <div className="mt-2 text-5xl font-black text-white">{riskResult.roll}</div>
-    <div className={`mt-2 text-lg font-black ${riskResult.won?'text-emerald-200':'text-rose-200'}`}>{riskResult.won?'SUCCESS':'FAILURE'}</div>
+    <div className="mt-2 text-[10px] font-black uppercase tracking-[.18em] text-slate-300">You took the chance</div>
+    <div className="mt-3 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-left text-xs text-slate-200">
+     <div className="flex items-center justify-between"><span>Performance gap</span><b className="text-white">{riskResult.performanceGap}</b></div>
+     <div className="mt-1 flex items-center justify-between"><span>Roll needed</span><b className="text-white">{riskResult.requiredRoll}+</b></div>
+     <div className="mt-1 flex items-center justify-between"><span>Dice roll</span><b className="text-xl text-white">{riskResult.roll}</b></div>
+    </div>
+    <div className={`mt-3 text-xl font-black ${riskResult.won?'text-emerald-200':'text-rose-200'}`}>{riskResult.won?'SUCCESS':'FAILURE'}</div>
+    <button type="button" onClick={()=>setRiskResult(null)} className={`mt-4 h-11 w-full rounded-xl border-2 text-sm font-black ${riskResult.won?'border-emerald-200 bg-emerald-300 text-emerald-950':'border-rose-200 bg-rose-300 text-rose-950'}`}>CONTINUE</button>
    </div>
   </div>}
 
