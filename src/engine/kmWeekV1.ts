@@ -69,29 +69,32 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
 };
 
 const FREE_ROUNDS: KMWeekChallenge[][] = [
+  // Round 1 deliberately creates an expert bottleneck: both cards need HR 3.
+  // Marcus can only be used once, so local capability or risk matters immediately.
   [
-    {id:'F1-HR-MEL',title:'Weekend supervisor shortage',story:'Two Melbourne shift supervisors call in sick before a high-volume weekend run. Coverage must be reorganised without breaching fatigue limits.',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
-    {id:'F1-HR-PER',title:'Seasonal hiring backlog',story:'Perth’s seasonal intake is behind schedule and several production roles remain unfilled days before demand peaks.',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F1-HR-MEL',title:'Weekend supervisor shortage',story:'Two Melbourne shift supervisors call in sick before a high-volume weekend run. Coverage must be reorganised without breaching fatigue limits.',siteId:'melbourne',domain:'hr',difficulty:3,impact:35,status:'open'},
+    {id:'F1-HR-PER',title:'Seasonal hiring backlog',story:'Perth’s seasonal intake is behind schedule and several production roles remain unfilled days before demand peaks.',siteId:'perth',domain:'hr',difficulty:3,impact:35,status:'open'},
   ],
   [
     {id:'F2-HR-MEL',title:'Roster compliance dispute',story:'Melbourne employees challenge a new overtime roster, claiming fatigue and allowance rules have been applied inconsistently.',siteId:'melbourne',domain:'hr',difficulty:2,impact:35,status:'open'},
-    {id:'F2-MKT-BNE',title:'Competitor launch response',story:'A competitor launches a discounted product into Brisbane’s strongest customer segment and several key accounts ask for an immediate response.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
+    {id:'F2-MKT-BNE',title:'Competitor launch response',story:'A competitor launches a discounted product into Brisbane’s strongest customer segment and several key accounts ask for an immediate response.',siteId:'brisbane',domain:'marketing',difficulty:3,impact:40,status:'open'},
   ],
   [
-    {id:'F3-MKT-BNE',title:'Major account renewal at risk',story:'A long-standing Brisbane customer questions recent service levels and is reconsidering its annual contract.',siteId:'brisbane',domain:'marketing',difficulty:2,impact:40,status:'open'},
-    {id:'F3-OPS-PER',title:'Maintenance backlog',story:'Perth has a growing Operations backlog that is starting to hit output.',siteId:'perth',domain:'operations',difficulty:2,impact:45,status:'open'},
+    {id:'F3-MKT-BNE',title:'Major account renewal at risk',story:'A long-standing Brisbane customer questions recent service levels and is reconsidering its annual contract.',siteId:'brisbane',domain:'marketing',difficulty:3,impact:40,status:'open'},
+    {id:'F3-OPS-PER',title:'Maintenance backlog',story:'Perth has a growing Operations backlog that is starting to hit output.',siteId:'perth',domain:'operations',difficulty:3,impact:45,status:'open'},
+  ],
+  // A second deliberate bottleneck. Priya can rescue only one Operations event.
+  [
+    {id:'F4-OPS-MEL',title:'Supplier changeover error',story:'A supplier substitution reaches Melbourne production without the expected process notes, and operators are seeing inconsistent setup results.',siteId:'melbourne',domain:'operations',difficulty:4,impact:45,status:'open'},
+    {id:'F4-OPS-BNE',title:'Safety interlock investigation',story:'A repeated interlock trip stops Brisbane production. The team must diagnose whether the fault is instrumentation, setup or process-related before restarting safely.',siteId:'brisbane',domain:'operations',difficulty:3,impact:45,status:'open'},
   ],
   [
-    {id:'F4-OPS-MEL',title:'Supplier changeover error',story:'A supplier substitution reaches Melbourne production without the expected process notes, and operators are seeing inconsistent setup results.',siteId:'melbourne',domain:'operations',difficulty:2,impact:40,status:'open'},
-    {id:'F4-HR-BNE',title:'Safety-critical vacancy',story:'A Brisbane team loses a safety-critical supervisor at short notice and needs to redesign coverage without breaching competency requirements.',siteId:'brisbane',domain:'hr',difficulty:2,impact:35,status:'open'},
+    {id:'F5-MKT-PER',title:'Distributor escalation',story:'A Perth distributor threatens to pause orders after receiving conflicting product and delivery advice from different parts of the company.',siteId:'perth',domain:'marketing',difficulty:4,impact:45,status:'open'},
+    {id:'F5-OPS-BNE',title:'Cold-storage sensor failure',story:'Brisbane loses trusted temperature readings during a high-volume run and the local team must decide how to keep production safe and moving.',siteId:'brisbane',domain:'operations',difficulty:3,impact:45,status:'open'},
   ],
   [
-    {id:'F5-MKT-PER',title:'Distributor escalation',story:'A Perth distributor threatens to pause orders after receiving conflicting product and delivery advice from different parts of the company.',siteId:'perth',domain:'marketing',difficulty:2,impact:40,status:'open'},
-    {id:'F5-OPS-BNE',title:'Cold-storage sensor failure',story:'Brisbane loses trusted temperature readings during a high-volume run and the local team must decide how to keep production safe and moving.',siteId:'brisbane',domain:'operations',difficulty:2,impact:45,status:'open'},
-  ],
-  [
-    {id:'F6-HR-PER',title:'Industrial relations briefing',story:'Perth managers need an urgent workforce briefing after a policy change, but the usual HR specialist is unavailable.',siteId:'perth',domain:'hr',difficulty:2,impact:35,status:'open'},
-    {id:'F6-MKT-MEL',title:'Recall communications',story:'A product issue requires Melbourne to contact customers quickly with accurate advice before rumours spread through the market.',siteId:'melbourne',domain:'marketing',difficulty:2,impact:45,status:'open'},
+    {id:'F6-HR-PER',title:'Industrial relations briefing',story:'Perth managers need an urgent workforce briefing after a policy change, but the usual HR specialist is unavailable.',siteId:'perth',domain:'hr',difficulty:4,impact:40,status:'open'},
+    {id:'F6-MKT-MEL',title:'Recall communications',story:'A product issue requires Melbourne to contact customers quickly with accurate advice before rumours spread through the market.',siteId:'melbourne',domain:'marketing',difficulty:3,impact:45,status:'open'},
   ],
 ]
 
