@@ -97,7 +97,7 @@ const FREE_ROUNDS: KMWeekChallenge[][] = [
 
 function guidedChallenge(turn:number):KMWeekChallenge{
   if(turn===1)return {id:'G1',title:'Packaging line shutdown',story:'A conveyor-control fault has stopped Brisbane’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
-  if(turn===2)return {id:'G2',title:'Batch quality hold',story:'After production restarts, quality checks find inconsistent fill weights across two Brisbane batches. Shipments are on hold until the cause is identified and corrected.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
+  if(turn===2)return {id:'G2',title:'Batch quality hold',story:'After production restarts, quality checks find inconsistent fill weights across two Brisbane batches. Shipments are on hold until the cause is identified and corrected.',siteId:'brisbane',domain:'operations',difficulty:1,impact:30,status:'open',guided:true};
   return {id:'G3',title:'Perth shift handover breakdown',story:'Incomplete maintenance and dispatch notes leave Perth’s afternoon shift unable to safely release several urgent customer orders.',siteId:'perth',domain:'operations',difficulty:4,impact:35,status:'open',guided:true};
 }
 
@@ -339,9 +339,8 @@ export function resolveKMWeekChallengeV1(
   const site=company.sites.find(item=>item.id===challenge.siteId);
   if(!site)return{success:false,message:'Challenge site not found.'};
 
-  if(state.stage==='guided'){
-    if(state.guidedTurn===2&&method==='expert')return{success:false,message:'This guided Challenge is teaching local response and risk. Use the Local Team, then decide whether to take the chance.'};
-    if(state.guidedTurn!==2&&method!=='expert')return{success:false,message:'This guided move is teaching expert deployment. Send the Operations expert.'};
+  if(state.stage==='guided'&&state.guidedTurn!==2&&method!=='expert'){
+    return{success:false,message:'This guided move is teaching expert deployment. Send the Operations expert.'};
   }
 
   let won=false;
