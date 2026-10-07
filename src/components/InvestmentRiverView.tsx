@@ -50,7 +50,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const selectedSitePreview=selectedSiteId?sites.find(site=>site.id===selectedSiteId)?.teamCapability[selectedDomain]||0:0;
  const selectedExpertPreview=selectedExpertId?expertMarks.find(mark=>mark.expert.id===selectedExpertId&&mark.domain===selectedDomain)?.score||0:0;
  const selectedHQPreview=company.intranet[selectedDomain]||0;
- const rawMax=mode==='km_week'?5:Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0),selectedSitePreview+previewSiteDelta,selectedExpertPreview+previewExpertDelta,selectedHQPreview+previewHQDelta);
+ const rawMax=mode==='km_week'?Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),selectedExpertPreview+previewExpertDelta):Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0),selectedSitePreview+previewSiteDelta,selectedExpertPreview+previewExpertDelta,selectedHQPreview+previewHQDelta);
  const niceStep=(max:number)=>{const raw=Math.max(1,max/4),power=Math.pow(10,Math.floor(Math.log10(raw))),scaled=raw/power;return(scaled<=1?1:scaled<=2?2:scaled<=5?5:10)*power};
  const tickStep=niceStep(rawMax),maxY=Math.max(tickStep,Math.ceil(rawMax/tickStep)*tickStep);
  const ticks=Array.from({length:Math.floor(maxY/tickStep)+1},(_,index)=>index*tickStep);
@@ -151,7 +151,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const labelAnchor=rightEdge?'end':'start';
        const loc=abbrev(mark.expert.location);
        const expertGhost=ghostPreview?.kind==='expert'&&ghostPreview.domain===item.domain&&ghostPreview.expertId===mark.expert.id&&ghostPreview.delta>0;
-       const expertGhostY=expertGhost?y(Math.min(5,mark.score+ghostPreview.delta)):py;
+       const expertGhostY=expertGhost?y(Math.min(mode==='km_week'?6:5,mark.score+ghostPreview.delta)):py;
        return <g key={`${mark.expert.id}-${item.domain}`} className="kmw-river-motion" data-river-target={`expert:${mark.expert.id}:${item.domain}`}>
         {expertGhost&&<g data-kmw-score-ghost="expertise" filter="url(#kmw-blue-ghost-glow)"><line x1={px} y1={py} x2={px} y2={expertGhostY} stroke="#38bdf8" strokeWidth="3" strokeDasharray="6 5"/><circle cx={px} cy={expertGhostY} r="18" fill="#082f49" fillOpacity=".72" stroke="#7dd3fc" strokeWidth="2.5" strokeDasharray="5 4"/></g>}
         {selected&&<circle cx={px} cy={py} r="25" fill="#facc15" fillOpacity=".12" stroke="#fde047" strokeWidth="3.5"/>}
