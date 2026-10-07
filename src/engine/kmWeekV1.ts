@@ -178,7 +178,7 @@ function retireHighestScoringExpert(session:GameSessionV2,company:CompanyV2){
   const names=KM_WEEK_REPLACEMENT_NAMES[domain];
   const replacementName=names[seededHash(`${session.id}|${company.id}|${domain}|replacement`)%names.length];
   selected.expert.isVacant=true;
-  selected.expert.state='Retired';
+  selected.expert.state='Available';
   selected.expert.replacementDueRound=state.freeRound+1;
   selected.expert.replacementName=replacementName;
   if(!company.retiredExpertNames.includes(selected.expert.name))company.retiredExpertNames.push(selected.expert.name);
