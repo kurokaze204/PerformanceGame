@@ -14,6 +14,7 @@ import type {
 export const KM_WEEK_DOMAINS: KnowledgeDomain[] = ['operations','hr','marketing'];
 export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
 export const KM_WEEK_MAX_KNOWLEDGE = 5;
+export const KM_WEEK_MAX_EXPERT_KNOWLEDGE = 6;
 export const KM_WEEK_SHOCK_WINDOW_SECONDS = 180;
 export const KM_WEEK_SHOCK_FAILURE_COST = 15;
 
@@ -51,7 +52,7 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
   'deep-bench': {
     id:'deep-bench',
     title:'Deep Bench',
-    description:'Finish with all three specialists at Knowledge 5.',
+    description:'Finish with all three specialists at Knowledge 6.',
     points:5,
   },
   'broad-base': {
@@ -76,28 +77,28 @@ type KMWeekEventDescription={id:string;title:string;story:string};
 // shuffled for each company at the start of every six-round cycle.
 const FREE_ROUND_VALUES:KMWeekFreeValue[][]=[
   [
-    {id:'HR3A',domain:'hr',difficulty:3,impact:35},
-    {id:'HR3B',domain:'hr',difficulty:3,impact:35},
+    {id:'HR3A',domain:'hr',difficulty:3,impact:45},
+    {id:'HR3B',domain:'hr',difficulty:3,impact:45},
   ],
   [
-    {id:'HR1',domain:'hr',difficulty:1,impact:35},
-    {id:'MKT2',domain:'marketing',difficulty:2,impact:40},
+    {id:'HR1',domain:'hr',difficulty:1,impact:15},
+    {id:'MKT2',domain:'marketing',difficulty:2,impact:30},
   ],
   [
-    {id:'MKT3A',domain:'marketing',difficulty:3,impact:40},
-    {id:'OPS3A',domain:'operations',difficulty:3,impact:45},
+    {id:'MKT3A',domain:'marketing',difficulty:3,impact:45},
+    {id:'OPS7',domain:'operations',difficulty:7,impact:105},
   ],
   [
-    {id:'OPS5',domain:'operations',difficulty:5,impact:45},
+    {id:'OPS5',domain:'operations',difficulty:5,impact:75},
     {id:'OPS3B',domain:'operations',difficulty:3,impact:45},
   ],
   [
-    {id:'MKT4',domain:'marketing',difficulty:4,impact:45},
+    {id:'MKT4',domain:'marketing',difficulty:4,impact:60},
     {id:'OPS3C',domain:'operations',difficulty:3,impact:45},
   ],
   [
-    {id:'HR4',domain:'hr',difficulty:4,impact:40},
-    {id:'MKT3B',domain:'marketing',difficulty:3,impact:45},
+    {id:'MKT5',domain:'marketing',difficulty:5,impact:75},
+    {id:'MKT6',domain:'marketing',difficulty:6,impact:90},
   ],
 ];
 
@@ -368,7 +369,7 @@ function goalAchieved(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek!;
   const goal=session.kmWeekGoalId||hashGoal(session.id);
   if(goal==='local-heroes')return state.localSuccesses>=2;
-  if(goal==='deep-bench')return activeExperts(company).every(expert=>(expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0)>=5);
+  if(goal==='deep-bench')return activeExperts(company).every(expert=>(expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0)>=KM_WEEK_MAX_EXPERT_KNOWLEDGE);
   if(goal==='broad-base')return localCapabilityPoints(company)>=4;
   const totals=activeSites(company).map(site=>KM_WEEK_DOMAINS.reduce((sum,domain)=>sum+(site.teamCapability[domain]||0),0));
   return totals.length===3&&totals.every(total=>total>=3)&&totals.some(total=>total>=4);
@@ -552,9 +553,9 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!skill)return{success:false,message:'Choose an expert and one of their knowledge domains.'};
-    if(skill.score>=KM_WEEK_MAX_KNOWLEDGE)return{success:false,message:`${expert.name} is already at the KM Week maximum of 5.`};
+    if(skill.score>=KM_WEEK_MAX_EXPERT_KNOWLEDGE)return{success:false,message:`${expert.name} is already at the KM Week expert maximum of ${KM_WEEK_MAX_EXPERT_KNOWLEDGE}.`};
     cost=15;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
-    before=skill.score;skill.score=Math.min(KM_WEEK_MAX_KNOWLEDGE,skill.score+1);after=skill.score;expertId=expert.id;expert.state='Training';
+    before=skill.score;skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,skill.score+1);after=skill.score;expertId=expert.id;expert.state='Training';
   }else if(type==='LOCAL_TRAINING'){
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const site=company.sites.find(item=>item.id===payload?.siteId&&!item.isClosed);
