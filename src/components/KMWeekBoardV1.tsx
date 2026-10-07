@@ -4,7 +4,7 @@ import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_FAILURE_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_FAILURE_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 import type{RiverGhostPreview}from'./InvestmentRiverView.tsx';
 import{KMWeekDebriefV1}from'./KMWeekDebriefV1.tsx';
@@ -161,7 +161,7 @@ function currentGuidedCopy(company:CompanyV2){
 }
 
 function scoreBriefSuggestion(goalId:string){
- if(goalId==='deep-bench')return 'Your Goal rewards expert depth. If an expert is still below Knowledge 5, Train Expert is the shortest route toward those 5 Goal points.';
+ if(goalId==='deep-bench')return 'Your Goal rewards expert depth. If an expert is still below Knowledge 6, Train Expert is the shortest route toward those 5 Goal points.';
  if(goalId==='local-heroes')return 'Your Goal rewards solving Challenges locally. Local Training or Knowledge Transfer can strengthen a site so you rely less on travelling experts.';
  if(goalId==='broad-base')return 'Your Goal rewards breadth. Look for a site/domain sitting below Knowledge 2 and use Local Training or Knowledge Transfer to lift it.';
  return 'Your Goal rewards a balanced network. Look for your weakest site and use Local Training or Knowledge Transfer to strengthen it.';
@@ -212,8 +212,9 @@ const ChallengeKnowledgeBars:React.FC<{
  onLocalClick:()=>void;
  onExpertClick?:()=>void;
 }>=({requirement,local,expert,expertName,expertLocation,travelCost=0,localSelection,expertSelection,localDisabled=false,expertDisabled=false,attention=false,onLocalClick,onExpertClick})=>{
- const SegmentBar:React.FC<{value:number;filled:number;tone:'requirement'|'local'|'expert'}>=({value,filled,tone})=><div className="grid grid-cols-5 gap-1" aria-label={tone+' knowledge '+value+' of 5'}>
-  {Array.from({length:5},(_,index)=>{
+ const slots=Math.max(5,requirement,local,expert);
+ const SegmentBar:React.FC<{value:number;filled:number;tone:'requirement'|'local'|'expert'}>=({value,filled,tone})=><div className="grid gap-1" style={{gridTemplateColumns:`repeat(${slots},minmax(0,1fr))`}} aria-label={tone+' knowledge '+value+' of '+slots}>
+  {Array.from({length:slots},(_,index)=>{
    const available=index<value;
    const applied=index<filled;
    const colour=tone==='requirement'?'border-rose-300 bg-rose-500':tone==='local'?'border-sky-300 bg-sky-400':'border-amber-300 bg-amber-400';
@@ -490,18 +491,19 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   const otherState=source==='local'?expertState:localState;
   const otherScore=source==='local'?activeExpertScore:localScore;
 
-  let nextState:ResponseSelectionState;
-  if(sourceState==='breadth')nextState='depth';
-  else if(sourceState==='depth')nextState='none';
-  else if(otherState!=='depth')nextState='depth';
-  else nextState=sourceScore>=otherScore?'depth':'breadth';
+  // First click always selects the clicked source as Depth so the selector
+  // visibly changes immediately. The other selected source becomes Breadth.
+  // Clicking the active Depth again removes it and promotes remaining Breadth.
+  const nextState:ResponseSelectionState=sourceState==='depth'?'none':'depth';
 
   if(source==='local'){
    localState=nextState;
    if(nextState==='depth'&&expertState==='depth')expertState='breadth';
+   if(nextState==='none'&&expertState==='breadth')expertState='depth';
   }else{
    expertState=nextState;
    if(nextState==='depth'&&localState==='depth')localState='breadth';
+   if(nextState==='none'&&localState==='breadth')localState='depth';
   }
 
   const method:ResponseMethod|undefined=localState==='depth'?'local':expertState==='depth'?'expert':undefined;
@@ -560,7 +562,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const source=company.sites.find(site=>site.id===sourceSiteId);
  const target=company.sites.find(site=>site.id===targetSiteId);
  const investmentPreview=investment==='TRAIN_EXPERT'
-   ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${Math.min(5,specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
+   ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
    :investment==='LOCAL_TRAINING'
     ?specialist&&localTrainingSite?`${localTrainingSite.name} ${domainLabel(specialistDomain)}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min(5,(localTrainingSite.teamCapability[specialistDomain]||0)+1)} · ${localTrainingTravelCost?`Travel $2k · total $12k`:'No travel · total $10k'}`:'Choose an expert and training site'
     :source&&target?(()=>{
@@ -572,7 +574,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const scoreGhostPreview:RiverGhostPreview|undefined=(()=>{
   if(scoreGhost==='expertise'&&specialist){
    const score=specialistScore(company,specialistDomain);
-   return score<5?{kind:'expert',domain:specialistDomain,expertId:specialist.id,delta:1}:undefined;
+   return score<KM_WEEK_MAX_EXPERT_KNOWLEDGE?{kind:'expert',domain:specialistDomain,expertId:specialist.id,delta:1}:undefined;
   }
   if(scoreGhost==='local'&&specialist&&localTrainingSite){
    const current=localTrainingSite.teamCapability[specialistDomain]||0;
@@ -613,7 +615,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(investment==='TRAIN_EXPERT'){
    const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
    const skill=expert?.domains.find(item=>item.domain===payload.domain);
-   if(skill)skill.score=Math.min(5,skill.score+1);
+   if(skill)skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,skill.score+1);
   }else if(investment==='LOCAL_TRAINING'){
    const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
    const site=optimisticCompany.sites.find(item=>item.id===payload.siteId);
@@ -813,7 +815,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          travelCost={activeExpertTravelCost}
          localSelection={localSelection}
          expertSelection={expertSelection}
-         localDisabled={localScore<=0}
+         localDisabled={false}
          expertDisabled={expertUsed||activeExpertScore<=0}
          attention={challengeAttention}
          onLocalClick={()=>cycleKnowledgeSource('local')}
