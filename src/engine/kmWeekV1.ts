@@ -155,6 +155,65 @@ function seededShuffle<T>(items:readonly T[],seedText:string):T[]{
   return result;
 }
 
+const KM_WEEK_REPLACEMENT_NAMES:Record<KMWeekFreeDomain,string[]>={
+  operations:['Alex Nguyen','Samira Khan','Daniel Cho','Riley Morgan'],
+  hr:['Elena Morris','Aisha Rahman','Jordan Lee','Tom Bennett'],
+  marketing:['Sofia Bennett','Maya Singh','Lucas Chen','Amelia Brooks'],
+};
+
+function primaryKMWeekSkill(expert:ExpertV2){
+  return expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain));
+}
+
+function retireHighestScoringExpert(session:GameSessionV2,company:CompanyV2){
+  const state=company.kmWeek;
+  if(!state||state.expertRetirement)return;
+  const ranked=activeExperts(company)
+    .map(expert=>({expert,skill:primaryKMWeekSkill(expert)}))
+    .filter((item):item is {expert:ExpertV2;skill:{domain:KnowledgeDomain;score:number}}=>Boolean(item.skill))
+    .sort((a,b)=>b.skill.score-a.skill.score||a.expert.name.localeCompare(b.expert.name));
+  const selected=ranked[0];
+  if(!selected)return;
+  const domain=selected.skill.domain as KMWeekFreeDomain;
+  const names=KM_WEEK_REPLACEMENT_NAMES[domain];
+  const replacementName=names[seededHash(`${session.id}|${company.id}|${domain}|replacement`)%names.length];
+  selected.expert.isVacant=true;
+  selected.expert.state='Retired';
+  selected.expert.replacementDueRound=state.freeRound+1;
+  selected.expert.replacementName=replacementName;
+  if(!company.retiredExpertNames.includes(selected.expert.name))company.retiredExpertNames.push(selected.expert.name);
+  state.expertRetirement={
+    expertId:selected.expert.id,
+    domain:selected.skill.domain,
+    retiredName:selected.expert.name,
+    retiredScore:selected.skill.score,
+    retiredAtRound:state.freeRound,
+    replacementRound:state.freeRound+1,
+    replacementName,
+    status:'retired',
+  };
+}
+
+function hireRetiredExpertReplacement(company:CompanyV2){
+  const state=company.kmWeek;
+  const retirement=state?.expertRetirement;
+  if(!state||!retirement||retirement.status!=='retired'||state.freeRound<retirement.replacementRound)return;
+  const expert=company.experts.find(item=>item.id===retirement.expertId);
+  if(!expert)return;
+  const skill=expert.domains.find(item=>item.domain===retirement.domain);
+  if(!skill)return;
+  const siteScores=activeSites(company).map(site=>site.teamCapability[retirement.domain]||0);
+  const replacementScore=Math.max(3,...siteScores);
+  expert.name=retirement.replacementName;
+  skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,replacementScore);
+  expert.isVacant=false;
+  expert.state='Available';
+  expert.replacementDueRound=null;
+  expert.replacementName=null;
+  retirement.replacementScore=skill.score;
+  retirement.status='replaced';
+}
+
 function guidedChallenge(turn:number):KMWeekChallenge{
   if(turn===1)return {id:'G1',title:'Packaging line shutdown',story:'A conveyor-control fault has stopped Brisbane’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
   if(turn===2)return {id:'G2',title:'Batch quality hold',story:'After production restarts, quality checks find inconsistent fill weights across two Brisbane batches. Shipments are on hold until the cause is identified and corrected.',siteId:'brisbane',domain:'operations',difficulty:1,impact:30,status:'open',guided:true};
@@ -410,6 +469,13 @@ function afterChallengeSet(session:GameSessionV2,company:CompanyV2){
   if(state.challenges.some(challenge=>challenge.status==='open'))return;
   state.phase='invest';
   company.roundPhase='investment';
+
+  if(state.stage==='free'&&state.freeRound===5&&!state.expertRetirement){
+    retireHighestScoringExpert(session,company);
+  }else if(state.stage==='free'&&state.expertRetirement?.status==='retired'&&state.freeRound>=state.expertRetirement.replacementRound){
+    hireRetiredExpertReplacement(company);
+  }
+
   state.lastMessage=state.stage==='guided'
     ? 'Challenge handled. Make the guided investment before continuing.'
     : 'Both Challenges are resolved. Choose one investment for the next round.';
