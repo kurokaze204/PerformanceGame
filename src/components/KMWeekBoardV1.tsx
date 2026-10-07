@@ -487,9 +487,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    return;
   }
   const sourceState=source==='local'?localState:expertState;
-  const sourceScore=source==='local'?localScore:activeExpertScore;
-  const otherState=source==='local'?expertState:localState;
-  const otherScore=source==='local'?activeExpertScore:localScore;
 
   // First click always selects the clicked source as Depth so the selector
   // visibly changes immediately. The other selected source becomes Breadth.
