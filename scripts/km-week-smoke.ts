@@ -88,6 +88,44 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.deepEqual(secondCycle.flat().length,12,'A new six-round cycle must generate another twelve Challenges from the same six value profiles');
 }
 
+{
+  const retireCompany=createInitialCompanyV2('Retirement Test','kmw-retirement',config);
+  const retireSession={...session,id:'KMWEEKRETIRE',companies:[retireCompany],activeEvents:{},participants:[],timerEndsAt:null,timerPausedSecondsRemaining:600} as GameSessionV2;
+  initialiseKMWeekSessionV1(retireSession);
+  const retireState=retireCompany.kmWeek!;
+  retireState.stage='free';
+  retireState.phase='challenge';
+  retireState.freeRound=5;
+  retireCompany.round=8;
+  const ops=retireCompany.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
+  const hr=retireCompany.experts.find(expert=>expert.domains.some(skill=>skill.domain==='hr'))!;
+  ops.domains[0].score=6;
+  hr.domains[0].score=5;
+  retireCompany.sites.find(site=>site.id==='melbourne')!.teamCapability.operations=4;
+  retireState.challenges=[{id:'RETIRE-R5',title:'Retirement trigger',story:'Test',siteId:'brisbane',domain:'operations',difficulty:1,impact:15,status:'open'}];
+  let retirementResult=applyKMWeekActionV1(retireSession,retireCompany.id,{type:'KM_WEEK_RESOLVE',challengeId:'RETIRE-R5',method:'local'});
+  assert.equal(retirementResult.success,true,retirementResult.message);
+  assert.equal(retireState.phase,'invest');
+  assert.equal(retireState.expertRetirement?.retiredName,ops.name,'The highest-scoring expert must retire after free Round 5 Challenges');
+  assert.equal(retireState.expertRetirement?.retiredScore,6);
+  assert.equal(ops.isVacant,true,'The retired expert must disappear from the active expert pool');
+
+  const retiredName=retireState.expertRetirement!.retiredName;
+  retirementResult=applyKMWeekActionV1(retireSession,retireCompany.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:hr.id,domain:'hr'});
+  assert.equal(retirementResult.success,true,retirementResult.message);
+  assert.equal(retireState.freeRound,6);
+  assert.equal(ops.isVacant,true,'The retired expert must remain absent throughout the next Challenge round');
+
+  retireState.challenges=[{id:'REPLACE-R6',title:'Replacement trigger',story:'Test',siteId:'brisbane',domain:'operations',difficulty:1,impact:15,status:'open'}];
+  retirementResult=applyKMWeekActionV1(retireSession,retireCompany.id,{type:'KM_WEEK_RESOLVE',challengeId:'REPLACE-R6',method:'local'});
+  assert.equal(retirementResult.success,true,retirementResult.message);
+  assert.equal(retireState.phase,'invest');
+  assert.equal(retireState.expertRetirement?.status,'replaced','The replacement must arrive at the next round Invest phase');
+  assert.equal(ops.isVacant,false);
+  assert.notEqual(ops.name,retiredName,'The replacement expert must have a new name');
+  assert.equal(ops.domains[0].score,4,'Replacement expertise must be Knowledge 3 or the strongest site score, whichever is higher');
+}
+
 const opsExpert=()=>company.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
 const resolveGuidedExpert=(includeLocalBreadth=false)=>{
   const challenge=company.kmWeek!.challenges[0];
