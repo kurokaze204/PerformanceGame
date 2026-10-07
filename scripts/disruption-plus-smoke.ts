@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createNewSessionV2 } from '../src/server/gameServiceV4.ts';
-import { createNewSessionV2 as createServiceSessionV2, knowledgeActionV2 as serviceKnowledgeActionV2 } from '../src/server/gameServiceV8.ts';
+import { createNewSessionV2 as createServiceSessionV2, knowledgeActionV2 as serviceKnowledgeActionV2 } from '../src/server/gameServiceV9.ts';
 import { saveSessionV2 } from '../src/server/dbV2.ts';
 import { disruptionStrengthForRoundsV1, estimatedDisruptionRoundsForTimedGameV1, evaluateFinalDisruptionV1, finalDisruptionChanceV1, swapDisruptionWithPeerV1 } from '../src/engine/disruptionPlusV1.ts';
 

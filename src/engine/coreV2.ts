@@ -645,7 +645,10 @@ export function executeRiskPhaseV2(sessionInput: GameSession, companyInput: Comp
 
   const checkedSites = shuffle(company.sites.filter((site) => !site.isClosed)).slice(0, 2);
   for (const site of checkedSites) {
-    const vulnerableDomains = DOMAINS.filter((domain) => site.teamCapability[domain] > site.codifiedKnowledge[domain] && site.teamCapability[domain] > 1);
+    const vulnerableDomains = DOMAINS.filter((domain) =>
+      site.teamCapability[domain] > 1 &&
+      (session.experienceMode === 'newbie' || site.teamCapability[domain] > site.codifiedKnowledge[domain]),
+    );
     if (!vulnerableDomains.length) {
       siteChecks.push({ siteId: site.id, siteName: site.name, domain: null, previousScore: null, newScore: null, knowledgeLost: false });
       continue;
@@ -664,25 +667,43 @@ export function executeRiskPhaseV2(sessionInput: GameSession, companyInput: Comp
   return { expertChecks, siteChecks, departedExperts, workforceAttrition, closedSites };
 }
 
+export function prepareCompanyNextRoundV2(sessionInput: GameSession, companyInput: Company): void {
+  const session = asSessionV2(sessionInput);
+  const company = asCompanyV2(companyInput);
+  const companyRound = Math.max(1, Number(company.round || session.round || 1));
+  company.experts.forEach((expert) => {
+    if (expert.isVacant && expert.replacementDueRound != null && expert.replacementDueRound <= companyRound) {
+      expert.isVacant = false;
+      expert.replacementDueRound = null;
+      expert.name = expert.replacementName || `${expert.name.split(' ')[0]} ${expert.name.split(' ')[1] || 'Morgan'} (Replacement)`;
+      expert.replacementName = null;
+      expert.domains.forEach((x) => { x.score = 4; });
+      expert.state = expert.location === 'HQ' ? 'HQ Assignment' : 'Available';
+    } else if (!expert.isVacant) {
+      expert.state = expert.location === 'HQ' ? 'HQ Assignment' : 'Available';
+    }
+  });
+  company.actionsRemaining = session.config.actions_per_round;
+  const growthChanges=applyKnowledgeTurnoverGrowthV1(company);
+  company.lastKnowledgeGrowth={
+    round:companyRound,
+    total:roundInvestmentMoneyV1(growthChanges.reduce((sum,change)=>sum+(change.after-change.before),0)),
+    sites:growthChanges.map(change=>({siteId:change.siteId,amount:roundInvestmentMoneyV1(change.after-change.before),growthPercent:change.growthPercent})),
+  };
+  company.strategicInvestmentFund = roundInvestmentMoneyV1(company.strategicInvestmentFund + strategicInvestmentContributionV1(company));
+  company.intranetRoundGrowth = emptyScores(0);
+  company.auditedSiteId = null;
+  if (company.horizonScanAvailableRound != null && companyRound > company.horizonScanAvailableRound) {
+    company.horizonScanDomain = null;
+    company.horizonScanAvailableRound = null;
+    company.horizonScanUsedThisRound = false;
+  }
+  recalculateCompanySPOFV2(company, session.config);
+}
+
 export function prepareNextRoundV2(sessionInput: GameSession): void {
   const session = asSessionV2(sessionInput);
-  for (const company of session.companies) {
-    company.experts.forEach((expert) => {
-      if (expert.isVacant && expert.replacementDueRound != null && expert.replacementDueRound <= session.round) {
-        expert.isVacant = false; expert.replacementDueRound = null; expert.name = `${expert.name.split(' ')[0]} ${expert.name.split(' ')[1] || 'Morgan'} (Replacement)`;
-        expert.domains.forEach((x) => { x.score = 4; }); expert.state = expert.location === 'HQ' ? 'HQ Assignment' : 'Available';
-      } else if (!expert.isVacant) expert.state = expert.location === 'HQ' ? 'HQ Assignment' : 'Available';
-    });
-    company.actionsRemaining = session.config.actions_per_round;
-    applyKnowledgeTurnoverGrowthV1(company);
-    company.strategicInvestmentFund = roundInvestmentMoneyV1(company.strategicInvestmentFund + strategicInvestmentContributionV1(company));
-    company.intranetRoundGrowth = emptyScores(0);
-    company.auditedSiteId = null;
-    if (company.horizonScanAvailableRound != null && session.round > company.horizonScanAvailableRound) {
-      company.horizonScanDomain = null; company.horizonScanAvailableRound = null; company.horizonScanUsedThisRound = false;
-    }
-    recalculateCompanySPOFV2(company, session.config);
-  }
+  for (const company of session.companies) prepareCompanyNextRoundV2(session, company);
 }
 
 export function canUseHorizonRedrawV2(sessionInput: GameSession, companyInput: Company, event: ActiveEvent): boolean {

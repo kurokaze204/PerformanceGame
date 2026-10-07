@@ -102,7 +102,7 @@ export const ExpertModal: React.FC<ExpertModalProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold font-mono text-indigo-300">Level {d.score}</span>
-                    {isSpofInDomain && <span title="SPOF Gap >= 3" className="text-amber-400">⚠</span>}
+                    {isSpofInDomain && <span title={`SPOF gap ≥ ${config.spof_gap}`} className="text-amber-400">⚠</span>}
                   </div>
                 </div>
               );

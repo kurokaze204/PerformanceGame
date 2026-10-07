@@ -39,6 +39,15 @@ export function claimCompanyOpenEventV1(
     return { success: false, claimed: false, message: 'That Event is no longer available.' };
   }
 
+  const firstTutorial=company.round===1
+    ?events.find(event=>!event.isResolved&&event.card.tags?.includes('tutorial-programmed-failure'))
+    :undefined;
+  const secondTutorial=company.round===1&&!firstTutorial
+    ?events.find(event=>!event.isResolved&&event.card.tags?.includes('tutorial-knowledge-assembly'))
+    :undefined;
+  const requiredTutorial=firstTutorial||secondTutorial;
+  const requestedEvent=requiredTutorial||requested;
+
   const currentId = String((company as any).uiOpenEventInstanceId || '');
   const current = events.find(event => event.instanceId === currentId && !event.isResolved);
   if (current) {
@@ -52,12 +61,14 @@ export function claimCompanyOpenEventV1(
     };
   }
 
-  (company as any).uiOpenEventInstanceId = requested.instanceId;
+  (company as any).uiOpenEventInstanceId = requestedEvent.instanceId;
   return {
     success: true,
     claimed: true,
-    winnerEventInstanceId: requested.instanceId,
-    message: 'Event opened for the company.',
+    winnerEventInstanceId: requestedEvent.instanceId,
+    message: requiredTutorial&&requiredTutorial.instanceId!==requested.instanceId
+      ? 'Showing the next Round 1 teaching challenge first.'
+      : 'Event opened for the company.',
   };
 }
 

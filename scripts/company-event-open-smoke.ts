@@ -72,7 +72,7 @@ assert.deepEqual(clicks,[
 // There must never be a second authoritative open-card field for the company.
 assert.equal(String((session.companies[0] as any).uiOpenEventInstanceId),'event-1');
 
-const serviceSource=readFileSync(new URL('../src/server/gameServiceV8.ts',import.meta.url),'utf8');
+const serviceSource=readFileSync(new URL('../src/server/gameServiceV9.ts',import.meta.url),'utf8');
 const acknowledgeStart=serviceSource.indexOf('async function acknowledgeEventResolution');
 const acknowledgeEnd=serviceSource.indexOf('export async function knowledgeActionV2',acknowledgeStart);
 const acknowledgeSource=serviceSource.slice(acknowledgeStart,acknowledgeEnd);
@@ -80,8 +80,9 @@ assert.ok(acknowledgeStart>=0&&acknowledgeEnd>acknowledgeStart,'current server m
 assert.equal(acknowledgeSource.includes('claimCompanyOpenEventV1('),false,'acknowledging one Event must not auto-claim/open the next Event');
 assert.ok(acknowledgeSource.includes("clearCompanyOpenEventV1(session,companyId,eventInstanceId)"),'acknowledging an Event must clear the shared open-card state');
 assert.ok(acknowledgeSource.includes("if(event.isResolved)return{success:true"),'duplicate acknowledgements from another browser must be idempotent');
-assert.ok(acknowledgeSource.includes("if(companyFinished)setRoundPhase(company,'investment')"),'finishing a company Events must move only that company into Invest');
-assert.ok(acknowledgeSource.includes("session.phase=allCompanyEventsResolved(session)?'investment':'respond'"),'shared phase must stay in Events while another company still has unresolved Events');
+assert.ok(acknowledgeSource.includes("if(companyFinished)company.roundPhase='investment'"),'finishing a company Events must move only that company into Invest');
+assert.ok(acknowledgeSource.includes('syncSessionSummary(session);'),'company acknowledgement must leave session phase as a compatibility summary only');
+assert.equal(acknowledgeSource.includes('allCompanyEventsResolved'),false,'one company finishing Events must never inspect or advance every other company');
 
 const resolveStart=serviceSource.indexOf('export async function resolveEventV2');
 const resolveEnd=serviceSource.indexOf('async function acknowledgeEventResolution',resolveStart);

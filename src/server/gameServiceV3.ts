@@ -2,9 +2,9 @@ import {
   getSessionV2 as baseGetSessionV2,
   knowledgeActionV2 as baseKnowledgeActionV2,
   registerSSEClientV2 as baseRegisterSSEClientV2,
-} from './gameServiceV8.ts';
+} from './gameServiceV9.ts';
 
-export * from './gameServiceV8.ts';
+export * from './gameServiceV9.ts';
 
 /**
  * Keep Event acknowledgement idempotent across multiple browsers in one company.

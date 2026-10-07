@@ -12,6 +12,10 @@ const pool = process.env.DATABASE_URL ? new Pool({
 const memory = new Map<string, GameSessionV2>();
 const DOMAINS: KnowledgeDomain[] = ['engineering', 'hr', 'marketing', 'operations', 'finance'];
 
+export function sessionStoreModeV2(): 'postgres'|'memory' {
+  return pool?'postgres':'memory';
+}
+
 export { deleteParticipant, logGameEvent, getGameEventLogs, saveParticipant };
 
 export interface CompanyMetricSnapshot {
@@ -220,7 +224,7 @@ export async function recordCompanyMetric(session: GameSessionV2, company: Compa
     INSERT INTO performance_gap.company_metrics_v2
       (session_id,company_id,elapsed_seconds,round,phase,trigger,turnover,avg_team_capability,avg_codified_knowledge,avg_corporate_intranet,avg_usable_intranet,knowledge_spend,consultant_spend,expected_successes,actual_successes)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-  `, [session.id, company.id, elapsedSeconds(session), session.round, session.phase, trigger, company.turnover, m.avgTeamCapability, m.avgCodifiedKnowledge, m.avgCorporateIntranet, m.avgUsableIntranet, company.cumulativeKnowledgeSpend, company.cumulativeConsultantSpend, company.expectedSuccesses, company.actualSuccesses]);
+  `, [session.id, company.id, elapsedSeconds(session), company.round, company.roundPhase, trigger, company.turnover, m.avgTeamCapability, m.avgCodifiedKnowledge, m.avgCorporateIntranet, m.avgUsableIntranet, company.cumulativeKnowledgeSpend, company.cumulativeConsultantSpend, company.expectedSuccesses, company.actualSuccesses]);
 
   await pool.query(`
     UPDATE performance_gap.company_runs_v2 SET
@@ -250,7 +254,7 @@ export async function recordEventReveal(session: GameSessionV2, company: Company
       (event_instance_id,session_id,company_id,round,card_id,card_title,event_type,event_scope,target_site_id,financial_exposure,company_turnover_before,site_turnover_before,reveal_probability_percent,knowledge_requirements,reveal_knowledge)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb)
     ON CONFLICT (event_instance_id) DO NOTHING
-  `, [event.instanceId, session.id, company.id, session.round, event.card.id, event.card.title, event.card.type, event.card.scope, event.targetSiteId || null, event.card.impact, company.turnover, site?.turnover ?? null, revealProbabilityPercent, JSON.stringify(event.card.domains), JSON.stringify(revealKnowledge)]);
+  `, [event.instanceId, session.id, company.id, company.round, event.card.id, event.card.title, event.card.type, event.card.scope, event.targetSiteId || null, event.card.impact, company.turnover, site?.turnover ?? null, revealProbabilityPercent, JSON.stringify(event.card.domains), JSON.stringify(revealKnowledge)]);
 }
 
 export async function recordEventResolution(session: GameSessionV2, company: CompanyV2, event: any, committedProbabilityPercent: number, result: any): Promise<void> {
@@ -275,7 +279,7 @@ export async function recordEventResolution(session: GameSessionV2, company: Com
 
 export async function finaliseAnalyticsRun(session: GameSessionV2, finalResults: any[]): Promise<void> {
   if (!pool) return;
-  await pool.query(`UPDATE performance_gap.game_runs_v2 SET completed_at=NOW(), rounds_completed=$2, elapsed_seconds=$3, final_disruption_card_id=$4 WHERE session_id=$1`, [session.id, Math.min(session.round, session.config.rounds), elapsedSeconds(session), session.finalDisruptionCard?.id || null]);
+  await pool.query(`UPDATE performance_gap.game_runs_v2 SET completed_at=NOW(), rounds_completed=$2, elapsed_seconds=$3, final_disruption_card_id=$4 WHERE session_id=$1`, [session.id, Math.min(Math.max(...session.companies.map(company=>company.round||1)), session.config.rounds), elapsedSeconds(session), session.finalDisruptionCard?.id || null]);
   for (const result of finalResults) {
     const company = session.companies.find((c) => c.id === result.companyId);
     if (!company) continue;

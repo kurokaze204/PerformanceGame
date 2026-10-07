@@ -9,6 +9,7 @@ import {
   KnowledgeDomain,
   Participant,
 } from './game.ts';
+import type { KMWeekCompanyState, KMWeekGoalId } from './kmWeek.ts';
 
 export type BusinessStrategy =
   | 'short_term_profit'
@@ -27,9 +28,10 @@ export type KnowledgeStrategy =
   | 'transfer_best_practice'
   | 'no_particular_strategy';
 
-export type ExperienceMode = 'newbie' | 'expert';
+export type ExperienceMode = 'km_week' | 'newbie' | 'expert';
 export type PopulationMode = 'expand' | 'balanced';
 export type GameEndMode = 'time' | 'rounds';
+export type CompanyRoundPhase = 'events' | 'investment' | 'risk';
 
 export interface CoPMessageV1 {
   id:string;
@@ -132,12 +134,22 @@ export interface CompanyV2 extends Company {
   disruptionSwapNotice?: DisruptionSwapNoticeV1 | null;
   riverTeachingUse?: { round: number; siteIds: string[] };
   strategicInvestmentFund: number;
-  autopilotEnabled: boolean;
+  /** Each company owns its progression. Session round/phase are compatibility summaries only. */
+  round: number;
+  roundPhase: CompanyRoundPhase;
+  /** The sole participant allowed to change this company's game state. */
+  controllerParticipantId: string | null;
   siteKmActivityUse?: { round: number; counts: Record<string, number> };
+  lastKnowledgeGrowth?: {
+    round: number;
+    total: number;
+    sites: { siteId: string; amount: number; growthPercent: number }[];
+  } | null;
   initialRiverSnapshot?: {
     sites: Company['sites'];
     experts: ExpertV2[];
   };
+  kmWeek?: KMWeekCompanyState;
 }
 
 export interface RiskSummaryV2 {
@@ -202,6 +214,7 @@ export interface GameSessionV2 extends Omit<GameSession, 'companies' | 'activeEv
   soloMode: boolean;
   copMessages: CoPMessageV1[];
   soloCopPeer: SoloCoPPeerV1 | null;
+  kmWeekGoalId?: KMWeekGoalId;
 }
 
 export interface V2BalanceConfig {
@@ -257,6 +270,7 @@ export function asCompanyV2(company: Company): CompanyV2 {
   c.disruptionSwapNotice ??= null;
   c.strategicInvestmentFund ??= 25;
   c.siteKmActivityUse ??= { round: 0, counts: {} };
+  c.lastKnowledgeGrowth ??= null;
   for (const site of c.sites || []) c.cumulativeSiteKnowledgeSpend[site.id] ??= 0;
   for (const expert of c.experts || []) expert.replacementName ??= null;
   return c;
@@ -265,9 +279,13 @@ export function asCompanyV2(company: Company): CompanyV2 {
 export function asSessionV2(session: GameSession): GameSessionV2 {
   const s = session as GameSessionV2;
   s.companies = s.companies.map(asCompanyV2);
-  s.companies.forEach((company,index)=>{
-    company.autopilotEnabled ??= index > 0;
-    if(index===0)company.autopilotEnabled=false;
+  const legacyPhase:CompanyRoundPhase=s.phase==='investment'?'investment':s.phase==='risk'?'risk':'events';
+  s.companies.forEach((company)=>{
+    company.round ??= Math.max(1,Number(s.round||1));
+    company.roundPhase ??= legacyPhase;
+    company.controllerParticipantId ??= null;
+    // Remove the retired synchronous-multiplayer field from persisted legacy snapshots.
+    delete (company as any).autopilotEnabled;
   });
   s.timerStartedAt ??= null;
   s.timerEndsAt ??= null;
