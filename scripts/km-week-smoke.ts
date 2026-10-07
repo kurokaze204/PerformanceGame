@@ -10,6 +10,7 @@ import {
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
   KM_WEEK_SHOCK_FAILURE_COST,
+  KM_WEEK_MAX_EXPERT_KNOWLEDGE,
   freeChallengesForRound,
   kmWeekRiskOddsV1,
 } from '../src/engine/kmWeekV1.ts';
@@ -73,13 +74,14 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   const expected=[
     'hr:3|hr:3',
     'hr:1|marketing:2',
-    'marketing:3|operations:3',
+    'marketing:3|operations:7',
     'operations:3|operations:5',
     'marketing:4|operations:3',
-    'hr:4|marketing:3',
+    'marketing:5|marketing:6',
   ].sort();
   assert.deepEqual(signatures,expected,'Each six-round cycle must contain the agreed six challenge-value profiles exactly once');
-  assert.equal(rounds.filter(cards=>cards[0].domain===cards[1].domain&&cards.every(card=>card.difficulty>2)).length,2,'Each cycle must contain two same-domain expert-bottleneck rounds');
+  assert.equal(rounds.filter(cards=>cards[0].domain===cards[1].domain&&cards.every(card=>card.difficulty>2)).length,3,'Each cycle must contain three same-domain expert-bottleneck rounds');
+  assert.ok(rounds.flat().every(card=>card.impact===card.difficulty*15),'Free-play business impact must scale at $15k per required knowledge level');
   assert.ok(rounds.every(cards=>cards[0].siteId!==cards[1].siteId),'The two Challenges in a round must be assigned to different sites');
   assert.equal(new Set(rounds.flat().map(card=>card.title)).size,12,'Story descriptions must not repeat within a six-round cycle');
   const secondCycle=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+7));
@@ -159,7 +161,7 @@ assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne
 }
 
 const makeFreeInvestment=()=>{
-  const trainable=company.experts.find(candidate=>candidate.domains[0].score<5);
+  const trainable=company.experts.find(candidate=>candidate.domains[0].score<KM_WEEK_MAX_EXPERT_KNOWLEDGE);
   if(trainable){
     const skill=trainable.domains[0];
     return applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:trainable.id,domain:skill.domain});
