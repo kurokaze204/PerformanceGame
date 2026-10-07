@@ -259,6 +259,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
  const[scorePadOpen,setScorePadOpen]=useState(false);
  const[turnoverChartOpen,setTurnoverChartOpen]=useState(false);
+ const[expertChangeDismissedKey,setExpertChangeDismissedKey]=useState('');
  const[challengeAttention,setChallengeAttention]=useState(false);
  const[riskResult,setRiskResult]=useState<{roll:number;won:boolean;requiredRoll:number;performanceGap:number}|null>(null);
  const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
@@ -399,6 +400,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const confidentResponseReady=Boolean(activePending?.method&&(activePending.method==='local'||activePending.method==='expert')&&selectedKnowledge>=activeChallenge!.difficulty);
  const responseReady=Boolean(riskSelected||confidentResponseReady);
  const activeExpertTravelCost=activeChallenge&&activeExpert&&activeExpert.location!==activeChallenge.siteId?2:0;
+ const expertChange=state.expertRetirement;
+ const expertChangeKind=state.stage==='free'&&state.phase==='invest'&&expertChange
+  ?expertChange.status==='retired'&&state.freeRound===expertChange.retiredAtRound?'retired'
+   :expertChange.status==='replaced'&&state.freeRound===expertChange.replacementRound?'replaced'
+   :null
+  :null;
+ const expertChangeKey=expertChangeKind&&expertChange?`${expertChangeKind}:${expertChange.expertId}:${state.freeRound}`:'';
+ const showExpertChangePopup=Boolean(expertChangeKind&&expertChangeKey!==expertChangeDismissedKey);
 
  const post=async(payload:any,beforeApply?:(nextSession:GameSessionV2)=>Promise<void>)=>{
   if(readOnly){onToast(`Read only · ${controllerName||'Your CEO'} controls this company.`);return false}
@@ -675,6 +684,31 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   </header>
 
   <TurnoverKnowledgeModal open={turnoverChartOpen} session={session} currentCompanyId={company.id} onClose={()=>setTurnoverChartOpen(false)}/>
+
+  {showExpertChangePopup&&expertChange&&<>
+   <div aria-hidden="true" className="fixed inset-0 z-[180] bg-black/70"/>
+   <div role="dialog" aria-modal="true" aria-label={expertChangeKind==='retired'?'Expert retirement':'New expert hired'} className="fixed left-1/2 top-1/2 z-[195] w-[min(500px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-5 shadow-[0_28px_90px_rgba(0,0,0,.78)]">
+    <button type="button" onClick={()=>setExpertChangeDismissedKey(expertChangeKey)} aria-label="Close expert change message" className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-xl border border-slate-700 bg-slate-950/80 text-slate-300 hover:border-slate-500 hover:text-white"><X className="h-4 w-4"/></button>
+    {expertChangeKind==='retired'?<>
+     <div className="text-[9px] font-black uppercase tracking-[.18em] text-rose-300">Knowledge risk just became real</div>
+     <h2 className="mt-2 pr-10 text-2xl font-black text-white">{expertChange.retiredName} has retired.</h2>
+     <p className="mt-2 text-sm leading-relaxed text-slate-200">Your highest-scoring expert was <b className="text-amber-200">{domainLabel(expertChange.domain)} Knowledge {expertChange.retiredScore}</b>. That expertise has now left the company. The expert will be unavailable for the next Challenge round, and a replacement will arrive when that round reaches Invest.</p>
+     <div className="mt-4 rounded-xl border-2 border-violet-700 bg-violet-950/25 p-3">
+      <div className="text-[9px] font-black uppercase tracking-[.14em] text-violet-300">Your question</div>
+      <div className="mt-1 text-base font-black text-white">What are you going to do to rebuild this capability?</div>
+     </div>
+    </>:<>
+     <div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Replacement expert hired</div>
+     <h2 className="mt-2 pr-10 text-2xl font-black text-white">{expertChange.replacementName} has joined the company.</h2>
+     <p className="mt-2 text-sm leading-relaxed text-slate-200">Your new <b className="text-amber-200">{domainLabel(expertChange.domain)}</b> expert starts at <b className="text-amber-200">Knowledge {expertChange.replacementScore}</b> — Knowledge 3 or the strongest site capability in that domain, whichever was higher.</p>
+     <div className="mt-4 rounded-xl border-2 border-violet-700 bg-violet-950/25 p-3">
+      <div className="text-[9px] font-black uppercase tracking-[.14em] text-violet-300">Your question</div>
+      <div className="mt-1 text-base font-black text-white">What are you planning to do to protect the organisation from this happening again?</div>
+     </div>
+    </>}
+    <button type="button" onClick={()=>setExpertChangeDismissedKey(expertChangeKey)} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">CONTINUE TO INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+   </div>
+  </>}
 
   {state.stage==='guided'&&state.phase==='invest'&&state.guidedTurn===1&&!firstInvestBriefDismissed&&<>
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/75"/>
