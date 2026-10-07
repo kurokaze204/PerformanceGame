@@ -1,4 +1,4 @@
-import React,{useMemo}from'react';
+import React,{useMemo,useState}from'react';
 import type{Expert,KnowledgeDomain}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,ExperienceMode}from'../types/gameV2.ts';
@@ -39,6 +39,7 @@ const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
 export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview})=>{
+ const[riverInfoOpen,setRiverInfoOpen]=useState(false);
  const domains=mode==='expert'?EXPERT:mode==='km_week'?KM_WEEK:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
  const experts=company.experts.filter(expert=>!expert.isVacant);
@@ -66,7 +67,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const domainIndex=domains.indexOf(selectedDomain);
  const referenceSite=referenceSiteId?sites.find(site=>site.id===referenceSiteId):undefined;
  const referencePath=referenceHQ?data.map((item,di)=>`${di?'L':'M'} ${x(di)+28} ${y(company.intranet[item.domain]||0)}`).join(' '):referenceSite?data.map((item,di)=>{const si=item.scores.findIndex(entry=>entry.site.id===referenceSite.id);if(si<0)return'';const domainSelected=item.domain===selectedDomain;const siteSpread=showSiteLabels&&domainSelected?18:9;const px=clamp(x(di)+(si-(item.scores.length-1)/2)*siteSpread,padL+6,W-padR-6);return `${di?'L':'M'} ${px} ${y(item.scores[si].score)}`}).filter(Boolean).join(' '):'';
- return <div className={`${compact?'h-full min-h-[170px] rounded-xl p-2':'h-full min-h-[260px] rounded-2xl p-3'} border border-slate-700 bg-slate-950/95 shadow-inner`}>
+ return <div className={`${compact?'h-full min-h-[170px] rounded-xl p-2':'h-full min-h-[260px] rounded-2xl p-3'} relative border border-slate-700 bg-slate-950/95 shadow-inner`}>
   {!compact&&<div className="flex items-center justify-between gap-3 px-1">
    <div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>
    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500"><span className="text-slate-50">● Site</span>{mode!=='km_week'&&<span className="text-sky-300">◆ HQ</span>}<span className="text-amber-300">● Expert</span>{thresholdLine&&<span className="text-yellow-300">┄ Shock cut-off</span>}</div>
@@ -165,5 +166,10 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
    })}
    <text x="18" y={H/2} textAnchor="middle" fill="#64748b" fontSize="14" fontWeight="700" transform={`rotate(-90 18 ${H/2})`}>Knowledge level</text>
   </svg>
+  {riverInfoOpen&&<div role="dialog" aria-label="About the River diagram" className="absolute bottom-12 right-3 z-30 w-[min(340px,calc(100%-24px))] rounded-xl border-2 border-sky-700 bg-[#0b1220]/98 p-3 text-left shadow-[0_16px_40px_rgba(0,0,0,.55)]">
+   <div className="text-[9px] font-black uppercase tracking-[.14em] text-sky-300">About The River</div>
+   <p className="mt-1 text-[11px] leading-relaxed text-slate-200">To learn more about The River diagram and how to use it to manage your knowledge, check out Chris Collison and Geoff Parcell&apos;s book <b className="text-white">&apos;No more consultants&apos;</b>.</p>
+  </div>}
+  <button type="button" aria-label="About the River diagram" aria-expanded={riverInfoOpen} onClick={()=>setRiverInfoOpen(open=>!open)} className="absolute bottom-3 right-3 z-40 grid h-8 w-8 place-items-center rounded-full border-2 border-sky-500 bg-slate-950/95 text-sm font-black italic text-sky-200 shadow-lg hover:border-sky-300 hover:text-white">i</button>
  </div>;
 };
