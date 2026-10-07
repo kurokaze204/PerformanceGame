@@ -262,6 +262,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[expertChangeDismissedKey,setExpertChangeDismissedKey]=useState('');
  const[challengeAttention,setChallengeAttention]=useState(false);
  const[riskResult,setRiskResult]=useState<{roll:number;won:boolean;requiredRoll:number;performanceGap:number}|null>(null);
+ const[riskRollPending,setRiskRollPending]=useState<{requiredRoll:number;performanceGap:number}|null>(null);
  const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
  const[riverFrozenCompany,setRiverFrozenCompany]=useState<CompanyV2|null>(null);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
@@ -309,10 +310,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  },[state?.stage,state?.phase,state?.guidedTurn]);
 
  useEffect(()=>{
-  if(state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1)return;
+  if(state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1||riskRollPending||riskResult)return;
   const key=`tpg:kmw-score-brief:${session.id}:${company.id}`;
   if(localStorage.getItem(key)!=='seen')setScoreBriefOpen(true);
- },[state?.stage,state?.phase,state?.freeRound,session.id,company.id]);
+ },[state?.stage,state?.phase,state?.freeRound,session.id,company.id,riskRollPending,riskResult]);
 
  useEffect(()=>{
   if(!state)return;
@@ -407,7 +408,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    :null
   :null;
  const expertChangeKey=expertChangeKind&&expertChange?`${expertChangeKind}:${expertChange.expertId}:${state.freeRound}`:'';
- const showExpertChangePopup=Boolean(expertChangeKind&&expertChangeKey!==expertChangeDismissedKey);
+ const showExpertChangePopup=Boolean(expertChangeKind&&expertChangeKey!==expertChangeDismissedKey&&!riskRollPending&&!riskResult);
 
  const post=async(payload:any,beforeApply?:(nextSession:GameSessionV2)=>Promise<void>)=>{
   if(readOnly){onToast(`Read only · ${controllerName||'Your CEO'} controls this company.`);return false}
@@ -531,6 +532,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(!pendingResponse.method)return;
   const committed=pendingResponse;
   const payload={type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth',useLocalRisk:committed.method==='risk'&&committed.localSelection!=='none'};
+  if(committed.method==='risk'){
+   const selectedLocal=committed.localSelection!=='none'?localScore:0;
+   const immediateOdds=kmWeekRiskOddsV1(selectedLocal,activeChallenge?.difficulty||0);
+   // Show the dice surface immediately while the server resolves the authoritative roll.
+   // This masks network latency and also blocks Invest-phase teaching popups until
+   // the player has seen the result and explicitly continued.
+   setScoreBriefOpen(false);
+   setRiskRollPending({requiredRoll:immediateOdds.requiredRoll,performanceGap:immediateOdds.performanceGap});
+  }
   const beforeApply=committed.method==='risk'?async(nextSession:GameSessionV2)=>{
    const nextCompany=nextSession.companies.find(item=>item.id===company.id);
    const resolved=nextCompany?.kmWeek?.challenges.find(item=>item.id===committed.challengeId);
@@ -539,9 +549,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     const selectedLocal=committed.localSelection!=='none'?(resolvedSite?.teamCapability[resolved.domain]||0):0;
     const odds=kmWeekRiskOddsV1(selectedLocal,resolved.difficulty);
     setRiskResult({roll:resolved.dieRoll,won:resolved.status==='success',requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
+    setRiskRollPending(null);
    }
   }:undefined;
   const ok=await post(payload,beforeApply);
+  if(!ok&&committed.method==='risk')setRiskRollPending(null);
   if(ok){
    setChallengeDrafts(current=>{
     const next={...current};
@@ -726,8 +738,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>
   </>}
 
-  {riskResult&&<div className="fixed inset-0 z-[175] grid place-items-center bg-black/55 p-4">
-   <div role="dialog" aria-modal="true" aria-label="Risk response result" className={`w-[min(360px,calc(100vw-32px))] rounded-[24px] border-4 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.75)] ${riskResult.won?'border-emerald-300 bg-emerald-950':'border-rose-300 bg-rose-950'}`}>
+  {(riskRollPending||riskResult)&&<div className="fixed inset-0 z-[205] grid place-items-center bg-black/70 p-4">
+   {riskResult?<div role="dialog" aria-modal="true" aria-label="Risk response result" className={`w-[min(360px,calc(100vw-32px))] rounded-[24px] border-4 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.75)] ${riskResult.won?'border-emerald-300 bg-emerald-950':'border-rose-300 bg-rose-950'}`}>
     <Dices className={`mx-auto h-10 w-10 ${riskResult.won?'text-emerald-200':'text-rose-200'}`}/>
     <div className="mt-2 text-[10px] font-black uppercase tracking-[.18em] text-slate-300">You took the chance</div>
     <div className="mt-3 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-left text-xs text-slate-200">
@@ -737,7 +749,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     </div>
     <div className={`mt-3 text-xl font-black ${riskResult.won?'text-emerald-200':'text-rose-200'}`}>{riskResult.won?'SUCCESS':'FAILURE'}</div>
     <button type="button" onClick={()=>setRiskResult(null)} className={`mt-4 h-11 w-full rounded-xl border-2 text-sm font-black ${riskResult.won?'border-emerald-200 bg-emerald-300 text-emerald-950':'border-rose-200 bg-rose-300 text-rose-950'}`}>CONTINUE</button>
-   </div>
+   </div>:<div role="dialog" aria-modal="true" aria-label="Rolling risk response" className="w-[min(360px,calc(100vw-32px))] rounded-[24px] border-4 border-violet-300 bg-violet-950 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.75)]">
+    <Dices className="mx-auto h-12 w-12 animate-spin text-violet-200"/>
+    <div className="mt-3 text-[10px] font-black uppercase tracking-[.18em] text-violet-200">You took the chance</div>
+    <div className="mt-2 text-xl font-black text-white">ROLLING…</div>
+    <div className="mt-3 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-left text-xs text-slate-200">
+     <div className="flex items-center justify-between"><span>Performance gap</span><b className="text-white">{riskRollPending?.performanceGap}</b></div>
+     <div className="mt-1 flex items-center justify-between"><span>Roll needed</span><b className="text-white">{riskRollPending?.requiredRoll}+</b></div>
+    </div>
+   </div>}
   </div>}
 
   {scoreBriefOpen&&<>
