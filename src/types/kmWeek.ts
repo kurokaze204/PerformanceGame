@@ -63,6 +63,18 @@ export interface KMWeekShockCheck {
   recovered?: boolean;
 }
 
+export interface KMWeekExpertRetirement {
+  expertId: string;
+  domain: KnowledgeDomain;
+  retiredName: string;
+  retiredScore: number;
+  retiredAtRound: number;
+  replacementRound: number;
+  replacementName: string;
+  replacementScore?: number;
+  status: 'retired' | 'replaced';
+}
+
 export interface KMWeekCompanyState {
   stage: KMWeekStage;
   phase: KMWeekPhase;
@@ -80,6 +92,7 @@ export interface KMWeekCompanyState {
   turnoverHistory: KMWeekTurnoverPoint[];
   shockChecks: KMWeekShockCheck[];
   shockResolved: boolean;
+  expertRetirement?: KMWeekExpertRetirement;
   score: KMWeekScore;
   lastMessage?: string;
 }
