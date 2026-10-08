@@ -16,14 +16,14 @@ export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
 export const KM_WEEK_MAX_KNOWLEDGE = 5;
 export const KM_WEEK_MAX_EXPERT_KNOWLEDGE = 6;
 export const KM_WEEK_SHOCK_WINDOW_SECONDS = 180;
-export const KM_WEEK_SHOCK_FAILURE_COST = 15;
+export const KM_WEEK_SHOCK_GAP_COST = 20;
 
 export const KM_WEEK_SHOCK_SPECS:{id:string;siteId:string;domain:KnowledgeDomain;difficulty:number}[]=[
-  {id:'S1',siteId:'brisbane',domain:'operations',difficulty:2},
-  {id:'S2',siteId:'perth',domain:'operations',difficulty:1},
-  {id:'S3',siteId:'melbourne',domain:'hr',difficulty:2},
-  {id:'S4',siteId:'brisbane',domain:'marketing',difficulty:2},
-  {id:'S5',siteId:'perth',domain:'marketing',difficulty:2},
+  {id:'S1',siteId:'brisbane',domain:'operations',difficulty:4},
+  {id:'S2',siteId:'perth',domain:'operations',difficulty:3},
+  {id:'S3',siteId:'melbourne',domain:'hr',difficulty:4},
+  {id:'S4',siteId:'brisbane',domain:'marketing',difficulty:3},
+  {id:'S5',siteId:'perth',domain:'marketing',difficulty:4},
 ];
 export const KM_WEEK_SHOCK_CUTOFF=Math.max(...KM_WEEK_SHOCK_SPECS.map(check=>check.difficulty));
 
@@ -77,30 +77,31 @@ type KMWeekEventDescription={id:string;title:string;story:string};
 // shuffled for each company at the start of every six-round cycle.
 const FREE_ROUND_VALUES:KMWeekFreeValue[][]=[
   [
-    {id:'HR3A',domain:'hr',difficulty:3,impact:45},
+    {id:'HR3',domain:'hr',difficulty:3,impact:45},
+    {id:'HR4',domain:'hr',difficulty:4,impact:60},
+  ],
+  [
     {id:'HR3B',domain:'hr',difficulty:3,impact:45},
+    {id:'MKT4A',domain:'marketing',difficulty:4,impact:60},
   ],
   [
-    {id:'HR1',domain:'hr',difficulty:1,impact:15},
-    {id:'MKT2',domain:'marketing',difficulty:2,impact:30},
+    {id:'MKT4B',domain:'marketing',difficulty:4,impact:60},
+    {id:'OPS8',domain:'operations',difficulty:8,impact:120},
   ],
   [
-    {id:'MKT3A',domain:'marketing',difficulty:3,impact:45},
-    {id:'OPS7',domain:'operations',difficulty:7,impact:105},
+    {id:'OPS6',domain:'operations',difficulty:6,impact:90},
+    {id:'OPS4A',domain:'operations',difficulty:4,impact:60},
   ],
   [
-    {id:'OPS5',domain:'operations',difficulty:5,impact:75},
-    {id:'OPS3B',domain:'operations',difficulty:3,impact:45},
+    {id:'MKT5A',domain:'marketing',difficulty:5,impact:75},
+    {id:'OPS4B',domain:'operations',difficulty:4,impact:60},
   ],
   [
-    {id:'MKT4',domain:'marketing',difficulty:4,impact:60},
-    {id:'OPS3C',domain:'operations',difficulty:3,impact:45},
-  ],
-  [
-    {id:'MKT5',domain:'marketing',difficulty:5,impact:75},
     {id:'MKT6',domain:'marketing',difficulty:6,impact:90},
+    {id:'MKT5B',domain:'marketing',difficulty:5,impact:75},
   ],
 ];
+const FREE_CYCLE_DIFFICULTY_TOTAL=FREE_ROUND_VALUES.flat().reduce((sum,card)=>sum+card.difficulty,0);
 
 // Eighteen story cards: six per knowledge domain. Only twelve are drawn in a
 // normal six-round cycle, so companies see different stories as well as a
@@ -355,6 +356,7 @@ export function initialiseKMWeekCompanyV1(company:CompanyV2){
     challenges:[guidedChallenge(1)],
     usedExpertIds:[],
     freeSuccesses:0,
+    businessDifficultySolved:0,
     localSuccesses:0,
     expertSuccesses:0,
     riskSuccesses:0,
@@ -437,8 +439,9 @@ function goalAchieved(session:GameSessionV2,company:CompanyV2){
 export function calculateKMWeekScoreV1(session:GameSessionV2,company:CompanyV2):KMWeekScore{
   const state=company.kmWeek;
   if(!state)return emptyScore();
+  const weightedBusiness=state.businessDifficultySolved??state.freeSuccesses*3;
   const score:KMWeekScore={
-    business:Math.min(12,state.freeSuccesses*2),
+    business:Math.min(12,Math.round((weightedBusiness/FREE_CYCLE_DIFFICULTY_TOTAL)*12)),
     expertise:expertisePoints(company),
     localCapability:localCapabilityPoints(company),
     knowledgeFlow:Math.min(6,state.knowledgeTransfers+state.meaningfulTransfers),
