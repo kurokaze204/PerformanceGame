@@ -704,7 +704,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     {expertChangeKind==='retired'?<>
      <div className="text-[9px] font-black uppercase tracking-[.18em] text-rose-300">Knowledge risk just became real</div>
      <h2 className="mt-2 pr-10 text-2xl font-black text-white">{expertChange.retiredName} has retired.</h2>
-     <p className="mt-2 text-sm leading-relaxed text-slate-200">Your highest-scoring expert was <b className="text-amber-200">{domainLabel(expertChange.domain)} Knowledge {expertChange.retiredScore}</b>. That expertise has now left the company. The expert will be unavailable for the next Challenge round, and a replacement will arrive when that round reaches Invest.</p>
+     <p className="mt-2 text-sm leading-relaxed text-slate-200">Your highest-scoring expert was <b className="text-amber-200">{domainLabel(expertChange.domain)} Knowledge {expertChange.retiredScore}</b>. That expertise has now left the company.</p>
      <div className="mt-4 rounded-xl border-2 border-violet-700 bg-violet-950/25 p-3">
       <div className="text-[9px] font-black uppercase tracking-[.14em] text-violet-300">Your question</div>
       <div className="mt-1 text-base font-black text-white">What are you going to do to rebuild this capability?</div>
@@ -712,7 +712,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     </>:<>
      <div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Replacement expert hired</div>
      <h2 className="mt-2 pr-10 text-2xl font-black text-white">{expertChange.replacementName} has joined the company.</h2>
-     <p className="mt-2 text-sm leading-relaxed text-slate-200">Your new <b className="text-amber-200">{domainLabel(expertChange.domain)}</b> expert starts at <b className="text-amber-200">Knowledge {expertChange.replacementScore}</b> — Knowledge 3 or the strongest site capability in that domain, whichever was higher.</p>
+     <p className="mt-2 text-sm leading-relaxed text-slate-200">Your new <b className="text-amber-200">{domainLabel(expertChange.domain)}</b> expert starts at <b className="text-amber-200">Knowledge {expertChange.replacementScore}</b>.</p>
      <div className="mt-4 rounded-xl border-2 border-violet-700 bg-violet-950/25 p-3">
       <div className="text-[9px] font-black uppercase tracking-[.14em] text-violet-300">Your question</div>
       <div className="mt-1 text-base font-black text-white">What are you planning to do to protect the organisation from this happening again?</div>
