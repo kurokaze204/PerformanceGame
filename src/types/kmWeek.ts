@@ -83,6 +83,7 @@ export interface KMWeekCompanyState {
   challenges: KMWeekChallenge[];
   usedExpertIds: string[];
   freeSuccesses: number;
+  businessDifficultySolved?: number;
   localSuccesses: number;
   expertSuccesses: number;
   riskSuccesses: number;
