@@ -9,7 +9,7 @@ import {
   calculateKMWeekScoreV1,
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
-  KM_WEEK_SHOCK_FAILURE_COST,
+  KM_WEEK_SHOCK_GAP_COST,
   KM_WEEK_MAX_EXPERT_KNOWLEDGE,
   freeChallengesForRound,
   kmWeekRiskOddsV1,
@@ -72,11 +72,11 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   const rounds=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+1));
   const signatures=rounds.map(cards=>cards.map(card=>card.domain+':'+card.difficulty).sort().join('|')).sort();
   const expected=[
-    'hr:3|hr:3',
-    'hr:1|marketing:2',
-    'marketing:3|operations:7',
-    'operations:3|operations:5',
-    'marketing:4|operations:3',
+    'hr:3|hr:4',
+    'hr:3|marketing:4',
+    'marketing:4|operations:8',
+    'operations:4|operations:6',
+    'marketing:5|operations:4',
     'marketing:5|marketing:6',
   ].sort();
   assert.deepEqual(signatures,expected,'Each six-round cycle must contain the agreed six challenge-value profiles exactly once');
@@ -86,6 +86,15 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.equal(new Set(rounds.flat().map(card=>card.title)).size,12,'Story descriptions must not repeat within a six-round cycle');
   const secondCycle=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+7));
   assert.deepEqual(secondCycle.flat().length,12,'A new six-round cycle must generate another twelve Challenges from the same six value profiles');
+}
+
+{
+  const scoreProbe=createInitialCompanyV2('Business Score Test','kmw-score-test',config);
+  initialiseKMWeekCompanyV1(scoreProbe);
+  scoreProbe.kmWeek!.businessDifficultySolved=28;
+  assert.equal(calculateKMWeekScoreV1(session,scoreProbe).business,6,'Business Performance must scale with Challenge difficulty solved, not raw win count');
+  scoreProbe.kmWeek!.businessDifficultySolved=56;
+  assert.equal(calculateKMWeekScoreV1(session,scoreProbe).business,12,'Solving the full six-round difficulty load must earn the full 12 Business Performance points');
 }
 
 {
@@ -124,6 +133,26 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.equal(ops.isVacant,false);
   assert.notEqual(ops.name,retiredName,'The replacement expert must have a new name');
   assert.equal(ops.domains[0].score,4,'Replacement expertise must be Knowledge 3 or the strongest site score, whichever is higher');
+}
+
+{
+  const failCompany=createInitialCompanyV2('Shortfall Test','kmw-shortfall',config);
+  const failSession={...session,id:'KMWEEKSHORTFALL',companies:[failCompany],activeEvents:{},participants:[],timerEndsAt:null,timerPausedSecondsRemaining:600} as GameSessionV2;
+  initialiseKMWeekSessionV1(failSession);
+  const failState=failCompany.kmWeek!;
+  failState.stage='free';
+  failState.phase='challenge';
+  failState.freeRound=1;
+  failCompany.round=4;
+  const failSite=failCompany.sites.find(site=>site.id==='brisbane')!;
+  failSite.teamCapability.operations=1;
+  failState.challenges=[{id:'SHORTFALL',title:'Capability shortfall',story:'Test',siteId:'brisbane',domain:'operations',difficulty:4,impact:60,status:'open'}];
+  const beforeFailure=failCompany.turnover;
+  const failed=applyKMWeekActionV1(failSession,failCompany.id,{type:'KM_WEEK_RESOLVE',challengeId:'SHORTFALL',method:'local'});
+  assert.equal(failed.success,true,'A committed underpowered free-play response must resolve as a real business outcome');
+  assert.equal(failState.challenges[0].status,'failure','Knowledge 1 committed against Knowledge 4 must fail rather than return an invalid-move error');
+  assert.equal(failCompany.turnover,beforeFailure-60,'A committed knowledge shortfall must apply the full business loss');
+  assert.equal(failState.phase,'invest','A failed committed response must still complete the Challenge and move the game forward');
 }
 
 const opsExpert=()=>company.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
@@ -253,9 +282,11 @@ assert.equal(result.success,true,result.message);
 assert.equal(company.kmWeek?.stage,'shock','Business Shock must show its result before leaving for the debrief');
 assert.equal(company.kmWeek?.shockChecks.length,5);
 assert.ok(company.kmWeek!.shockChecks.every(check=>Number.isFinite(check.localKnowledge)),'Business Shock result must record the local capability tested at each site');
-const failedSites=new Set(company.kmWeek!.shockChecks.filter(check=>!check.passed).map(check=>check.siteId));
-assert.equal(company.turnover,beforeShockTurnover-(failedSites.size*KM_WEEK_SHOCK_FAILURE_COST),'Business Shock must charge $15k once for each affected site');
-assert.equal(company.kmWeek!.turnoverHistory.filter(point=>point.label.startsWith('SHOCK ')).length,failedSites.size,'Each failed site must appear as a shock cost in the turnover history');
+const missingKnowledge=company.kmWeek!.shockChecks.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+const shockCost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
+assert.equal(company.turnover,beforeShockTurnover-shockCost,'Business Shock must charge $20k for every missing local Knowledge point');
+assert.equal(company.kmWeek!.turnoverHistory.filter(point=>point.label.startsWith('SHOCK ')).length,1,'Business Shock must remain as one explicit turnover event in the final graph');
+assert.ok(company.kmWeek!.turnoverHistory.some(point=>point.label===`SHOCK -${shockCost}k`),'The turnover graph label must retain the exact Business Shock cost');
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_COMPLETE_SHOCK'});
 assert.equal(result.success,true,result.message);
 assert.equal(company.kmWeek?.stage,'complete');
