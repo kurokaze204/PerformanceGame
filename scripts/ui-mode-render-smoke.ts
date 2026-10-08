@@ -332,7 +332,6 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
 }
 
 console.log('Mode-aware UI render smoke tests passed.');
-),'KM Week must make the fixed expert travel cost visible before commit');
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
 assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
 
