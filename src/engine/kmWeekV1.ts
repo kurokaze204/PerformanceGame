@@ -532,6 +532,7 @@ export function resolveKMWeekChallengeV1(
     }
     const total=localKnowledge+breadth;
     won=total>=challenge.difficulty;
+    if(state.stage==='guided'&&!won)return{success:false,message:`${site.name} provides depth ${localKnowledge}${breadth?' plus expert breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.`};
     if(expert){
       travelCost=expert.location===site.id?0:2;
       expert.location=site.id;
@@ -549,6 +550,10 @@ export function resolveKMWeekChallengeV1(
     const breadth=includeLocalBreadth&&localKnowledge>0?1:0;
     const total=skill.score+breadth;
     won=total>=challenge.difficulty;
+    if(state.stage==='guided'&&!won){
+      const breadthHint=!includeLocalBreadth&&localKnowledge>0?' Select the Local Team as breadth to add +1.':'';
+      return{success:false,message:`${expert.name} provides depth ${skill.score}${breadth?' plus local breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.${breadthHint}`};
+    }
     travelCost=expert.location===site.id?0:2;
     expert.location=site.id;
     expert.state='Supporting Event';
