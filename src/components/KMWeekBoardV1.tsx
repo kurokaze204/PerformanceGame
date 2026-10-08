@@ -4,7 +4,7 @@ import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_FAILURE_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 import type{RiverGhostPreview}from'./InvestmentRiverView.tsx';
 import{KMWeekDebriefV1}from'./KMWeekDebriefV1.tsx';
@@ -398,8 +398,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0);
  const selectedKnowledge=riskSelected?riskKnowledge:selectedDepth+selectedBreadth;
  const expertUsed=Boolean(activeExpert&&state.usedExpertIds.includes(activeExpert.id));
- const confidentResponseReady=Boolean(activePending?.method&&(activePending.method==='local'||activePending.method==='expert')&&selectedKnowledge>=activeChallenge!.difficulty);
- const responseReady=Boolean(riskSelected||confidentResponseReady);
+ const deterministicSelected=Boolean(activePending?.method&&(activePending.method==='local'||activePending.method==='expert'));
+ const knowledgeShortfall=activeChallenge&&!riskSelected?Math.max(0,activeChallenge.difficulty-selectedKnowledge):0;
+ const responseReady=Boolean(riskSelected||(deterministicSelected&&(!guided||knowledgeShortfall===0)));
  const activeExpertTravelCost=activeChallenge&&activeExpert&&activeExpert.location!==activeChallenge.siteId?2:0;
  const expertChange=state.expertRetirement;
  const expertChangeKind=state.stage==='free'&&state.phase==='invest'&&expertChange
@@ -806,7 +807,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       {scorePadOpen&&<div data-kmw-scorepad className={`absolute left-2 right-2 top-[54px] z-[90] h-fit overflow-visible rounded-[18px] border-2 border-amber-700 bg-[#101827]/[.98] p-3 shadow-[0_20px_60px_rgba(0,0,0,.7)] min-[700px]:left-auto min-[700px]:w-2/3 ${scoreBriefOpen?'z-[135] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}`}>
        <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
        <div className="mt-2 grid grid-cols-2 gap-1.5">
-        <ScoreCell label="Business Performance" value={state.score.business} max="12" icon={<CircleDollarSign className="h-3.5 w-3.5"/>} tip="2 points for each successful free-play Challenge. Improve this by solving business problems successfully."/>
+        <ScoreCell label="Business Performance" value={state.score.business} max="12" icon={<CircleDollarSign className="h-3.5 w-3.5"/>} tip="Weighted by Challenge difficulty. Harder problems contribute more Business Performance points; solving the full six-round challenge set is worth 12."/>
         <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability. Each expert scores 1 point per knowledge level above 3. Use Train Expert to improve it. Hover here to preview the next +1 on the River." ghost="expertise" onGhost={setScoreGhost}/>
         <ScoreCell label="Local capability" value={state.score.localCapability} max="9" icon={<Users className="h-3.5 w-3.5"/>} tip="Scores the strength of the whole local River: 1 point for every 2 local knowledge levels across the nine site/domain positions, up to 9 points. Improve it with Local Training or Knowledge Transfer." ghost="local" onGhost={setScoreGhost}/>
         <ScoreCell label="Knowledge Flow" value={state.score.knowledgeFlow} max="6" icon={<Workflow className="h-3.5 w-3.5"/>} tip="Rewards knowledge actually moved. A transfer now moves half the gap to the stronger source (rounded up), and each level moved scores here, with a bonus when the target crosses Knowledge 2." ghost="flow" onGhost={setScoreGhost}/>
@@ -872,6 +873,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          onLocalClick={()=>cycleKnowledgeSource('local')}
          onExpertClick={()=>cycleKnowledgeSource('expert')}
         />
+        {!guided&&deterministicSelected&&knowledgeShortfall>0&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-1.5 text-[10px] font-black text-rose-200">KNOWLEDGE SHORTFALL {knowledgeShortfall} · If you commit this response, the Challenge will fail.</div>}
         {!guided&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);const riskLocalSelection:ResponseSelectionState=localSelection==='none'?'none':'depth';setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:riskLocalSelection,expertSelection:'none',label:'Take the risk'+(riskLocalSelection!=='none'?' + Local Team':'')+' · '+riskOdds.chancePercent+'%'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+ on d6'}</span></ResponseButton></div>}
         <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5">
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
@@ -903,7 +905,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        <div className="rounded-2xl border-2 border-rose-700 bg-[linear-gradient(145deg,#32121d,#171827)] p-3 text-left">
         <div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-4 border-rose-300 bg-rose-950"><ShieldCheck className="h-5 w-5 text-rose-200"/></div><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-rose-300">Business Shock · final three minutes</div><h3 className="mt-0.5 text-lg font-black text-white">The experts cannot be everywhere at once.</h3></div></div>
         <p className="mt-3 text-[11px] leading-relaxed text-slate-200">Five critical issues hit across the company at the same time. Your specialists are already committed elsewhere, so each site has to act using the knowledge that has actually been built locally.</p>
-        <div className="mt-2 rounded-xl border border-amber-700/70 bg-amber-950/25 p-2 text-[10px] leading-relaxed text-amber-100"><b className="text-amber-300">The consequence:</b> if a site has one or more local capability gaps, the company has to bring in emergency external support at <b>${KM_WEEK_SHOCK_FAILURE_COST}k for that site</b>. That cost comes straight off turnover and will appear in the final graph.</div>
+        <div className="mt-2 rounded-xl border border-amber-700/70 bg-amber-950/25 p-2 text-[10px] leading-relaxed text-amber-100"><b className="text-amber-300">The consequence:</b> every missing local Knowledge point requires emergency external support at <b>$${KM_WEEK_SHOCK_GAP_COST}k per point</b>. The larger the capability gap, the larger the hit to turnover.</div>
        </div>
 
        <div className="mt-3 space-y-1.5">
@@ -916,7 +918,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          const site=company.sites.find(item=>item.id===check.siteId);
          return <div key={check.id} className={'rounded-xl border p-2 text-left '+(check.passed?'border-emerald-700 bg-emerald-950/25':'border-rose-700 bg-rose-950/30')}>
           <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-400">Local Knowledge {check.localKnowledge} · required {check.difficulty}</div></div><div className={'rounded-full border px-2 py-1 text-[9px] font-black '+(check.passed?'border-emerald-500 text-emerald-300':'border-rose-500 text-rose-200')}>{check.passed?'HELD LOCALLY':'CAPABILITY GAP'}</div></div>
-          {!check.passed&&<div className="mt-2 rounded-lg border border-rose-800 bg-slate-950/70 px-2 py-1.5 text-[9px] font-black text-rose-200">This capability gap means the site needs emergency external support.</div>}
+          {!check.passed&&<div className="mt-2 rounded-lg border border-rose-800 bg-slate-950/70 px-2 py-1.5 text-[9px] font-black text-rose-200">Shortfall {Math.max(0,check.difficulty-check.localKnowledge)} · emergency support {money(Math.max(0,check.difficulty-check.localKnowledge)*KM_WEEK_SHOCK_GAP_COST)}</div>}
          </div>;
         })}
        </div>
@@ -925,11 +927,21 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         {(()=>{
          const gaps=state.shockChecks.filter(check=>!check.passed).length;
          const ready=state.shockChecks.length-gaps;
-         const failedSites=new Set(state.shockChecks.filter(check=>!check.passed).map(check=>check.siteId));
-         const cost=failedSites.size*KM_WEEK_SHOCK_FAILURE_COST;
-         return <div className={'mt-3 rounded-xl border-2 p-3 text-left '+(gaps?'border-rose-700 bg-rose-950/25':'border-emerald-700 bg-emerald-950/25')}><div className={'text-[9px] font-black uppercase tracking-[.14em] '+(gaps?'text-rose-300':'text-emerald-300')}>{gaps?'The cost of knowledge gaps':'The payoff from distributed knowledge'}</div><div className="mt-1 text-sm font-black text-white">{ready}/{state.shockChecks.length} critical capabilities held locally.</div><p className="mt-1 text-[10px] leading-relaxed text-slate-300">{gaps?<>{gaps} capability gap{gaps===1?'':'s'} across {failedSites.size} site{failedSites.size===1?'':'s'} forced emergency external support at <b className="text-rose-200">{money(KM_WEEK_SHOCK_FAILURE_COST)} per affected site</b>, taking <b className="text-rose-200">-{money(cost)}</b> from turnover. The organisation could keep operating, but it paid for knowledge that had not been transferred in time.</>:<>Every tested capability was available where the work happened. The company absorbed the shock without emergency external support.</>}</p></div>;
+         const missingKnowledge=state.shockChecks.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+         const cost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
+         const beforeShock=company.turnover+cost;
+         return <div className={'mt-3 rounded-2xl border-2 p-3 text-left '+(gaps?'border-rose-500 bg-rose-950/30':'border-emerald-500 bg-emerald-950/25')}>
+          <div className={'text-[9px] font-black uppercase tracking-[.16em] '+(gaps?'text-rose-300':'text-emerald-300')}>BUSINESS SHOCK RESULT</div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Held locally</div><div className="text-xl font-black text-white">{ready}/{state.shockChecks.length}</div></div>
+           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Knowledge missing</div><div className={'text-xl font-black '+(missingKnowledge?'text-rose-200':'text-emerald-200')}>{missingKnowledge}</div></div>
+           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Emergency support</div><div className={'text-xl font-black '+(cost?'text-rose-200':'text-emerald-200')}>{cost?'-'+money(cost):money(0)}</div></div>
+           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Turnover</div><div className="text-sm font-black text-white">{money(beforeShock)} → {money(company.turnover)}</div></div>
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-300">{gaps?<>The company bought emergency expertise for <b className="text-rose-200">{missingKnowledge} missing knowledge point{missingKnowledge===1?'':'s'}</b>. This cost is now permanently recorded in turnover and will remain visible in the debrief graph.</>:<>Every tested capability was already available where the work happened. No emergency external support was needed.</>}</p>
+         </div>;
         })()}
-        <button onClick={()=>void post({type:'KM_WEEK_COMPLETE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-emerald-300 bg-emerald-400 text-sm font-black text-emerald-950 disabled:opacity-40">{busy?'FINISHING…':'CONTINUE TO SCORE & DEBRIEF'}</button>
+        <button onClick={()=>void post({type:'KM_WEEK_COMPLETE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-emerald-300 bg-emerald-400 text-sm font-black text-emerald-950 disabled:opacity-40">{busy?'FINISHING…':'CONTINUE TO DEBRIEF'}</button>
        </>}
       </div>}
 
