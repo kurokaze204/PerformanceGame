@@ -296,7 +296,7 @@ assert.equal(appBoardEventSource.includes('/advance-phase'),false,'player UI mus
 // Player-legibility audit: important mechanics must be visible without adding permanent instruction walls.
 const eventDecisionSource=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
 assert.ok(eventPlaytestSource.includes('diagnostic={Boolean(isOpeningDiagnostic)}'),'opening challenge must be explicitly marked as diagnostic in both modes');
-assert.ok(eventDecisionSource.includes("What happens when your company has the knowledge but the local site doesn't? You are about to find out."),'diagnostic challenge must frame the knowledge-access gap in player language');
+assert.ok(eventDecisionSource.includes('The site could not contain the issue with the capability immediately available there.'),'diagnostic challenge must frame the knowledge-access gap in player language');
 assert.ok(eventDecisionSource.includes('D {e.depthKnowledge} · B +{e.breadthBonus}'),'ordinary Event scoring must expose compact depth/breadth values');
 assert.ok(eventDecisionSource.includes('A relevant expert unlocks the full score.'),'Corporate Intranet must reveal when absorptive capacity limits usable knowledge');
 assert.ok(eventDecisionSource.includes('Each consultant engagement increases the future rate by 35%.'),'consultant UI must reveal escalating future rates');
@@ -315,7 +315,7 @@ assert.ok(eventPlaytestSource.includes("isOpeningDiagnostic?['existing']"),'firs
 assert.ok(eventPlaytestSource.includes("isAssemblyLesson?['existing','expert']"),'second teaching challenge must expose only existing knowledge and experts');
 assert.ok(eventDecisionSource.includes('visibleModes.map'),'Event strategy rail must render only currently available strategies');
 assert.ok(eventPlaytestSource.includes('teamOnlyExisting={Boolean(isAssemblyLesson)}'),'second teaching challenge must focus existing knowledge on Team Capability');
-assert.ok(eventDecisionSource.includes('2-domain lesson'),'second teaching challenge must have a compact two-domain teaching cue');
+assert.ok(eventDecisionSource.includes('Multiple requirements')&&eventDecisionSource.includes('teachingHint'),'second teaching challenge must have a compact multiple-requirement teaching cue');
 assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInstanceId||event.instanceId)'),'board must display the authoritative Round 1 teaching card even when another card was clicked');
 
 {
