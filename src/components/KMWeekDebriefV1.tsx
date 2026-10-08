@@ -2,6 +2,7 @@ import React,{useMemo,useState}from'react';
 import{ArrowRight,Brain,CircleDollarSign,Medal,ShieldCheck,Target,Users,Workflow,X}from'lucide-react';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import{formatCurrency}from'../utils/format.ts';
+import{KM_WEEK_SHOCK_GAP_COST}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 
 type Props={session:GameSessionV2;company:CompanyV2};
@@ -26,6 +27,24 @@ const MiniScorePad:React.FC<{company:CompanyV2;color:string}>=({company,color})=
  <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><div className="text-xs font-black text-white">Score Pad</div><div className="ml-auto text-2xl font-black text-white">{company.kmWeek?.score.total||0}</div></div>
  <div className="mt-2 grid grid-cols-2 gap-1.5">{scoreItems(company).map(item=><div key={item.label} className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-1.5"><span className="text-slate-500">{item.icon}</span><span className="min-w-0 flex-1 truncate text-[9px] font-black text-slate-500">{item.label}</span><b className="text-sm text-white">{item.value}<span className="ml-0.5 text-[8px] text-slate-600">/{item.max}</span></b></div>)}</div>
 </section>;
+
+const ShockSummary:React.FC<{company:CompanyV2}>=({company})=>{
+ const checks=company.kmWeek?.shockChecks||[];
+ if(!checks.length)return null;
+ const ready=checks.filter(check=>check.passed).length;
+ const missingKnowledge=checks.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+ const cost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
+ const beforeShock=company.turnover+cost;
+ return <section className={'mt-3 rounded-2xl border-2 p-3 '+(missingKnowledge?'border-rose-700 bg-rose-950/20':'border-emerald-700 bg-emerald-950/20')}>
+  <div className={'text-[9px] font-black uppercase tracking-[.16em] '+(missingKnowledge?'text-rose-300':'text-emerald-300')}>Business Shock result</div>
+  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Held locally</div><div className="text-lg font-black text-white">{ready}/{checks.length}</div></div>
+   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Knowledge missing</div><div className={'text-lg font-black '+(missingKnowledge?'text-rose-200':'text-emerald-200')}>{missingKnowledge}</div></div>
+   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Emergency support</div><div className={'text-lg font-black '+(cost?'text-rose-200':'text-emerald-200')}>{cost?'-'+formatCurrency(cost):formatCurrency(0)}</div></div>
+   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Turnover effect</div><div className="text-sm font-black text-white">{formatCurrency(beforeShock)} → {formatCurrency(company.turnover)}</div></div>
+  </div>
+ </section>;
+};
 
 const TurnoverGraph:React.FC<{companies:CompanyV2[];colors:string[]}>=({companies,colors})=>{
  const histories=companies.map(company=>{
@@ -95,6 +114,7 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" compact/></div></div>
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After free play</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" compact/></div></div>
      </div>
+     <ShockSummary company={item}/>
     </section>
    })}
   </div>
