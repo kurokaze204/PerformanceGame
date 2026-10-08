@@ -560,7 +560,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     const next={...current};
     delete next[committed.challengeId];
     if(committed.expertId&&committed.expertSelection!=='none'){
-     for(const [challengeId,draft] of Object.entries(next)){
+     for(const [challengeId,draft] of Object.entries(next) as [string,Exclude<PendingResponse,null>][]){
       if(draft.expertId!==committed.expertId||draft.expertSelection==='none')continue;
       const localSelection=draft.localSelection;
       next[challengeId]={
