@@ -157,6 +157,7 @@ assert.ok(disruptionCardSource.includes("mt-1 rounded-3xl")&&disruptionCardSourc
 assert.ok(disruptionCardSource.includes("h-[180px] w-[130px]")&&disruptionCardSource.includes("xl:h-[260px] xl:w-[186px]"),'The dealt Disruption card must shrink on iPad and return to desktop proportions at XL');
 assert.ok(appBoardSource.includes("companyRoundPhase==='events'"),'Board-level Event/Disruption UI must render only for the current company Events phase');
 
+const tabletCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 const boardShellSource=readFileSync(new URL('../src/components/BoardShell.tsx',import.meta.url),'utf8');
 const strategyPromptSource=readFileSync(new URL('../src/components/StrategyPromptV2.tsx',import.meta.url),'utf8');
 assert.ok(boardShellSource.includes('tpg-board-overlay-scroll')&&boardShellSource.includes('pointer-events-auto overflow-y-scroll')&&boardShellSource.includes('pb-24'),'Board overlays must receive iPad touch gestures, scroll internally, and keep bottom clearance above the phase bar');
@@ -165,7 +166,6 @@ assert.ok(boardShellSource.includes('max-w-full xl:max-w-[min(100%,calc((100dvh-
 assert.ok(tabletCssSource.includes('.tpg-board-shell')&&tabletCssSource.includes('max-width: none !important')&&tabletCssSource.includes('padding-left: .25rem !important'),'Tablet gameplay must remove the narrow 4:3 width cap and minimise side padding');
 assert.ok(strategyPromptSource.includes('overflow-y-auto overscroll-contain touch-pan-y')&&strategyPromptSource.includes('items-start justify-center'),'Strategy setup must scroll inside the viewport on iPad instead of relying on page scrolling');
 assert.ok(strategyPromptSource.includes('!h-12 !text-base')&&strategyPromptSource.includes('xl:!h-14 xl:!text-lg'),'Strategy controls must compact on tablet while keeping desktop sizing at XL');
-const tabletCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes('tpg-game-root')&&appBoardSource.includes('tpg-game-main'),'Active Newbie/Expert gameplay must expose dedicated tablet scroll containers');
 assert.ok(tabletCssSource.includes('.tpg-game-root')&&tabletCssSource.includes('position: fixed')&&tabletCssSource.includes('height: 100dvh')&&tabletCssSource.includes('overflow: hidden'),'iPad gameplay must pin the application to the viewport so Safari cannot scroll the whole document');
 assert.ok(tabletCssSource.includes('.tpg-game-main')&&tabletCssSource.includes('flex: 1 1 auto')&&tabletCssSource.includes('-webkit-overflow-scrolling: touch'),'The normal iPad board surface must remain the internal vertical scroller');
