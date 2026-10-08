@@ -529,14 +529,13 @@ export function resolveKMWeekChallengeV1(
     }
     const total=localKnowledge+breadth;
     won=total>=challenge.difficulty;
-    if(!won)return{success:false,message:`${site.name} provides depth ${localKnowledge}${breadth?' plus expert breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.`};
     if(expert){
       travelCost=expert.location===site.id?0:2;
       expert.location=site.id;
       expert.state='Supporting Event';
       if(state.stage==='free')state.usedExpertIds.push(expert.id);
     }
-    if(state.stage==='free'&&!includeExpertBreadth)state.localSuccesses+=1;
+    if(won&&state.stage==='free'&&!includeExpertBreadth)state.localSuccesses+=1;
   }else if(method==='expert'){
     expert=company.experts.find(item=>item.id===expertId&&!item.isVacant);
     if(!expert)return{success:false,message:'Choose an available expert.'};
@@ -547,15 +546,11 @@ export function resolveKMWeekChallengeV1(
     const breadth=includeLocalBreadth&&localKnowledge>0?1:0;
     const total=skill.score+breadth;
     won=total>=challenge.difficulty;
-    if(!won){
-      const breadthHint=!includeLocalBreadth&&localKnowledge>0?' Select the Local Team as breadth to add +1.':'';
-      return{success:false,message:`${expert.name} provides depth ${skill.score}${breadth?' plus local breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.${breadthHint}`};
-    }
     travelCost=expert.location===site.id?0:2;
     expert.location=site.id;
     expert.state='Supporting Event';
     if(state.stage==='free')state.usedExpertIds.push(expert.id);
-    if(state.stage==='free')state.expertSuccesses+=1;
+    if(won&&state.stage==='free')state.expertSuccesses+=1;
   }else{
     roll=Math.floor(Math.random()*6)+1;
     const team=useLocalRisk?(site.teamCapability[challenge.domain]||0):0;
@@ -578,7 +573,10 @@ export function resolveKMWeekChallengeV1(
   const challengeIndex=state.challenges.findIndex(item=>item.id===challenge.id)+1;
   const challengeLabel=state.stage==='guided'?`G${state.guidedTurn} C`:`R${state.freeRound} C${challengeIndex}`;
   state.turnoverHistory.push({label:challengeLabel,turnover:company.turnover});
-  if(won&&state.stage==='free')state.freeSuccesses+=1;
+  if(won&&state.stage==='free'){
+    state.freeSuccesses+=1;
+    state.businessDifficultySolved=(state.businessDifficultySolved||0)+challenge.difficulty;
+  }
   const travelText=travelCost?` Expert travel -${travelCost}k.`:'';
   const rollText=roll!==undefined?` Dice roll ${roll}: ${won?'SUCCESS':'FAILURE'} (performance gap ${riskPerformanceGap}, needed ${riskRequiredRoll}+).`:'';
   state.lastMessage=won
@@ -706,15 +704,13 @@ export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
 
   const failures=checks.filter(check=>!check.passed);
   const failedSiteIds=[...new Set(failures.map(check=>check.siteId))];
-  for(const siteId of failedSiteIds){
-    applyTurnover(company,-KM_WEEK_SHOCK_FAILURE_COST);
-    const siteLabel=siteId.slice(0,3).toUpperCase();
-    state.turnoverHistory.push({label:`SHOCK ${siteLabel}`,turnover:company.turnover});
-  }
+  const missingKnowledge=failures.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+  const totalCost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
+  if(totalCost>0)applyTurnover(company,-totalCost);
+  state.turnoverHistory.push({label:`SHOCK -${totalCost}k`,turnover:company.turnover});
 
-  const totalCost=failedSiteIds.length*KM_WEEK_SHOCK_FAILURE_COST;
   state.lastMessage=failures.length
-    ? `The shock exposed ${failures.length} local capability gap${failures.length===1?'':'s'} across ${failedSiteIds.length} site${failedSiteIds.length===1?'':'s'}. Emergency external support cost ${totalCost}k in total.`
+    ? `The shock exposed ${failures.length} local capability gap${failures.length===1?'':'s'} across ${failedSiteIds.length} site${failedSiteIds.length===1?'':'s'}, with ${missingKnowledge} knowledge point${missingKnowledge===1?'':'s'} missing. Emergency external support cost ${totalCost}k in total.`
     : `All ${checks.length} critical capability tests were handled locally. No emergency external support was needed.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
@@ -729,9 +725,10 @@ export function completeKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const ready=state.shockChecks.filter(check=>check.passed).length;
   const gaps=state.shockChecks.length-ready;
   const failedSites=new Set(state.shockChecks.filter(check=>!check.passed).map(check=>check.siteId));
-  const cost=failedSites.size*KM_WEEK_SHOCK_FAILURE_COST;
+  const missingKnowledge=state.shockChecks.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+  const cost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
   state.lastMessage=gaps
-    ? `${ready} of ${state.shockChecks.length} critical capabilities held locally. ${gaps} gap${gaps===1?'':'s'} across ${failedSites.size} site${failedSites.size===1?'':'s'} required emergency external support costing ${cost}k.`
+    ? `${ready} of ${state.shockChecks.length} critical capabilities held locally. ${gaps} gap${gaps===1?'':'s'} across ${failedSites.size} site${failedSites.size===1?'':'s'} left ${missingKnowledge} knowledge point${missingKnowledge===1?'':'s'} missing and required emergency external support costing ${cost}k.`
     : `All ${state.shockChecks.length} critical capabilities held locally. The organisation absorbed the shock without external rescue.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
