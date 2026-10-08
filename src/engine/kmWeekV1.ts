@@ -403,7 +403,10 @@ export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
   if(session.finalWindowMinutes!==3){session.finalWindowMinutes=3;changed=true;}
   for(const company of session.companies){
     if(!company.kmWeek){initialiseKMWeekCompanyV1(company);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
-    else if(!company.kmWeek.turnoverHistory){company.kmWeek.turnoverHistory=[{label:'CURRENT',turnover:company.turnover}];changed=true;}
+    else{
+      if(!company.kmWeek.turnoverHistory){company.kmWeek.turnoverHistory=[{label:'CURRENT',turnover:company.turnover}];changed=true;}
+      if(company.kmWeek.businessDifficultySolved===undefined){company.kmWeek.businessDifficultySolved=company.kmWeek.freeSuccesses*3;changed=true;}
+    }
   }
   return changed;
 }
