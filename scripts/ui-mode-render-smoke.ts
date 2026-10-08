@@ -73,7 +73,7 @@ assert.ok(kmWeekDebriefSource.includes('Before free play')&&kmWeekDebriefSource.
 const eventV4Source=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
 const eventProgressionSource=readFileSync(new URL('../src/engine/eventProgressionV5.ts',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoardSource.includes('<KMWeekBoardV1'),'KM Week sessions must use their dedicated play surface');
-assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}/3`"),'KM Week board must expose the three guided and three free-play progression');
+assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}`"),'KM Week board must expose the three guided moves and the open-ended time-boxed free-play round number');
 assert.ok(kmWeekBoardSource.includes('<InvestmentRiverView company={riverFrozenCompany||company} mode="km_week"'),'KM Week must keep the Knowledge River central while supporting animation sequencing');
 assert.ok(kmWeekBoardSource.includes("min-[700px]:grid-cols-[minmax(0,1fr)_310px]")&&kmWeekBoardSource.includes("lg:grid-cols-[minmax(0,1fr)_350px]"),'Tablet-width KM Week must use the desktop-style River/controls two-column layout instead of stacking vertically');
 assert.ok(kmWeekBoardSource.includes("min-[700px]:min-h-[210px]")&&kmWeekBoardSource.includes("min-[700px]:p-2 xl:p-3"),'Tablet-width KM Week must compact the River and site cards so the controls remain visible beside them');
@@ -81,9 +81,9 @@ assert.ok(kmWeekBoardSource.includes("min-[700px]:w-10")&&kmWeekBoardSource.incl
 assert.ok(kmWeekBoardSource.includes("min-[700px]:flex-1")&&kmWeekBoardSource.includes("min-[700px]:h-full min-[700px]:min-h-0 min-[700px]:overflow-y-auto"),'Tablet right-side Challenge/Invest panel must fill the available column and scroll internally');
 assert.ok(kmWeekBoardSource.includes("min-[700px]:overflow-y-auto"),'The tablet Challenge/Invest panel must scroll internally rather than pushing below the River');
 assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'KM Week must limit strategic investment to the agreed three interventions');
-assert.ok(kmWeekBoardSource.includes('Training site')&&kmWeekBoardSource.includes("'+$2k travel'"),'KM Week Local Training must let the player choose another site and show the fixed travel fee');
+assert.ok(kmWeekBoardSource.includes('Training site')&&kmWeekBoardSource.includes("' · +$2k travel'"),'KM Week Local Training must let the player choose another site and show the fixed travel fee');
 assert.ok(kmWeekBoardSource.includes('Travel $2k · total $12k')&&kmWeekBoardSource.includes('No travel · total $10k'),'KM Week Local Training preview must make travel and total cost explicit');
-assert.ok(kmWeekBoardSource.includes('Business Shock')&&kmWeekBoardSource.includes('Can your sites cope without the experts?'),'KM Week must end with a clearly explained local-capability resilience test');
+assert.ok(kmWeekBoardSource.includes('Business Shock · final three minutes')&&kmWeekBoardSource.includes('The experts cannot be everywhere at once.'),'KM Week must end with a clearly explained local-capability resilience test');
 assert.equal(eventV4Source.includes('2-domain lesson'),false,'Newbie and Expert Challenge cards must not label business events as lessons');
 assert.equal(eventV4Source.includes('Diagnostic complete'),false,'Newbie and Expert Challenge cards must not describe business events as diagnostics');
 assert.equal(eventProgressionSource.includes("card.title=\`\${tier}:"),false,'Challenge titles must not expose simulation pressure tiers');
@@ -102,7 +102,7 @@ assert.ok(kmWeekDebriefSource.includes('kmw-aar-slide-in')&&globalCssSource.incl
 assert.ok(riverSource.includes('compact?:boolean'),'Knowledge River must support compact side-by-side AAR comparisons');
 assert.ok(riverSource.includes('data-kmw-score-ghost="expertise"')&&riverSource.includes('data-kmw-score-ghost="local"')&&riverSource.includes('data-kmw-score-ghost="flow"'),'Knowledge River must support glowing blue ghost previews for expertise, local training and knowledge transfer');
 assert.ok(kmWeekBoardSource.includes('ghost="expertise"')&&kmWeekBoardSource.includes('ghost="local"')&&kmWeekBoardSource.includes('ghost="flow"')&&kmWeekBoardSource.includes('ghost="resilience"'),'Score Pad tooltips must drive River previews for the actionable knowledge scores and resilience');
-assert.ok(kmWeekBoardSource.includes('Company experts'),'KM Week must use the business-facing Company experts label');
+assert.ok(kmWeekBoardSource.includes('Company expert'),'KM Week must use the business-facing Company expert label');
 assert.ok(kmWeekBoardSource.includes('Score pad')&&kmWeekBoardSource.includes('ToolTip'),'KM Week score categories must explain how points are earned');
 assert.ok(kmWeekBoardSource.includes('<ToolTip large text={tip}')&&kmWeekBoardSource.includes("large?'h-7 w-7 rounded-full"),'Score Pad help controls must use the same 28px circular target size as the score topic icons');
 assert.ok(kmWeekBoardSource.includes('<span className="min-w-0 flex-1">')&&kmWeekBoardSource.includes('<ToolTip large text={tip}'),'Score Pad help controls must sit at the right-hand end of each score box');
@@ -136,7 +136,7 @@ assert.ok(kmWeekBoardSource.includes('Your Goal card')&&kmWeekBoardSource.includ
 assert.ok(kmWeekBoardSource.includes("state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1"),'The score briefing must trigger at the first free-play Invest round only');
 assert.ok(kmWeekBoardSource.includes('animateKnowledgeSpark')&&riverSource.includes('data-river-target'),'KM Week investments must send a visual knowledge spark toward the River');
 assert.ok(globalCssSource.includes('.kmw-knowledge-spark')&&globalCssSource.includes('transition-duration: 1.2s'),'KM Week River changes must use the glowing spark and 1.2 second movement');
-assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1")&&kmWeekBoardSource.includes('const travelDuration=firstGuidedRound?2200:1100'),'The first guided River cue must run at half speed while later rounds remain slower than before');
+assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1")&&kmWeekBoardSource.includes('const travelDuration=firstGuidedRound?1400:1000'),'The first guided River cue must remain deliberately slower than later rounds');
 assert.ok(kmWeekBoardSource.includes('const animationPromise=animateKnowledgeSpark')&&kmWeekBoardSource.includes('setRiverFrozenCompany(optimisticCompany)'),'River movement must chain directly after the knowledge orb without waiting for the server round-trip');
 assert.ok(kmWeekBoardSource.includes('window.setTimeout(resolve,1300)'),'The Invest screen must remain visible until the River transition has fully completed');
 assert.ok(kmWeekBoardSource.includes('onPresentationHoldChange?.(true)')&&kmWeekBoardSource.includes('onPresentationHoldChange?.(false)'),'KM Week must hold and release presentation state around the knowledge movement sequence');
