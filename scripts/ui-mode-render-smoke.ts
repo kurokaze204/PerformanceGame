@@ -153,7 +153,7 @@ assert.ok(disruptionCardSource.includes("w-[132px] min-h-[176px]"),'Invest Disru
 assert.ok(disruptionCardSource.includes("[overflow-wrap:normal]"),'Disruption domain names must not split inside words');
 assert.ok(disruptionCardSource.includes('tpg-disruption-deal')&&disruptionCardSource.includes('w-[280px]')&&disruptionCardSource.includes('xl:w-[360px]'),'Newbie Disruption setup must use the smaller iPad card while restoring desktop dimensions at XL');
 assert.ok(disruptionCardSource.includes('tpg-disruption-deal')&&disruptionCardSource.includes('touch-pan-y overflow-y-auto overscroll-contain'),'The Disruption box itself must own vertical touch scrolling on iPad');
-assert.ok(disruptionCardSource.includes("mt-1 rounded-3xl")&&disruptionCardSource.includes("min-h-[210px]")&&disruptionCardSource.includes("xl:min-h-[300px]"),'Disruption setup must use a compact tablet layout while retaining the full desktop size');
+assert.ok(disruptionCardSource.includes("mt-2 flex min-h-[170px]")&&disruptionCardSource.includes("xl:min-h-[300px]"),'Disruption setup must use a compact tablet layout while retaining the full desktop size');
 assert.ok(disruptionCardSource.includes("h-[180px] w-[130px]")&&disruptionCardSource.includes("xl:h-[260px] xl:w-[186px]"),'The dealt Disruption card must shrink on iPad and return to desktop proportions at XL');
 assert.ok(appBoardSource.includes("companyRoundPhase==='events'"),'Board-level Event/Disruption UI must render only for the current company Events phase');
 
