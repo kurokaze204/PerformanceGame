@@ -20,6 +20,7 @@ interface Props{
  highlightHQ?:boolean;
  highlightAllSites?:boolean;
  highlightDomain?:boolean;
+ guidedSiteId?:string;
  showSiteLabels?:boolean;
  referenceSiteId?:string;
  referenceHQ?:boolean;
@@ -38,7 +39,7 @@ const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',ad
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,guidedSiteId,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview})=>{
  const[riverInfoOpen,setRiverInfoOpen]=useState(false);
  const domains=mode==='expert'?EXPERT:mode==='km_week'?KM_WEEK:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
@@ -121,9 +122,11 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const rightEdge=px>W-padR-58;
        const labelX=rightEdge?px-10:px+10;
        const labelAnchor=rightEdge?'end':'start';
+       const guidedSite=mode==='km_week'&&domainSelected&&site.id===guidedSiteId;
        const siteGhost=ghostPreview?.kind==='site'&&ghostPreview.domain===item.domain&&ghostPreview.siteId===site.id&&ghostPreview.delta>0;
        const siteGhostY=siteGhost?y(Math.min(5,score+ghostPreview.delta)):py;
        return <g key={site.id} className="kmw-river-motion" data-river-target={`site:${site.id}:${item.domain}`}>
+        {guidedSite&&<circle className="kmw-guided-site-pulse" data-kmw-guided-site={site.id} cx={px} cy={py} r="17" fill="#082f49" fillOpacity=".20" stroke="#38bdf8" strokeWidth="3" strokeDasharray="5 5"/>}
         {siteGhost&&<g data-kmw-score-ghost="local" filter="url(#kmw-blue-ghost-glow)"><line x1={px} y1={py} x2={px} y2={siteGhostY} stroke="#38bdf8" strokeWidth="3" strokeDasharray="6 5"/><circle cx={px} cy={siteGhostY} r="8" fill="#082f49" stroke="#7dd3fc" strokeWidth="2.5" strokeDasharray="4 3"/></g>}
         {(target||source||reference)&&<circle cx={px} cy={py} r="12" fill={source?'#10b981':'#facc15'} fillOpacity=".15" stroke={source?'#34d399':'#fde047'} strokeWidth="3"/>}
         {target&&previewSiteDelta>0&&<><line x1={px} y1={py} x2={px} y2={y(score+previewSiteDelta)} stroke="#fde047" strokeWidth="2" strokeDasharray="4 3"/><circle cx={px} cy={y(score+previewSiteDelta)} r="7" fill="#0f172a" stroke="#fde047" strokeWidth="2" strokeDasharray="3 2"/><text x={px+10} y={y(score+previewSiteDelta)-5} fill="#fde047" fontSize="12" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">+{previewSiteDelta}</text></>}
