@@ -714,6 +714,20 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>
   </header>
 
+  {firstGuidedTour&&guideAnchor&&activeChallenge&&<>
+   <svg className="pointer-events-none fixed inset-0 z-[150]" style={{width:'100vw',height:'100vh'}} aria-hidden="true">
+    <defs><marker id="kmw-tour-arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#38bdf8" strokeWidth="1.5"/></marker></defs>
+    <path d={`M ${guideAnchor.left+(guideAnchor.left<guideAnchor.targetX?guideAnchor.panelWidth:0)} ${guideAnchor.top+112} Q ${(guideAnchor.left+guideAnchor.panelWidth/2+guideAnchor.targetX)/2} ${guideAnchor.targetY-35} ${guideAnchor.targetX} ${guideAnchor.targetY}`} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" markerEnd="url(#kmw-tour-arrowhead)"/>
+   </svg>
+   <section role="status" aria-live="polite" aria-label="Guided challenge walkthrough" className="fixed z-[160] rounded-[22px] border-[3px] border-sky-400 bg-[#071526] p-4 text-left text-white shadow-[0_14px_55px_rgba(8,145,178,.4)]" style={{left:guideAnchor.left,top:guideAnchor.top,width:guideAnchor.panelWidth,maxWidth:'calc(100vw - 24px)'}}>
+    <div className="mb-2 flex items-center justify-between gap-3"><span className="text-xs font-black uppercase tracking-wide text-sky-200">{guideStep} of 5</span><span className="flex gap-1">{[1,2,3,4,5].map(i=><span key={i} className={'h-2 w-2 rounded-full '+(i===guideStep?'bg-sky-300':i<guideStep?'bg-sky-600':'bg-slate-600')}/>)}</span></div>
+    <h3 className="text-lg font-black text-white">{guideStep===1?'The business problem':guideStep===2?'Start with the local team':guideStep===3?'Bring in our expert':guideStep===4?'The team still contributes':'Solve the problem'}</h3>
+    <p className="mt-2 text-sm leading-relaxed text-slate-200">{guideStep===1?<>A surprise business problem has happened in {siteName(company,activeChallenge.siteId)}. Solving it requires significant {domainLabel(activeChallenge.domain)} expertise.</>:guideStep===2?<>Your {siteName(company,activeChallenge.siteId)} team is usually pretty good, but doesn’t have enough knowledge to handle this problem alone. Click their circle to involve them and watch the chance of success increase.</>:guideStep===3?<>Thankfully {activeExpert?.name.split(' ')[0]||'our specialist'} is our company expert in {domainLabel(activeChallenge.domain)}. Based in {activeExpert?siteName(company,activeExpert.location):'another city'}, we can fly them in for a small travel and accommodation cost. Select their circle. Their expertise will guarantee success.</>:guideStep===4?<>Notice how {siteName(company,activeChallenge.siteId)} has moved into a supporting role. We call this <b className="text-sky-300">knowledge breadth</b>. Each additional supporting source contributes one point alongside the expert’s depth.</>:<>Now click <b className="text-amber-300">Commit Response</b> to solve the problem.</>}</p>
+    {(guideStep===1||guideStep===4)&&<button type="button" onClick={()=>setGuideStep(guideStep===1?2:5)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-400 px-3 py-2 text-sm font-black text-slate-950">NEXT <ArrowRight className="h-4 w-4"/></button>}
+    {(guideStep===2||guideStep===3||guideStep===5)&&<p className="mt-3 text-xs font-bold text-sky-300">Select the highlighted {guideStep===5?'Commit Response button':'circle'} to continue.</p>}
+   </section>
+  </>}
+
   <TurnoverKnowledgeModal open={turnoverChartOpen} session={session} currentCompanyId={company.id} onClose={()=>setTurnoverChartOpen(false)}/>
 
   {showExpertChangePopup&&expertChange&&<>
