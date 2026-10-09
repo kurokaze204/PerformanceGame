@@ -246,7 +246,7 @@ const ChallengeKnowledgeBars:React.FC<{
    <SegmentBar value={local} filled={localFilled} tone="local"/>
    <Selector state={localSelection} disabled={localDisabled} anchor={guideStep===4?'breadth':'local'}/>
   </button>
-  {expertName&&<button type="button" disabled={expertDisabled} onClick={onExpertClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 disabled:grayscale '+(expertSelection!=='none'?'border-amber-400 bg-amber-950/20':'border-slate-700 bg-slate-950/70 hover:border-amber-700')+(attention&&!expertDisabled?' kmw-attention-button':'')+(guideStep===3?' kmw-tour-highlight':'')}>
+  {expertName&&<button type="button" disabled={expertDisabled} onClick={onExpertClick} className={'grid w-full grid-cols-[100px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 disabled:grayscale '+(expertSelection!=='none'?'border-amber-400 bg-amber-950/20':'border-slate-700 bg-slate-950/70 hover:border-amber-700')+(attention&&!expertDisabled?' kmw-attention-button':'')+(guideStep===3?' kmw-tour-highlight':'')}>
    <span className="min-w-0"><span className="block truncate text-[13px] font-black text-white">{expertName.split(' ')[0]}{expertLocation?' · '+(SITE_ABBR[expertLocation]||expertLocation):''}</span><span className="block text-[12px] font-bold text-amber-300">{domainLabel(domain)} {expert}{expertTraining?'':expertDisabled?' · used':travelCost?' · $'+travelCost+'k travel':''}</span></span>
    <SegmentBar value={expert} filled={expertFilled} tone="expert"/>
    <Selector state={expertSelection} disabled={expertDisabled} anchor="expert"/>
