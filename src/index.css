@@ -366,6 +366,19 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
   100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; }
 }
 
+/* Guided Challenge 1: unobtrusive cyan signals connected to the real controls. */
+@keyframes kmw-tour-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgb(56 189 248 / .55), 0 0 8px rgb(56 189 248 / .2); }
+  50% { box-shadow: 0 0 0 3px rgb(56 189 248 / .85), 0 0 24px rgb(56 189 248 / .5); }
+}
+.kmw-tour-highlight { position: relative; animation: kmw-tour-glow 1.4s ease-in-out infinite; }
+.kmw-tour-chance { animation: kmw-tour-glow 1s ease-in-out infinite; }
+@keyframes kmw-guided-site-glow {
+  0%, 100% { opacity: .65; stroke-width: 2.5; }
+  50% { opacity: 1; stroke-width: 4; }
+}
+.kmw-guided-site-pulse { animation: kmw-guided-site-glow 1.3s ease-in-out infinite; }
+
 /* KM Week delayed action cue: after 8 seconds with no knowledge source selected,
    pulse the actionable source buttons, then their selection circles 300ms later. */
 @keyframes kmw-attention-button-pulse {
