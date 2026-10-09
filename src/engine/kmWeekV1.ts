@@ -467,7 +467,7 @@ function setChallengePhase(company:CompanyV2,challenges:KMWeekChallenge[]){
   state.usedExpertIds=[];
   company.roundPhase='events';
   company.actionsRemaining=1;
-  for(const expert of activeExperts(company))expert.state=expert.location==='HQ'?'HQ Assignment':'Available';
+  for(const expert of activeExperts(company))expert.state=state.trainingCommitments?.[expert.id]===company.round?'Knowledge Transfer':expert.location==='HQ'?'HQ Assignment':'Available';
 }
 
 function afterChallengeSet(session:GameSessionV2,company:CompanyV2){
@@ -501,6 +501,7 @@ export function resolveKMWeekChallengeV1(
   includeLocalBreadth=false,
   includeExpertBreadth=false,
   useLocalRisk=true,
+  useExpertRisk=false,
 ){
   const state=company.kmWeek;
   if(!state||state.phase!=='challenge'||state.stage==='shock'||state.stage==='complete')return{success:false,message:'No normal Challenge is ready to resolve.'};
@@ -509,9 +510,11 @@ export function resolveKMWeekChallengeV1(
   const site=company.sites.find(item=>item.id===challenge.siteId);
   if(!site)return{success:false,message:'Challenge site not found.'};
 
-  if(state.stage==='guided'&&state.guidedTurn!==2&&method!=='expert'){
+  if(state.stage==='guided'&&state.guidedTurn===1&&method!=='expert'){
     return{success:false,message:'This guided move is teaching expert deployment. Send the Operations expert.'};
   }
+
+  if(expertId&&(method==='expert'||includeExpertBreadth||useExpertRisk)&&state.trainingCommitments?.[expertId]===company.round)return{success:false,message:'Busy training staff'};
 
   let won=false;
   let roll:number|undefined;
@@ -561,7 +564,16 @@ export function resolveKMWeekChallengeV1(
     if(won&&state.stage==='free')state.expertSuccesses+=1;
   }else{
     roll=Math.floor(Math.random()*6)+1;
-    const team=useLocalRisk?(site.teamCapability[challenge.domain]||0):0;
+    let team=useLocalRisk?(site.teamCapability[challenge.domain]||0):0;
+    if(useExpertRisk||includeExpertBreadth){
+      expert=company.experts.find(item=>item.id===expertId&&!item.isVacant);
+      const skill=expert?.domains.find(item=>item.domain===challenge.domain);
+      if(!expert||!skill||skill.score<=0||state.usedExpertIds.includes(expert.id))return{success:false,message:'Choose an available expert.'};
+      team=useExpertRisk?skill.score+(includeLocalBreadth&&team>0?1:0):team+1;
+      travelCost=expert.location===site.id?0:2;
+      expert.location=site.id;expert.state='Supporting Event';
+      if(state.stage==='free')state.usedExpertIds.push(expert.id);
+    }
     const odds=kmWeekRiskOddsV1(team,challenge.difficulty);
     riskRequiredRoll=odds.requiredRoll;
     riskPerformanceGap=odds.performanceGap;
@@ -636,10 +648,11 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const site=company.sites.find(item=>item.id===payload?.siteId&&!item.isClosed);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!site||!skill)return{success:false,message:'Choose an expert, their domain and a site.'};
-    if((site.teamCapability[domain]||0)>=skill.score)return{success:false,message:'The local team is already at this expert’s teaching ceiling.'};
+    if((site.teamCapability[domain]||0)>=Math.min(KM_WEEK_MAX_KNOWLEDGE,skill.score))return{success:false,message:'The local team is already at this expert’s teaching ceiling.'};
     const travelCost=expert.location===site.id?0:2;
     cost=10+travelCost;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
-    before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+1,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.location=site.id;expert.state='Knowledge Transfer';
+    before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+2,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.location=site.id;expert.state='Knowledge Transfer';
+    state.trainingCommitments={...state.trainingCommitments,[expert.id]:company.round+1};
   }else{
     const source=company.sites.find(item=>item.id===payload?.sourceSiteId&&!item.isClosed);
     const target=company.sites.find(item=>item.id===payload?.targetSiteId&&!item.isClosed);
@@ -751,7 +764,7 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
   let result:{success:boolean;message:string};
   if(type==='KM_WEEK_RESOLVE'){
     const useLocalRisk=payload?.useLocalRisk===undefined?true:Boolean(payload?.useLocalRisk);
-    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth),Boolean(payload?.includeExpertBreadth),useLocalRisk);
+    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth),Boolean(payload?.includeExpertBreadth),useLocalRisk,Boolean(payload?.useExpertRisk));
   }else if(type==='KM_WEEK_INVEST'){
     result=investKMWeekV1(session,company,payload);
   }else if(type==='KM_WEEK_RESOLVE_SHOCK'){

@@ -404,3 +404,17 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* Keep touch scrolling inside the controls; readable labels on tablets. */
+.kmw-controls [class*="text-[8px]"],
+.kmw-controls [class*="text-[9px]"],
+.kmw-controls [class*="text-[10px]"],
+.kmw-controls [class*="text-[11px]"] { font-size: 12px; }
+.kmw-controls select { min-height: 44px; font-size: 14px; }
+.kmw-controls label { display: block; min-width: 0; }
+.kmw-controls button { touch-action: manipulation; }
+@media (min-width: 700px) {
+ .kmw-controls { overflow: hidden; }
+ .kmw-controls > div { min-height: 0; }
+ .kmw-controls [class*="overflow-y-auto"] { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+}

@@ -82,6 +82,7 @@ export interface KMWeekCompanyState {
   freeRound: number;
   challenges: KMWeekChallenge[];
   usedExpertIds: string[];
+  trainingCommitments?: Record<string, number>;
   freeSuccesses: number;
   businessDifficultySolved?: number;
   localSuccesses: number;

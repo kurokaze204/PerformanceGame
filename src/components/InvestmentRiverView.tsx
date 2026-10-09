@@ -55,7 +55,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const niceStep=(max:number)=>{const raw=Math.max(1,max/4),power=Math.pow(10,Math.floor(Math.log10(raw))),scaled=raw/power;return(scaled<=1?1:scaled<=2?2:scaled<=5?5:10)*power};
  const tickStep=niceStep(rawMax),maxY=Math.max(tickStep,Math.ceil(rawMax/tickStep)*tickStep);
  const ticks=Array.from({length:Math.floor(maxY/tickStep)+1},(_,index)=>index*tickStep);
- const W=920,H=350,padL=64,padR=92,padT=34,padB=58;
+ const W=mode==='km_week'&&!compact?660:920,H=350,padL=64,padR=92,padT=34,padB=58;
  const x=(index:number)=>padL+index*((W-padL-padR)/Math.max(1,domains.length-1));
  const y=(value:number)=>padT+(maxY-value)*((H-padT-padB)/maxY);
  const riverLeft=x(0)-40,riverRight=x(domains.length-1)+40;

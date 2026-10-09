@@ -5,6 +5,8 @@ import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
 import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{toggleKMWeekSourceV1}from'../engine/kmWeekSelectionV1.ts';
+import{kmWeekCoachV1}from'../engine/kmWeekCoachV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 import type{RiverGhostPreview}from'./InvestmentRiverView.tsx';
 import{KMWeekDebriefV1}from'./KMWeekDebriefV1.tsx';
@@ -157,7 +159,7 @@ function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
  if(turn===1)return{title:'1. Solve the business problem',text:'Brisbane needs Operations 4. Build the response yourself: select Priya for depth, then select the Local Team if you want its knowledge to contribute breadth.',invest:'After the Challenge, you will deepen Priya’s expertise.'};
  if(turn===2)return{title:'2. Who should handle this one?',text:'This problem only needs Operations 1 — exactly what the Brisbane team already knows. You can use the Local Team, or still send Priya if you want to.',invest:'Now use Local Training. Brisbane is the obvious target, but you can send Priya to another site; training away from her current site adds $2k travel.'};
- return{title:'3. The problem moves',text:'A similar Operations issue has appeared in Perth. Use Priya, then commit your response.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
+ return{title:'3. The problem moves',text:'Priya is busy training staff. How well can Perth handle this problem without her? Use the local team and take a risk.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
 }
 
 function scoreBriefSuggestion(goalId:string){
@@ -208,10 +210,11 @@ const ChallengeKnowledgeBars:React.FC<{
  expertSelection:ResponseSelectionState;
  localDisabled?:boolean;
  expertDisabled?:boolean;
+ expertTraining?:boolean;
  attention?:boolean;
  onLocalClick:()=>void;
  onExpertClick?:()=>void;
-}>=({requirement,local,expert,expertName,expertLocation,travelCost=0,localSelection,expertSelection,localDisabled=false,expertDisabled=false,attention=false,onLocalClick,onExpertClick})=>{
+}>=({requirement,local,expert,expertName,expertLocation,travelCost=0,localSelection,expertSelection,localDisabled=false,expertDisabled=false,expertTraining=false,attention=false,onLocalClick,onExpertClick})=>{
  const slots=Math.max(5,requirement,local,expert);
  const SegmentBar:React.FC<{value:number;filled:number;tone:'requirement'|'local'|'expert'}>=({value,filled,tone})=><div className="grid gap-1" style={{gridTemplateColumns:`repeat(${slots},minmax(0,1fr))`}} aria-label={tone+' knowledge '+value+' of '+slots}>
   {Array.from({length:slots},(_,index)=>{
@@ -239,11 +242,12 @@ const ChallengeKnowledgeBars:React.FC<{
    <SegmentBar value={local} filled={localFilled} tone="local"/>
    <Selector state={localSelection} disabled={localDisabled}/>
   </button>
-  {expertName&&<button type="button" disabled={expertDisabled} onClick={onExpertClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 '+(expertSelection!=='none'?'border-amber-400 bg-amber-950/20':'border-slate-700 bg-slate-950/70 hover:border-amber-700')+(attention&&!expertDisabled?' kmw-attention-button':'')}>
-   <span className="min-w-0"><span className="block truncate text-[10px] font-black text-white">{expertName.split(' ')[0]}{expertLocation?' · '+(SITE_ABBR[expertLocation]||expertLocation):''}</span><span className="block text-[9px] font-bold text-amber-300">Knowledge {expert}{expertDisabled?' · used':travelCost?' · $'+travelCost+'k travel':''}</span></span>
+  {expertName&&<button type="button" disabled={expertDisabled} onClick={onExpertClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 disabled:grayscale '+(expertSelection!=='none'?'border-amber-400 bg-amber-950/20':'border-slate-700 bg-slate-950/70 hover:border-amber-700')+(attention&&!expertDisabled?' kmw-attention-button':'')}>
+   <span className="min-w-0"><span className="block truncate text-[10px] font-black text-white">{expertName.split(' ')[0]}{expertLocation?' · '+(SITE_ABBR[expertLocation]||expertLocation):''}</span><span className="block text-[9px] font-bold text-amber-300">Knowledge {expert}{expertTraining?'':expertDisabled?' · used':travelCost?' · $'+travelCost+'k travel':''}</span></span>
    <SegmentBar value={expert} filled={expertFilled} tone="expert"/>
    <Selector state={expertSelection} disabled={expertDisabled}/>
   </button>}
+  {expertTraining&&<p className="text-sm font-bold text-red-800">Busy training staff</p>}
  </div>;
 };
 
@@ -277,6 +281,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const goalId=session.kmWeekGoalId||'local-heroes';
  const goal=KM_WEEK_GOALS[goalId];
  const scoreSuggestion=scoreBriefSuggestion(goalId);
+ const coaching=kmWeekCoachV1(company);
  const sites=KM_WEEK_SITE_IDS.map(id=>company.sites.find(site=>site.id===id)).filter((site):site is CompanyV2['sites'][number]=>Boolean(site));
  const experts=company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
  const specialist=expertId?experts.find(item=>item.id===expertId):specialistFor(company,selectedDomain);
@@ -310,10 +315,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  },[state?.stage,state?.phase,state?.guidedTurn]);
 
  useEffect(()=>{
-  if(state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1||riskRollPending||riskResult)return;
+  if(state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1||riskRollPending||riskResult||busy||riverFrozenCompany)return;
   const key=`tpg:kmw-score-brief:${session.id}:${company.id}`;
   if(localStorage.getItem(key)!=='seen')setScoreBriefOpen(true);
- },[state?.stage,state?.phase,state?.freeRound,session.id,company.id,riskRollPending,riskResult]);
+ },[state?.stage,state?.phase,state?.freeRound,session.id,company.id,riskRollPending,riskResult,busy,riverFrozenCompany]);
 
  useEffect(()=>{
   if(!state)return;
@@ -323,7 +328,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     else{setInvestment('KNOWLEDGE_TRANSFER');setSelectedDomain('operations');setSourceSiteId('brisbane');setTargetSiteId('perth');}
   }else if(state.stage==='free'&&state.phase==='invest'){
     setInvestment('TRAIN_EXPERT');
-    const first=experts[0];setExpertId(first?.id||'');setSelectedDomain(first?.domains[0]?.domain||'operations');
+    const domain=coaching?.domain||'operations';const first=specialistFor(company,domain)||experts[0];setExpertId(first?.id||'');setSelectedDomain(domain);
   }
  },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound,company.id]);
 
@@ -392,11 +397,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const localSelection:ResponseSelectionState=activePending?.localSelection||'none';
  const expertSelection:ResponseSelectionState=activePending?.expertSelection||'none';
  const riskSelected=activePending?.method==='risk';
- const riskKnowledge=localSelection!=='none'?localScore:0;
+ const riskKnowledge=(expertSelection==='depth'?activeExpertScore:localSelection==='depth'?localScore:0)+(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0);
  const riskOdds=activeChallenge?kmWeekRiskOddsV1(riskKnowledge,activeChallenge.difficulty):{performanceGap:0,requiredRoll:7,successfulFaces:0,chancePercent:0};
  const selectedDepth=localSelection==='depth'?localScore:expertSelection==='depth'?activeExpertScore:0;
  const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0);
  const selectedKnowledge=riskSelected?riskKnowledge:selectedDepth+selectedBreadth;
+ const expertTraining=Boolean(activeExpert&&state.trainingCommitments?.[activeExpert.id]===company.round);
  const expertUsed=Boolean(activeExpert&&state.usedExpertIds.includes(activeExpert.id));
  const deterministicSelected=Boolean(activePending?.method&&(activePending.method==='local'||activePending.method==='expert'));
  const knowledgeShortfall=activeChallenge&&!riskSelected?Math.max(0,activeChallenge.difficulty-selectedKnowledge):0;
@@ -484,37 +490,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   setChallengeAttention(false);
   const current=pendingResponse?.challengeId===activeChallenge.id?pendingResponse:null;
   let localState:ResponseSelectionState=current?.localSelection||'none';
-  let expertState:ResponseSelectionState=current?.method==='risk'?'none':current?.expertSelection||'none';
-  if(source==='local'&&current?.method==='risk'){
-   localState=localState==='none'?'depth':'none';
-   setPendingResponse({
-    challengeId:activeChallenge.id,
-    method:'risk',
-    expertId:undefined,
-    localSelection:localState,
-    expertSelection:'none',
-    label:`Take the risk${localState!=='none'?' + Local Team':''}`,
-   });
-   return;
-  }
-  const sourceState=source==='local'?localState:expertState;
-
-  // First click always selects the clicked source as Depth so the selector
-  // visibly changes immediately. The other selected source becomes Breadth.
-  // Clicking the active Depth again removes it and promotes remaining Breadth.
-  const nextState:ResponseSelectionState=sourceState==='depth'?'none':'depth';
-
-  if(source==='local'){
-   localState=nextState;
-   if(nextState==='depth'&&expertState==='depth')expertState='breadth';
-   if(nextState==='none'&&expertState==='breadth')expertState='depth';
-  }else{
-   expertState=nextState;
-   if(nextState==='depth'&&localState==='depth')localState='breadth';
-   if(nextState==='none'&&localState==='breadth')localState='depth';
-  }
-
-  const method:ResponseMethod|undefined=localState==='depth'?'local':expertState==='depth'?'expert':undefined;
+  let expertState:ResponseSelectionState=current?.expertSelection||'none';
+  if(source==='expert'&&(expertUsed||expertTraining||activeExpertScore<=0))return;
+  const next=toggleKMWeekSourceV1(localState,expertState,source,localScore,activeExpertScore);
+  localState=next.local;expertState=next.expert;
+  const method:ResponseMethod|undefined=current?.method==='risk'?'risk':localState==='depth'?'local':expertState==='depth'?'expert':undefined;
   const parts:string[]=[];
   if(localState!=='none')parts.push(`Local ${localState}`);
   if(expertState!=='none'&&activeExpert)parts.push(`${activeExpert.name} ${expertState}`);
@@ -532,9 +512,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(!pendingResponse)return;
   if(!pendingResponse.method)return;
   const committed=pendingResponse;
-  const payload={type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth',useLocalRisk:committed.method==='risk'&&committed.localSelection!=='none'};
+  const payload={type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth',useLocalRisk:committed.method==='risk'&&committed.localSelection!=='none',useExpertRisk:committed.method==='risk'&&committed.expertSelection==='depth'};
   if(committed.method==='risk'){
-   const selectedLocal=committed.localSelection!=='none'?localScore:0;
+   const selectedLocal=riskKnowledge;
    const immediateOdds=kmWeekRiskOddsV1(selectedLocal,activeChallenge?.difficulty||0);
    // Show the dice surface immediately while the server resolves the authoritative roll.
    // This masks network latency and also blocks Invest-phase teaching popups until
@@ -546,9 +526,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const nextCompany=nextSession.companies.find(item=>item.id===company.id);
    const resolved=nextCompany?.kmWeek?.challenges.find(item=>item.id===committed.challengeId);
    if(resolved?.dieRoll!==undefined){
-    const resolvedSite=nextCompany?.sites.find(item=>item.id===resolved.siteId);
-    const selectedLocal=committed.localSelection!=='none'?(resolvedSite?.teamCapability[resolved.domain]||0):0;
-    const odds=kmWeekRiskOddsV1(selectedLocal,resolved.difficulty);
+    const odds=kmWeekRiskOddsV1(riskKnowledge,resolved.difficulty);
     setRiskResult({roll:resolved.dieRoll,won:resolved.status==='success',requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
     setRiskRollPending(null);
    }
@@ -565,7 +543,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       const localSelection=draft.localSelection;
       next[challengeId]={
        ...draft,
-       method:localSelection==='depth'?'local':undefined,
+       method:draft.method==='risk'?'risk':localSelection!=='none'?'local':undefined,
+       localSelection:localSelection!=='none'?'depth':'none',
        expertId:undefined,
        expertSelection:'none',
        label:localSelection==='depth'?'Local depth':localSelection==='breadth'?'Local breadth · choose a new Depth source':'Expert already committed · choose another response',
@@ -583,7 +562,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const investmentPreview=investment==='TRAIN_EXPERT'
    ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
    :investment==='LOCAL_TRAINING'
-    ?specialist&&localTrainingSite?`${localTrainingSite.name} ${domainLabel(specialistDomain)}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min(5,(localTrainingSite.teamCapability[specialistDomain]||0)+1)} · ${localTrainingTravelCost?`Travel $2k · total $12k`:'No travel · total $10k'}`:'Choose an expert and training site'
+    ?specialist&&localTrainingSite?`${localTrainingSite.name} ${domainLabel(specialistDomain)}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min(5,specialistScore(company,specialistDomain),(localTrainingSite.teamCapability[specialistDomain]||0)+2)} · ${localTrainingTravelCost?`Travel $2k · total $12k`:'No travel · total $10k'}`:'Choose an expert and training site'
     :source&&target?(()=>{
       const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;
       const uplift=from>to?Math.max(1,Math.ceil((from-to)/2)):0;
@@ -598,7 +577,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(scoreGhost==='local'&&specialist&&localTrainingSite){
    const current=localTrainingSite.teamCapability[specialistDomain]||0;
    const ceiling=specialistScore(company,specialistDomain);
-   return current<ceiling&&current<5?{kind:'site',domain:specialistDomain,siteId:localTrainingSite.id,delta:1}:undefined;
+   return current<ceiling&&current<5?{kind:'site',domain:specialistDomain,siteId:localTrainingSite.id,delta:Math.min(2,ceiling-current,5-current)}:undefined;
   }
   if(scoreGhost==='flow'&&source&&target){
    const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;
@@ -641,7 +620,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const skill=expert?.domains.find(item=>item.domain===payload.domain);
    if(expert&&site&&skill){
     const before=site.teamCapability[payload.domain]||0;
-    site.teamCapability[payload.domain]=Math.min(5,before+1,skill.score);
+    site.teamCapability[payload.domain]=Math.min(5,before+2,skill.score);
     expert.location=site.id;
    }
   }else{
@@ -685,8 +664,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const investStepDone=state.stage==='shock'||shockDone;
 
  return <div className="min-h-screen bg-[#071019] text-slate-100 xl:h-screen xl:overflow-hidden">
-  <header className="relative z-[100] border-b-2 border-amber-950/60 bg-[#09131f]/98 px-3 py-2 shadow-xl xl:h-[66px]">
-   <div className="mx-auto flex h-full max-w-[1500px] items-center gap-2">
+  <header className="relative z-[100] border-b-2 border-amber-950/60 bg-[#09131f]/98 px-3 py-2 shadow-xl min-[700px]:h-[66px]">
+   <div className="mx-auto flex h-full w-full items-center gap-2">
     <div className="mr-auto min-w-0"><div className="text-[8px] font-black uppercase tracking-[.22em] text-emerald-300">The Performance Gap · KM Week</div><div className="flex min-w-0 items-center gap-2"><Building2 className="h-5 w-5 shrink-0 text-amber-300"/><h1 className="truncate text-lg font-black text-white">{company.name}</h1><span className="hidden rounded-md border border-slate-700 px-1.5 py-0.5 text-[9px] font-black text-slate-500 sm:inline">{session.id}</span>{readOnly?<span className="hidden rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400 lg:inline">Watching · CEO {controllerName}</span>:<span className="hidden rounded-full border border-amber-600 bg-amber-950/50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-200 lg:inline"><Crown className="mr-1 inline h-3 w-3"/>CEO · You</span>}</div></div>
     <button type="button" onClick={()=>setTurnoverChartOpen(true)} aria-haspopup="dialog" className="flex h-12 min-w-[112px] flex-col justify-center rounded-xl border-2 border-emerald-800 bg-emerald-950/25 px-3 text-left transition hover:border-emerald-500 hover:bg-emerald-950/40"><div className="text-[8px] font-black uppercase text-emerald-400">Turnover</div><div className="text-base font-black leading-none text-emerald-200">{money(company.turnover)}</div></button>
     <div className="flex h-12 min-w-[82px] flex-col justify-center rounded-xl border-2 border-amber-700 bg-amber-950/25 px-3"><div className="text-[8px] font-black uppercase text-amber-400">Score</div><div className="text-base font-black leading-none text-amber-200">{state.score.total}</div></div>
@@ -778,9 +757,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>
   </>}
 
+  {state.stage==='guided'&&state.guidedTurn===1&&state.phase==='challenge'&&!challengeFocusOpen&&<div aria-hidden="true" className="fixed inset-0 z-[110] bg-black/70"/>}
+
   {challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')&&<div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 top-[66px] z-40 bg-black/20"/>}
 
-  {state.stage==='complete'?<KMWeekDebriefV1 session={session} company={company}/>:<main className="mx-auto max-w-[1500px] p-3 min-[700px]:flex min-[700px]:h-[calc(100dvh-66px)] min-[700px]:flex-col min-[700px]:overflow-hidden">
+  {state.stage==='complete'?<KMWeekDebriefV1 session={session} company={company}/>:<main className="mx-auto w-full p-3 min-[700px]:flex min-[700px]:h-[calc(100dvh-66px)] min-[700px]:flex-col min-[700px]:overflow-hidden">
    <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
     <div className="rounded-xl border-2 border-indigo-700 bg-indigo-950/45 px-3 py-1.5 text-[10px] font-black text-indigo-100">{phaseTitle(company)}</div>
     <PhaseStep number="1" label="Challenge" active={(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'} done={challengeStepDone}/>
@@ -790,9 +771,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <div className="ml-auto rounded-xl border border-amber-800 bg-amber-950/20 px-3 py-1.5 text-xs font-black text-amber-100"><span className="mr-2 text-[9px] uppercase text-amber-500">Current phase</span>{currentPhaseLabel(company)}</div>
    </div>
 
+   {coaching&&state.phase==='challenge'&&challengeFocusOpen&&<div className="mb-2 shrink-0 rounded-xl border border-amber-800 bg-amber-950/25 px-3 py-2 text-sm text-amber-100">{coaching.text}</div>}
+
    {finalShockWindow&&<div className="mb-2 shrink-0 rounded-xl border-2 border-rose-500 bg-rose-950/35 px-3 py-2 text-[10px] font-bold leading-relaxed text-rose-100"><b className="text-rose-300">FINAL 3 MINUTES.</b> Finish this round. After your next investment, the Business Shock begins and company experts become unavailable.</div>}
 
-   <div className="grid gap-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:grid-cols-[minmax(0,1fr)_310px] lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_410px]">
+   <div className="grid gap-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
     <div className="space-y-3 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2 xl:gap-3">
      <Card className="relative p-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-2 xl:p-3">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
@@ -828,8 +811,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      </div>
     </div>
 
-    <aside className="space-y-2 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2">
-     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className="flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-3 xl:p-5">
+    <aside className="kmw-controls min-w-0 space-y-2 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2">
+     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className={`relative ${state.stage==='guided'&&state.guidedTurn===1?'z-[120]':''} overflow-y-auto overscroll-contain touch-pan-y flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-3 xl:p-5`}>
       {state.stage==='guided'&&state.guidedTurn===1&&<div className="mb-4 max-w-[350px] rounded-2xl border border-amber-700/70 bg-amber-950/20 p-3 text-left shadow-lg"><div className="text-[13px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Challenge</div><p className="mt-2 text-[16px] leading-relaxed text-slate-200">Welcome! You are the new CEO of <b className="text-white">{company.name}</b>. It’s a business with promise but also some challenges to overcome. There are islands of excellence and a few experts you can rely on to meet the challenges, but your role is to build up knowledge so every site performs well. Business goes on while you make improvements, so you will have to use the expertise you have to solve daily events. In fact, here comes one right now. <b className="text-amber-200">Click the card below to see what it is.</b></p></div>}
       <button type="button" onClick={()=>setChallengeFocusOpen(true)} className="group kmw-start-card relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
        <div className="absolute inset-2 rounded-[13px] border border-violet-400/35"/>
@@ -839,7 +822,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        <div className="mt-3 text-[9px] font-bold text-slate-500">{phaseTitle(company)}</div>
       </button>
      </div>:<div className={`min-[700px]:min-h-0 min-[700px]:flex-1 ${challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')?'relative z-[60] kmw-card-reveal':''}`}>
-     <Card className={`border-violet-700 bg-[linear-gradient(145deg,#1b1731,#101827)] p-3 min-[700px]:h-full min-[700px]:min-h-0 min-[700px]:overflow-y-auto ${challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')?'ring-4 ring-violet-400/20 shadow-[0_20px_60px_rgba(0,0,0,.55)]':''}`}>
+     <Card className={`border-violet-700 bg-[linear-gradient(145deg,#1b1731,#101827)] p-3 min-[700px]:h-full min-[700px]:min-h-0 min-[700px]:overflow-y-auto overscroll-contain touch-pan-y ${challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')?'ring-4 ring-violet-400/20 shadow-[0_20px_60px_rgba(0,0,0,.55)]':''}`}>
       <div className="flex items-center justify-between gap-2"><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-violet-300">Your move</div><h2 className="text-xl font-black text-white">{currentPhaseLabel(company)}</h2></div><div className="rounded-lg border border-violet-700 bg-violet-950/30 px-2 py-1 text-[9px] font-black uppercase text-violet-200">{phaseTitle(company)}</div></div>
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&<>
@@ -868,13 +851,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          localSelection={localSelection}
          expertSelection={expertSelection}
          localDisabled={false}
-         expertDisabled={expertUsed||activeExpertScore<=0}
+         expertDisabled={expertUsed||expertTraining||activeExpertScore<=0}
+         expertTraining={expertTraining}
          attention={challengeAttention}
          onLocalClick={()=>cycleKnowledgeSource('local')}
          onExpertClick={()=>cycleKnowledgeSource('expert')}
         />
         {!guided&&deterministicSelected&&knowledgeShortfall>0&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-1.5 text-[10px] font-black text-rose-200">KNOWLEDGE SHORTFALL {knowledgeShortfall} · If you commit this response, the Challenge will fail.</div>}
-        {!guided&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);const riskLocalSelection:ResponseSelectionState=localSelection==='none'?'none':'depth';setPendingResponse({challengeId:activeChallenge.id,method:'risk',expertId:undefined,localSelection:riskLocalSelection,expertSelection:'none',label:'Take the risk'+(riskLocalSelection!=='none'?' + Local Team':'')+' · '+riskOdds.chancePercent+'%'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+ on d6'}</span></ResponseButton></div>}
+        {(!guided||state.guidedTurn===3)&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:riskSelected?(expertSelection==='depth'?'expert':localSelection==='depth'?'local':undefined):'risk',expertId:activePending?.expertId,localSelection,expertSelection,label:'Take the risk'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+ on d6'}</span></ResponseButton></div>}
         <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5">
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
@@ -887,15 +871,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       </>}
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'&&<>
-       <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5"><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?<><span>{guidedCopy.invest}</span><br/><span className="font-black text-amber-200">Guided move: choose {guidedTargetInvestment==='TRAIN_EXPERT'?'Train Expert':guidedTargetInvestment==='LOCAL_TRAINING'?'Local Training':'Knowledge Transfer'}.</span></>:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
+       <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5">{coaching&&<p className="mb-2 text-sm font-bold leading-snug text-amber-100">{coaching.text}</p>}<div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?<><span>{guidedCopy.invest}</span><br/><span className="font-black text-amber-200">Guided move: choose {guidedTargetInvestment==='TRAIN_EXPERT'?'Train Expert':guidedTargetInvestment==='LOCAL_TRAINING'?'Local Training':'Knowledge Transfer'}.</span></>:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
        <div className="mt-2 grid grid-cols-3 gap-1.5">
         <button disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>setInvestment('TRAIN_EXPERT')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}><GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+1 depth · $15k</div></button>
-        <button disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>setInvestment('LOCAL_TRAINING')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}><Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+1 local · $10k</div></button>
+        <button disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>setInvestment('LOCAL_TRAINING')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}><Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+2 local · $10k</div></button>
         <button disabled={guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'} onClick={()=>setInvestment('KNOWLEDGE_TRANSFER')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='KNOWLEDGE_TRANSFER'?'border-emerald-300 bg-emerald-950/40':'border-slate-700 bg-slate-950'}`}><Workflow className="h-4 w-4 text-emerald-300"/><div className="mt-1 text-[10px] font-black text-white">Knowledge Transfer</div><div className="text-[9px] text-slate-500">Move half the gap · $8k</div></button>
        </div>
        <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/75 p-2.5">
-        {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} ({SITE_ABBR[expert.location]||expert.location}) · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
-        <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span></div>
+        {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 items-start gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} ({SITE_ABBR[expert.location]||expert.location}) · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
+        <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span>{investment==='LOCAL_TRAINING'&&<div className="mt-1 font-bold text-red-300">Training commitment — unavailable next round</div>}</div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
         <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':finalShockWindow?'COMMIT FINAL INVESTMENT & FACE BUSINESS SHOCK':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>
