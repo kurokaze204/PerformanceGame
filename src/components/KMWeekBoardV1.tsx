@@ -203,6 +203,10 @@ const ChallengeKnowledgeBars:React.FC<{
  requirement:number;
  local:number;
  expert:number;
+ domain:KnowledgeDomain;
+ siteLabel:string;
+ requirementMet:boolean;
+ guideStep?:number;
  expertName?:string;
  expertLocation?:string;
  travelCost?:number;
@@ -214,38 +218,38 @@ const ChallengeKnowledgeBars:React.FC<{
  attention?:boolean;
  onLocalClick:()=>void;
  onExpertClick?:()=>void;
-}>=({requirement,local,expert,expertName,expertLocation,travelCost=0,localSelection,expertSelection,localDisabled=false,expertDisabled=false,expertTraining=false,attention=false,onLocalClick,onExpertClick})=>{
+}>=({requirement,local,expert,domain,siteLabel,requirementMet,guideStep=0,expertName,expertLocation,travelCost=0,localSelection,expertSelection,localDisabled=false,expertDisabled=false,expertTraining=false,attention=false,onLocalClick,onExpertClick})=>{
  const slots=Math.max(5,requirement,local,expert);
  const SegmentBar:React.FC<{value:number;filled:number;tone:'requirement'|'local'|'expert'}>=({value,filled,tone})=><div className="grid gap-1" style={{gridTemplateColumns:`repeat(${slots},minmax(0,1fr))`}} aria-label={tone+' knowledge '+value+' of '+slots}>
   {Array.from({length:slots},(_,index)=>{
    const available=index<value;
    const applied=index<filled;
-   const colour=tone==='requirement'?'border-rose-300 bg-rose-500':tone==='local'?'border-sky-300 bg-sky-400':'border-amber-300 bg-amber-400';
-   const idle=tone==='requirement'?'border-rose-400/90 bg-rose-950/30':tone==='local'?'border-sky-500/85 bg-sky-950/25':'border-amber-500/85 bg-amber-950/20';
+   const colour=tone==='requirement'?(requirementMet?'border-emerald-200 bg-emerald-400':'border-rose-300 bg-rose-500'):tone==='local'?'border-sky-300 bg-sky-400':'border-amber-300 bg-amber-400';
+   const idle=tone==='requirement'?(requirementMet?'border-emerald-400/80 bg-emerald-950/30':'border-rose-400/90 bg-rose-950/30'):tone==='local'?'border-sky-500/85 bg-sky-950/25':'border-amber-500/85 bg-amber-950/20';
    return <span key={index} className={'h-4 rounded-md border-2 transition-all duration-200 '+(available?(applied?colour:idle):'border-slate-800 bg-slate-950')}/>;
   })}
  </div>;
- const Selector:React.FC<{state:ResponseSelectionState;disabled?:boolean}>=({state,disabled=false})=>{
+ const Selector:React.FC<{state:ResponseSelectionState;disabled?:boolean;anchor?:string}>=({state,disabled=false,anchor})=>{
   const tone=disabled?'border-slate-800 bg-slate-950':state==='depth'?'border-amber-200 bg-amber-400 text-slate-950':state==='breadth'?'border-sky-300 bg-slate-900':'border-slate-500 bg-slate-900';
-  return <span aria-label={state==='depth'?'Selected as depth':state==='breadth'?'Selected as breadth':'Not selected'} className={'relative grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-full border-2 '+tone+(attention&&!disabled?' kmw-attention-circle':'')}>{state==='depth'?'✓':state==='breadth'?<span aria-hidden="true" className="absolute inset-y-0 left-0 w-1/2 bg-sky-400"/>:''}</span>;
+  return <span data-kmw-tour={anchor} aria-label={state==='depth'?'Selected as depth':state==='breadth'?'Selected as breadth':'Not selected'} className={'relative grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-full border-2 '+tone+(attention&&!disabled?' kmw-attention-circle':'')}>{state==='depth'?'✓':state==='breadth'?<span aria-hidden="true" className="absolute inset-y-0 left-0 w-1/2 bg-sky-400"/>:''}</span>;
  };
  const localFilled=localSelection==='depth'?local:localSelection==='breadth'?Math.min(local,1):0;
  const expertFilled=expertSelection==='depth'?expert:expertSelection==='breadth'?Math.min(expert,1):0;
  return <div className="mt-2 space-y-1.5" data-kmw-knowledge-bars>
-  <div className="grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border border-rose-900/70 bg-rose-950/10 px-2 py-2">
-   <span><span className="block text-[10px] font-black text-white">Required</span><span className="block text-[9px] font-bold text-rose-300">Knowledge {requirement}</span></span>
+  <div data-kmw-tour="required" className={'grid w-full grid-cols-[100px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 '+(requirementMet?'border-emerald-400/80 bg-emerald-950/20': 'border-rose-900/70 bg-rose-950/10')+(guideStep===1?' kmw-tour-highlight':'')}>
+   <span><span className="block text-[13px] font-black text-white">Required</span><span className={'block text-[12px] font-bold '+(requirementMet?'text-emerald-300':'text-rose-300')}>{domainLabel(domain)} {requirement}</span></span>
    <SegmentBar value={requirement} filled={requirement} tone="requirement"/>
-   <b className="text-center text-xs font-black text-rose-300">{requirement}</b>
+   <b className={'text-center text-sm font-black '+(requirementMet?'text-emerald-300':'text-rose-300')}>{requirement}</b>
   </div>
-  <button type="button" disabled={localDisabled} onClick={onLocalClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 '+(localSelection!=='none'?'border-sky-500 bg-sky-950/20':'border-slate-700 bg-slate-950/70 hover:border-sky-700')+(attention&&!localDisabled?' kmw-attention-button':'')}>
-   <span><span className="block text-[10px] font-black text-white">Local team</span><span className="block text-[9px] font-bold text-sky-300">Knowledge {local}</span></span>
+  <button type="button" disabled={localDisabled} onClick={onLocalClick} className={'grid w-full grid-cols-[100px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 '+(localSelection!=='none'?'border-sky-500 bg-sky-950/20':'border-slate-700 bg-slate-950/70 hover:border-sky-700')+(attention&&!localDisabled?' kmw-attention-button':'')+(guideStep===2||guideStep===4?' kmw-tour-highlight':'')}>
+   <span><span className="block text-[13px] font-black text-white">{siteLabel} team</span><span className="block text-[12px] font-bold text-sky-300">{domainLabel(domain)} {local}</span></span>
    <SegmentBar value={local} filled={localFilled} tone="local"/>
-   <Selector state={localSelection} disabled={localDisabled}/>
+   <Selector state={localSelection} disabled={localDisabled} anchor={guideStep===4?'breadth':'local'}/>
   </button>
-  {expertName&&<button type="button" disabled={expertDisabled} onClick={onExpertClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 disabled:grayscale '+(expertSelection!=='none'?'border-amber-400 bg-amber-950/20':'border-slate-700 bg-slate-950/70 hover:border-amber-700')+(attention&&!expertDisabled?' kmw-attention-button':'')}>
-   <span className="min-w-0"><span className="block truncate text-[10px] font-black text-white">{expertName.split(' ')[0]}{expertLocation?' · '+(SITE_ABBR[expertLocation]||expertLocation):''}</span><span className="block text-[9px] font-bold text-amber-300">Knowledge {expert}{expertTraining?'':expertDisabled?' · used':travelCost?' · $'+travelCost+'k travel':''}</span></span>
+  {expertName&&<button type="button" disabled={expertDisabled} onClick={onExpertClick} className={'grid w-full grid-cols-[88px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 text-left transition disabled:opacity-35 disabled:grayscale '+(expertSelection!=='none'?'border-amber-400 bg-amber-950/20':'border-slate-700 bg-slate-950/70 hover:border-amber-700')+(attention&&!expertDisabled?' kmw-attention-button':'')+(guideStep===3?' kmw-tour-highlight':'')}>
+   <span className="min-w-0"><span className="block truncate text-[13px] font-black text-white">{expertName.split(' ')[0]}{expertLocation?' · '+(SITE_ABBR[expertLocation]||expertLocation):''}</span><span className="block text-[12px] font-bold text-amber-300">{domainLabel(domain)} {expert}{expertTraining?'':expertDisabled?' · used':travelCost?' · $'+travelCost+'k travel':''}</span></span>
    <SegmentBar value={expert} filled={expertFilled} tone="expert"/>
-   <Selector state={expertSelection} disabled={expertDisabled}/>
+   <Selector state={expertSelection} disabled={expertDisabled} anchor="expert"/>
   </button>}
   {expertTraining&&<p className="text-sm font-bold text-red-800">Busy training staff</p>}
  </div>;
@@ -259,6 +263,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[selectedChallengeId,setSelectedChallengeId]=useState('');
  const[challengeDrafts,setChallengeDrafts]=useState<Record<string,Exclude<PendingResponse,null>>>({});
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
+ const[guideStep,setGuideStep]=useState(0);
+ const[guideAnchor,setGuideAnchor]=useState<{left:number;top:number;targetX:number;targetY:number;panelWidth:number}|null>(null);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
  const[scorePadOpen,setScorePadOpen]=useState(false);
@@ -307,6 +313,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  useEffect(()=>{
   const challengePhase=state?.phase==='challenge'&&(state?.stage==='guided'||state?.stage==='free');
   setChallengeFocusOpen(!challengePhase);
+  setGuideStep(0);
   setChallengeDrafts({});
  },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
 
@@ -335,7 +342,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  useEffect(()=>{challengeDraftsRef.current=challengeDrafts},[challengeDrafts]);
 
  useEffect(()=>{
-  if(!challengeFocusOpen||state?.phase!=='challenge'||(state?.stage!=='guided'&&state?.stage!=='free')){
+  if(!challengeFocusOpen||state?.phase!=='challenge'||(state?.stage!=='guided'&&state?.stage!=='free')||(state.stage==='guided'&&state.guidedTurn===1&&guideStep>0)){
    setChallengeAttention(false);
    return;
   }
@@ -352,7 +359,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    }
   },8000);
   return()=>{window.clearTimeout(attentionTimer);if(pulseTimer!==undefined)window.clearTimeout(pulseTimer)};
- },[challengeFocusOpen,state?.stage,state?.phase,state?.guidedTurn,state?.freeRound,selectedChallengeId]);
+ },[challengeFocusOpen,state?.stage,state?.phase,state?.guidedTurn,state?.freeRound,selectedChallengeId,guideStep]);
 
  useEffect(()=>{
   if(!scorePadOpen)return;
