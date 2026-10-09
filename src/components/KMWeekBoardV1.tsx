@@ -434,8 +434,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const selectedKnowledge=riskSelected?riskKnowledge:selectedDepth+selectedBreadth;
  const successChance=activeChallenge
   ?selectedKnowledge>=activeChallenge.difficulty?100
-   :selectedKnowledge===0&&!riskSelected?0
-   :kmWeekRiskOddsV1(selectedKnowledge,activeChallenge.difficulty).chancePercent
+   :riskSelected?riskOdds.chancePercent
+   :guided&&state.guidedTurn===1&&selectedKnowledge>0?kmWeekRiskOddsV1(selectedKnowledge,activeChallenge.difficulty).chancePercent
+   :0
   :0;
  const firstGuidedTour=state.stage==='guided'&&state.guidedTurn===1&&state.phase==='challenge'&&challengeFocusOpen&&activeChallenge?.status==='open'&&guideStep>0;
  const expertTraining=Boolean(activeExpert&&state.trainingCommitments?.[activeExpert.id]===company.round);
