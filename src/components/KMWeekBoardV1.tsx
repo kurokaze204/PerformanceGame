@@ -372,6 +372,29 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   return()=>document.removeEventListener('pointerdown',closeOnOutside,true);
  },[scorePadOpen]);
 
+ useEffect(()=>{
+  if(!guideStep||!challengeFocusOpen||state?.stage!=='guided'||state.guidedTurn!==1||state.phase!=='challenge'){
+   setGuideAnchor(null);
+   return;
+  }
+  const targetKey=guideStep===1?'required':guideStep===2?'local':guideStep===3?'expert':guideStep===4?'breadth':'commit';
+  let frame=0;
+  const position=()=>{
+   const target=document.querySelector('[data-kmw-tour="'+targetKey+'"]');
+   if(!target)return;
+   const rect=target.getBoundingClientRect();
+   const panelWidth=Math.min(350,window.innerWidth-24);
+   const roomLeft=rect.left-panelWidth-26;
+   const left=roomLeft>=12?roomLeft:rect.right+panelWidth+26<window.innerWidth?rect.right+18:12;
+   const top=Math.max(72,Math.min(window.innerHeight-245,rect.top-72));
+   setGuideAnchor({left,top,targetX:rect.left+rect.width/2,targetY:rect.top+rect.height/2,panelWidth});
+  };
+  frame=requestAnimationFrame(position);
+  window.addEventListener('resize',position);
+  window.addEventListener('scroll',position,true);
+  return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true)};
+ },[guideStep,challengeFocusOpen,state?.stage,state?.guidedTurn,state?.phase]);
+
  useEffect(()=>{setScorePadOpen(false)},[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
  useEffect(()=>{if(scoreBriefOpen)setScorePadOpen(true)},[scoreBriefOpen]);
 
@@ -409,6 +432,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const selectedDepth=localSelection==='depth'?localScore:expertSelection==='depth'?activeExpertScore:0;
  const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0);
  const selectedKnowledge=riskSelected?riskKnowledge:selectedDepth+selectedBreadth;
+ const successChance=activeChallenge
+  ?selectedKnowledge>=activeChallenge.difficulty?100
+   :selectedKnowledge===0&&!riskSelected?0
+   :kmWeekRiskOddsV1(selectedKnowledge,activeChallenge.difficulty).chancePercent
+  :0;
+ const firstGuidedTour=state.stage==='guided'&&state.guidedTurn===1&&state.phase==='challenge'&&challengeFocusOpen&&activeChallenge?.status==='open'&&guideStep>0;
  const expertTraining=Boolean(activeExpert&&state.trainingCommitments?.[activeExpert.id]===company.round);
  const expertUsed=Boolean(activeExpert&&state.usedExpertIds.includes(activeExpert.id));
  const deterministicSelected=Boolean(activePending?.method&&(activePending.method==='local'||activePending.method==='expert'));
@@ -501,6 +530,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(source==='expert'&&(expertUsed||expertTraining||activeExpertScore<=0))return;
   const next=toggleKMWeekSourceV1(localState,expertState,source,localScore,activeExpertScore);
   localState=next.local;expertState=next.expert;
+  if(guideStep===2&&source==='local'&&localState!=='none')setGuideStep(3);
+  if(guideStep===3&&source==='expert'&&expertState==='depth')setGuideStep(4);
   const method:ResponseMethod|undefined=current?.method==='risk'?'risk':localState==='depth'?'local':expertState==='depth'?'expert':undefined;
   const parts:string[]=[];
   if(localState!=='none')parts.push(`Local ${localState}`);
@@ -518,6 +549,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const commitResponse=async()=>{
   if(!pendingResponse)return;
   if(!pendingResponse.method)return;
+  if(guideStep===5)setGuideStep(0);
   const committed=pendingResponse;
   const payload={type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth',useLocalRisk:committed.method==='risk'&&committed.localSelection!=='none',useExpertRisk:committed.method==='risk'&&committed.expertSelection==='depth'};
   if(committed.method==='risk'){
@@ -793,7 +825,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         </button>
        </div>
       </div>
-      <div className="relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+      <div className="relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
       {scorePadOpen&&<div data-kmw-scorepad className={`absolute left-2 right-2 top-[54px] z-[90] h-fit overflow-visible rounded-[18px] border-2 border-amber-700 bg-[#101827]/[.98] p-3 shadow-[0_20px_60px_rgba(0,0,0,.7)] min-[700px]:left-auto min-[700px]:w-2/3 ${scoreBriefOpen?'z-[135] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}`}>
        <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
        <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -821,7 +853,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <aside className="kmw-controls min-w-0 space-y-2 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2">
      {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className={`relative ${state.stage==='guided'&&state.guidedTurn===1?'z-[120]':''} overflow-y-auto overscroll-contain touch-pan-y flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-3 xl:p-5`}>
       {state.stage==='guided'&&state.guidedTurn===1&&<div className="mb-4 max-w-[350px] rounded-2xl border border-amber-700/70 bg-amber-950/20 p-3 text-left shadow-lg"><div className="text-[13px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Challenge</div><p className="mt-2 text-[16px] leading-relaxed text-slate-200">Welcome! You are the new CEO of <b className="text-white">{company.name}</b>. It’s a business with promise but also some challenges to overcome. There are islands of excellence and a few experts you can rely on to meet the challenges, but your role is to build up knowledge so every site performs well. Business goes on while you make improvements, so you will have to use the expertise you have to solve daily events. In fact, here comes one right now. <b className="text-amber-200">Click the card below to see what it is.</b></p></div>}
-      <button type="button" onClick={()=>setChallengeFocusOpen(true)} className="group kmw-start-card relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
+      <button type="button" onClick={()=>{setChallengeFocusOpen(true);if(state.stage==='guided'&&state.guidedTurn===1)setGuideStep(1)}} className="group kmw-start-card relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
        <div className="absolute inset-2 rounded-[13px] border border-violet-400/35"/>
        <div className="text-[9px] font-black uppercase tracking-[.24em] text-violet-300">The Performance Gap</div>
        <div className="mt-5 text-2xl font-black tracking-[.08em] text-white">CHALLENGE</div>
@@ -841,15 +873,19 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        {activeChallenge&&activeChallenge.status==='open'&&<div className="mt-2 rounded-xl border border-slate-700 bg-black/20 p-2.5">
         <div className="flex items-start justify-between gap-3">
          <div className="min-w-0">
-          {guided&&<div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">{guidedCopy.title}</div>}
-          <div className={(guided?'mt-0.5 ':'')+'text-sm font-black text-white'}>{challengeDisplayTitle(company,activeChallenge)}</div>
-          <div className="mt-1 text-[10px] font-bold text-slate-400">Needs: <b className="text-white">{domainLabel(activeChallenge.domain)} {activeChallenge.difficulty}</b> · Local knowledge: <b className={localScore>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300'}>{localScore}</b></div>
+          {guided&&<div className="text-[12px] font-black uppercase tracking-[.14em] text-amber-300">{guidedCopy.title}</div>}
+          <div className={(guided?'mt-0.5 ':'')+'text-[20px] leading-tight font-black text-white'}>{challengeDisplayTitle(company,activeChallenge)}</div>
+          <div className="mt-1 text-[13px] font-bold text-slate-400">Needs: <b className="text-white">{domainLabel(activeChallenge.domain)} {activeChallenge.difficulty}</b> · Local knowledge: <b className={localScore>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300'}>{localScore}</b></div>
          </div>
          <div className="shrink-0 text-right"><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">Selected knowledge</div><div className={'mt-0.5 text-[34px] font-black leading-none tracking-[-.05em] tabular-nums '+(selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-white')}>{selectedKnowledge}<span className="text-[20px] text-slate-500">/{activeChallenge.difficulty}</span></div>{pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'&&<div className="mt-1 text-[10px] font-black text-amber-300">RISK {riskOdds.chancePercent}% · {riskOdds.requiredRoll<=1?'ANY ROLL':riskOdds.requiredRoll>6?'NO WINNING ROLL':'NEED '+riskOdds.requiredRoll+'+'}</div>}</div>
         </div>
         <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
         <ChallengeKnowledgeBars
          requirement={activeChallenge.difficulty}
+         domain={activeChallenge.domain}
+         siteLabel={siteName(company,activeChallenge.siteId)}
+         requirementMet={selectedKnowledge>=activeChallenge.difficulty}
+         guideStep={firstGuidedTour?guideStep:0}
          local={localScore}
          expert={activeExpertScore}
          expertName={activeExpert?.name}
@@ -864,6 +900,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          onLocalClick={()=>cycleKnowledgeSource('local')}
          onExpertClick={()=>cycleKnowledgeSource('expert')}
         />
+        <div data-kmw-tour="chance" className={'mt-2 flex items-center justify-between gap-2 rounded-xl border-2 px-3 py-2 '+(selectedKnowledge>=activeChallenge.difficulty?'border-emerald-400 bg-emerald-950/30':'border-sky-500 bg-sky-950/30')+(firstGuidedTour&&guideStep===2?' kmw-tour-chance':'')}>
+         <div className="flex items-center gap-2"><Target className="h-5 w-5 text-sky-300"/><div><div className="text-[13px] font-black text-white">Chance of success</div><div className="text-[11px] text-slate-300">Based on selected team and expertise</div></div></div>
+         <b className={'text-2xl font-black tabular-nums '+(selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300')}>{successChance}%</b>
+        </div>
         {!guided&&deterministicSelected&&knowledgeShortfall>0&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-1.5 text-[10px] font-black text-rose-200">KNOWLEDGE SHORTFALL {knowledgeShortfall} · If you commit this response, the Challenge will fail.</div>}
         {(!guided||state.guidedTurn===3)&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:riskSelected?(expertSelection==='depth'?'expert':localSelection==='depth'?'local':undefined):'risk',expertId:activePending?.expertId,localSelection,expertSelection,label:'Take the risk'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+ on d6'}</span></ResponseButton></div>}
         <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5">
@@ -871,7 +911,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
         </div>
         {actionError&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
-        <button type="button" onClick={()=>void commitResponse()} disabled={!responseReady||busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':'COMMIT RESPONSE'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+        <button type="button" onClick={()=>void commitResponse()} disabled={!responseReady||busy||readOnly} data-kmw-tour="commit" className={'mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-600'+(firstGuidedTour&&guideStep===5?' kmw-tour-highlight':'')}>{busy?'COMMITTING…':'COMMIT RESPONSE'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>}
 
        {challengeDone&&<div className="mt-3 rounded-xl border-2 border-emerald-700 bg-emerald-950/25 p-3 text-xs font-black text-emerald-200">Challenges complete. Moving to Invest…</div>}
