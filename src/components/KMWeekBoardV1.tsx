@@ -953,7 +953,30 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>
   </>}
 
-  {state.stage==='guided'&&state.guidedTurn===1&&state.phase==='challenge'&&!challengeFocusOpen&&<div aria-hidden="true" className="fixed inset-0 z-[110] bg-black/70"/>}
+  {riverIntroActive&&<>
+   {riverIntroStep===1&&<div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[135] bg-black/75"/>}
+   {riverIntroStep<9&&<button type="button" aria-label="Next River introduction step" className="fixed inset-0 z-[160] cursor-pointer bg-transparent" onClick={advanceRiverIntro}/>}
+   {riverIntroArrows.length>0&&<svg className="pointer-events-none fixed inset-0 z-[180] h-screen w-screen" aria-hidden="true">
+    <defs><marker id="kmw-river-intro-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" stroke="#7dd3fc" fill="none" strokeWidth="1.8"/></marker></defs>
+    {riverIntroArrows.map((arrow,index)=><path key={index} d={`M ${arrow.fromX} ${arrow.fromY} C ${arrow.fromX+(riverIntroUnlocked?48:-46)} ${arrow.fromY}, ${arrow.toX+(riverIntroUnlocked?-60:38)} ${arrow.toY}, ${arrow.toX} ${arrow.toY}`} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" markerEnd="url(#kmw-river-intro-arrow)"/>)}
+   </svg>}
+   <section role="dialog" aria-modal={riverIntroStep<9} aria-label="CEO briefing: the Knowledge River" data-kmw-river-brief className={'fixed top-1/2 z-[190] max-h-[calc(100dvh-80px)] w-[min(380px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,.75)] min-[700px]:w-[min(400px,calc(38vw-24px))] '+(riverIntroUnlocked?'left-1/2 min-[700px]:left-[30%]':'left-1/2 min-[700px]:left-[80%]')}>
+    <div className="flex items-center justify-between gap-2"><div className="text-[11px] font-black uppercase tracking-[.14em] text-amber-300">CEO briefing · Knowledge River</div><div className="text-xs font-black text-sky-300">{riverIntroStep}/9</div></div>
+    <p className="mt-3 text-[15px] leading-relaxed text-white">
+     {riverIntroStep===1?<>Welcome, CEO of <b>{company.name}</b>. Your company has pockets of expertise, but not every site has the knowledge it needs. Solve today's business problems while building capability across the company.</>:
+      riverIntroStep===2?<>Knowledge and expertise are intangible assets. Being able to visualise them and how they contribute to your capability is important. We do that with the <b>River Diagram</b>.</>:
+      riverIntroStep===3?<>These are the critical knowledge domains of your company.</>:
+      riverIntroStep===4?<>These show how each site rates itself in that domain. The higher the number, the greater the team's capability. Even when someone is on holiday, the local team can deliver to this level.</>:
+      riverIntroStep===5?<>Across your company you have several experts. They know much more than those around them, but are a limited resource and also a knowledge-loss risk.</>:
+      riverIntroStep===6?<>The River itself represents what the company as a whole knows.</>:
+      riverIntroStep===7?<>The south bank is the least we know as a company. The north bank is the most we know. Anything beyond it must come from elsewhere — training, consultants, vendors and other sources.</>:
+      riverIntroStep===8?<>Each turn you will put this knowledge to work solving problems at your sites, followed by an Invest phase where you can improve the level and distribution of expertise across the company.</>:
+      <>Each Challenge requires a particular level of knowledge in one domain. <b>Click the Challenge card below to get started.</b></>}
+    </p>
+    {riverIntroStep<9&&<button type="button" onClick={advanceRiverIntro} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">NEXT <ArrowRight className="ml-1 inline h-4 w-4"/></button>}
+    {riverIntroUnlocked&&<p className="mt-3 text-xs font-bold text-sky-200">Select the highlighted Challenge card to continue.</p>}
+   </section>
+  </>}
 
   {challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')&&<div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 top-[66px] z-40 bg-black/20"/>}
 
@@ -980,7 +1003,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         </button>
        </div>
       </div>
-      <div data-kmw-tour-river className="relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+      <div data-kmw-tour-river className={'relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]'+(riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?' z-[145] rounded-2xl':'')} style={riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?{boxShadow:'0 0 0 160vmax rgba(0,0,0,.74)'}:undefined}><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
       {scorePadOpen&&<div data-kmw-scorepad className={`absolute left-2 right-2 top-[54px] z-[90] h-fit overflow-visible rounded-[18px] border-2 border-amber-700 bg-[#101827]/[.98] p-3 shadow-[0_20px_60px_rgba(0,0,0,.7)] min-[700px]:left-auto min-[700px]:w-2/3 ${scoreBriefOpen?'z-[135] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}`}>
        <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
        <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -1006,9 +1029,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     </div>
 
     <aside className="kmw-controls min-w-0 space-y-2 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2">
-     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className={`relative ${state.stage==='guided'&&state.guidedTurn===1?'z-[120]':''} overflow-y-auto overscroll-contain touch-pan-y flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-3 xl:p-5`}>
-      {state.stage==='guided'&&state.guidedTurn===1&&<div className="mb-4 max-w-[350px] rounded-2xl border border-amber-700/70 bg-amber-950/20 p-3 text-left shadow-lg"><div className="text-[13px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Challenge</div><p className="mt-2 text-[16px] leading-relaxed text-slate-200">Welcome, CEO of <b className="text-white">{company.name}</b>. Your company has pockets of expertise, but not every site has the knowledge it needs. Solve today's business problems while building capability across the company. <b className="text-amber-200">Click the Challenge card to begin.</b></p></div>}
-      <button type="button" onClick={()=>{setChallengeFocusOpen(true);if(state.stage==='guided'&&state.guidedTurn===1)setGuideStep(1)}} className="group kmw-start-card relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
+     {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className={`relative ${riverIntroActive&&riverIntroStep<9?'opacity-50 grayscale-[.25]':''} overflow-y-auto overscroll-contain touch-pan-y flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-3 xl:p-5`}>
+      <button type="button" data-kmw-river-intro="challenge-card" disabled={riverIntroActive&&!riverIntroUnlocked} onClick={beginFirstChallenge} className="group kmw-start-card disabled:cursor-not-allowed disabled:hover:translate-y-0 relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
        <div className="absolute inset-2 rounded-[13px] border border-violet-400/35"/>
        <div className="text-[9px] font-black uppercase tracking-[.24em] text-violet-300">The Performance Gap</div>
        <div className="mt-5 text-2xl font-black tracking-[.08em] text-white">CHALLENGE</div>
