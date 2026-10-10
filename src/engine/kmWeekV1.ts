@@ -612,7 +612,7 @@ export function resolveKMWeekChallengeV1(
   applyTurnover(company,turnoverChange);
   const challengeIndex=state.challenges.findIndex(item=>item.id===challenge.id)+1;
   const challengeLabel=state.stage==='guided'?`G${state.guidedTurn} C`:`R${state.freeRound} C${challengeIndex}`;
-  state.turnoverHistory.push({label:challengeLabel,turnover:company.turnover});
+  state.turnoverHistory.push({label:challengeLabel,turnover:company.turnover,challengeResult:challenge.status});
   if(won&&state.stage==='free'){
     state.freeSuccesses+=1;
     state.businessDifficultySolved=(state.businessDifficultySolved||0)+challenge.difficulty;
