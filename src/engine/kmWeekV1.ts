@@ -20,7 +20,7 @@ export const KM_WEEK_AAR_UNLOCK_ROUND = 8;
 
 export function kmWeekAARCandidatesV1(company:CompanyV2):KMWeekChallenge[]{
  const state=company.kmWeek;
- if(!state||state.stage!=='free'||state.phase!=='invest'||state.freeRound<KM_WEEK_AAR_UNLOCK_ROUND)return [];
+ if(!state||state.stage!=='free'||state.phase!=='invest'||company.round<KM_WEEK_AAR_UNLOCK_ROUND)return [];
  const reviewed=new Set(state.investmentHistory.filter(item=>item.type==='AFTER_ACTION_REVIEW').map(item=>item.challengeId));
  return state.challenges.filter(item=>item.difficulty>=5&&item.status!=='open'&&!reviewed.has(item.id));
 }
