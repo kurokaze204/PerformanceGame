@@ -39,7 +39,7 @@ assert.equal(result.success,true,result.message);
 assert.equal(site.teamCapability.operations,4,'+2 training must stop at expert ceiling');
 assert.equal(expert.domains[0].score,4,'Training staff must retain expert knowledge');
 assert.equal(state.trainingCommitments?.[expert.id],company.round);
-assert.match(kmWeekCoachV1(company)!.text,/local expertise that can spread/,'Training commitment warning belongs to the expert row; the coaching question should not repeat it');
+assert.match(kmWeekCoachV1(company)!.text,/stronger site's knowledge available elsewhere/,'After an investment moves play to Round 2, the coach should focus on distribution rather than repeat the training warning');
 state.challenges=[{id:'risk-expert',title:'Test',story:'Test',siteId:site.id,domain:'operations',difficulty:6,impact:15,status:'open'}];
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:'risk-expert',method:'risk',expertId:expert.id,useExpertRisk:true});
 assert.equal(result.success,false,'Risk cannot bypass trainer unavailability');
