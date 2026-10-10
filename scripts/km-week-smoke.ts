@@ -72,7 +72,7 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   const rounds=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+1));
   const signatures=rounds.map(cards=>cards.map(card=>card.domain+':'+card.difficulty).sort().join('|')).sort();
   const expected=[
-    'hr:3|hr:4',
+    'hr:2|marketing:3',
     'hr:3|marketing:4',
     'marketing:4|operations:8',
     'operations:4|operations:6',
@@ -80,7 +80,8 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
     'marketing:5|marketing:6',
   ].sort();
   assert.deepEqual(signatures,expected,'Each six-round cycle must contain the agreed six challenge-value profiles exactly once');
-  assert.equal(rounds.filter(cards=>cards[0].domain===cards[1].domain&&cards.every(card=>card.difficulty>2)).length,3,'Each cycle must contain three same-domain expert-bottleneck rounds');
+  assert.equal(rounds.filter(cards=>cards[0].domain===cards[1].domain&&cards.every(card=>card.difficulty>2)).length,2,'Each cycle must contain two later same-domain expert-bottleneck rounds');
+  assert.deepEqual(rounds[0].map(card=>card.domain+':'+card.difficulty).sort(),['hr:2','marketing:3'],'The first full round must remain approachable for new players');
   assert.ok(rounds.flat().every(card=>card.impact===card.difficulty*15),'Free-play business impact must scale at $15k per required knowledge level');
   assert.ok(rounds.every(cards=>cards[0].siteId!==cards[1].siteId),'The two Challenges in a round must be assigned to different sites');
   assert.equal(new Set(rounds.flat().map(card=>card.title)).size,12,'Story descriptions must not repeat within a six-round cycle');
@@ -93,7 +94,7 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   initialiseKMWeekCompanyV1(scoreProbe);
   scoreProbe.kmWeek!.businessDifficultySolved=28;
   assert.equal(calculateKMWeekScoreV1(session,scoreProbe).business,6,'Business Performance must scale with Challenge difficulty solved, not raw win count');
-  scoreProbe.kmWeek!.businessDifficultySolved=56;
+  scoreProbe.kmWeek!.businessDifficultySolved=54;
   assert.equal(calculateKMWeekScoreV1(session,scoreProbe).business,12,'Solving the full six-round difficulty load must earn the full 12 Business Performance points');
 }
 
@@ -180,13 +181,17 @@ assert.equal(result.success,true,result.message);
 assert.equal(opsExpert().domains[0].score,5);
 assert.equal(company.kmWeek?.guidedTurn,2);
 
-// Guided 2 deliberately teaches a local-team risk response rather than
-// sending Priya for a second challenge in a row.
+// Guided 2 uses Human Resources so the local team or Marcus can respond
+// without bringing Priya back in straight after her first investment.
 const guided2=company.kmWeek!.challenges[0];
-result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:guided2.id,method:'risk',useLocalRisk:true});
+assert.equal(guided2.domain,'hr','Guided 2 should introduce HR rather than require Priya again');
+assert.equal(guided2.siteId,'melbourne');
+const melbourneHR=company.sites.find(site=>site.id==='melbourne')?.teamCapability.hr||0;
+assert.ok(melbourneHR>=guided2.difficulty,'Guided 2 must be solvable by Melbourne local HR');
+result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:guided2.id,method:'local'});
 assert.equal(result.success,true,result.message);
-assert.equal(guided2.resolution,'risk');
-assert.ok((guided2.dieRoll||0)>=1&&(guided2.dieRoll||0)<=6,'Guided 2 must record the d6 result');
+assert.equal(guided2.status,'success');
+assert.equal(guided2.resolution,'local');
 assert.equal(company.kmWeek?.phase,'invest');
 const beforeRemoteTraining=company.turnover;
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:opsExpert().id,siteId:'melbourne',domain:'operations'});
@@ -197,11 +202,14 @@ assert.equal(opsExpert().location,'melbourne','Local Training travel must update
 assert.equal(company.kmWeek?.guidedTurn,3);
 
 const busyChallenge=company.kmWeek!.challenges[0];
+assert.equal(busyChallenge.domain,'marketing','Guided 3 must offer another domain while Priya trains');
 const blocked=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:busyChallenge.id,method:'expert',expertId:opsExpert().id});
 assert.equal(blocked.success,false,'A site trainer must be unavailable next round');
 assert.match(blocked.message,/Busy training staff/);
-const riskWithoutExpert=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:busyChallenge.id,method:'risk',useLocalRisk:true});
-assert.equal(riskWithoutExpert.success,true,riskWithoutExpert.message);
+const marketingExpert=company.experts.find(expert=>expert.domains.some(skill=>skill.domain==='marketing'))!;
+const availableExpert=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:busyChallenge.id,method:'expert',expertId:marketingExpert.id});
+assert.equal(availableExpert.success,true,availableExpert.message);
+assert.equal(busyChallenge.status,'success','Mary should be able to solve Guided 3 while Priya is training');
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',sourceSiteId:'melbourne',targetSiteId:'brisbane',domain:'hr'});
 assert.equal(result.success,true,result.message);
 assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.hr,1,'Guided Knowledge Transfer must accept any valid domain/source/target choice');
