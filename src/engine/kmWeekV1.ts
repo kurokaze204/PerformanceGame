@@ -302,7 +302,7 @@ function hashGoal(sessionId:string):KMWeekGoalId{
 }
 
 function emptyScore():KMWeekScore{
-  return {business:0,expertise:0,localCapability:0,knowledgeFlow:0,resilience:0,goal:0,total:0};
+  return {business:0,expertise:0,localCapability:0,knowledgeFlow:0,resilience:0,goal:0,turnover:0,total:0};
 }
 
 function activeSites(company:CompanyV2){
@@ -442,6 +442,20 @@ function goalAchieved(session:GameSessionV2,company:CompanyV2){
   return totals.length===3&&totals.every(total=>total>=3)&&totals.some(total=>total>=4);
 }
 
+/** Final turnover placements are decided across the companies actually playing.
+ * Equal turnover shares the same place; the next place is skipped (competition ranking).
+ * Nobody earns a placement bonus while any participating company is still playing.
+ */
+export function kmWeekFinalTurnoverPointsV1(session:GameSessionV2,company:CompanyV2):number{
+  const participantCompanyIds=new Set(session.participants.filter(participant=>participant.role!=='facilitator'&&participant.companyId).map(participant=>participant.companyId));
+  const competitors=participantCompanyIds.size
+    ?session.companies.filter(candidate=>participantCompanyIds.has(candidate.id))
+    :session.companies;
+  if(!competitors.length||!competitors.some(candidate=>candidate.id===company.id)||!competitors.every(candidate=>candidate.kmWeek?.stage==='complete'))return 0;
+  const ahead=competitors.filter(candidate=>candidate.turnover>company.turnover).length;
+  return [7,4,2][ahead]??0;
+}
+
 export function calculateKMWeekScoreV1(session:GameSessionV2,company:CompanyV2):KMWeekScore{
   const state=company.kmWeek;
   if(!state)return emptyScore();
@@ -455,9 +469,10 @@ export function calculateKMWeekScoreV1(session:GameSessionV2,company:CompanyV2):
     resilience:state.shockChecks.filter(check=>check.passed).length+
       (state.shockChecks.length===KM_WEEK_SHOCK_SPECS.length&&state.shockChecks.every(check=>check.passed)?10:0),
     goal:goalAchieved(session,company)?5:0,
+    turnover:kmWeekFinalTurnoverPointsV1(session,company),
     total:0,
   };
-  score.total=score.business+score.expertise+score.localCapability+score.knowledgeFlow+score.resilience+score.goal;
+  score.total=score.business+score.expertise+score.localCapability+score.knowledgeFlow+score.resilience+score.goal+score.turnover;
   return score;
 }
 
@@ -788,6 +803,11 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
   syncScore(session,company);
   const staffedIds=new Set(session.participants.filter(participant=>participant.role!=='facilitator').map(participant=>participant.companyId));
   const relevant=staffedIds.size?session.companies.filter(candidate=>staffedIds.has(candidate.id)):session.companies;
-  if(relevant.length&&relevant.every(candidate=>candidate.kmWeek?.stage==='complete'))session.finalDisruptionResolved=true;
+  if(relevant.length&&relevant.every(candidate=>candidate.kmWeek?.stage==='complete')){
+    session.finalDisruptionResolved=true;
+    // Turnover rankings only exist after the last team completes. Re-score all
+    // participants together so the persisted final totals match the debrief.
+    for(const candidate of relevant)syncScore(session,candidate);
+  }
   return{...result,session};
 }
