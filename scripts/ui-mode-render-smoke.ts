@@ -86,6 +86,17 @@ assert.ok(kmWeekBoardSource.includes("min-[700px]:flex-1")&&kmWeekBoardSource.in
 assert.ok(kmWeekBoardSource.includes("min-[700px]:overflow-y-auto"),'The tablet Challenge/Invest panel must scroll internally rather than pushing below the River');
 assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'The three initial KM Week investments must remain');
 assert.ok(kmWeekBoardSource.includes('data-kmw-aar-button')&&kmWeekBoardSource.includes('aarCandidates.length>0')&&kmWeekBoardSource.includes("setInvestment('AFTER_ACTION_REVIEW')"),'AAR is offered as a fourth investment only for a completed tough Challenge');
+
+for(const kind of ['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER','AFTER_ACTION_REVIEW']){
+ assert.ok(kmWeekBoardSource.includes(`<InvestmentInfoIcon kind="${kind}"`),`Investment ${kind} needs a refresh icon`);
+ assert.ok(kmWeekBoardSource.includes(`title:'${kind==='TRAIN_EXPERT'?'Train Expert':kind==='LOCAL_TRAINING'?'Local Training':kind==='KNOWLEDGE_TRANSFER'?'Knowledge Transfer':'After Action Review'}'`),`Investment ${kind} must have a complete explanatory script`);
+}
+assert.ok(kmWeekBoardSource.includes('data-kmw-investment-info={kind}')&&kmWeekBoardSource.includes('aria-expanded={open}')&&kmWeekBoardSource.includes('aria-controls="kmw-intervention-help"'),'The four separate info buttons must be accessible on mouse, touch and keyboard');
+assert.ok(kmWeekBoardSource.includes('data-kmw-intervention-help={infoInvestment}')&&kmWeekBoardSource.includes('max-h-[min(40dvh,320px)]')&&kmWeekBoardSource.includes('overscroll-contain'),'Help must open immediately below the interventions and scroll within the iPad control panel');
+assert.ok(kmWeekBoardSource.includes("const scoreGhostPreview:RiverGhostPreview|undefined=infoInvestment")&&kmWeekBoardSource.includes("previewForIntervention(infoInvestment)")&&kmWeekBoardSource.includes('infoPreviewDomain'),'Info button should preview the selected intervention on the River without changing the committed investment');
+assert.ok(kmWeekBoardSource.includes('setInfoInvestment(current=>current===')&&kmWeekBoardSource.includes('onClick={()=>setInfoInvestment(null)}'),'Information buttons must toggle and be closable');
+assert.ok(kmWeekBoardSource.includes('kind:\'aar\',domain:aarChallenge.domain')&&riverSource.includes('data-kmw-score-ghost="local"')&&riverSource.includes('data-kmw-score-ghost="expertise"'),'AAR information must show both site and expert projections using the established River ghost markers');
+
 assert.ok(kmWeekBoardSource.includes("item.status==='success'?'SUCCESS: ':'FAILURE: '")&&kmWeekBoardSource.includes('data-kmw-aar-select'),'AAR dropdown labels successful and failed Challenges');
 assert.ok(kmWeekBoardSource.includes('data-kmw-aar-intro')&&kmWeekBoardSource.includes('kmw-aar-arrow')&&kmWeekBoardSource.includes('dismissAARIntro'),'AAR opens a one-time briefing pointing at its button');
 assert.ok(kmWeekBoardSource.includes("kind:'aar',domain:aarChallenge.domain")&&riverSource.includes("ghostPreview.kind==='aar'&&ghostPreview.siteDelta>0")&&riverSource.includes("ghostPreview.kind==='aar'&&ghostPreview.expertDelta>0"),'AAR previews both site and expert knowledge gains');
