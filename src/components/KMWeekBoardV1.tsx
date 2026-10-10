@@ -259,6 +259,11 @@ function currentGuidedCopy(company:CompanyV2){
 
 const ToolTip:React.FC<{text:React.ReactNode;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
 
+const InvestmentInfoIcon:React.FC<{kind:KMWeekInvestment;open:boolean;onToggle:()=>void}>=({kind,open,onToggle})=>
+ <button type="button" data-kmw-investment-info={kind} aria-label={`Information about ${KM_WEEK_INTERVENTION_HELP[kind].title}`} aria-controls="kmw-intervention-help" aria-expanded={open} onClick={onToggle} title={`Learn about ${KM_WEEK_INTERVENTION_HELP[kind].title} and preview it on the River`} className={'absolute right-1.5 top-1.5 z-10 grid h-8 w-8 place-items-center rounded-lg border-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 '+(open?'border-sky-300 bg-sky-900 text-sky-200':'border-slate-600 bg-slate-900 text-sky-300 hover:border-sky-400 hover:bg-slate-800')}>
+  <Info className="h-4 w-4"/>
+ </button>;
+
 const KM_WEEK_INTERVENTION_HELP:Record<KMWeekInvestment,{title:string;description:string}>={
  TRAIN_EXPERT:{
   title:'Train Expert',
@@ -1462,15 +1467,44 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'&&<>
        {guided&&<div className="mt-2 rounded-xl border border-amber-800 bg-amber-950/15 px-2.5 py-2 text-[11px] leading-snug text-slate-200"><span className="font-black text-amber-300">This investment: </span>{guidedCopy.invest}</div>}
        <div className="mt-2 grid grid-cols-3 gap-1.5">
-        <button disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>setInvestment('TRAIN_EXPERT')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}><GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+1 depth · $15k</div></button>
-        <button disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>setInvestment('LOCAL_TRAINING')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}><Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+2 local · $10k</div></button>
-        <button disabled={guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'} onClick={()=>setInvestment('KNOWLEDGE_TRANSFER')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='KNOWLEDGE_TRANSFER'?'border-emerald-300 bg-emerald-950/40':'border-slate-700 bg-slate-950'}`}><Workflow className="h-4 w-4 text-emerald-300"/><div className="mt-1 text-[10px] font-black text-white">Knowledge Transfer</div><div className="text-[9px] text-slate-500">Move half the gap · $8k</div></button>
+        <div className="relative min-w-0">
+         <button type="button" disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>{setInvestment('TRAIN_EXPERT');setInfoInvestment(null)}} className={`h-full w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}>
+          <GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+1 depth · $15k</div>
+         </button>
+         <InvestmentInfoIcon kind="TRAIN_EXPERT" open={infoInvestment==='TRAIN_EXPERT'} onToggle={()=>setInfoInvestment(current=>current==='TRAIN_EXPERT'?null:'TRAIN_EXPERT')}/>
+        </div>
+        <div className="relative min-w-0">
+         <button type="button" disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>{setInvestment('LOCAL_TRAINING');setInfoInvestment(null)}} className={`h-full w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}>
+          <Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+2 local · $10k</div>
+         </button>
+         <InvestmentInfoIcon kind="LOCAL_TRAINING" open={infoInvestment==='LOCAL_TRAINING'} onToggle={()=>setInfoInvestment(current=>current==='LOCAL_TRAINING'?null:'LOCAL_TRAINING')}/>
+        </div>
+        <div className="relative min-w-0">
+         <button type="button" disabled={guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'} onClick={()=>{setInvestment('KNOWLEDGE_TRANSFER');setInfoInvestment(null)}} className={`h-full w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='KNOWLEDGE_TRANSFER'?'border-emerald-300 bg-emerald-950/40':'border-slate-700 bg-slate-950'}`}>
+          <Workflow className="h-4 w-4 text-emerald-300"/><div className="mt-1 text-[10px] font-black text-white">Knowledge Transfer</div><div className="text-[9px] text-slate-500">Move half the gap · $8k</div>
+         </button>
+         <InvestmentInfoIcon kind="KNOWLEDGE_TRANSFER" open={infoInvestment==='KNOWLEDGE_TRANSFER'} onToggle={()=>setInfoInvestment(current=>current==='KNOWLEDGE_TRANSFER'?null:'KNOWLEDGE_TRANSFER')}/>
+        </div>
        </div>
-       {aarCandidates.length>0&&<button type="button" data-kmw-aar-button onClick={()=>{setInvestment('AFTER_ACTION_REVIEW');if(aarChallenge)setSelectedDomain(aarChallenge.domain)}} className={'mt-2 flex w-full items-center gap-3 rounded-xl border-2 p-2.5 text-left transition '+(investment==='AFTER_ACTION_REVIEW'?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-950 hover:border-amber-500')}>
-        <BookOpenCheck className="h-5 w-5 shrink-0 text-amber-300"/>
-        <span className="flex-1"><span className="block text-xs font-black text-white">After Action Review</span><span className="block text-[10px] text-slate-400">Learn from tough Challenges · $50k</span></span>
-        <ArrowRight className="h-4 w-4 text-amber-300"/>
-       </button>}
+       {aarCandidates.length>0&&<div className="relative">
+        <button type="button" data-kmw-aar-button onClick={()=>{setInvestment('AFTER_ACTION_REVIEW');setInfoInvestment(null);if(aarChallenge)setSelectedDomain(aarChallenge.domain)}} className={'mt-2 flex w-full items-center gap-3 rounded-xl border-2 p-2.5 pr-12 text-left transition '+(investment==='AFTER_ACTION_REVIEW'?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-950 hover:border-amber-500')}>
+         <BookOpenCheck className="h-5 w-5 shrink-0 text-amber-300"/>
+         <span className="flex-1"><span className="block text-xs font-black text-white">After Action Review</span><span className="block text-[10px] text-slate-400">Learn from tough Challenges · $50k</span></span>
+        </button>
+        <InvestmentInfoIcon kind="AFTER_ACTION_REVIEW" open={infoInvestment==='AFTER_ACTION_REVIEW'} onToggle={()=>setInfoInvestment(current=>current==='AFTER_ACTION_REVIEW'?null:'AFTER_ACTION_REVIEW')}/>
+       </div>}
+       {infoInvestment&&<section id="kmw-intervention-help" data-kmw-intervention-help={infoInvestment} aria-label={`About ${KM_WEEK_INTERVENTION_HELP[infoInvestment].title}`} className="mt-2 max-h-[min(40dvh,320px)] overflow-y-auto overscroll-contain rounded-xl border-2 border-sky-500 bg-[#102439] p-3 text-left shadow-[0_10px_30px_rgba(0,0,0,.4)]">
+        <div className="flex items-start gap-2">
+         <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300"/>
+         <h3 className="flex-1 text-sm font-black text-white">{KM_WEEK_INTERVENTION_HELP[infoInvestment].title}</h3>
+         <button type="button" onClick={()=>setInfoInvestment(null)} aria-label="Close investment information" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-500 text-slate-300 hover:bg-slate-800"><X className="h-4 w-4"/></button>
+        </div>
+        <p className="mt-2 text-[12px] leading-relaxed text-slate-100">{KM_WEEK_INTERVENTION_HELP[infoInvestment].description}</p>
+        <div className="mt-2 rounded-lg border border-sky-700/70 bg-sky-950/45 px-2.5 py-2 text-[11px] leading-relaxed text-sky-100">
+         <span className="font-black text-sky-300">River preview: </span>{infoPreviewText}
+         {!scoreGhostPreview&&<span className="mt-1 block font-semibold text-amber-200">No further knowledge gain with these settings. Choose a different expert, site or domain to see an uplift.</span>}
+        </div>
+       </section>}
        <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/75 p-2.5">
         {investment==='AFTER_ACTION_REVIEW'?<label className="block text-[10px] font-black uppercase text-slate-400">Challenge to review
           <select data-kmw-aar-select value={aarChallenge?.id||''} onChange={event=>{const chosen=aarCandidates.find(item=>item.id===event.target.value);setAARChallengeId(event.target.value);if(chosen)setSelectedDomain(chosen.domain)}} className="mt-1 block w-full rounded-lg border border-amber-700 bg-[#071019] px-2 py-2.5 text-xs font-bold normal-case text-white">
