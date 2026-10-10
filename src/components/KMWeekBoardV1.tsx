@@ -4,7 +4,7 @@ import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_AAR_COST,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{toggleKMWeekSourceV1}from'../engine/kmWeekSelectionV1.ts';
 import{kmWeekCoachV1}from'../engine/kmWeekCoachV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -646,7 +646,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  },[state?.stage,state?.freeRound]);
 
  useEffect(()=>{
-  const popupAvailable=Boolean(state?.stage==='free'&&state.phase==='invest'&&state.freeRound>=8&&!aarIntroDismissed&&!readOnly&&localStorage.getItem(`tpg:kmw-aar-intro:${session.id}:${company.id}`)!=='seen');
+  const popupAvailable=Boolean(state?.stage==='free'&&state.phase==='invest'&&company.round>=KM_WEEK_AAR_UNLOCK_ROUND&&!aarIntroDismissed&&!readOnly&&localStorage.getItem(`tpg:kmw-aar-intro:${session.id}:${company.id}`)!=='seen');
   if(!popupAvailable){setAARIntroArrow(null);return;}
   const reposition=()=>{
    const panel=document.querySelector('[data-kmw-aar-intro]')?.getBoundingClientRect();
