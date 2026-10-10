@@ -736,6 +736,37 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   }
  };
 
+ const completeSiteAudits=async()=>{
+  if(busy||readOnly||!state.shockResolved)return;
+  // Keep the pre-audit turnover in the header until the fine reaches it.
+  onPresentationHoldChange?.(true);
+  try{
+   await post({type:'KM_WEEK_COMPLETE_SHOCK'},async()=>{
+    const origin=document.querySelector('[data-kmw-audit-fine]')?.getBoundingClientRect();
+    const target=document.querySelector('[data-kmw-turnover-target]')?.getBoundingClientRect();
+    if(!origin||!target)return;
+    const startX=origin.left+origin.width/2,startY=origin.top+origin.height/2;
+    const dx=target.left+target.width/2-startX,dy=target.top+target.height/2-startY;
+    const globe=document.createElement('div');
+    globe.className='kmw-knowledge-spark '+(auditFine>0?'kmw-turnover-globe-loss':'kmw-turnover-globe-win');
+    globe.style.left=`${startX-9}px`;
+    globe.style.top=`${startY-9}px`;
+    document.body.appendChild(globe);
+    try{
+     const path=globe.animate([
+      {transform:'translate(0,0) scale(.65)',opacity:0},
+      {transform:`translate(${dx*.12}px,-55px) scale(1.2)`,opacity:1,offset:.16},
+      {transform:`translate(${dx*.55}px,${dy*.43-80}px) scale(1.08)`,opacity:1,offset:.58},
+      {transform:`translate(${dx}px,${dy}px) scale(.85)`,opacity:1}
+     ],{duration:1350,easing:'cubic-bezier(.25,.62,.3,1)',fill:'forwards'});
+     await path.finished;
+    }catch{}finally{globe.remove();}
+    // The incoming completed session, including turnover, applies only now.
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+   });
+  }finally{onPresentationHoldChange?.(false)}
+ };
+
  const guidedTargetInvestment:KMWeekInvestment|undefined=guided?(state.guidedTurn===1?'TRAIN_EXPERT':state.guidedTurn===2?'LOCAL_TRAINING':'KNOWLEDGE_TRANSFER'):undefined;
  const source=company.sites.find(site=>site.id===sourceSiteId);
  const target=company.sites.find(site=>site.id===targetSiteId);
@@ -1121,45 +1152,44 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
       {state.stage==='shock'&&<div className="mt-2">
        <div className="rounded-2xl border-2 border-rose-700 bg-[linear-gradient(145deg,#32121d,#171827)] p-3 text-left">
-        <div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-4 border-rose-300 bg-rose-950"><ShieldCheck className="h-5 w-5 text-rose-200"/></div><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-rose-300">Site Audits · final three minutes</div><h3 className="mt-0.5 text-lg font-black text-white">The experts cannot be everywhere at once.</h3></div></div>
-        <p className="mt-3 text-[11px] leading-relaxed text-slate-200">Five critical issues hit across the company at the same time. Your specialists are already committed elsewhere, so each site has to act using the knowledge that has actually been built locally.</p>
-        <div className="mt-2 rounded-xl border border-amber-700/70 bg-amber-950/25 p-2 text-[10px] leading-relaxed text-amber-100"><b className="text-amber-300">The consequence:</b> every missing local Knowledge point requires emergency external support at <b>$${KM_WEEK_SHOCK_GAP_COST}k per point</b>. The larger the capability gap, the larger the hit to turnover.</div>
+        <div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-4 border-rose-300 bg-rose-950"><ShieldCheck className="h-5 w-5 text-rose-200"/></div><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-rose-300">Site Audits · final three minutes</div><h3 className="mt-0.5 text-lg font-black text-white">Can your sites prove compliance?</h3></div></div>
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-200">Auditors are inspecting five local capabilities. Each missing knowledge level increases the chance of a non-conformance being found. Company experts cannot stand in for the local teams.</p>
+        <div className="mt-2 rounded-xl border border-amber-700/70 bg-amber-950/25 p-2 text-[10px] leading-relaxed text-amber-100"><b className="text-amber-300">At stake:</b> $40k fine per missing level if auditors find a non-conformance. Clear all five audits to earn <b>10 bonus Squeaky clean points</b>.</div>
        </div>
 
        <div className="mt-3 space-y-1.5">
         {!state.shockResolved?KM_WEEK_SHOCK_SPECS.map(check=>{
          const site=company.sites.find(item=>item.id===check.siteId);
          return <div key={check.id} className="rounded-xl border border-slate-700 bg-slate-950/70 p-2 text-left">
-          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-500">Critical local capability · requires Knowledge {check.difficulty}</div></div><div className="rounded-full border border-slate-600 px-2 py-1 text-[8px] font-black text-slate-400">ABOUT TO BE TESTED</div></div>
+          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-400">Site Knowledge {site?.teamCapability[check.domain]||0} · audit standard {check.difficulty}</div></div><div className="rounded-full border border-slate-600 px-2 py-1 text-[8px] font-black text-slate-300">AWAITING AUDIT</div></div>
          </div>;
         }):state.shockChecks.map(check=>{
          const site=company.sites.find(item=>item.id===check.siteId);
+         const gap=Math.max(0,check.difficulty-check.localKnowledge);
          return <div key={check.id} className={'rounded-xl border p-2 text-left '+(check.passed?'border-emerald-700 bg-emerald-950/25':'border-rose-700 bg-rose-950/30')}>
-          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-400">Local Knowledge {check.localKnowledge} · required {check.difficulty}</div></div><div className={'rounded-full border px-2 py-1 text-[9px] font-black '+(check.passed?'border-emerald-500 text-emerald-300':'border-rose-500 text-rose-200')}>{check.passed?'HELD LOCALLY':'CAPABILITY GAP'}</div></div>
-          {!check.passed&&<div className="mt-2 rounded-lg border border-rose-800 bg-slate-950/70 px-2 py-1.5 text-[9px] font-black text-rose-200">Shortfall {Math.max(0,check.difficulty-check.localKnowledge)} · emergency support {money(Math.max(0,check.difficulty-check.localKnowledge)*KM_WEEK_SHOCK_GAP_COST)}</div>}
+          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-300">Site Knowledge {check.localKnowledge} · standard {check.difficulty}{check.dieRoll!==undefined?` · audit roll ${check.dieRoll}`:''}</div></div><div className={'rounded-full border px-2 py-1 text-[9px] font-black '+(check.passed?'border-emerald-500 text-emerald-300':'border-rose-500 text-rose-200')}>{check.passed?'CLEARED':'NON-CONFORMANCE'}</div></div>
+          {!check.passed&&<div className="mt-2 rounded-lg border border-rose-800 bg-slate-950/70 px-2 py-1.5 text-[9px] font-black text-rose-200">Knowledge shortfall {gap} · fine −{money(gap*KM_WEEK_SHOCK_GAP_COST)}</div>}
          </div>;
         })}
        </div>
 
-       {!state.shockResolved?<button onClick={()=>void post({type:'KM_WEEK_RESOLVE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-white bg-white text-sm font-black text-rose-950 disabled:opacity-40">{busy?'REVEALING…':'REVEAL WHAT THE COMPANY CAN HANDLE'}</button>:<>
+       {!state.shockResolved?<button onClick={()=>void post({type:'KM_WEEK_RESOLVE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-white bg-white text-sm font-black text-rose-950 disabled:opacity-40">{busy?'AUDITING…':'RUN THE SITE AUDITS'}</button>:<>
         {(()=>{
-         const gaps=state.shockChecks.filter(check=>!check.passed).length;
-         const ready=state.shockChecks.length-gaps;
-         const missingKnowledge=state.shockChecks.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
-         const cost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
-         const beforeShock=company.turnover+cost;
-         return <div className={'mt-3 rounded-2xl border-2 p-3 text-left '+(gaps?'border-rose-500 bg-rose-950/30':'border-emerald-500 bg-emerald-950/25')}>
-          <div className={'text-[9px] font-black uppercase tracking-[.16em] '+(gaps?'text-rose-300':'text-emerald-300')}>SITE AUDITS RESULT</div>
+         const findings=state.shockChecks.filter(check=>!check.passed).length;
+         const cleared=state.shockChecks.length-findings;
+         const before=state.auditTurnoverBefore??company.turnover+auditFine;
+         return <div className={'mt-3 rounded-2xl border-2 p-3 text-left '+(findings?'border-rose-500 bg-rose-950/30':'border-emerald-500 bg-emerald-950/25')}>
+          <div className={'text-[9px] font-black uppercase tracking-[.16em] '+(findings?'text-rose-300':'text-emerald-300')}>SITE AUDITS RESULT</div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Held locally</div><div className="text-xl font-black text-white">{ready}/{state.shockChecks.length}</div></div>
-           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Knowledge missing</div><div className={'text-xl font-black '+(missingKnowledge?'text-rose-200':'text-emerald-200')}>{missingKnowledge}</div></div>
-           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Emergency support</div><div className={'text-xl font-black '+(cost?'text-rose-200':'text-emerald-200')}>{cost?'-'+money(cost):money(0)}</div></div>
-           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Turnover</div><div className="text-sm font-black text-white">{money(beforeShock)} → {money(company.turnover)}</div></div>
+           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Audits cleared</div><div className="text-xl font-black text-white">{cleared}/{state.shockChecks.length}</div></div>
+           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Findings</div><div className={'text-xl font-black '+(findings?'text-rose-200':'text-emerald-200')}>{findings}</div></div>
+           <div data-kmw-audit-fine className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Fines</div><div className={'text-xl font-black '+(auditFine?'text-rose-200':'text-emerald-200')}>{auditFine?'−'+money(auditFine):money(0)}</div></div>
+           <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Turnover after fines</div><div className="text-sm font-black text-white">{money(before)} → {money(company.turnover)}</div></div>
           </div>
-          <p className="mt-2 text-[10px] leading-relaxed text-slate-300">{gaps?<>The company bought emergency expertise for <b className="text-rose-200">{missingKnowledge} missing knowledge point{missingKnowledge===1?'':'s'}</b>. This cost is now permanently recorded in turnover and will remain visible in the debrief graph.</>:<>Every tested capability was already available where the work happened. No emergency external support was needed.</>}</p>
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-300">{findings?<>Auditors identified <b className="text-rose-200">{findings} non-conformance{findings===1?'':'s'}</b>. The fines will reduce turnover and remain visible in the debrief graph.</>:<>Every audit was cleared. No fines, and <b className="text-emerald-300">10 extra Squeaky clean points</b>!</>}</p>
          </div>;
         })()}
-        <button onClick={()=>void post({type:'KM_WEEK_COMPLETE_SHOCK'})} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-emerald-300 bg-emerald-400 text-sm font-black text-emerald-950 disabled:opacity-40">{busy?'FINISHING…':'CONTINUE TO DEBRIEF'}</button>
+        <button onClick={()=>void completeSiteAudits()} disabled={busy||readOnly} className="mt-3 h-11 w-full rounded-xl border-2 border-emerald-300 bg-emerald-400 text-sm font-black text-emerald-950 disabled:opacity-40">{busy?'FINISHING…':'CONTINUE TO DEBRIEF'}</button>
        </>}
       </div>}
 
