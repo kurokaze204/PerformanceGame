@@ -1,6 +1,7 @@
 import React,{useMemo,useState}from'react';
 import{ArrowRight,Brain,CircleDollarSign,Medal,ShieldCheck,Target,Trophy,Users,Workflow,X}from'lucide-react';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
+import type{KMWeekTurnoverPoint}from'../types/kmWeek.ts';
 import{formatCurrency}from'../utils/format.ts';
 import{KM_WEEK_GOALS,KM_WEEK_SHOCK_GAP_COST,calculateKMWeekScoreV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -62,7 +63,7 @@ const SiteAuditSummary:React.FC<{company:CompanyV2}>=({company})=>{
 };
 
 const TurnoverGraph:React.FC<{companies:CompanyV2[];colors:string[]}>=({companies,colors})=>{
- const histories=companies.map(company=>{
+ const histories=companies.map((company):KMWeekTurnoverPoint[]=>{
   const recorded=company.kmWeek?.turnoverHistory||[];
   return recorded.length>1?recorded:[
    {label:'START',turnover:company.startingTurnover||company.turnover},
