@@ -259,6 +259,25 @@ function currentGuidedCopy(company:CompanyV2){
 
 const ToolTip:React.FC<{text:React.ReactNode;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
 
+const KM_WEEK_INTERVENTION_HELP:Record<KMWeekInvestment,{title:string;description:string}>={
+ TRAIN_EXPERT:{
+  title:'Train Expert',
+  description:'Experts are usually leaders in their field. Occasionally they learn on the job or through lessons learned, but more often they go and get external training to lift their skill and bring it back into the company.',
+ },
+ LOCAL_TRAINING:{
+  title:'Local Training',
+  description:"This uses your expert to train a single site. It is effective, but slow and most importantly, it ties them up so they can't help with challenges next round. Powerful, but use with caution as bad timing can be costly.",
+ },
+ KNOWLEDGE_TRANSFER:{
+  title:'Knowledge Transfer',
+  description:"Often we have the know-how in the company but it isn't evenly spread. Performance is lumpy depending on where issues happen, and a powerful and relatively cheap way to resolve this is by having higher-performing site managers visit another site for a few days to review their practices, plug gaps and introduce tighter processes. Choose a domain, choose the teaching site (from the top of the River) and the learning site (from the bottom). The bigger the gap, the greater the impact will be.",
+ },
+ AFTER_ACTION_REVIEW:{
+  title:'After Action Review',
+  description:'Originating in the military and emergency services, Lessons Management programs seek to maximise learning from both real events and exercises. Using an After Action Review, you pull the team together and, guided by the four key questions, you review what was planned, what happened, why and what can be done better next time. This can benefit all involved, unveiling root causes as well as practice and doctrine improvements. Having junior team members take part makes a big difference, and if the event was a failure, the learning can be even greater again.',
+ },
+};
+
 type ScoreGhostKind='expertise'|'local'|'flow'|'resilience';
 const ScoreCell:React.FC<{label:string;value:number;max:string;icon:React.ReactNode;tip:React.ReactNode;ghost?:ScoreGhostKind;onGhost?:(ghost:ScoreGhostKind|null)=>void}>=({label,value,max,icon,tip,ghost,onGhost})=><div className="relative flex min-w-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2 py-1.5"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-700 bg-slate-900 text-slate-300">{icon}</span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-black text-slate-400">{label}</span><span className="text-lg font-black leading-none tabular-nums text-white">{value}<span className="ml-1 text-[9px] text-slate-600">/{max}</span></span></span><ToolTip large text={tip} onHoverChange={ghost&&onGhost?(active)=>onGhost(active?ghost:null):undefined}/></div>;
 
@@ -376,6 +395,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
  const[riverFrozenCompany,setRiverFrozenCompany]=useState<CompanyV2|null>(null);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
+ const[infoInvestment,setInfoInvestment]=useState<KMWeekInvestment|null>(null);
  const[aarChallengeId,setAARChallengeId]=useState('');
  const[aarIntroDismissed,setAARIntroDismissed]=useState(false);
  const[aarIntroArrow,setAARIntroArrow]=useState<{x1:number;y1:number;x2:number;y2:number}|null>(null);
@@ -455,6 +475,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   const key=`tpg:kmw-score-brief:${session.id}:${company.id}`;
   if(localStorage.getItem(key)!=='seen')setScoreBriefOpen(true);
  },[state?.stage,state?.phase,state?.freeRound,session.id,company.id,riskRollPending,riskResult,busy,riverFrozenCompany]);
+
+ useEffect(()=>{setInfoInvestment(null)},[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
 
  useEffect(()=>{
   if(!state)return;
@@ -993,27 +1015,48 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       return uplift?`${source.name} ${domainLabel(selectedDomain)} ${from} → ${target.name} ${to} → ${Math.min(from,to+uplift)} (+${uplift})`:`${source.name} must know more than ${target.name}`;
     })():'Choose two sites';
 
- const scoreGhostPreview:RiverGhostPreview|undefined=(()=>{
-  if(state.phase==='invest'&&investment==='AFTER_ACTION_REVIEW'&&aarChallenge&&aarSite&&aarExpert){
-   return{kind:'aar',domain:aarChallenge.domain,siteId:aarSite.id,expertId:aarExpert.id,siteDelta:aarSiteDelta,expertDelta:aarExpertDelta};
-  }
-  if(scoreGhost==='expertise'&&specialist){
+ const previewForIntervention=(kind:KMWeekInvestment):RiverGhostPreview|undefined=>{
+  if(kind==='TRAIN_EXPERT'&&specialist){
    const score=specialistScore(company,specialistDomain);
    return score<KM_WEEK_MAX_EXPERT_KNOWLEDGE?{kind:'expert',domain:specialistDomain,expertId:specialist.id,delta:1}:undefined;
   }
-  if(scoreGhost==='local'&&specialist&&localTrainingSite){
-   const current=localTrainingSite.teamCapability[specialistDomain]||0;
+  if(kind==='LOCAL_TRAINING'&&specialist&&localTrainingSite){
+   const score=localTrainingSite.teamCapability[specialistDomain]||0;
    const ceiling=specialistScore(company,specialistDomain);
-   return current<ceiling&&current<5?{kind:'site',domain:specialistDomain,siteId:localTrainingSite.id,delta:Math.min(2,ceiling-current,5-current)}:undefined;
+   const delta=Math.max(0,Math.min(5,score+2,ceiling)-score);
+   return delta?{kind:'site',domain:specialistDomain,siteId:localTrainingSite.id,delta}:undefined;
   }
-  if(scoreGhost==='flow'&&source&&target){
+  if(kind==='KNOWLEDGE_TRANSFER'&&source&&target){
    const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;
-   const uplift=from>to?Math.max(1,Math.ceil((from-to)/2)):0;
-   return uplift&&to<5?{kind:'transfer',domain:selectedDomain,sourceSiteId:source.id,targetSiteId:target.id,delta:uplift}:undefined;
+   const delta=from>to?Math.max(1,Math.ceil((from-to)/2)):0;
+   return delta&&to<5?{kind:'transfer',domain:selectedDomain,sourceSiteId:source.id,targetSiteId:target.id,delta}:undefined;
   }
-  if(scoreGhost==='resilience')return{kind:'threshold',value:KM_WEEK_SHOCK_CUTOFF,label:`AUDIT TARGET · ${KM_WEEK_SHOCK_CUTOFF}`};
+  if(kind==='AFTER_ACTION_REVIEW'&&aarChallenge&&aarSite&&aarExpert){
+   return{kind:'aar',domain:aarChallenge.domain,siteId:aarSite.id,expertId:aarExpert.id,siteDelta:aarSiteDelta,expertDelta:aarExpertDelta};
+  }
   return undefined;
- })();
+ };
+ // The information icon temporarily overrides the selected investment's River
+ // preview, without changing the investment or its form settings.
+ const scoreGhostPreview:RiverGhostPreview|undefined=infoInvestment
+  ?previewForIntervention(infoInvestment)
+  :investment==='AFTER_ACTION_REVIEW'&&state.phase==='invest'
+   ?previewForIntervention('AFTER_ACTION_REVIEW')
+   :scoreGhost==='expertise'?previewForIntervention('TRAIN_EXPERT')
+   :scoreGhost==='local'?previewForIntervention('LOCAL_TRAINING')
+   :scoreGhost==='flow'?previewForIntervention('KNOWLEDGE_TRANSFER')
+   :scoreGhost==='resilience'?{kind:'threshold',value:KM_WEEK_SHOCK_CUTOFF,label:`AUDIT TARGET · ${KM_WEEK_SHOCK_CUTOFF}`}
+   :undefined;
+ const infoPreviewText=infoInvestment==='AFTER_ACTION_REVIEW'
+  ?aarChallenge&&aarSite&&aarExpert?`${aarSite.name}: ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]}: ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} (${aarChallenge.status==='failure'?'learning from failure':'learning from success'})`:'No eligible event in this round.'
+  :infoInvestment==='TRAIN_EXPERT'
+   ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,specialistScore(company,specialistDomain)+1)} (${domainLabel(specialistDomain)})`:'Choose an expert to preview.'
+   :infoInvestment==='LOCAL_TRAINING'
+    ?specialist&&localTrainingSite?`${localTrainingSite.name}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.max(localTrainingSite.teamCapability[specialistDomain]||0,Math.min(5,(localTrainingSite.teamCapability[specialistDomain]||0)+2,specialistScore(company,specialistDomain)))} (${domainLabel(specialistDomain)})`:'Choose an expert and a training site.'
+    :infoInvestment==='KNOWLEDGE_TRANSFER'
+     ?source&&target?(()=>{const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;return from>to?`${source.name} (${from}) → ${target.name} (${to} → ${Math.min(5,to+Math.max(1,Math.ceil((from-to)/2)))})`:'Choose a teaching site with more knowledge than the learning site.'})():'Choose two sites.'
+     :'';
+ const infoPreviewDomain=infoInvestment==='AFTER_ACTION_REVIEW'?aarChallenge?.domain:infoInvestment==='KNOWLEDGE_TRANSFER'?selectedDomain:infoInvestment?specialistDomain:undefined;
 
  const invest=async(event:React.MouseEvent<HTMLButtonElement>)=>{
   let payload:any,targetKey='';
@@ -1321,7 +1364,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        </div>
       </div>
       <div data-kmw-tour-river data-kmw-river-chart-area className={'relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]'+(riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?' z-[145] rounded-2xl':'')} style={riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?{boxShadow:'0 0 0 160vmax rgba(0,0,0,.74)'}:undefined}>
-       <InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={state.phase==='invest'&&investment==='AFTER_ACTION_REVIEW'&&aarChallenge?aarChallenge.domain:selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/>
+       <InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={state.phase==='invest'&&infoPreviewDomain?infoPreviewDomain:state.phase==='invest'&&investment==='AFTER_ACTION_REVIEW'&&aarChallenge?aarChallenge.domain:selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/>
        <button type="button" data-kmw-site-panels-toggle aria-expanded={sitePanelsOpen} aria-label={sitePanelsOpen?'Hide site details':'Show site details'} title={sitePanelsOpen?'Hide site details':'Show site details'} onClick={()=>setSitePanelsOpen(open=>!open)} className={'absolute bottom-2 left-2 z-20 grid h-11 w-11 place-items-center rounded-xl border-2 shadow-lg transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 '+(sitePanelsOpen?'border-emerald-300 bg-emerald-600 text-white':'border-slate-500 bg-slate-900/95 text-emerald-300 hover:border-emerald-300 hover:bg-slate-800')}>
         <Building2 className="h-5 w-5"/>
        </button>
