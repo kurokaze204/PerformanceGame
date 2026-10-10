@@ -646,7 +646,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  },[state?.stage,state?.freeRound]);
 
  useEffect(()=>{
-  if(!showAARIntro){setAARIntroArrow(null);return;}
+  const popupAvailable=Boolean(state?.stage==='free'&&state.phase==='invest'&&state.freeRound>=8&&!aarIntroDismissed&&!readOnly&&localStorage.getItem(`tpg:kmw-aar-intro:${session.id}:${company.id}`)!=='seen');
+  if(!popupAvailable){setAARIntroArrow(null);return;}
   const reposition=()=>{
    const panel=document.querySelector('[data-kmw-aar-intro]')?.getBoundingClientRect();
    const button=document.querySelector('[data-kmw-aar-button]')?.getBoundingClientRect();
@@ -660,7 +661,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   window.addEventListener('resize',reposition);
   window.addEventListener('scroll',reposition,true);
   return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',reposition);window.removeEventListener('scroll',reposition,true)};
- },[showAARIntro]);
+ },[state?.stage,state?.phase,state?.freeRound,aarIntroDismissed,session.id,company.id,readOnly]);
  useEffect(()=>{if(scoreBriefOpen)setScorePadOpen(true)},[scoreBriefOpen]);
 
  if(!state)return <div className="min-h-screen bg-slate-950 text-white grid place-items-center">Preparing KM Week board…</div>;
@@ -996,7 +997,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(state.phase==='invest'&&investment==='AFTER_ACTION_REVIEW'&&aarChallenge&&aarSite&&aarExpert){
    return{kind:'aar',domain:aarChallenge.domain,siteId:aarSite.id,expertId:aarExpert.id,siteDelta:aarSiteDelta,expertDelta:aarExpertDelta};
   }
-  if(scoreGhost='expertise'&&specialist){
+  if(scoreGhost==='expertise'&&specialist){
    const score=specialistScore(company,specialistDomain);
    return score<KM_WEEK_MAX_EXPERT_KNOWLEDGE?{kind:'expert',domain:specialistDomain,expertId:specialist.id,delta:1}:undefined;
   }
