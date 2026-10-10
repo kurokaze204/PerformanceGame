@@ -7,6 +7,7 @@ import {
   initialiseKMWeekCompanyV1,
   investKMWeekV1,
   calculateKMWeekScoreV1,
+  kmWeekFinalTurnoverPointsV1,
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
   KM_WEEK_SHOCK_GAP_COST,
@@ -354,5 +355,33 @@ assert.ok((company.kmWeek?.turnoverHistory.length||0)>6,'KM Week must preserve t
 assert.equal(company.kmWeek?.turnoverHistory[0].label,'START','KM Week turnover history must begin with the starting company');
 assert.equal(session.finalDisruptionResolved,true,'completed KM Week session should be marked complete');
 assert.ok((company.kmWeek?.score.total||0)>0);
+
+
+// Final turnover ranking is worth 7 / 4 / 2 points after all participating
+// companies finish. Earlier finishers must receive their points when the last
+// team completes, and ties share the same place rather than depend on ordering.
+{
+ const teams=['First','Second','Third','Fourth'].map((name,index)=>{
+  const team=createInitialCompanyV2(name,'kmw-turnover-'+index,config);
+  initialiseKMWeekCompanyV1(team);
+  team.turnover=1000-index*100;
+  team.kmWeek!.stage=index===3?'shock':'complete';
+  team.kmWeek!.shockResolved=true;
+  return team;
+ });
+ const rankedSession={...session,id:'KMWEEK-RANK-TEST',companies:teams,participants:[],finalDisruptionResolved:false} as GameSessionV2;
+ assert.deepEqual(teams.map(team=>kmWeekFinalTurnoverPointsV1(rankedSession,team)),[0,0,0,0],'No team should receive turnover placement points before every team finishes');
+ for(const team of teams.slice(0,3))team.kmWeek!.score=calculateKMWeekScoreV1(rankedSession,team);
+ const finish=applyKMWeekActionV1(rankedSession,teams[3].id,{type:'KM_WEEK_COMPLETE_SHOCK'});
+ assert.equal(finish.success,true,finish.message);
+ assert.equal(rankedSession.finalDisruptionResolved,true,'Workshop final scores must be settled when the last team finishes');
+ assert.deepEqual(teams.map(team=>team.kmWeek!.score.turnover),[7,4,2,0],'Final turnover placement must award first 7, second 4, third 2, fourth zero');
+ for(const team of teams){
+  const {total,...parts}=team.kmWeek!.score;
+  assert.equal(total,Object.values(parts).reduce((a,b)=>a+b,0),'Each final Score Pad total must include its turnover placement points');
+ }
+ teams[1].turnover=teams[0].turnover;
+ assert.deepEqual(teams.map(team=>kmWeekFinalTurnoverPointsV1(rankedSession,team)),[7,7,2,0],'Tied first-place turnover shares seven points, and the next company is third');
+}
 
 console.log('KM Week smoke passed');
