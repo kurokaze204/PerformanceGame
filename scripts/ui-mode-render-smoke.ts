@@ -7,6 +7,8 @@ import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import { ActionsPanelV5 } from '../src/components/ActionsPanelV5.tsx';
 import { EventDecisionCardV4 } from '../src/components/EventDecisionCardV4.tsx';
 import { InvestmentRiverView } from '../src/components/InvestmentRiverView.tsx';
+import { KMWeekDebriefV1,kmWeekCompanyPlayerLabel } from '../src/components/KMWeekDebriefV1.tsx';
+import { initialiseKMWeekCompanyV1 } from '../src/engine/kmWeekV1.ts';
 import type { ActiveEventV2, GameSessionV2 } from '../src/types/gameV2.ts';
 
 (globalThis as any).localStorage={getItem:()=>null,setItem:()=>{},removeItem:()=>{},clear:()=>{}};
@@ -429,4 +431,45 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  assert.equal(staged.includes('Local Codified'),false,'second teaching challenge must not distract Expert players with codified knowledge');
 }
 
+// Complete two competing KM Week companies and verify score colour and player credits.
+{
+ const apex=createInitialCompanyV2('Apex Technologies','apex',DEFAULT_CONFIG);
+ const rival=createInitialCompanyV2('Rival Company','rival',DEFAULT_CONFIG);
+ initialiseKMWeekCompanyV1(apex);
+ initialiseKMWeekCompanyV1(rival);
+ apex.kmWeek!.stage='complete';
+ rival.kmWeek!.stage='complete';
+ apex.kmWeek!.knowledgeTransfers=4;
+ rival.kmWeek!.knowledgeTransfers=1;
+ apex.turnover=1200;
+ rival.turnover=900;
+ apex.controllerParticipantId='stuart';
+ rival.controllerParticipantId='rival-ceo';
+ const players=[
+  {id:'jane',name:'Jane',role:'participant',companyId:apex.id},
+  {id:'stuart',name:'Stuart',role:'controller',companyId:apex.id},
+  {id:'hank',name:'Hank',role:'participant',companyId:apex.id},
+  {id:'bill',name:'Bill Fond',role:'participant',companyId:apex.id},
+  {id:'rival-ceo',name:'Alex',role:'controller',companyId:rival.id},
+ ].map(p=>({...p,sessionId:'TEST',lastSeen:'now'}));
+ const game={...session('newbie'),experienceMode:'km_week',id:'TEST',companies:[apex,rival],participants:players,kmWeekGoalId:'local-heroes'} as GameSessionV2;
+ assert.equal(kmWeekCompanyPlayerLabel(game,apex),'CEO: Stuart (Jane, Hank, Bill Fond)','A company must display its controller first with the other player names in brackets');
+ assert.equal(kmWeekCompanyPlayerLabel(game,rival),'CEO: Alex','Other companies must display their own CEO');
+ const html=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
+ assert.ok(html.includes('CEO: Stuart (Jane, Hank, Bill Fond)')&&html.includes('CEO: Alex'),'Final AAR must display player credits for every company');
+ assert.ok(html.includes('data-kmw-category="knowledgeFlow" data-kmw-category-rank="first"'),'Unique category leader must be green');
+ assert.ok(html.includes('data-kmw-category="knowledgeFlow" data-kmw-category-rank="other"'),'A losing category must not be highlighted');
+ assert.ok(html.includes('data-kmw-category="expertise" data-kmw-category-rank="joint-first"'),'Equal top scores must be orange');
+ assert.ok(html.includes('data-kmw-category="turnover" data-kmw-category-rank="first"'),'Final Turnover must use the same top-score highlighting');
+ assert.ok(html.includes('data-kmw-category="turnover" data-kmw-category-rank="other"'),'Final Turnover loser must not have a permanent orange/red background');
+ assert.ok(html.includes('EXPORT PDF')&&html.includes('data-kmw-debrief')&&html.includes('data-kmw-pdf-company'),'Players must be able to print the complete final results as a PDF');
+ assert.ok(kmWeekDebriefSource.includes('xl:grid-cols-[360px_minmax(0,1fr)_minmax(0,1fr)]')&&!kmWeekDebriefSource.includes('truncate text-[9px]'),'Wider Score Pads must not truncate category names');
+ const css=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
+ assert.ok(css.includes('@media print')&&css.includes('[data-kmw-pdf-company]')&&css.includes('size: A4 landscape'),'PDF output must include print styles for all cards and charts');
+ // No cross-company results or premature winner highlights before all companies finish.
+ rival.kmWeek!.stage='free';
+ const early=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
+ assert.equal((early.match(/data-kmw-pdf-company/g)||[]).length,1,'Do not reveal unfinished competitors');
+ assert.equal(early.includes('data-kmw-category-rank="first"'),false,'Do not award green rankings while opponents are still playing');
+}
 console.log('Mode-aware UI render smoke tests passed.');
