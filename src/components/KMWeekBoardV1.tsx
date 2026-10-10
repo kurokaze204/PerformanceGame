@@ -650,10 +650,17 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   let localState:ResponseSelectionState=current?.localSelection||'none';
   let expertState:ResponseSelectionState=current?.expertSelection||'none';
   if(source==='expert'&&(expertUsed||expertTraining||activeExpertScore<=0))return;
+  // On the breadth-explanation card, a second tap on the selected expert
+  // acknowledges the explanation; don't accidentally deselect the Depth source.
+  if(guideStep===4&&source==='expert'&&expertState==='depth'){
+   setGuideStep(5);
+   return;
+  }
   const next=toggleKMWeekSourceV1(localState,expertState,source,localScore,activeExpertScore);
   localState=next.local;expertState=next.expert;
   if(guideStep===2&&source==='local'&&localState!=='none')setGuideStep(3);
   if(guideStep===3&&source==='expert'&&expertState==='depth')setGuideStep(4);
+  if(guideStep===4&&source==='expert'&&expertState==='depth')setGuideStep(5);
   const method:ResponseMethod|undefined=current?.method==='risk'?'risk':localState==='depth'?'local':expertState==='depth'?'expert':undefined;
   const parts:string[]=[];
   if(localState!=='none')parts.push(`Local ${localState}`);
