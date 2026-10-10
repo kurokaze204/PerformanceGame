@@ -69,6 +69,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
  const spreadLabelYs=(preferred:number[],gap=17)=>{if(!preferred.length)return[] as number[];const min=padT+10,max=H-padB-8;const ordered=preferred.map((value,index)=>({value,index})).sort((a,b)=>a.value-b.value);const placed=ordered.map(item=>item.value);for(let i=0;i<placed.length;i++)placed[i]=Math.max(i?placed[i-1]+gap:min,Math.max(min,placed[i]));if(placed[placed.length-1]>max){placed[placed.length-1]=max;for(let i=placed.length-2;i>=0;i--)placed[i]=Math.min(placed[i],placed[i+1]-gap)}const result=Array(preferred.length).fill(0);ordered.forEach((item,index)=>{result[item.index]=placed[index]});return result};
  const domainIndex=domains.indexOf(selectedDomain);
+ const targetLabelBelow=Boolean(challengeTarget&&y(challengeTarget.level)<padT+43);
  const referenceSite=referenceSiteId?sites.find(site=>site.id===referenceSiteId):undefined;
  const referencePath=referenceHQ?data.map((item,di)=>`${di?'L':'M'} ${x(di)+28} ${y(company.intranet[item.domain]||0)}`).join(' '):referenceSite?data.map((item,di)=>{const si=item.scores.findIndex(entry=>entry.site.id===referenceSite.id);if(si<0)return'';const domainSelected=item.domain===selectedDomain;const siteSpread=showSiteLabels&&domainSelected?18:9;const px=clamp(x(di)+(si-(item.scores.length-1)/2)*siteSpread,padL+6,W-padR-6);return `${di?'L':'M'} ${px} ${y(item.scores[si].score)}`}).filter(Boolean).join(' '):'';
  return <div className={`${compact?'h-full min-h-[170px] rounded-xl p-2':'h-full min-h-[260px] rounded-2xl p-3'} relative border border-slate-700 bg-slate-950/95 shadow-inner`}>
@@ -177,8 +178,8 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
     <circle r="14" fill="#dc2626"/>
     <circle r="9" fill="#fff"/>
     <circle r="4.5" fill="#dc2626"/>
-    <rect x="-34" y="-43" width="68" height="19" rx="7" fill="#7f1d1d" stroke="#fff" strokeWidth="1.5"/>
-    <text x="0" y="-29" textAnchor="middle" fill="#fff" fontSize="12" fontWeight="900">NEEDS {challengeTarget.level}</text>
+    <rect x="-34" y={targetLabelBelow?24:-43} width="68" height="19" rx="7" fill="#7f1d1d" stroke="#fff" strokeWidth="1.5"/>
+    <text x="0" y={targetLabelBelow?38:-29} textAnchor="middle" fill="#fff" fontSize="12" fontWeight="900">NEEDS {challengeTarget.level}</text>
    </g>}
    <text x="18" y={H/2} textAnchor="middle" fill="#64748b" fontSize="14" fontWeight="700" transform={`rotate(-90 18 ${H/2})`}>Knowledge level</text>
   </svg>
