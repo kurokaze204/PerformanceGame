@@ -691,7 +691,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
         experts:structuredClone(company.experts),
       };
       if(kmWeekShockWindowOpen(session)){
-        enterBusinessShock(company,'The guided section has ended just as the final three-minute window begins. Your organisation now has to cope without its specialists.');
+        enterBusinessShock(company,'The guided section has ended as the final three-minute window begins. Site Audits are now underway; auditors assess local teams only.');
       }else{
         state.stage='free';
         state.freeRound=1;
@@ -702,7 +702,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     }
   }else{
     if(kmWeekShockWindowOpen(session)){
-      enterBusinessShock(company,'The clock has entered its final three minutes. The specialists are no longer available: begin the Site Audits.');
+      enterBusinessShock(company,'The clock has entered its final three minutes. Site Audits now test local capability without expert assistance.');
     }else{
       state.freeRound+=1;
       company.round=3+state.freeRound;
