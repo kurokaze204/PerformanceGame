@@ -259,6 +259,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[challengeDrafts,setChallengeDrafts]=useState<Record<string,Exclude<PendingResponse,null>>>({});
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
  const[guideStep,setGuideStep]=useState(0);
+ const[riverIntroStep,setRiverIntroStep]=useState(1);
+ const[riverIntroArrows,setRiverIntroArrows]=useState<{fromX:number;fromY:number;toX:number;toY:number}[]>([]);
  const[guideAnchor,setGuideAnchor]=useState<{left:number;top:number;targetX:number;targetY:number;panelWidth:number;startY:number}|null>(null);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
@@ -280,6 +282,16 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[trainingSiteId,setTrainingSiteId]=useState('brisbane');
  const[now,setNow]=useState(Date.now());
  const challengeDraftsRef=useRef(challengeDrafts);
+ const riverIntroActive=Boolean(state?.stage==='guided'&&state.guidedTurn===1&&state.phase==='challenge'&&!challengeFocusOpen);
+ const riverIntroUnlocked=riverIntroActive&&riverIntroStep===9;
+ const advanceRiverIntro=()=>{
+  if(riverIntroActive&&riverIntroStep<9)setRiverIntroStep(step=>Math.min(9,step+1));
+ };
+ const beginFirstChallenge=()=>{
+  if(riverIntroActive&&!riverIntroUnlocked)return;
+  setChallengeFocusOpen(true);
+  if(state?.stage==='guided'&&state.guidedTurn===1)setGuideStep(1);
+ };
 
  const members=session.participants.filter(item=>item.role!=='facilitator'&&item.companyId===company.id);
  const goalId=session.kmWeekGoalId||'local-heroes';
@@ -417,6 +429,36 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  },[guideStep,challengeFocusOpen,state?.stage,state?.guidedTurn,state?.phase]);
 
  useEffect(()=>{setScorePadOpen(false)},[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
+ useEffect(()=>{
+  if(!riverIntroActive){setRiverIntroArrows([]);return;}
+  const arrowTargets:Record<number,string[]>={
+   2:['water'],3:['domain-operations','domain-hr','domain-marketing'],
+   4:['site'],5:['expert'],6:['water'],7:['water'],9:['challenge-card'],
+  };
+  const update=()=>{
+   const briefing=document.querySelector('[data-kmw-river-brief]');
+   if(!briefing)return;
+   const box=briefing.getBoundingClientRect();
+   const targetNames=arrowTargets[riverIntroStep]||[];
+   const fromRight=riverIntroStep===9;
+   const fromX=fromRight?box.right+3:box.left-3;
+   const fromY=box.top+Math.min(box.height*.52,135);
+   const arrows=targetNames.flatMap(name=>{
+    const target=document.querySelector('[data-kmw-river-intro="'+name+'"]');
+    if(!target)return [];
+    const rect=target.getBoundingClientRect();
+    const toX=name==='challenge-card'?rect.left+4:rect.left+rect.width/2;
+    const toY=name==='challenge-card'?rect.top+rect.height/2:rect.top+rect.height/2;
+    return[{fromX,fromY,toX,toY}];
+   });
+   setRiverIntroArrows(old=>old.length===arrows.length&&old.every((a,i)=>Object.keys(a).every(key=>a[key as keyof typeof a]===arrows[i][key as keyof typeof a]))?old:arrows);
+  };
+  const frame=requestAnimationFrame(update);
+  window.addEventListener('resize',update);
+  window.addEventListener('scroll',update,true);
+  return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true)};
+ },[riverIntroActive,riverIntroStep]);
+
  useEffect(()=>{if(scoreBriefOpen)setScorePadOpen(true)},[scoreBriefOpen]);
 
  if(!state)return <div className="min-h-screen bg-slate-950 text-white grid place-items-center">Preparing KM Week board…</div>;
