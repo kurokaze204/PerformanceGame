@@ -48,6 +48,8 @@ export interface KMWeekScore {
   knowledgeFlow: number;
   resilience: number;
   goal: number;
+  /** Final turnover placement points, awarded once all companies finish. */
+  turnover: number;
   total: number;
 }
 
