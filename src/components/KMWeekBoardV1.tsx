@@ -162,13 +162,6 @@ function currentGuidedCopy(company:CompanyV2){
  return{title:'3. Another problem, another expert',text:'Priya is busy training staff, but Marketing specialist Mary is available for Perth’s distributor problem. You can call on a different expert while Priya teaches.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
 }
 
-function scoreBriefSuggestion(goalId:string){
- if(goalId==='deep-bench')return 'Your Goal rewards expert depth. If an expert is still below Knowledge 6, Train Expert is the shortest route toward those 5 Goal points.';
- if(goalId==='local-heroes')return 'Your Goal rewards solving Challenges locally. Local Training or Knowledge Transfer can strengthen a site so you rely less on travelling experts.';
- if(goalId==='broad-base')return 'Your Goal rewards breadth. Look for a site/domain sitting below Knowledge 2 and use Local Training or Knowledge Transfer to lift it.';
- return 'Your Goal rewards a balanced network. Look for your weakest site and use Local Training or Knowledge Transfer to strengthen it.';
-}
-
 const ToolTip:React.FC<{text:React.ReactNode;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
 
 type ScoreGhostKind='expertise'|'local'|'flow'|'resilience';
@@ -291,7 +284,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const members=session.participants.filter(item=>item.role!=='facilitator'&&item.companyId===company.id);
  const goalId=session.kmWeekGoalId||'local-heroes';
  const goal=KM_WEEK_GOALS[goalId];
- const scoreSuggestion=scoreBriefSuggestion(goalId);
  const coaching=kmWeekCoachV1(company);
  const sites=KM_WEEK_SITE_IDS.map(id=>company.sites.find(site=>site.id===id)).filter((site):site is CompanyV2['sites'][number]=>Boolean(site));
  const experts=company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
@@ -482,6 +474,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   :null;
  const expertChangeKey=expertChangeKind&&expertChange?`${expertChangeKind}:${expertChange.expertId}:${state.freeRound}`:'';
  const showExpertChangePopup=Boolean(expertChangeKind&&expertChangeKey!==expertChangeDismissedKey&&!riskRollPending&&!riskResult);
+ // Expert retirement/replacement popups already supply their own reflection question.
+ const expertChangeQuestionCoversRound=Boolean(expertChange&&state.stage==='free'&&state.phase==='invest'&&(
+   state.freeRound===expertChange.retiredAtRound||state.freeRound===expertChange.replacementRound
+ ));
  // Questions are specific to the River after each of the first six full-play
  // rounds. They are presented once per round, after any score, dice, or expert
  // change popup, and only after Challenge/Turnover animations have finished.
@@ -489,7 +485,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const firstScoreBriefPending=state.stage==='free'&&state.freeRound===1&&localStorage.getItem(`tpg:kmw-score-brief:${session.id}:${company.id}`)!=='seen';
  const showCoachPopup=Boolean(state.stage==='free'&&state.phase==='invest'&&coaching&&
   !readOnly&&!busy&&!riskResult&&!riskRollPending&&!challengeOutcome&&!riverFrozenCompany&&
-  !scoreBriefOpen&&!firstScoreBriefPending&&!showExpertChangePopup&&
+  !scoreBriefOpen&&!firstScoreBriefPending&&!showExpertChangePopup&&!expertChangeQuestionCoversRound&&
   coachDismissedKey!==coachPopupKey&&localStorage.getItem(coachPopupKey)!=='seen');
  const dismissCoach=()=>{
   localStorage.setItem(coachPopupKey,'seen');
@@ -860,14 +856,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/75"/>
    <div className="fixed left-1/2 top-1/2 z-[145] w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-5 shadow-[0_24px_80px_rgba(0,0,0,.72)]">
     <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Before your first investment</div>
-    <h2 className="mt-2 text-2xl font-black text-white">The next three investments are guided.</h2>
-    <p className="mt-2 text-sm leading-relaxed text-slate-200">For the next three rounds you will solve a Challenge, make one guided investment, then watch the Knowledge River change.</p>
-    <div className="mt-4 grid gap-2">
-     <div className="flex items-center gap-3 rounded-xl border border-amber-800 bg-amber-950/25 px-3 py-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-amber-500 bg-amber-950 text-xs font-black text-amber-200">1</span><div><b className="text-sm text-white">Train Expert</b><div className="text-[11px] text-slate-400">Build deeper expertise.</div></div></div>
-     <div className="flex items-center gap-3 rounded-xl border border-sky-800 bg-sky-950/20 px-3 py-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-sky-500 bg-sky-950 text-xs font-black text-sky-200">2</span><div><b className="text-sm text-white">Local Training</b><div className="text-[11px] text-slate-400">Build capability at a site.</div></div></div>
-     <div className="flex items-center gap-3 rounded-xl border border-emerald-800 bg-emerald-950/20 px-3 py-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-emerald-500 bg-emerald-950 text-xs font-black text-emerald-200">3</span><div><b className="text-sm text-white">Knowledge Transfer</b><div className="text-[11px] text-slate-400">Spread capability between sites.</div></div></div>
-    </div>
-    <p className="mt-3 text-[11px] leading-relaxed text-slate-400">After the third guided investment, the board opens up and the investment choice is yours.</p>
+    <h2 className="mt-2 text-xl font-black text-white">Three investments, three ways to build capability.</h2>
+    <p className="mt-2 text-sm leading-relaxed text-slate-200">First, deepen an expert. Next, train a local team. Then, share knowledge between sites. Watch the River after each investment.</p>
+    <p className="mt-2 text-xs text-slate-400">After these guided moves, you'll choose your own investments.</p>
     <button type="button" onClick={()=>setFirstInvestBriefDismissed(true)} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">SHOW ME THE FIRST INVESTMENT <ArrowRight className="ml-1 inline h-4 w-4"/></button>
    </div>
   </>}
@@ -898,9 +889,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    <div aria-hidden="true" className="fixed inset-0 z-[118] bg-black/65"/>
    <section role="dialog" aria-modal="true" aria-label="Knowledge investment coaching question" data-kmw-coaching-popup className="fixed left-1/2 top-1/2 z-[145] max-h-[calc(100dvh-90px)] w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-sky-300 bg-[linear-gradient(145deg,#10253a,#111827)] p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,.75)] min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)] min-[700px]:translate-x-0">
     <div className="text-[10px] font-black uppercase tracking-[.15em] text-sky-300">A question before you invest · Round {state.freeRound} of 6</div>
-    <h2 className="mt-2 text-lg font-black text-white">Look at your Knowledge River</h2>
-    <p className="mt-3 text-[15px] font-semibold leading-relaxed text-slate-100">{coaching.text}</p>
-    <p className="mt-3 text-xs leading-relaxed text-slate-400">Consider where expertise sits today, and what your next investment could change.</p>
+    <p className="mt-3 text-[17px] font-semibold leading-relaxed text-white">{coaching.text}</p>
     <button type="button" onClick={dismissCoach} className="mt-4 h-11 w-full rounded-xl border-2 border-sky-200 bg-sky-400 text-sm font-black text-slate-950">CONTINUE TO INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button>
    </section>
   </>}
@@ -910,14 +899,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    <div className="fixed left-1/2 top-1/2 z-[145] max-h-[calc(100dvh-90px)] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 shadow-[0_24px_80px_rgba(0,0,0,.72)] min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)] min-[700px]:translate-x-0 xl:p-5">
     <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Score briefing · Round 4 Invest</div>
     <h2 className="mt-2 text-2xl font-black text-white">Nice work — you’re up to {state.score.total} points.</h2>
-    <p className="mt-2 text-sm leading-relaxed text-slate-200">Your Score Pad is already showing the effect of the choices you have made. <b className="text-amber-200">Only the total score matters</b>, so there is no single “right” way to build the company. You can earn points through business performance, deeper expertise, stronger local capability, knowledge flow, resilience and the Goal card.</p>
+    <p className="mt-2 text-sm leading-relaxed text-slate-200">Your Score Pad tracks <b className="text-amber-200">business results, expertise, local capability, knowledge flow and resilience</b>. Different investments strengthen different parts of your score.</p>
     <div className="mt-3 rounded-xl border border-slate-700 bg-slate-950/75 p-3">
      <div className="text-[9px] font-black uppercase tracking-[.14em] text-violet-300">Your Goal card</div>
      <div className="mt-1 text-base font-black text-white">{goal.title} · 5 points</div>
      <p className="mt-1 text-xs leading-relaxed text-slate-400">{goal.description}</p>
-     <p className="mt-2 text-xs leading-relaxed text-emerald-200"><b>One idea for this Invest:</b> {scoreSuggestion}</p>
+     
     </div>
-    <p className="mt-3 text-[11px] leading-relaxed text-slate-400">That is only a suggestion. From here, choose the investment that fits the company you want to build.</p>
+    
     <button type="button" onClick={()=>{localStorage.setItem(`tpg:kmw-score-brief:${session.id}:${company.id}`,'seen');setScoreBriefOpen(false);setScorePadOpen(false)}} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">GOT IT — LET ME INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button>
    </div>
   </>}
@@ -933,7 +922,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <PhaseStep number="2" label="Invest" active={(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'} done={investStepDone}/>
     <PhaseStep number="3" label="Business Shock" active={state.stage==='shock'} done={shockDone}/>
     <PhaseStep number="4" label="Score" active={state.stage==='complete'} done={false}/>
-    <div className="ml-auto rounded-xl border border-amber-800 bg-amber-950/20 px-3 py-1.5 text-xs font-black text-amber-100"><span className="mr-2 text-[9px] uppercase text-amber-500">Current phase</span>{currentPhaseLabel(company)}</div>
+    
    </div>
 
    {finalShockWindow&&<div className="mb-2 shrink-0 rounded-xl border-2 border-rose-500 bg-rose-950/35 px-3 py-2 text-[10px] font-bold leading-relaxed text-rose-100"><b className="text-rose-300">FINAL 3 MINUTES.</b> Finish this round. After your next investment, the Business Shock begins and company experts become unavailable.</div>}
@@ -976,7 +965,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
     <aside className="kmw-controls min-w-0 space-y-2 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2">
      {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&!challengeFocusOpen?<div className={`relative ${state.stage==='guided'&&state.guidedTurn===1?'z-[120]':''} overflow-y-auto overscroll-contain touch-pan-y flex min-h-[360px] shrink-0 flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-violet-500/70 bg-violet-950/10 p-5 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-3 xl:p-5`}>
-      {state.stage==='guided'&&state.guidedTurn===1&&<div className="mb-4 max-w-[350px] rounded-2xl border border-amber-700/70 bg-amber-950/20 p-3 text-left shadow-lg"><div className="text-[13px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Challenge</div><p className="mt-2 text-[16px] leading-relaxed text-slate-200">Welcome! You are the new CEO of <b className="text-white">{company.name}</b>. It’s a business with promise but also some challenges to overcome. There are islands of excellence and a few experts you can rely on to meet the challenges, but your role is to build up knowledge so every site performs well. Business goes on while you make improvements, so you will have to use the expertise you have to solve daily events. In fact, here comes one right now. <b className="text-amber-200">Click the card below to see what it is.</b></p></div>}
+      {state.stage==='guided'&&state.guidedTurn===1&&<div className="mb-4 max-w-[350px] rounded-2xl border border-amber-700/70 bg-amber-950/20 p-3 text-left shadow-lg"><div className="text-[13px] font-black uppercase tracking-[.16em] text-amber-300">CEO briefing · Before Challenge</div><p className="mt-2 text-[16px] leading-relaxed text-slate-200">Welcome, CEO of <b className="text-white">{company.name}</b>. Your company has pockets of expertise, but not every site has the knowledge it needs. Solve today's business problems while building capability across the company. <b className="text-amber-200">Click the Challenge card to begin.</b></p></div>}
       <button type="button" onClick={()=>{setChallengeFocusOpen(true);if(state.stage==='guided'&&state.guidedTurn===1)setGuideStep(1)}} className="group kmw-start-card relative flex h-[230px] w-[168px] flex-col items-center justify-center overflow-hidden rounded-[18px] border-[3px] border-violet-300 bg-[linear-gradient(145deg,#28184d,#111827)] px-5 text-center shadow-[0_18px_35px_rgba(0,0,0,.42)] transition hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(124,58,237,.25)] focus:outline-none focus:ring-4 focus:ring-violet-400/40" aria-label="Open the next Challenge">
        <div className="absolute inset-2 rounded-[13px] border border-violet-400/35"/>
        <div className="text-[9px] font-black uppercase tracking-[.24em] text-violet-300">The Performance Gap</div>
@@ -990,7 +979,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&<>
        {!guided&&<>
-        <div className="mt-2 rounded-xl border border-amber-800 bg-amber-950/15 px-2.5 py-2 text-[10px] text-slate-300">Resolve both Challenges. Pick one, choose the knowledge you will use, then commit the response.</div>
+        
         <div className={'mt-2 grid gap-2 '+(state.challenges.length>1?'grid-cols-2':'grid-cols-1')}>{state.challenges.map(challenge=><ChallengeToken key={challenge.id} challenge={challenge} company={company} selected={challenge.id===activeChallenge?.id} draft={challengeDrafts[challenge.id]} onClick={()=>setSelectedChallengeId(challenge.id)}/>)}</div>
        </>}
 
@@ -999,9 +988,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          <div className="min-w-0">
           {guided&&<div className="text-[12px] font-black uppercase tracking-[.14em] text-amber-300">{guidedCopy.title}</div>}
           <div className={(guided?'mt-0.5 ':'')+'text-[20px] leading-tight font-black text-white'}>{challengeDisplayTitle(company,activeChallenge)}</div>
-          <div className="mt-1 text-[13px] font-bold text-slate-400">Needs: <b className="text-white">{domainLabel(activeChallenge.domain)} {activeChallenge.difficulty}</b> · Local knowledge: <b className={localScore>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300'}>{localScore}</b></div>
+          {guided&&<div className="mt-1 text-[13px] font-bold text-slate-400">Needs: <b className="text-white">{domainLabel(activeChallenge.domain)} {activeChallenge.difficulty}</b> · Local knowledge: <b className={localScore>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300'}>{localScore}</b></div>}
          </div>
-         <div className="shrink-0 text-right"><div className="text-[13px] font-black uppercase tracking-[.12em] text-slate-500">Selected knowledge</div><div className={'mt-0.5 text-[34px] font-black leading-none tracking-[-.05em] tabular-nums '+(selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-white')}>{selectedKnowledge}<span className="text-[20px] text-slate-500">/{activeChallenge.difficulty}</span></div>{pendingResponse?.challengeId===activeChallenge.id&&pendingResponse.method==='risk'&&<div className="mt-1 text-[10px] font-black text-amber-300">RISK {riskOdds.chancePercent}% · {riskOdds.requiredRoll<=1?'ANY ROLL':riskOdds.requiredRoll>6?'NO WINNING ROLL':'NEED '+riskOdds.requiredRoll+'+'}</div>}</div>
+         <div className="shrink-0 text-right"><div className="text-[13px] font-black uppercase tracking-[.12em] text-slate-500">Selected knowledge</div><div className={'mt-0.5 text-[34px] font-black leading-none tracking-[-.05em] tabular-nums '+(selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-white')}>{selectedKnowledge}<span className="text-[20px] text-slate-500">/{activeChallenge.difficulty}</span></div></div>
         </div>
         <p className="mt-1.5 text-[13px] leading-relaxed text-slate-400">{activeChallenge.story}</p>
         <ChallengeKnowledgeBars
@@ -1025,11 +1014,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          onExpertClick={()=>cycleKnowledgeSource('expert')}
         />
         <div data-kmw-tour="chance" className={'mt-2 flex items-center justify-between gap-2 rounded-xl border-2 px-3 py-2 '+(selectedKnowledge>=activeChallenge.difficulty?'border-emerald-400 bg-emerald-950/30':'border-sky-500 bg-sky-950/30')+(firstGuidedTour&&guideStep===2?' kmw-tour-chance':'')}>
-         <div className="flex items-center gap-2"><Target className="h-5 w-5 text-sky-300"/><div><div className="text-[13px] font-black text-white">Chance of success</div><div className="text-[11px] text-slate-300">Based on selected team and expertise</div></div></div>
+         <div className="flex items-center gap-2"><Target className="h-5 w-5 text-sky-300"/><div><div className="text-[13px] font-black text-white">Chance of success</div></div></div>
          <b className={'text-2xl font-black tabular-nums '+(selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300')}>{successChance}%</b>
         </div>
         {!guided&&deterministicSelected&&knowledgeShortfall>0&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-1.5 text-[10px] font-black text-rose-200">KNOWLEDGE SHORTFALL {knowledgeShortfall} · If you commit this response, the Challenge will fail.</div>}
-        {(!guided||state.guidedTurn===3)&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:riskSelected?(expertSelection==='depth'?'expert':localSelection==='depth'?'local':undefined):'risk',expertId:activePending?.expertId,localSelection,expertSelection,label:'Take the risk'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+ on d6'}</span></ResponseButton></div>}
+        {(!guided||state.guidedTurn===3)&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:riskSelected?(expertSelection==='depth'?'expert':localSelection==='depth'?'local':undefined):'risk',expertId:activePending?.expertId,localSelection,expertSelection,label:'Take the risk'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">· roll {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+'}</span></ResponseButton></div>}
         <div data-kmw-outcome-origin className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5">
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
@@ -1042,7 +1031,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       </>}
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'&&<>
-       <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5"><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?<><span>{guidedCopy.invest}</span><br/><span className="font-black text-amber-200">Guided move: choose {guidedTargetInvestment==='TRAIN_EXPERT'?'Train Expert':guidedTargetInvestment==='LOCAL_TRAINING'?'Local Training':'Knowledge Transfer'}.</span></>:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
+       {guided&&<div className="mt-2 rounded-xl border border-amber-800 bg-amber-950/15 px-2.5 py-2 text-[11px] leading-snug text-slate-200"><span className="font-black text-amber-300">This investment: </span>{guidedCopy.invest}</div>}
        <div className="mt-2 grid grid-cols-3 gap-1.5">
         <button disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>setInvestment('TRAIN_EXPERT')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}><GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+1 depth · $15k</div></button>
         <button disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>setInvestment('LOCAL_TRAINING')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}><Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+2 local · $10k</div></button>
