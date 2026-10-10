@@ -16,7 +16,7 @@ export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
 export const KM_WEEK_MAX_KNOWLEDGE = 5;
 export const KM_WEEK_MAX_EXPERT_KNOWLEDGE = 6;
 export const KM_WEEK_AAR_COST = 50;
-export const KM_WEEK_AAR_UNLOCK_ROUND = 8;
+export const KM_WEEK_AAR_UNLOCK_ROUND = 7;
 
 export function kmWeekAARCandidatesV1(company:CompanyV2):KMWeekChallenge[]{
  const state=company.kmWeek;
