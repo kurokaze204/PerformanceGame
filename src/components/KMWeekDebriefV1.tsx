@@ -14,7 +14,7 @@ const scoreItems=(company:CompanyV2)=>[
  {label:'Expertise',value:company.kmWeek?.score.expertise||0,max:6,icon:<Brain className="h-3.5 w-3.5"/>},
  {label:'Local capability',value:company.kmWeek?.score.localCapability||0,max:9,icon:<Users className="h-3.5 w-3.5"/>},
  {label:'Knowledge Flow',value:company.kmWeek?.score.knowledgeFlow||0,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
- {label:'Resilience',value:company.kmWeek?.score.resilience||0,max:5,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
+ {label:'Squeaky clean',value:company.kmWeek?.score.resilience||0,max:15,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
  {label:'KM Week goal',value:company.kmWeek?.score.goal||0,max:5,icon:<Target className="h-3.5 w-3.5"/>},
 ];
 
@@ -28,21 +28,22 @@ const MiniScorePad:React.FC<{company:CompanyV2;color:string}>=({company,color})=
  <div className="mt-2 grid grid-cols-2 gap-1.5">{scoreItems(company).map(item=><div key={item.label} className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-1.5"><span className="text-slate-500">{item.icon}</span><span className="min-w-0 flex-1 truncate text-[9px] font-black text-slate-500">{item.label}</span><b className="text-sm text-white">{item.value}<span className="ml-0.5 text-[8px] text-slate-600">/{item.max}</span></b></div>)}</div>
 </section>;
 
-const ShockSummary:React.FC<{company:CompanyV2}>=({company})=>{
+const SiteAuditSummary:React.FC<{company:CompanyV2}>=({company})=>{
  const checks=company.kmWeek?.shockChecks||[];
  if(!checks.length)return null;
- const ready=checks.filter(check=>check.passed).length;
- const missingKnowledge=checks.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
- const cost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
- const beforeShock=company.turnover+cost;
- return <section className={'mt-3 rounded-2xl border-2 p-3 '+(missingKnowledge?'border-rose-700 bg-rose-950/20':'border-emerald-700 bg-emerald-950/20')}>
-  <div className={'text-[9px] font-black uppercase tracking-[.16em] '+(missingKnowledge?'text-rose-300':'text-emerald-300')}>Business Shock result</div>
+ const cleared=checks.filter(check=>check.passed).length;
+ const findings=checks.length-cleared;
+ const totalFine=company.kmWeek?.auditFineTotal??checks.filter(check=>!check.passed).reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge)*KM_WEEK_SHOCK_GAP_COST,0);
+ const before=company.kmWeek?.auditTurnoverBefore??company.turnover+totalFine;
+ return <section className={'mt-3 rounded-2xl border-2 p-3 '+(findings?'border-rose-700 bg-rose-950/20':'border-emerald-700 bg-emerald-950/20')}>
+  <div className={'text-[9px] font-black uppercase tracking-[.16em] '+(findings?'text-rose-300':'text-emerald-300')}>Site Audits result</div>
   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Held locally</div><div className="text-lg font-black text-white">{ready}/{checks.length}</div></div>
-   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Knowledge missing</div><div className={'text-lg font-black '+(missingKnowledge?'text-rose-200':'text-emerald-200')}>{missingKnowledge}</div></div>
-   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Emergency support</div><div className={'text-lg font-black '+(cost?'text-rose-200':'text-emerald-200')}>{cost?'-'+formatCurrency(cost):formatCurrency(0)}</div></div>
-   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Turnover effect</div><div className="text-sm font-black text-white">{formatCurrency(beforeShock)} → {formatCurrency(company.turnover)}</div></div>
+   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Audits cleared</div><div className="text-lg font-black text-white">{cleared}/{checks.length}</div></div>
+   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Findings</div><div className={'text-lg font-black '+(findings?'text-rose-200':'text-emerald-200')}>{findings}</div></div>
+   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Fines</div><div className={'text-lg font-black '+(totalFine?'text-rose-200':'text-emerald-200')}>{totalFine?'−'+formatCurrency(totalFine):formatCurrency(0)}</div></div>
+   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Turnover effect</div><div className="text-sm font-black text-white">{formatCurrency(before)} → {formatCurrency(company.turnover)}</div></div>
   </div>
+  <p className="mt-2 text-[10px] text-slate-300">{findings?<>The findings attracted fines of {formatCurrency(totalFine)}.</>:<>All five Site Audits cleared — a 10-point Squeaky clean bonus.</>}</p>
  </section>;
 };
 
@@ -114,7 +115,7 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" compact/></div></div>
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After free play</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" compact/></div></div>
      </div>
-     <ShockSummary company={item}/>
+     <SiteAuditSummary company={item}/>
     </section>
    })}
   </div>
