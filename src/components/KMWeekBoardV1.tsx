@@ -61,9 +61,9 @@ function companyPerformanceHistory(company:CompanyV2):PerformanceHistoryPoint[]{
   knowledge+=investmentDeltas[index]||0;
   points.push({label:`Month ${index+1}`,turnover:point.turnover,knowledge});
  });
- const shockPoints=(state.turnoverHistory||[]).filter(point=>point.label.startsWith('SHOCK '));
+ const shockPoints=(state.turnoverHistory||[]).filter(point=>point.label.startsWith('SITE AUDITS ')||point.label.startsWith('SHOCK '));
  if(shockPoints.length){
-  points.push({label:'Shock',turnover:shockPoints[shockPoints.length-1].turnover,knowledge:totalKnowledge(company)});
+  points.push({label:'Site Audits',turnover:shockPoints[shockPoints.length-1].turnover,knowledge:totalKnowledge(company)});
  }
  return points;
 }
@@ -143,14 +143,14 @@ function phaseTitle(company:CompanyV2){
  if(!state)return'PREPARING';
  if(state.stage==='guided')return`GUIDED ${state.guidedTurn}/3`;
  if(state.stage==='free')return`ROUND ${state.freeRound}`;
- if(state.stage==='shock')return'BUSINESS SHOCK';
+ if(state.stage==='shock')return'SITE AUDITS';
  return'COMPLETE';
 }
 
 function currentPhaseLabel(company:CompanyV2){
  const state=company.kmWeek;
  if(!state)return'Preparing';
- if(state.stage==='shock')return'Business Shock';
+ if(state.stage==='shock')return'Site Audits';
  if(state.stage==='complete')return'Score & Debrief';
  return state.phase==='challenge'?'Challenge':'Invest';
 }
@@ -764,7 +764,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const uplift=from>to?Math.max(1,Math.ceil((from-to)/2)):0;
    return uplift&&to<5?{kind:'transfer',domain:selectedDomain,sourceSiteId:source.id,targetSiteId:target.id,delta:uplift}:undefined;
   }
-  if(scoreGhost==='resilience')return{kind:'threshold',value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK READY · ${KM_WEEK_SHOCK_CUTOFF}`};
+  if(scoreGhost==='resilience')return{kind:'threshold',value:KM_WEEK_SHOCK_CUTOFF,label:`AUDIT TARGET · ${KM_WEEK_SHOCK_CUTOFF}`};
   return undefined;
  })();
 
@@ -840,6 +840,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
  const challengeDone=state.challenges.length>0&&state.challenges.every(challenge=>challenge.status!=='open');
  const shockDone=state.stage==='complete';
+  const auditFine=state.auditFineTotal??state.shockChecks.filter(check=>!check.passed).reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge)*KM_WEEK_SHOCK_GAP_COST,0);
+  const shownTurnover=state.stage==='shock'&&state.shockResolved?(state.auditTurnoverBefore??company.turnover+auditFine):company.turnover;
  const challengeStepDone=state.stage==='guided'||state.stage==='free'?state.phase==='invest':state.stage==='shock'||shockDone;
  const investStepDone=state.stage==='shock'||shockDone;
 
@@ -847,7 +849,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   <header className="relative z-[100] border-b-2 border-amber-950/60 bg-[#09131f]/98 px-3 py-2 shadow-xl min-[700px]:h-[66px]">
    <div className="mx-auto flex h-full w-full items-center gap-2">
     <div className="mr-auto min-w-0"><div className="text-[8px] font-black uppercase tracking-[.22em] text-emerald-300">The Performance Gap · KM Week</div><div className="flex min-w-0 items-center gap-2"><Building2 className="h-5 w-5 shrink-0 text-amber-300"/><h1 className="truncate text-lg font-black text-white">{company.name}</h1><span className="hidden rounded-md border border-slate-700 px-1.5 py-0.5 text-[9px] font-black text-slate-500 sm:inline">{session.id}</span>{readOnly?<span className="hidden rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400 lg:inline">Watching · CEO {controllerName}</span>:<span className="hidden rounded-full border border-amber-600 bg-amber-950/50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-200 lg:inline"><Crown className="mr-1 inline h-3 w-3"/>CEO · You</span>}</div></div>
-    <button type="button" data-kmw-turnover-target onClick={()=>setTurnoverChartOpen(true)} aria-haspopup="dialog" className="flex h-12 min-w-[112px] flex-col justify-center rounded-xl border-2 border-emerald-800 bg-emerald-950/25 px-3 text-left transition hover:border-emerald-500 hover:bg-emerald-950/40"><div className="text-[8px] font-black uppercase text-emerald-400">Turnover</div><div className="text-base font-black leading-none text-emerald-200">{money(company.turnover)}</div></button>
+    <button type="button" data-kmw-turnover-target onClick={()=>setTurnoverChartOpen(true)} aria-haspopup="dialog" className="flex h-12 min-w-[112px] flex-col justify-center rounded-xl border-2 border-emerald-800 bg-emerald-950/25 px-3 text-left transition hover:border-emerald-500 hover:bg-emerald-950/40"><div className="text-[8px] font-black uppercase text-emerald-400">Turnover</div><div className="text-base font-black leading-none text-emerald-200">{money(shownTurnover)}</div></button>
     <div className="flex h-12 min-w-[82px] flex-col justify-center rounded-xl border-2 border-amber-700 bg-amber-950/25 px-3"><div className="text-[8px] font-black uppercase text-amber-400">Score</div><div className="text-base font-black leading-none text-amber-200">{state.score.total}</div></div>
     <div title={overtime?'KM Week is time-boxed, not hard-stopped. Finish the game at your own pace.':undefined} className="flex h-12 min-w-[92px] flex-col justify-center rounded-xl border-2 border-violet-800 bg-violet-950/25 px-3"><div className="text-[8px] font-black uppercase text-violet-400">Game time</div><div className={`font-black leading-none tabular-nums ${overtime?'text-xs text-amber-200':'text-base text-violet-100'}`}>{overtime?'OVERTIME':`${mm}:${ss}`}</div></div>
     {!readOnly&&members.length>1&&onTransferCeo&&<select defaultValue="" onChange={event=>{const id=event.target.value;event.currentTarget.value='';if(id)onTransferCeo(id)}} className="h-12 rounded-xl border-2 border-amber-800 bg-slate-950 px-2 text-[10px] font-black text-amber-100"><option value="">Pass CEO…</option>{members.filter(member=>member.id!==participant?.id).map(member=><option key={member.id} value={member.id}>{member.name}</option>)}</select>}
@@ -948,7 +950,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    <div className="fixed left-1/2 top-1/2 z-[145] max-h-[calc(100dvh-90px)] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 shadow-[0_24px_80px_rgba(0,0,0,.72)] min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)] min-[700px]:translate-x-0 xl:p-5">
     <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Score briefing · First full round</div>
     <h2 className="mt-2 text-2xl font-black text-white">Nice work — you’re up to {state.score.total} points.</h2>
-    <p className="mt-2 text-sm leading-relaxed text-slate-200">Your Score Pad tracks <b className="text-amber-200">business results, expertise, local capability, knowledge flow and resilience</b>. Different investments strengthen different parts of your score.</p>
+    <p className="mt-2 text-sm leading-relaxed text-slate-200">Your Score Pad tracks <b className="text-amber-200">business results, expertise, local capability, knowledge flow and Squeaky clean audit results</b>. Different investments strengthen different parts of your score.</p>
+     <p className="mt-2 text-sm leading-relaxed text-slate-200"><b className="text-amber-200">Site Audits are coming.</b> Auditors will check five local capabilities. Experts can't step in. Weak sites risk costly fines of <b>$40k per missing knowledge level found</b>. Clear all five audits for <b>10 bonus points</b> on top of the five audit points.</p>
     <div className="mt-3 rounded-xl border border-slate-700 bg-slate-950/75 p-3">
      <div className="text-[9px] font-black uppercase tracking-[.14em] text-violet-300">Your Goal card</div>
      <div className="mt-1 text-base font-black text-white">{goal.title} · 5 points</div>
@@ -992,12 +995,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <div className="rounded-xl border-2 border-indigo-700 bg-indigo-950/45 px-3 py-1.5 text-[10px] font-black text-indigo-100">{phaseTitle(company)}</div>
     <PhaseStep number="1" label="Challenge" active={(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'} done={challengeStepDone}/>
     <PhaseStep number="2" label="Invest" active={(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'} done={investStepDone}/>
-    <PhaseStep number="3" label="Business Shock" active={state.stage==='shock'} done={shockDone}/>
+    <PhaseStep number="3" label="Site Audits" active={state.stage==='shock'} done={shockDone}/>
     <PhaseStep number="4" label="Score" active={state.stage==='complete'} done={false}/>
     
    </div>
 
-   {finalShockWindow&&<div className="mb-2 shrink-0 rounded-xl border-2 border-rose-500 bg-rose-950/35 px-3 py-2 text-[10px] font-bold leading-relaxed text-rose-100"><b className="text-rose-300">FINAL 3 MINUTES.</b> Finish this round. After your next investment, the Business Shock begins and company experts become unavailable.</div>}
+   {finalShockWindow&&<div className="mb-2 shrink-0 rounded-xl border-2 border-rose-500 bg-rose-950/35 px-3 py-2 text-[10px] font-bold leading-relaxed text-rose-100"><b className="text-rose-300">FINAL 3 MINUTES.</b> Finish this round. After your next investment, Site Audits begin. Auditors assess local teams, not company experts.</div>}
 
    <div className="grid gap-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
     <div className="space-y-3 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2 xl:gap-3">
@@ -1018,7 +1021,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability. Each expert scores 1 point per knowledge level above 3. Use Train Expert to improve it. Hover here to preview the next +1 on the River." ghost="expertise" onGhost={setScoreGhost}/>
         <ScoreCell label="Local capability" value={state.score.localCapability} max="9" icon={<Users className="h-3.5 w-3.5"/>} tip="Scores the strength of the whole local River: 1 point for every 2 local knowledge levels across the nine site/domain positions, up to 9 points. Improve it with Local Training or Knowledge Transfer." ghost="local" onGhost={setScoreGhost}/>
         <ScoreCell label="Knowledge Flow" value={state.score.knowledgeFlow} max="6" icon={<Workflow className="h-3.5 w-3.5"/>} tip="Rewards knowledge actually moved. A transfer now moves half the gap to the stronger source (rounded up), and each level moved scores here, with a bonus when the target crosses Knowledge 2." ghost="flow" onGhost={setScoreGhost}/>
-        <ScoreCell label="Resilience" value={state.score.resilience} max="5" icon={<ShieldCheck className="h-3.5 w-3.5"/>} tip="Scored in the final Business Shock: 1 point for each test your sites can handle without company experts. Hover here to see the main resilience cut-off on the River." ghost="resilience" onGhost={setScoreGhost}/>
+        <ScoreCell label="Squeaky clean" value={state.score.resilience} max="15" icon={<ShieldCheck className="h-3.5 w-3.5"/>} tip="Site Audits: 1 point for each audit cleared, plus 10 extra if all five are clear. A knowledge shortfall risks a non-conformance finding, and company experts cannot answer for the site. Hover to see the highest audit target." ghost="resilience" onGhost={setScoreGhost}/>
         <ScoreCell label="KM Week goal" value={state.score.goal} max="5" icon={<Target className="h-3.5 w-3.5"/>} tip={<span className="block text-left"><span className="block text-[9px] font-black uppercase tracking-[.14em] text-amber-300">Goal · 5 pts</span><span className="mt-1 block text-sm font-black text-white">{goal.title}</span><span className="mt-1 block text-[10px] leading-relaxed text-slate-300">{goal.description}</span><span className={`mt-2 block rounded-lg border px-2 py-1 text-[9px] font-black ${state.score.goal?'border-emerald-700 bg-emerald-950/30 text-emerald-300':'border-amber-800 bg-amber-950/25 text-amber-300'}`}>{state.score.goal?'ACHIEVED · +5':'IN PLAY'}</span></span>}/>
        </div>
        {standings.length>1&&<div className="mt-2 border-t border-slate-800 pt-2"><div className="text-[8px] font-black uppercase tracking-[.14em] text-violet-300">Workshop standings</div><div className="mt-1 grid grid-cols-2 gap-1">{standings.map((entry,index)=><div key={entry.id} className={`flex items-center rounded-lg border px-2 py-1 text-[9px] ${entry.id===company.id?'border-violet-500 bg-violet-950/25':'border-slate-800 bg-slate-950'}`}><span className="w-4 font-black text-slate-500">{index+1}</span><span className="min-w-0 flex-1 truncate font-bold text-slate-300">{entry.name}</span><b className="text-white">{entry.score}</b></div>)}</div></div>}
@@ -1112,13 +1115,13 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         {investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 items-start gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} ({SITE_ABBR[expert.location]||expert.location}) · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
         <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span>{investment==='LOCAL_TRAINING'&&<div className="mt-1 font-bold text-red-300">Training commitment — unavailable next round</div>}</div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
-        <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':finalShockWindow?'COMMIT FINAL INVESTMENT & FACE BUSINESS SHOCK':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+        <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':finalShockWindow?'COMMIT FINAL INVESTMENT & FACE SITE AUDITS':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>
       </>}
 
       {state.stage==='shock'&&<div className="mt-2">
        <div className="rounded-2xl border-2 border-rose-700 bg-[linear-gradient(145deg,#32121d,#171827)] p-3 text-left">
-        <div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-4 border-rose-300 bg-rose-950"><ShieldCheck className="h-5 w-5 text-rose-200"/></div><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-rose-300">Business Shock · final three minutes</div><h3 className="mt-0.5 text-lg font-black text-white">The experts cannot be everywhere at once.</h3></div></div>
+        <div className="flex items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-4 border-rose-300 bg-rose-950"><ShieldCheck className="h-5 w-5 text-rose-200"/></div><div><div className="text-[9px] font-black uppercase tracking-[.18em] text-rose-300">Site Audits · final three minutes</div><h3 className="mt-0.5 text-lg font-black text-white">The experts cannot be everywhere at once.</h3></div></div>
         <p className="mt-3 text-[11px] leading-relaxed text-slate-200">Five critical issues hit across the company at the same time. Your specialists are already committed elsewhere, so each site has to act using the knowledge that has actually been built locally.</p>
         <div className="mt-2 rounded-xl border border-amber-700/70 bg-amber-950/25 p-2 text-[10px] leading-relaxed text-amber-100"><b className="text-amber-300">The consequence:</b> every missing local Knowledge point requires emergency external support at <b>$${KM_WEEK_SHOCK_GAP_COST}k per point</b>. The larger the capability gap, the larger the hit to turnover.</div>
        </div>
@@ -1146,7 +1149,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          const cost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
          const beforeShock=company.turnover+cost;
          return <div className={'mt-3 rounded-2xl border-2 p-3 text-left '+(gaps?'border-rose-500 bg-rose-950/30':'border-emerald-500 bg-emerald-950/25')}>
-          <div className={'text-[9px] font-black uppercase tracking-[.16em] '+(gaps?'text-rose-300':'text-emerald-300')}>BUSINESS SHOCK RESULT</div>
+          <div className={'text-[9px] font-black uppercase tracking-[.16em] '+(gaps?'text-rose-300':'text-emerald-300')}>SITE AUDITS RESULT</div>
           <div className="mt-2 grid grid-cols-2 gap-2">
            <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Held locally</div><div className="text-xl font-black text-white">{ready}/{state.shockChecks.length}</div></div>
            <div className="rounded-xl border border-white/10 bg-black/20 p-2"><div className="text-[8px] font-black uppercase text-slate-500">Knowledge missing</div><div className={'text-xl font-black '+(missingKnowledge?'text-rose-200':'text-emerald-200')}>{missingKnowledge}</div></div>
