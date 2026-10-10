@@ -736,6 +736,8 @@ export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const failedSiteIds=[...new Set(failures.map(check=>check.siteId))];
   const missingKnowledge=failures.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
   const totalCost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
+  state.auditTurnoverBefore=company.turnover;
+  state.auditFineTotal=totalCost;
   if(totalCost>0)applyTurnover(company,-totalCost);
   state.turnoverHistory.push({label:`SITE AUDITS -${totalCost}k`,turnover:company.turnover});
 
