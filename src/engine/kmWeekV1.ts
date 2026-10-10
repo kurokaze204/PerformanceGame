@@ -15,6 +15,16 @@ export const KM_WEEK_DOMAINS: KnowledgeDomain[] = ['operations','hr','marketing'
 export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
 export const KM_WEEK_MAX_KNOWLEDGE = 5;
 export const KM_WEEK_MAX_EXPERT_KNOWLEDGE = 6;
+export const KM_WEEK_AAR_COST = 50;
+export const KM_WEEK_AAR_UNLOCK_ROUND = 8;
+
+export function kmWeekAARCandidatesV1(company:CompanyV2):KMWeekChallenge[]{
+ const state=company.kmWeek;
+ if(!state||state.stage!=='free'||state.phase!=='invest'||state.freeRound<KM_WEEK_AAR_UNLOCK_ROUND)return [];
+ const reviewed=new Set(state.investmentHistory.filter(item=>item.type==='AFTER_ACTION_REVIEW').map(item=>item.challengeId));
+ return state.challenges.filter(item=>item.difficulty>=5&&item.status!=='open'&&!reviewed.has(item.id));
+}
+
 export const KM_WEEK_SHOCK_WINDOW_SECONDS = 180;
 export const KM_WEEK_SHOCK_GAP_COST = 40; // $40k per documented non-conformity knowledge point (fine)
 
@@ -645,6 +655,7 @@ function guidedRequirement(state:KMWeekCompanyState):KMWeekInvestment{
 function investmentLabel(type:KMWeekInvestment){
   if(type==='TRAIN_EXPERT')return'Train Expert';
   if(type==='LOCAL_TRAINING')return'Local Training';
+  if(type==='AFTER_ACTION_REVIEW')return'After Action Review';
   return'Knowledge Transfer';
 }
 
@@ -652,14 +663,32 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
   const state=company.kmWeek;
   if(!state||state.phase!=='invest'||state.stage==='shock'||state.stage==='complete')return{success:false,message:'Investment is not available right now.'};
   const type=String(payload?.investment||'') as KMWeekInvestment;
-  if(!['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER'].includes(type))return{success:false,message:'Choose one of the three KM Week investments.'};
+  if(!['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER','AFTER_ACTION_REVIEW'].includes(type))return{success:false,message:'Choose an available KM Week investment.'};
   if(state.stage==='guided'&&type!==guidedRequirement(state))return{success:false,message:`For this guided move, choose ${investmentLabel(guidedRequirement(state))}.`};
   const domain=String(payload?.domain||'') as KnowledgeDomain;
-  if(!KM_WEEK_DOMAINS.includes(domain))return{success:false,message:'Choose Operations, Human Resources or Marketing.'};
+  if(type!=='AFTER_ACTION_REVIEW'&&!KM_WEEK_DOMAINS.includes(domain))return{success:false,message:'Choose Operations, Human Resources or Marketing.'};
 
   let before=0,after=0,cost=0,expertId:string|undefined,siteId:string|undefined,sourceSiteId:string|undefined,targetSiteId:string|undefined,meaningfulFlow=false;
+  let reviewedChallengeId:string|undefined,expertBefore:number|undefined,expertAfter:number|undefined;
+  let selectedDomain=domain;
 
-  if(type==='TRAIN_EXPERT'){
+  if(type==='AFTER_ACTION_REVIEW'){
+    const event=kmWeekAARCandidatesV1(company).find(item=>item.id===payload?.challengeId);
+    if(!event)return{success:false,message:'Choose an eligible completed Challenge (knowledge requirement of 5 or more) from this round.'};
+    const site=company.sites.find(item=>item.id===event.siteId&&!item.isClosed);
+    const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===event.domain));
+    const skill=expert?.domains.find(item=>item.domain===event.domain);
+    if(!site||!expert||!skill)return{success:false,message:'A local site and a company expert in the Challenge domain are required for the review.'};
+    cost=KM_WEEK_AAR_COST;
+    if(!spend(company,cost))return{success:false,message:'Not enough turnover for the $50k After Action Review.'};
+    const uplift=event.status==='failure'?2:1;
+    selectedDomain=event.domain;siteId=site.id;expertId=expert.id;reviewedChallengeId=event.id;
+    before=site.teamCapability[event.domain]||0;
+    after=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+uplift);
+    expertBefore=skill.score;expertAfter=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,expertBefore+uplift);
+    site.teamCapability[event.domain]=after;
+    skill.score=expertAfter;
+  }else if(type==='TRAIN_EXPERT'){
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!skill)return{success:false,message:'Choose an expert and one of their knowledge domains.'};
@@ -693,10 +722,12 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
 
   state.investmentHistory.push({
     roundLabel:state.stage==='guided'?`Guided ${state.guidedTurn}`:`Free ${state.freeRound}`,
-    type,domain,expertId,siteId,sourceSiteId,targetSiteId,before,after,meaningfulFlow,
+    type,domain:selectedDomain,expertId,siteId,sourceSiteId,targetSiteId,before,after,meaningfulFlow,challengeId:reviewedChallengeId,expertBefore,expertAfter,
   });
   state.turnoverHistory.push({label:state.stage==='guided'?`G${state.guidedTurn} I`:`R${state.freeRound} I`,turnover:company.turnover});
-  state.lastMessage=`${investmentLabel(type)} complete: ${before} → ${after}. Cost $${cost}k.`;
+  state.lastMessage=type==='AFTER_ACTION_REVIEW'
+    ?`After Action Review complete: site ${before} → ${after}, expert ${expertBefore} → ${expertAfter}. Cost ${cost}k.`
+    :`${investmentLabel(type)} complete: ${before} → ${after}. Cost ${cost}k.`;
 
   if(state.stage==='guided'){
     if(state.guidedTurn<3){
