@@ -2,7 +2,7 @@ import React,{useMemo,useState}from'react';
 import{ArrowRight,Brain,CircleDollarSign,Medal,ShieldCheck,Target,Trophy,Users,Workflow,X}from'lucide-react';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import{formatCurrency}from'../utils/format.ts';
-import{KM_WEEK_SHOCK_GAP_COST,calculateKMWeekScoreV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_GOALS,KM_WEEK_SHOCK_GAP_COST,calculateKMWeekScoreV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 
 type Props={session:GameSessionV2;company:CompanyV2};
@@ -17,7 +17,7 @@ const scoreItems=(company:CompanyV2,session:GameSessionV2)=>{
   {label:'Local capability',value:score.localCapability,max:9,icon:<Users className="h-3.5 w-3.5"/>},
   {label:'Knowledge Flow',value:score.knowledgeFlow,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
   {label:'Squeaky clean',value:score.resilience,max:15,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
-  {label:'KM Week goal',value:score.goal,max:5,icon:<Target className="h-3.5 w-3.5"/>},
+  {label:session.kmWeekGoalId?KM_WEEK_GOALS[session.kmWeekGoalId].title:'KM Week goal',value:score.goal,max:5,icon:<Target className="h-3.5 w-3.5"/>},
   {label:'Final turnover',value:score.turnover,max:7,icon:<Trophy className="h-3.5 w-3.5"/>},
  ];
 };
