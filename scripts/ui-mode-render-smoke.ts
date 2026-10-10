@@ -94,6 +94,14 @@ assert.ok(kmWeekBoardSource.includes('Depth')&&kmWeekBoardSource.includes('Bread
 assert.ok(kmWeekBoardSource.includes('COMMIT RESPONSE'),'KM Week Challenge choices must require an explicit commit');
 
 assert.ok(kmWeekBoardSource.includes('data-kmw-turnover-target')&&kmWeekBoardSource.includes('data-kmw-outcome-origin')&&kmWeekBoardSource.includes('data-kmw-challenge-outcome'),'KM Week Challenge result globe must travel from the result box to the Turnover header');
+
+assert.ok(kmWeekBoardSource.includes("state.stage==='free'&&state.freeRound>=2")&&kmWeekBoardSource.includes('data-kmw-turnover-toggle')&&kmWeekBoardSource.includes('aria-pressed={riverTurnoverOpen}'),'The green Turnover toggle must appear by the Score Pad from free-play round 2');
+assert.ok(kmWeekBoardSource.includes('data-kmw-river-chart-area')&&kmWeekBoardSource.includes('data-kmw-turnover-shade')&&kmWeekBoardSource.includes('z-[240]')&&kmWeekBoardSource.includes('<TurnoverRiverChart session={session} currentCompanyId={company.id}/>'),'The turnover chart must sit over the River and keep the toggle above the greyed-out board');
+assert.ok(kmWeekBoardSource.includes("event.key==='Escape'")&&kmWeekBoardSource.includes('document.addEventListener(\'keydown\',escape)'),'The River turnover chart must close on Escape');
+assert.ok(kmWeekBoardSource.includes('stroke="#facc15" strokeWidth="5"')&&kmWeekBoardSource.includes("const color=index%2===0?'#22c55e':'#34d399'"),'The player turnover must be a heavy yellow line while competitors are thin green lines');
+assert.ok(kmWeekBoardSource.includes('data-kmw-turnover-event={event.kind}')&&kmWeekBoardSource.includes("'#22c55e':'#7f1d1d'")&&kmWeekBoardSource.includes('data-kmw-turnover-retirement'),'Chart must distinguish challenge wins, losses, and crossed-out retired experts');
+assert.ok(kmWeekBoardSource.includes("const match=/^([GR])")&&kmWeekBoardSource.includes('const retirement=state?.expertRetirement'),'Chart markers must come from the recorded multi-round turnover history and retirement event');
+
 assert.ok(kmWeekBoardSource.includes('await presentChallengeOutcome(nextCompany,resolved)')&&kmWeekBoardSource.includes('if(data.session){if(beforeApply)await beforeApply(data.session);onSessionUpdate(data.session);}')&&kmWeekBoardSource.includes('onPresentationHoldChange?.(true)'),'Challenge turnover must stay unchanged until the outcome animation has completed');
 assert.ok(kmWeekBoardSource.includes('riskContinueRef.current?.()')&&kmWeekBoardSource.includes('riskContinueRef.current=resolve'),'Risk dice result must be acknowledged before the Challenge outcome globe starts');
 assert.ok(globalCssSource.includes('.kmw-turnover-globe-win')&&globalCssSource.includes('.kmw-turnover-globe-loss'),'Challenge outcome globe must be visually distinct for gains and losses');
