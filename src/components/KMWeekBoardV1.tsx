@@ -142,13 +142,13 @@ const TurnoverRiverChart:React.FC<{session:GameSessionV2;currentCompanyId:string
       <circle cx={x(point.key)} cy={y(point.turnover)} r="5" fill="#facc15" stroke="#111827" strokeWidth="2"><title>{item.company.name}: {point.key} — {money(point.turnover)}</title></circle>
       {point.events.map((event,i)=>{
        const iconX=x(point.key)+(i-(point.events.length-1)/2)*22;
-       const iconY=y(point.turnover)+(event.kind==='win'?-24:26);
+       const iconY=event.kind==='win'?Math.max(14,y(point.turnover)-24):Math.min(H-bottom-12,y(point.turnover)+26);
        return <g data-kmw-turnover-event={event.kind} key={i} transform={`translate(${iconX} ${iconY})`}>
         <path d="M0 -10 L-8 -2 H-4 V10 H4 V-2 H8 Z" transform={event.kind==='loss'?'rotate(180)':undefined} fill={event.kind==='win'?'#22c55e':'#7f1d1d'} stroke={event.kind==='win'?'#14532d':'#fca5a5'} strokeWidth="1.3"/>
         <title>{point.key} Challenge {event.challenge}: {event.kind==='win'?'won':'lost'} ({event.amount>=0?'+':''}{money(event.amount)})</title>
        </g>;
       })}
-      {point.retiredName&&<g data-kmw-turnover-retirement transform={`translate(${x(point.key)} ${y(point.turnover)-52})`}>
+      {point.retiredName&&<g data-kmw-turnover-retirement transform={`translate(${x(point.key)} ${y(point.turnover)>70?y(point.turnover)-51:y(point.turnover)+51})`}>
        <circle r="13" fill="#facc15" stroke="#713f12" strokeWidth="2"/>
        <circle cx="0" cy="-4" r="3.6" fill="#422006"/>
        <path d="M-7 7 Q-7 0 0 0 Q7 0 7 7" fill="#422006"/>
