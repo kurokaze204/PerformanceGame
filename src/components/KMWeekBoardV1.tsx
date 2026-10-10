@@ -882,7 +882,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
   {scoreBriefOpen&&<>
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/70"/>
-   <div className="fixed left-1/2 top-1/2 z-[145] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-5 shadow-[0_24px_80px_rgba(0,0,0,.72)] xl:left-[38%]">
+   <div className="fixed left-1/2 top-1/2 z-[145] max-h-[calc(100dvh-90px)] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 shadow-[0_24px_80px_rgba(0,0,0,.72)] min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)] min-[700px]:translate-x-0 xl:p-5">
     <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Score briefing · Round 4 Invest</div>
     <h2 className="mt-2 text-2xl font-black text-white">Nice work — you’re up to {state.score.total} points.</h2>
     <p className="mt-2 text-sm leading-relaxed text-slate-200">Your Score Pad is already showing the effect of the choices you have made. <b className="text-amber-200">Only the total score matters</b>, so there is no single “right” way to build the company. You can earn points through business performance, deeper expertise, stronger local capability, knowledge flow, resilience and the Goal card.</p>
