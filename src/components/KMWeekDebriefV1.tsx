@@ -153,20 +153,29 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
   b.turnover-a.turnover||a.name.localeCompare(b.name)
  );
  const colors=companies.map((_,index)=>COMPANY_COLORS[index%COMPANY_COLORS.length]);
- return <main className="mx-auto h-[calc(100vh-66px)] max-w-[1500px] overflow-auto p-3 text-slate-100">
+ // Comparisons are only meaningful once every participating company is finished.
+ const scoreKeys:ScoreKey[]=['business','expertise','localCapability','knowledgeFlow','resilience','goal','turnover'];
+ const completeScores=allComplete&&companies.length>1?companies.map(item=>calculateKMWeekScoreV1(session,item)):[];
+ const leaders:Partial<Record<ScoreKey,CategoryLeader>>={};
+ if(completeScores.length>1)for(const key of scoreKeys){
+  const value=Math.max(...completeScores.map(score=>score[key]));
+  leaders[key]={value,ties:completeScores.filter(score=>score[key]===value).length};
+ }
+ return <main data-kmw-debrief className="mx-auto h-[calc(100vh-66px)] max-w-[1700px] overflow-auto p-3 text-slate-100">
   <section className="rounded-2xl border-2 border-violet-700 bg-[linear-gradient(145deg,#19152d,#101827)] p-4">
-   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><h2 className="text-2xl font-black text-white">After Action Review - Discuss Together</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, so nobody sees another team’s strategy while they are still playing.</p>}</div><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div>
+   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><h2 className="text-2xl font-black text-white">After Action Review - Discuss Together</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, so nobody sees another team’s strategy while they are still playing.</p>}{completeScores.length>1&&<p data-kmw-score-legend className="mt-2 text-[11px] font-bold text-slate-200"><span className="text-emerald-300">■ Green: highest category score</span><span className="ml-4 text-orange-300">■ Orange: joint highest</span></p>}</div><div data-kmw-pdf-hide className="flex flex-wrap items-center gap-2"><button type="button" onClick={()=>window.print()} title="Select Save as PDF in your browser's print dialog" className="flex h-12 items-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-700 px-4 text-xs font-black text-white shadow-lg hover:bg-emerald-600"><FileDown className="h-4 w-4"/> EXPORT PDF</button><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div></div>
   </section>
 
-  <div className="mt-3"><TurnoverGraph companies={companies} colors={colors}/></div>
+  <div data-kmw-pdf-chart className="mt-3"><TurnoverGraph companies={companies} colors={colors}/></div>
   <div className="mt-3 space-y-3">
    {companies.map((item,index)=>{
     const color=colors[index];
     const before=beforeCompany(item);
-    return <section key={item.id} className="rounded-2xl border-2 bg-[#0b1420] p-3" style={{borderColor:color}}>
-     <div className="mb-2 flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:color}}/><span className="text-xs font-black text-amber-300">#{index+1}</span><h3 className="text-lg font-black text-white">{item.name}</h3>{item.id===company.id&&<span className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">Your company</span>}</div>
-     <div className="grid gap-3 xl:grid-cols-[240px_minmax(0,1fr)_minmax(0,1fr)]">
-      <MiniScorePad company={item} color={color} session={session} allComplete={allComplete}/>
+    return <section key={item.id} data-kmw-pdf-company className="rounded-2xl border-2 bg-[#0b1420] p-3" style={{borderColor:color}}>
+     <div className="mb-1 flex flex-wrap items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:color}}/><span className="text-xs font-black text-amber-300">#{index+1}</span><h3 className="text-lg font-black text-white">{item.name}</h3>{item.id===company.id&&<span className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">Your company</span>}</div>
+     <p data-kmw-company-players className="mb-3 text-sm font-semibold text-emerald-100">{kmWeekCompanyPlayerLabel(session,item)}</p>
+     <div className="grid gap-3 xl:grid-cols-[360px_minmax(0,1fr)_minmax(0,1fr)]">
+      <MiniScorePad company={item} color={color} session={session} allComplete={allComplete} leaders={leaders}/>
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" compact/></div></div>
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After free play</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" compact/></div></div>
      </div>
