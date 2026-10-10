@@ -12,10 +12,11 @@ assert.deepEqual(toggleKMWeekSourceV1('depth','none','expert',5,2),{local:'depth
 const company=createInitialCompanyV2('Coaching test','coach',DEFAULT_CONFIG);
 initialiseKMWeekCompanyV1(company);
 const state=company.kmWeek!;
+assert.equal(kmWeekCoachV1(company),null,'Guided introduction must not consume a full-play coaching question');
+state.stage='free';state.freeRound=1;company.round=4;state.phase='invest';
 assert.match(kmWeekCoachV1(company)!.text,/deeper expertise/);
 state.investmentHistory.push({roundLabel:'Guided 1',type:'TRAIN_EXPERT',domain:'operations',before:4,after:5});
 assert.match(kmWeekCoachV1(company)!.text,/train the best site/);
-state.stage='free';state.freeRound=1;company.round=4;state.phase='invest';
 const expert=company.experts.find(e=>e.domains[0].domain==='operations')!;
 expert.domains[0].score=4;
 const site=company.sites.find(s=>s.id==='brisbane')!;
@@ -39,5 +40,6 @@ try{
  assert.match(result.message,/performance gap 1, needed 2/,'Expert depth and local breadth must both reduce risk');
  assert.ok(state.usedExpertIds.includes(expert.id),'Risk must commit the expert for the round');
 }finally{Math.random=random;}
-company.round=7;assert.equal(kmWeekCoachV1(company),null);
+state.freeRound=6;company.round=9;assert.ok(kmWeekCoachV1(company),'The sixth full-play round must still have a River-based coaching question');
+state.freeRound=7;company.round=10;assert.equal(kmWeekCoachV1(company),null,'No coaching popup after the sixth full-play round');
 console.log('KM Week coaching, selections and training commitment passed');
