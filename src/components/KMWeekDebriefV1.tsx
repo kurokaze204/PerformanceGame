@@ -1,32 +1,46 @@
 import React,{useMemo,useState}from'react';
-import{ArrowRight,Brain,CircleDollarSign,Medal,ShieldCheck,Target,Users,Workflow,X}from'lucide-react';
+import{ArrowRight,Brain,CircleDollarSign,Medal,ShieldCheck,Target,Trophy,Users,Workflow,X}from'lucide-react';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import{formatCurrency}from'../utils/format.ts';
-import{KM_WEEK_SHOCK_GAP_COST}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_SHOCK_GAP_COST,calculateKMWeekScoreV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 
 type Props={session:GameSessionV2;company:CompanyV2};
 
 const COMPANY_COLORS=['#facc15','#38bdf8','#a78bfa','#34d399','#fb7185','#fb923c','#22d3ee','#c084fc'];
 
-const scoreItems=(company:CompanyV2)=>[
- {label:'Business Performance',value:company.kmWeek?.score.business||0,max:12,icon:<CircleDollarSign className="h-3.5 w-3.5"/>},
- {label:'Expertise',value:company.kmWeek?.score.expertise||0,max:6,icon:<Brain className="h-3.5 w-3.5"/>},
- {label:'Local capability',value:company.kmWeek?.score.localCapability||0,max:9,icon:<Users className="h-3.5 w-3.5"/>},
- {label:'Knowledge Flow',value:company.kmWeek?.score.knowledgeFlow||0,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
- {label:'Squeaky clean',value:company.kmWeek?.score.resilience||0,max:15,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
- {label:'KM Week goal',value:company.kmWeek?.score.goal||0,max:5,icon:<Target className="h-3.5 w-3.5"/>},
-];
+const scoreItems=(company:CompanyV2,session:GameSessionV2)=>{
+ const score=calculateKMWeekScoreV1(session,company);
+ return [
+  {label:'Business Performance',value:score.business,max:12,icon:<CircleDollarSign className="h-3.5 w-3.5"/>},
+  {label:'Expertise',value:score.expertise,max:6,icon:<Brain className="h-3.5 w-3.5"/>},
+  {label:'Local capability',value:score.localCapability,max:9,icon:<Users className="h-3.5 w-3.5"/>},
+  {label:'Knowledge Flow',value:score.knowledgeFlow,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
+  {label:'Squeaky clean',value:score.resilience,max:15,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
+  {label:'KM Week goal',value:score.goal,max:5,icon:<Target className="h-3.5 w-3.5"/>},
+  {label:'Final turnover',value:score.turnover,max:7,icon:<Trophy className="h-3.5 w-3.5"/>},
+ ];
+};
 
 function beforeCompany(company:CompanyV2):CompanyV2{
  const snapshot=company.initialRiverSnapshot;
  return snapshot?{...company,sites:snapshot.sites,experts:snapshot.experts}:company;
 }
 
-const MiniScorePad:React.FC<{company:CompanyV2;color:string}>=({company,color})=><section className="rounded-2xl border-2 bg-slate-950/75 p-3" style={{borderColor:color}}>
- <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><div className="text-xs font-black text-white">Score Pad</div><div className="ml-auto text-2xl font-black text-white">{company.kmWeek?.score.total||0}</div></div>
- <div className="mt-2 grid grid-cols-2 gap-1.5">{scoreItems(company).map(item=><div key={item.label} className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-1.5"><span className="text-slate-500">{item.icon}</span><span className="min-w-0 flex-1 truncate text-[9px] font-black text-slate-500">{item.label}</span><b className="text-sm text-white">{item.value}<span className="ml-0.5 text-[8px] text-slate-600">/{item.max}</span></b></div>)}</div>
-</section>;
+const MiniScorePad:React.FC<{company:CompanyV2;color:string;session:GameSessionV2;allComplete:boolean}>=({company,color,session,allComplete})=>{
+ const score=calculateKMWeekScoreV1(session,company);
+ return <section className="rounded-2xl border-2 bg-slate-950/75 p-3" style={{borderColor:color}}>
+  <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><div className="text-xs font-black text-white">Score Pad</div><div className="ml-auto text-2xl font-black text-white">{score.total}</div></div>
+  <div className="mt-2 grid grid-cols-2 gap-1.5">{scoreItems(company,session).map(item=>{
+   const finalTurnover=item.label==='Final turnover';
+   return <div key={item.label} title={finalTurnover?'Final company turnover after Site Audit fines: 1st 7 points, 2nd 4, 3rd 2, all others 0. Ties share the same position.':undefined} className={'flex items-center gap-1.5 rounded-lg border px-2 py-1.5 '+(finalTurnover?'col-span-2 border-amber-700/60 bg-amber-950/20':'border-slate-800 bg-slate-900/80')}>
+    <span className={finalTurnover?'text-amber-300':'text-slate-500'}>{item.icon}</span>
+    <span className="min-w-0 flex-1 truncate text-[9px] font-black text-slate-300">{item.label}{finalTurnover&&<span className="ml-1 text-[8px] text-slate-500">1st 7 · 2nd 4 · 3rd 2</span>}</span>
+    <b className="text-sm text-white">{finalTurnover&&!allComplete?'Pending':item.value}<span className="ml-0.5 text-[8px] text-slate-600">{finalTurnover&&!allComplete?'':'/'+item.max}</span></b>
+   </div>;
+  })}</div>
+ </section>;
+};
 
 const SiteAuditSummary:React.FC<{company:CompanyV2}>=({company})=>{
  const checks=company.kmWeek?.shockChecks||[];
@@ -111,7 +125,7 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
     return <section key={item.id} className="rounded-2xl border-2 bg-[#0b1420] p-3" style={{borderColor:color}}>
      <div className="mb-2 flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:color}}/><h3 className="text-lg font-black text-white">{item.name}</h3>{item.id===company.id&&<span className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">Your company</span>}</div>
      <div className="grid gap-3 xl:grid-cols-[240px_minmax(0,1fr)_minmax(0,1fr)]">
-      <MiniScorePad company={item} color={color}/>
+      <MiniScorePad company={item} color={color} session={session} allComplete={allComplete}/>
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" compact/></div></div>
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After free play</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" compact/></div></div>
      </div>
