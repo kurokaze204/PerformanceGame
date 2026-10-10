@@ -91,6 +91,12 @@ assert.equal(eventProgressionSource.includes('This is move \${moveNumber}'),fals
 assert.ok(kmWeekBoardSource.includes('Business Performance')&&kmWeekBoardSource.includes('Knowledge Flow')&&kmWeekBoardSource.includes('Resilience'),'KM Week must show the board-game score pad');
 assert.ok(kmWeekBoardSource.includes('Depth')&&kmWeekBoardSource.includes('Breadth')&&kmWeekBoardSource.includes('Flow'),'KM Week debrief must name the River concepts after players experience them');
 assert.ok(kmWeekBoardSource.includes('COMMIT RESPONSE'),'KM Week Challenge choices must require an explicit commit');
+
+assert.ok(kmWeekBoardSource.includes('data-kmw-turnover-target')&&kmWeekBoardSource.includes('data-kmw-outcome-origin')&&kmWeekBoardSource.includes('data-kmw-challenge-outcome'),'KM Week Challenge result globe must travel from the result box to the Turnover header');
+assert.ok(kmWeekBoardSource.includes('await presentChallengeOutcome(nextCompany,resolved)')&&kmWeekBoardSource.includes('if(data.session){if(beforeApply)await beforeApply(data.session);onSessionUpdate(data.session);}')&&kmWeekBoardSource.includes('onPresentationHoldChange?.(true)'),'Challenge turnover must stay unchanged until the outcome animation has completed');
+assert.ok(kmWeekBoardSource.includes('riskContinueRef.current?.()')&&kmWeekBoardSource.includes('riskContinueRef.current=resolve'),'Risk dice result must be acknowledged before the Challenge outcome globe starts');
+assert.ok(globalCssSource.includes('.kmw-turnover-globe-win')&&globalCssSource.includes('.kmw-turnover-globe-loss'),'Challenge outcome globe must be visually distinct for gains and losses');
+
 assert.ok(kmWeekBoardSource.includes('Current phase'),'KM Week board must make the current phase explicit');
 assert.ok(kmWeekBoardSource.includes("overtime?'OVERTIME'")&&kmWeekBoardSource.includes('KM Week is time-boxed, not hard-stopped'),'KM Week must make clear that 0:00 does not lock the player out');
 assert.ok(kmWeekBoardSource.includes("actionError&&<div")&&kmWeekBoardSource.includes('COMMIT RESPONSE'),'Challenge action failures must be explained inline instead of flashing Working and appearing to do nothing');
