@@ -1,10 +1,11 @@
 import type { CompanyV2 } from '../types/gameV2.ts';
 import { KM_WEEK_DOMAINS } from './kmWeekV1.ts';
 
-// Coach from the River and the challenges just faced, within the first six rounds.
+// Ask a River-informed question after each of the first six full-play rounds.
+// The three introductory guided turns are separate and must not use up those six.
 export function kmWeekCoachV1(company:CompanyV2){
  const state=company.kmWeek;
- if(!state||company.round>6)return null;
+ if(!state||state.stage!=='free'||state.freeRound<1||state.freeRound>6)return null;
  const sites=company.sites.filter(site=>!site.isClosed);
  const experts=company.experts.filter(expert=>!expert.isVacant);
  const busy=experts.find(expert=>state.trainingCommitments?.[expert.id]===company.round);
