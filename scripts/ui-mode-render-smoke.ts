@@ -103,6 +103,10 @@ assert.ok(kmWeekBoardSource.includes("actionError&&<div")&&kmWeekBoardSource.inc
 assert.ok(kmWeekBoardSource.includes('<KMWeekDebriefV1 session={session} company={company}/>'),'Completed KM Week games must move into the AAR-lite dashboard');
 assert.ok(kmWeekDebriefSource.includes('AAR-lite · Discuss together')&&kmWeekDebriefSource.includes('Before')&&kmWeekDebriefSource.includes('After'),'KM Week AAR-lite must compare each company score and before/after Rivers');
 assert.ok(kmWeekDebriefSource.includes('TurnoverGraph')&&kmWeekDebriefSource.includes('COMPANY_COLORS'),'KM Week AAR-lite must graph all company turnover using the same company colours as the comparison cards');
+assert.ok(kmWeekDebriefSource.includes("label:'Final turnover'")&&kmWeekDebriefSource.includes('max:7')&&kmWeekDebriefSource.includes('1st 7 · 2nd 4 · 3rd 2'),'The final Score Pad must display turnover rank points (7, 4 and 2) as an additional scoring category');
+assert.ok(kmWeekDebriefSource.includes('calculateKMWeekScoreV1(session,company)')&&kmWeekDebriefSource.includes('{score.total}'),'Final Score Pad totals must include the turnover placement points and remain in sync with the engine');
+assert.ok(kmWeekDebriefSource.includes('finalTurnover&&!allComplete')&&kmWeekDebriefSource.includes('Pending'),'The final-turnover bonus must not be prematurely revealed while competing companies are still playing');
+
 assert.ok(kmWeekDebriefSource.includes('AFTER ACTION REVIEW QUESTIONS')&&kmWeekDebriefSource.includes('What did you plan?')&&kmWeekDebriefSource.includes('What actually happened?')&&kmWeekDebriefSource.includes('Why do you think it was different?')&&kmWeekDebriefSource.includes('What can you alter next time so it works better?'),'KM Week AAR-lite must expose the four Newbie AAR questions in a slide-in panel');
 assert.ok(kmWeekDebriefSource.includes('kmw-aar-slide-in')&&globalCssSource.includes('@keyframes kmw-aar-slide-in'),'The AAR questions panel must visibly slide in from the right');
 assert.ok(riverSource.includes('compact?:boolean'),'Knowledge River must support compact side-by-side AAR comparisons');
