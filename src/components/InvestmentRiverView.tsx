@@ -31,6 +31,8 @@ interface Props{
  thresholdLine?:{value:number;label:string};
  compact?:boolean;
  ghostPreview?:RiverGhostPreview;
+ /** The selected KM Week Challenge's required knowledge level. */
+ challengeTarget?:{domain:KnowledgeDomain;level:number};
 }
 
 const KM_WEEK:KnowledgeDomain[]=['operations','hr','marketing'];
@@ -40,7 +42,7 @@ const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',ad
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,guidedSiteId,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,guidedSiteId,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview,challengeTarget})=>{
  const[riverInfoOpen,setRiverInfoOpen]=useState(false);
  const domains=mode==='expert'?EXPERT:mode==='km_week'?KM_WEEK:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
@@ -53,7 +55,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  const selectedSitePreview=selectedSiteId?sites.find(site=>site.id===selectedSiteId)?.teamCapability[selectedDomain]||0:0;
  const selectedExpertPreview=selectedExpertId?expertMarks.find(mark=>mark.expert.id===selectedExpertId&&mark.domain===selectedDomain)?.score||0:0;
  const selectedHQPreview=company.intranet[selectedDomain]||0;
- const rawMax=mode==='km_week'?Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),selectedExpertPreview+previewExpertDelta):Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0),selectedSitePreview+previewSiteDelta,selectedExpertPreview+previewExpertDelta,selectedHQPreview+previewHQDelta);
+ const rawMax=mode==='km_week'?Math.max(6,challengeTarget?.level||0,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),selectedExpertPreview+previewExpertDelta):Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0),selectedSitePreview+previewSiteDelta,selectedExpertPreview+previewExpertDelta,selectedHQPreview+previewHQDelta);
  const niceStep=(max:number)=>{const raw=Math.max(1,max/4),power=Math.pow(10,Math.floor(Math.log10(raw))),scaled=raw/power;return(scaled<=1?1:scaled<=2?2:scaled<=5?5:10)*power};
  const tickStep=niceStep(rawMax),maxY=Math.max(tickStep,Math.ceil(rawMax/tickStep)*tickStep);
  const ticks=Array.from({length:Math.floor(maxY/tickStep)+1},(_,index)=>index*tickStep);
@@ -72,7 +74,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
  return <div className={`${compact?'h-full min-h-[170px] rounded-xl p-2':'h-full min-h-[260px] rounded-2xl p-3'} relative border border-slate-700 bg-slate-950/95 shadow-inner`}>
   {!compact&&<div className="flex items-center justify-between gap-3 px-1">
    {mode!=='km_week'&&<div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>}
-   <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[15px] leading-none font-bold text-slate-500"><span className="text-slate-50">● Site</span>{mode!=='km_week'&&<span className="text-sky-300">◆ HQ</span>}<span className="text-amber-300">● Expert</span>{thresholdLine&&<span className="text-yellow-300">┄ {mode==='km_week'?'Audit standard':'Shock cut-off'}</span>}</div>
+   <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[15px] leading-none font-bold text-slate-500"><span className="text-slate-50">● Site</span>{mode!=='km_week'&&<span className="text-sky-300">◆ HQ</span>}<span className="text-amber-300">● Expert</span>{challengeTarget&&<span className="text-rose-200">◎ Challenge requirement</span>}{thresholdLine&&<span className="text-yellow-300">┄ {mode==='km_week'?'Audit standard':'Shock cut-off'}</span>}</div>
   </div>}
   <svg viewBox={`0 0 ${W} ${H}`} className={`${compact?'h-full min-h-[150px]':mode==='km_week'?'mt-1 h-[calc(100%-25px)] min-h-[220px]':'mt-1 h-[calc(100%-42px)] min-h-[220px]'} w-full`} role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
    {ghostPreview&&<defs><filter id="kmw-blue-ghost-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>}
@@ -168,6 +170,16 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
      })}
     </g>
    })}
+   {challengeTarget&&domains.includes(challengeTarget.domain)&&<g data-kmw-challenge-target={`${challengeTarget.domain}:${challengeTarget.level}`} transform={`translate(${x(domains.indexOf(challengeTarget.domain))+42} ${y(challengeTarget.level)})`}>
+    <title>{DOMAIN_INFO[challengeTarget.domain].label} Challenge requires knowledge {challengeTarget.level}</title>
+    <line x1="-42" y1="0" x2="-20" y2="0" stroke="#fda4af" strokeWidth="2.5" strokeDasharray="4 3"/>
+    <circle r="19" fill="#fff" stroke="#991b1b" strokeWidth="2.5"/>
+    <circle r="14" fill="#dc2626"/>
+    <circle r="9" fill="#fff"/>
+    <circle r="4.5" fill="#dc2626"/>
+    <rect x="-34" y="-43" width="68" height="19" rx="7" fill="#7f1d1d" stroke="#fff" strokeWidth="1.5"/>
+    <text x="0" y="-29" textAnchor="middle" fill="#fff" fontSize="12" fontWeight="900">NEEDS {challengeTarget.level}</text>
+   </g>}
    <text x="18" y={H/2} textAnchor="middle" fill="#64748b" fontSize="14" fontWeight="700" transform={`rotate(-90 18 ${H/2})`}>Knowledge level</text>
   </svg>
   {riverInfoOpen&&<div role="dialog" aria-label="About the River diagram" className="absolute bottom-12 right-3 z-30 w-[min(340px,calc(100%-24px))] rounded-xl border-2 border-sky-700 bg-[#0b1220]/98 p-3 text-left shadow-[0_16px_40px_rgba(0,0,0,.55)]">
