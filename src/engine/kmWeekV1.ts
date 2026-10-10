@@ -16,7 +16,7 @@ export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
 export const KM_WEEK_MAX_KNOWLEDGE = 5;
 export const KM_WEEK_MAX_EXPERT_KNOWLEDGE = 6;
 export const KM_WEEK_SHOCK_WINDOW_SECONDS = 180;
-export const KM_WEEK_SHOCK_GAP_COST = 20;
+export const KM_WEEK_SHOCK_GAP_COST = 40; // $40k per documented non-conformity knowledge point (fine)
 
 export const KM_WEEK_SHOCK_SPECS:{id:string;siteId:string;domain:KnowledgeDomain;difficulty:number}[]=[
   {id:'S1',siteId:'brisbane',domain:'operations',difficulty:4},
@@ -281,7 +281,7 @@ function kmWeekShockWindowOpen(session:GameSessionV2){
   return kmWeekSecondsRemaining(session)<=KM_WEEK_SHOCK_WINDOW_SECONDS;
 }
 
-function enterBusinessShock(company:CompanyV2,message='The final three minutes have begun. The Business Shock is here.'){
+function enterBusinessShock(company:CompanyV2,message='The final three minutes have begun. Site Audits are starting.'){
   const state=company.kmWeek!;
   state.stage='shock';
   state.phase='challenge';
@@ -451,7 +451,9 @@ export function calculateKMWeekScoreV1(session:GameSessionV2,company:CompanyV2):
     expertise:expertisePoints(company),
     localCapability:localCapabilityPoints(company),
     knowledgeFlow:Math.min(6,state.knowledgeTransfers+state.meaningfulTransfers),
-    resilience:state.shockChecks.filter(check=>check.passed).length,
+    // Squeaky clean: one point per cleared audit, plus ten if all five clear.
+    resilience:state.shockChecks.filter(check=>check.passed).length+
+      (state.shockChecks.length===KM_WEEK_SHOCK_SPECS.length&&state.shockChecks.every(check=>check.passed)?10:0),
     goal:goalAchieved(session,company)?5:0,
     total:0,
   };
@@ -695,17 +697,17 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
         state.freeRound=1;
         company.round=4;
         setChallengePhase(company,freeChallengesForRound(session,company,1));
-        state.lastMessage='Guided section complete. From here, keep playing until the final three-minute Business Shock.';
+        state.lastMessage='Guided section complete. From here, keep playing until the final three-minute Site Audits.';
       }
     }
   }else{
     if(kmWeekShockWindowOpen(session)){
-      enterBusinessShock(company,'The clock has entered its final three minutes. The specialists are no longer available: reveal the Business Shock.');
+      enterBusinessShock(company,'The clock has entered its final three minutes. The specialists are no longer available: begin the Site Audits.');
     }else{
       state.freeRound+=1;
       company.round=3+state.freeRound;
       setChallengePhase(company,freeChallengesForRound(session,company,state.freeRound));
-      state.lastMessage=`Round ${state.freeRound} begins. Keep building capability before the final three-minute Business Shock.`;
+      state.lastMessage=`Round ${state.freeRound} begins. Keep building capability before the final three-minute Site Audits.`;
     }
   }
   syncScore(session,company);
@@ -714,12 +716,16 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
 
 export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek;
-  if(!state||state.stage!=='shock'||state.shockResolved)return{success:false,message:'The Business Shock is not ready.'};
+  if(!state||state.stage!=='shock'||state.shockResolved)return{success:false,message:'The Site Audits are not ready.'};
   const checks:KMWeekShockCheck[]=KM_WEEK_SHOCK_SPECS.map(spec=>{
     const site=company.sites.find(item=>item.id===spec.siteId);
     const localKnowledge=site?.teamCapability[spec.domain]||0;
-    const passed=localKnowledge>=spec.difficulty;
-    return{...spec,localKnowledge,passed,resolution:passed?'ready':undefined,recovered:passed};
+    const shortfall=Math.max(0,spec.difficulty-localKnowledge);
+    // A fully capable site always passes; every missing knowledge level adds
+    // another face of a d6 on which auditors identify a non-conformity.
+    const dieRoll=shortfall>0?Math.floor(Math.random()*6)+1:undefined;
+    const passed=shortfall===0||(dieRoll!==undefined&&dieRoll>shortfall);
+    return{...spec,localKnowledge,passed,dieRoll,resolution:passed?'ready':'accept',recovered:passed};
   });
   state.shockChecks=checks;
   state.shockResolved=true;
@@ -731,29 +737,29 @@ export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const missingKnowledge=failures.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
   const totalCost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
   if(totalCost>0)applyTurnover(company,-totalCost);
-  state.turnoverHistory.push({label:`SHOCK -${totalCost}k`,turnover:company.turnover});
+  state.turnoverHistory.push({label:`SITE AUDITS -${totalCost}k`,turnover:company.turnover});
 
   state.lastMessage=failures.length
-    ? `The shock exposed ${failures.length} local capability gap${failures.length===1?'':'s'} across ${failedSiteIds.length} site${failedSiteIds.length===1?'':'s'}, with ${missingKnowledge} knowledge point${missingKnowledge===1?'':'s'} missing. Emergency external support cost ${totalCost}k in total.`
-    : `All ${checks.length} critical capability tests were handled locally. No emergency external support was needed.`;
+    ? `Auditors identified ${failures.length} non-conformit${failures.length===1?'y':'ies'} at ${failedSiteIds.length} site${failedSiteIds.length===1?'':'s'}. The knowledge shortfall of ${missingKnowledge} point${missingKnowledge===1?'':'s'} attracted fines totalling ${totalCost}k.`
+    : `All ${checks.length} Site Audits passed. No fines, and a 10-point Squeaky clean bonus!`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
 }
 
 export function completeKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek;
-  if(!state||state.stage!=='shock'||!state.shockResolved)return{success:false,message:'Run the Business Shock first.'};
+  if(!state||state.stage!=='shock'||!state.shockResolved)return{success:false,message:'Run the Site Audits first.'};
   state.stage='complete';
   state.phase='challenge';
   company.roundPhase='risk';
   const ready=state.shockChecks.filter(check=>check.passed).length;
   const gaps=state.shockChecks.length-ready;
   const failedSites=new Set(state.shockChecks.filter(check=>!check.passed).map(check=>check.siteId));
-  const missingKnowledge=state.shockChecks.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+  const missingKnowledge=state.shockChecks.filter(check=>!check.passed).reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
   const cost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
   state.lastMessage=gaps
-    ? `${ready} of ${state.shockChecks.length} critical capabilities held locally. ${gaps} gap${gaps===1?'':'s'} across ${failedSites.size} site${failedSites.size===1?'':'s'} left ${missingKnowledge} knowledge point${missingKnowledge===1?'':'s'} missing and required emergency external support costing ${cost}k.`
-    : `All ${state.shockChecks.length} critical capabilities held locally. The organisation absorbed the shock without external rescue.`;
+    ? `${ready} of ${state.shockChecks.length} Site Audits passed; ${gaps} non-conformit${gaps===1?'y':'ies'} across ${failedSites.size} site${failedSites.size===1?'':'s'} attracted fines of ${cost}k.`
+    : `All ${state.shockChecks.length} Site Audits passed. No fines and an additional 10 Squeaky clean points.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
 }
