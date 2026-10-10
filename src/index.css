@@ -449,3 +449,50 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
  .kmw-controls > div { min-height: 0; }
  .kmw-controls [class*="overflow-y-auto"] { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
 }
+
+/* Print the complete KM Week debrief (including SVG turnover and Rivers).
+   EXPORT PDF opens the browser print dialog; players select Save as PDF. */
+@media print {
+ @page { size: A4 landscape; margin: 10mm; }
+ html, body, #root, .kmw-game-root {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+ }
+ html, body, #root { background: #fff !important; }
+ .kmw-game-root > header, [data-kmw-pdf-hide], .kmw-aar-slide-in { display: none !important; }
+ [data-kmw-debrief] {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+ }
+ [data-kmw-debrief] *,
+ [data-kmw-debrief] svg {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+ }
+ [data-kmw-debrief] > section, [data-kmw-pdf-chart], [data-kmw-pdf-company] {
+  break-inside: avoid;
+  page-break-inside: avoid;
+ }
+ [data-kmw-debrief] [data-kmw-pdf-company] { margin-top: 10px !important; }
+ [data-kmw-debrief] [data-kmw-pdf-company] > .grid {
+  display: grid !important;
+  grid-template-columns: 360px minmax(0,1fr) minmax(0,1fr) !important;
+  gap: 10px !important;
+ }
+ [data-kmw-debrief] section { box-shadow: none !important; }
+ [data-kmw-debrief] svg { max-width: 100% !important; }
+}
