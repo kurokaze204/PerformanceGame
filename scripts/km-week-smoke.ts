@@ -16,6 +16,7 @@ import {
 } from '../src/engine/kmWeekV1.ts';
 import type { GameSessionV2 } from '../src/types/gameV2.ts';
 import { riverSiteKnowledgeScore } from '../src/engine/riverKnowledgeV1.ts';
+import { kmWeekCoachV1 } from '../src/engine/kmWeekCoachV1.ts';
 
 const config={...DEFAULT_CONFIG,actions_per_round:1};
 const company=createInitialCompanyV2('Apex Technologies','kmw-company',config);
@@ -215,6 +216,23 @@ assert.equal(result.success,true,result.message);
 assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.hr,1,'Guided Knowledge Transfer must accept any valid domain/source/target choice');
 assert.equal(company.kmWeek?.stage,'free');
 assert.equal(company.kmWeek?.freeRound,1);
+{
+  const coach=kmWeekCoachV1(company);
+  assert.ok(coach?.text&&coach.domain,'The first full-play round must offer a River-informed coaching question');
+  const originalFreeRound=company.kmWeek!.freeRound;
+  const originalRound=company.round;
+  company.kmWeek!.freeRound=6;
+  company.round=9;
+  assert.ok(kmWeekCoachV1(company)?.text,'Coaching must still appear in the sixth full round, even though the company turn number is nine');
+  company.kmWeek!.freeRound=7;
+  assert.equal(kmWeekCoachV1(company),null,'Coaching must stop after the sixth full round');
+  company.kmWeek!.stage='guided';
+  company.kmWeek!.freeRound=1;
+  assert.equal(kmWeekCoachV1(company),null,'The introductory guided rounds must not count towards the six River coaching questions');
+  company.kmWeek!.stage='free';
+  company.kmWeek!.freeRound=originalFreeRound;
+  company.round=originalRound;
+}
 assert.notEqual(company.kmWeek?.trainingCommitments?.[opsExpert().id],company.round,'Trainer must return after one round');
 assert.equal(company.kmWeek?.challenges.length,2);
 assert.ok(company.kmWeek!.challenges[0].siteId!==company.kmWeek!.challenges[1].siteId,'Free-play Challenges must be assigned to different sites');
