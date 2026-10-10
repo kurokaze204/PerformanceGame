@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from'react';
-import{ArrowRight,Brain,Building2,CheckCircle2,CircleDollarSign,Crown,Dices,GraduationCap,Info,LogOut,MapPin,Medal,ShieldCheck,Sparkles,Target,Users,Workflow,X}from'lucide-react';
+import{ArrowRight,BarChart3,Brain,Building2,CheckCircle2,CircleDollarSign,Crown,Dices,GraduationCap,Info,LogOut,MapPin,Medal,ShieldCheck,Sparkles,Target,Users,Workflow,X}from'lucide-react';
 import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
@@ -364,6 +364,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[coachDismissedKey,setCoachDismissedKey]=useState('');
  const[scorePadOpen,setScorePadOpen]=useState(false);
  const[turnoverChartOpen,setTurnoverChartOpen]=useState(false);
+ const[riverTurnoverOpen,setRiverTurnoverOpen]=useState(false);
+ const[riverTurnoverRect,setRiverTurnoverRect]=useState<{left:number;top:number;width:number;height:number}|null>(null);
  const[expertChangeDismissedKey,setExpertChangeDismissedKey]=useState('');
  const[challengeAttention,setChallengeAttention]=useState(false);
  const[riskResult,setRiskResult]=useState<{roll:number;won:boolean;requiredRoll:number;performanceGap:number}|null>(null);
@@ -599,6 +601,28 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   window.addEventListener('scroll',update,true);
   return()=>{cancelAnimationFrame(frame);observer?.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true)};
  },[showFreeChallengeIntro,challengeFocusOpen]);
+
+ useEffect(()=>{
+  if(!riverTurnoverOpen){setRiverTurnoverRect(null);return;}
+  const update=()=>{
+   const zone=document.querySelector('[data-kmw-river-chart-area]')?.getBoundingClientRect();
+   if(!zone)return;
+   const next={left:Math.max(0,zone.left),top:Math.max(0,zone.top),width:Math.min(zone.width,window.innerWidth),height:Math.min(zone.height,window.innerHeight-Math.max(0,zone.top))};
+   setRiverTurnoverRect(previous=>previous&&previous.left===next.left&&previous.top===next.top&&previous.width===next.width&&previous.height===next.height?previous:next);
+  };
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setRiverTurnoverOpen(false)}};
+  const frame=requestAnimationFrame(update);
+  const zone=document.querySelector('[data-kmw-river-chart-area]');
+  const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(update);
+  if(zone)observer?.observe(zone);
+  window.addEventListener('resize',update);
+  window.addEventListener('scroll',update,true);
+  document.addEventListener('keydown',escape);
+  return()=>{cancelAnimationFrame(frame);observer?.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);document.removeEventListener('keydown',escape)};
+ },[riverTurnoverOpen]);
+ useEffect(()=>{
+  if(state?.stage==='guided'||state?.stage==='complete'||(state?.stage==='free'&&state.freeRound<2))setRiverTurnoverOpen(false);
+ },[state?.stage,state?.freeRound]);
 
  useEffect(()=>{if(scoreBriefOpen)setScorePadOpen(true)},[scoreBriefOpen]);
 
@@ -1016,6 +1040,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   const shownTurnover=state.stage==='shock'&&state.shockResolved?(state.auditTurnoverBefore??company.turnover+auditFine):company.turnover;
  const challengeStepDone=state.stage==='guided'||state.stage==='free'?state.phase==='invest':state.stage==='shock'||shockDone;
  const investStepDone=state.stage==='shock'||shockDone;
+ const turnoverToggleAvailable=(state.stage==='free'&&state.freeRound>=2)||state.stage==='shock';
+
 
  return <div className="min-h-screen bg-[#071019] text-slate-100 xl:h-screen xl:overflow-hidden">
   <header className="relative z-[100] border-b-2 border-amber-950/60 bg-[#09131f]/98 px-3 py-2 shadow-xl min-[700px]:h-[66px]">
@@ -1048,6 +1074,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    <div className={'mt-1 text-2xl font-black tabular-nums '+(challengeOutcome.won?'text-emerald-300':'text-rose-300')}>{challengeOutcome.change>=0?'+':'−'}{money(Math.abs(challengeOutcome.change))}</div>
    <div className="text-[10px] font-bold text-slate-300">Turnover {challengeOutcome.change>=0?'gain':'loss'}{challengeOutcome.travelCost?' · includes travel':''}</div>
   </div>}
+  {riverTurnoverOpen&&<>
+   <div aria-hidden="true" data-kmw-turnover-shade className="fixed inset-0 z-[200] bg-black/75"/>
+   {riverTurnoverRect&&<div className="fixed z-[220]" style={riverTurnoverRect}>
+    <TurnoverRiverChart session={session} currentCompanyId={company.id}/>
+   </div>}
+  </>}
   <TurnoverKnowledgeModal open={turnoverChartOpen} session={session} currentCompanyId={company.id} onClose={()=>setTurnoverChartOpen(false)}/>
 
   {showExpertChangePopup&&expertChange&&<>
@@ -1192,13 +1224,18 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      <Card className="relative p-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:p-2 xl:p-3">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
        <div><div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Knowledge River</div><h2 className="text-lg font-black text-white min-[700px]:text-sm lg:text-base xl:text-lg">Where is the capability now?</h2></div>
+       {turnoverToggleAvailable&&<div className={riverTurnoverOpen?'relative z-[240]':''}>
+        <button type="button" data-kmw-turnover-toggle aria-pressed={riverTurnoverOpen} onClick={()=>{setRiverTurnoverOpen(open=>!open);setScorePadOpen(false)}} className={'flex h-10 items-center gap-2 rounded-xl border-2 px-3 text-xs font-black shadow-lg transition '+(riverTurnoverOpen?'border-emerald-200 bg-emerald-500 text-slate-950 ring-4 ring-emerald-300/50':'border-emerald-400 bg-emerald-600 text-white hover:bg-emerald-500')}>
+         <BarChart3 className="h-4 w-4"/>Turnover
+        </button>
+       </div>}
        <div data-kmw-scorepad>
         <button type="button" data-kmw-scorepad-button aria-expanded={scorePadOpen} onClick={()=>setScorePadOpen(open=>!open)} className={`flex min-w-[176px] items-center justify-between gap-3 rounded-xl border-2 px-3 py-2 text-left text-xs font-black shadow-lg transition ${scorePadOpen?'border-amber-300 bg-amber-400 text-slate-950':'border-amber-700 bg-amber-950/35 text-amber-100 hover:border-amber-400'}`}>
          <span className="flex items-center gap-2"><Medal className="h-4 w-4"/>SCORE PAD</span><span className={`rounded-lg border px-2 py-0.5 text-sm ${scorePadOpen?'border-slate-900/30 bg-slate-950/10':'border-amber-700 bg-slate-950/40'}`}>{state.score.total}</span>
         </button>
        </div>
       </div>
-      <div data-kmw-tour-river className={'relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]'+(riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?' z-[145] rounded-2xl':'')} style={riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?{boxShadow:'0 0 0 160vmax rgba(0,0,0,.74)'}:undefined}><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+      <div data-kmw-tour-river data-kmw-river-chart-area className={'relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]'+(riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?' z-[145] rounded-2xl':'')} style={riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?{boxShadow:'0 0 0 160vmax rgba(0,0,0,.74)'}:undefined}><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
       {scorePadOpen&&<div data-kmw-scorepad className={`absolute left-2 right-2 top-[54px] z-[90] h-fit overflow-visible rounded-[18px] border-2 border-amber-700 bg-[#101827]/[.98] p-3 shadow-[0_20px_60px_rgba(0,0,0,.7)] min-[700px]:left-auto min-[700px]:w-2/3 ${scoreBriefOpen?'z-[135] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}`}>
        <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
        <div className="mt-2 grid grid-cols-2 gap-1.5">
