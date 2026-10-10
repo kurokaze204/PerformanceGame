@@ -104,7 +104,7 @@ function riverTurnoverSeries(company:CompanyV2):RiverTurnoverPoint[]{
 const TurnoverRiverChart:React.FC<{session:GameSessionV2;currentCompanyId:string}>=({session,currentCompanyId})=>{
  const companies=session.companies.filter(item=>item.kmWeek);
  const series=companies.map(item=>({company:item,points:riverTurnoverSeries(item)}));
- const allKeys=[...new Set(series.flatMap(item=>item.points.map(point=>point.key)))];
+ const allKeys:string[]=Array.from(new Set<string>(series.flatMap(item=>item.points.map(point=>point.key))));
  const order=(key:string)=>key==='START'?0:key==='AUDITS'?1000:key.startsWith('G')?Number(key.slice(1)):100+Number(key.slice(1));
  const keys=allKeys.sort((a,b)=>order(a)-order(b));
  const W=760,H=282,left=61,right=18,top=24,bottom=48,innerH=H-top-bottom,innerW=W-left-right;
