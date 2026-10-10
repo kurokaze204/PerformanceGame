@@ -960,7 +960,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <defs><marker id="kmw-river-intro-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" stroke="#7dd3fc" fill="none" strokeWidth="1.8"/></marker></defs>
     {riverIntroArrows.map((arrow,index)=><path key={index} d={`M ${arrow.fromX} ${arrow.fromY} C ${arrow.fromX+(riverIntroUnlocked?48:-46)} ${arrow.fromY}, ${arrow.toX+(riverIntroUnlocked?-60:38)} ${arrow.toY}, ${arrow.toX} ${arrow.toY}`} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" markerEnd="url(#kmw-river-intro-arrow)"/>)}
    </svg>}
-   <section role="dialog" aria-modal={riverIntroStep<9} aria-label="CEO briefing: the Knowledge River" data-kmw-river-brief className={'fixed top-1/2 z-[190] max-h-[calc(100dvh-80px)] w-[min(380px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,.75)] min-[700px]:w-[min(400px,calc(38vw-24px))] '+(riverIntroUnlocked?'left-1/2 min-[700px]:left-[30%]':'left-1/2 min-[700px]:left-[80%]')}>
+   <section role="dialog" aria-modal={riverIntroStep<9} aria-label="CEO briefing: the Knowledge River" data-kmw-river-brief onClick={advanceRiverIntro} className={'fixed top-1/2 z-[190] max-h-[calc(100dvh-80px)] w-[min(380px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,.75)] min-[700px]:w-[min(400px,calc(38vw-24px))] '+(riverIntroUnlocked?'left-1/2 min-[700px]:left-[30%]':'left-1/2 min-[700px]:left-[80%]')}>
     <div className="flex items-center justify-between gap-2"><div className="text-[11px] font-black uppercase tracking-[.14em] text-amber-300">CEO briefing · Knowledge River</div><div className="text-xs font-black text-sky-300">{riverIntroStep}/9</div></div>
     <p className="mt-3 text-[15px] leading-relaxed text-white">
      {riverIntroStep===1?<>Welcome, CEO of <b>{company.name}</b>. Your company has pockets of expertise, but not every site has the knowledge it needs. Solve today's business problems while building capability across the company.</>:
@@ -973,7 +973,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       riverIntroStep===8?<>Each turn you will put this knowledge to work solving problems at your sites, followed by an Invest phase where you can improve the level and distribution of expertise across the company.</>:
       <>Each Challenge requires a particular level of knowledge in one domain. <b>Click the Challenge card below to get started.</b></>}
     </p>
-    {riverIntroStep<9&&<button type="button" onClick={advanceRiverIntro} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">NEXT <ArrowRight className="ml-1 inline h-4 w-4"/></button>}
+    {riverIntroStep<9&&<button type="button" onClick={event=>{event.stopPropagation();advanceRiverIntro()}} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">NEXT <ArrowRight className="ml-1 inline h-4 w-4"/></button>}
     {riverIntroUnlocked&&<p className="mt-3 text-xs font-bold text-sky-200">Select the highlighted Challenge card to continue.</p>}
    </section>
   </>}
