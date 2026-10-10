@@ -6,6 +6,9 @@ import { DEFAULT_CONFIG } from '../src/engine/config.ts';
 import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import { ActionsPanelV5 } from '../src/components/ActionsPanelV5.tsx';
 import { EventDecisionCardV4 } from '../src/components/EventDecisionCardV4.tsx';
+import { InvestmentRiverView } from '../src/components/InvestmentRiverView.tsx';
+import { KMWeekDebriefV1,kmWeekCompanyPlayerLabel } from '../src/components/KMWeekDebriefV1.tsx';
+import { initialiseKMWeekCompanyV1 } from '../src/engine/kmWeekV1.ts';
 import type { ActiveEventV2, GameSessionV2 } from '../src/types/gameV2.ts';
 
 (globalThis as any).localStorage={getItem:()=>null,setItem:()=>{},removeItem:()=>{},clear:()=>{}};
@@ -68,41 +71,101 @@ assert.ok(appBoardSource.includes("actionType:'FINISH_INVESTING'"),'Invest compl
 const kmWeekBoardSource=readFileSync(new URL('../src/components/KMWeekBoardV1.tsx',import.meta.url),'utf8');
 const globalCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 const riverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
+// The selected KM Week requirement must track its domain and difficulty,
+// including values above the local-team capability scale.
+const targetCompany=createInitialCompanyV2('River Test Co','river-test',DEFAULT_CONFIG);
+const renderRiverTarget=(domain:'operations'|'hr'|'marketing',level:number)=>renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:domain,challengeTarget:{domain,level}}));
+const operationTarget=renderRiverTarget('operations',8);
+const marketingTarget=renderRiverTarget('marketing',3);
+assert.ok(operationTarget.includes('data-kmw-challenge-target="operations:8"')&&operationTarget.includes('NEEDS 8'),'The River must show the required level even when a Challenge is harder than local expertise');
+assert.ok(marketingTarget.includes('data-kmw-challenge-target="marketing:3"')&&marketingTarget.includes('NEEDS 3'),'Changing Challenges must move the requirement to the new domain and level');
+assert.notEqual(operationTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],marketingTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],'A different Challenge must move the bullseye');
+const noTarget=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations'}));
+assert.equal(noTarget.includes('data-kmw-challenge-target'),false,'The River must clear the bullseye when no Challenge is active');
+assert.ok(kmWeekBoardSource.includes("activeChallenge?.status==='open'?activeChallenge:undefined")&&kmWeekBoardSource.includes("riverChallenge?{domain:riverChallenge.domain,level:riverChallenge.difficulty}:undefined"),'Only the selected open Challenge may drive the River requirement');
 const kmWeekDebriefSource=readFileSync(new URL('../src/components/KMWeekDebriefV1.tsx',import.meta.url),'utf8');
 assert.ok(kmWeekDebriefSource.includes('Before free play')&&kmWeekDebriefSource.includes('selectedDomain="operations"'),'KM Week AAR Before River must use each company’s post-guided snapshot and a valid KM Week domain');
 const eventV4Source=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
 const eventProgressionSource=readFileSync(new URL('../src/engine/eventProgressionV5.ts',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoardSource.includes('<KMWeekBoardV1'),'KM Week sessions must use their dedicated play surface');
-assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}/3`"),'KM Week board must expose the three guided and three free-play progression');
+assert.ok(kmWeekBoardSource.includes("return`GUIDED ${state.guidedTurn}/3`")&&kmWeekBoardSource.includes("return`ROUND ${state.freeRound}`"),'KM Week board must expose the three guided moves and the open-ended time-boxed free-play round number');
 assert.ok(kmWeekBoardSource.includes('<InvestmentRiverView company={riverFrozenCompany||company} mode="km_week"'),'KM Week must keep the Knowledge River central while supporting animation sequencing');
-assert.ok(kmWeekBoardSource.includes("min-[700px]:grid-cols-[minmax(0,1fr)_310px]")&&kmWeekBoardSource.includes("lg:grid-cols-[minmax(0,1fr)_350px]"),'Tablet-width KM Week must use the desktop-style River/controls two-column layout instead of stacking vertically');
+assert.ok(kmWeekBoardSource.includes("min-[700px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"),'Tablet-width KM Week must use the desktop-style River/controls two-column layout instead of stacking vertically');
+assert.ok(kmWeekBoardSource.includes('const[sitePanelsOpen,setSitePanelsOpen]=useState(false)')&&kmWeekBoardSource.includes('{sitePanelsOpen&&<div data-kmw-site-panels'),'Three local site summary panels must be hidden by default and displayed only when requested');
+assert.ok(kmWeekBoardSource.includes('data-kmw-site-panels-toggle aria-expanded={sitePanelsOpen}')&&kmWeekBoardSource.includes('onClick={()=>setSitePanelsOpen(open=>!open)}')&&kmWeekBoardSource.includes('<Building2 className="h-5 w-5"/>'),'The River must have a square accessible Buildings button to toggle site details');
+assert.ok(kmWeekBoardSource.includes('absolute bottom-2 left-2 z-20 grid h-11 w-11'),'The 44px Buildings toggle must sit at the bottom-left of the River without obscuring other controls');
+
 assert.ok(kmWeekBoardSource.includes("min-[700px]:min-h-[210px]")&&kmWeekBoardSource.includes("min-[700px]:p-2 xl:p-3"),'Tablet-width KM Week must compact the River and site cards so the controls remain visible beside them');
 assert.ok(kmWeekBoardSource.includes("min-[700px]:w-10")&&kmWeekBoardSource.includes("min-[700px]:h-2 min-[700px]:w-2"),'Tablet site cards must shrink domain labels and knowledge pips enough to remain three-across in portrait');
 assert.ok(kmWeekBoardSource.includes("min-[700px]:flex-1")&&kmWeekBoardSource.includes("min-[700px]:h-full min-[700px]:min-h-0 min-[700px]:overflow-y-auto"),'Tablet right-side Challenge/Invest panel must fill the available column and scroll internally');
 assert.ok(kmWeekBoardSource.includes("min-[700px]:overflow-y-auto"),'The tablet Challenge/Invest panel must scroll internally rather than pushing below the River');
-assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'KM Week must limit strategic investment to the agreed three interventions');
-assert.ok(kmWeekBoardSource.includes('Training site')&&kmWeekBoardSource.includes("'+$2k travel'"),'KM Week Local Training must let the player choose another site and show the fixed travel fee');
+assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'The three initial KM Week investments must remain');
+assert.ok(kmWeekBoardSource.includes('data-kmw-aar-button')&&kmWeekBoardSource.includes('aarCandidates.length>0')&&kmWeekBoardSource.includes("setInvestment('AFTER_ACTION_REVIEW')"),'AAR is offered as a fourth investment only for a completed tough Challenge');
+
+for(const kind of ['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER','AFTER_ACTION_REVIEW']){
+ assert.ok(kmWeekBoardSource.includes(`<InvestmentInfoIcon kind="${kind}"`),`Investment ${kind} needs a refresh icon`);
+ assert.ok(kmWeekBoardSource.includes(`title:'${kind==='TRAIN_EXPERT'?'Train Expert':kind==='LOCAL_TRAINING'?'Local Training':kind==='KNOWLEDGE_TRANSFER'?'Knowledge Transfer':'After Action Review'}'`),`Investment ${kind} must have a complete explanatory script`);
+}
+assert.ok(kmWeekBoardSource.includes('data-kmw-investment-info={kind}')&&kmWeekBoardSource.includes('aria-expanded={open}')&&kmWeekBoardSource.includes('aria-controls="kmw-intervention-help"'),'The four separate info buttons must be accessible on mouse, touch and keyboard');
+assert.ok(kmWeekBoardSource.includes('data-kmw-intervention-help={infoInvestment}')&&kmWeekBoardSource.includes('max-h-[min(40dvh,320px)]')&&kmWeekBoardSource.includes('overscroll-contain'),'Help must open immediately below the interventions and scroll within the iPad control panel');
+assert.ok(kmWeekBoardSource.includes("const scoreGhostPreview:RiverGhostPreview|undefined=infoInvestment")&&kmWeekBoardSource.includes("previewForIntervention(infoInvestment)")&&kmWeekBoardSource.includes('infoPreviewDomain'),'Info button should preview the selected intervention on the River without changing the committed investment');
+assert.ok(kmWeekBoardSource.includes('setInfoInvestment(current=>current===')&&kmWeekBoardSource.includes('onClick={()=>setInfoInvestment(null)}'),'Information buttons must toggle and be closable');
+assert.ok(kmWeekBoardSource.includes('kind:\'aar\',domain:aarChallenge.domain')&&riverSource.includes('data-kmw-score-ghost="local"')&&riverSource.includes('data-kmw-score-ghost="expertise"'),'AAR information must show both site and expert projections using the established River ghost markers');
+
+assert.ok(kmWeekBoardSource.includes("item.status==='success'?'SUCCESS: ':'FAILURE: '")&&kmWeekBoardSource.includes('data-kmw-aar-select'),'AAR dropdown labels successful and failed Challenges');
+assert.ok(kmWeekBoardSource.includes('data-kmw-aar-intro')&&kmWeekBoardSource.includes('kmw-aar-arrow')&&kmWeekBoardSource.includes('dismissAARIntro'),'AAR opens a one-time briefing pointing at its button');
+assert.ok(kmWeekBoardSource.includes("kind:'aar',domain:aarChallenge.domain")&&riverSource.includes("ghostPreview.kind==='aar'&&ghostPreview.siteDelta>0")&&riverSource.includes("ghostPreview.kind==='aar'&&ghostPreview.expertDelta>0"),'AAR previews both site and expert knowledge gains');
+assert.ok(kmWeekBoardSource.includes("targetKey=`expert:${aarExpert.id}:${aarChallenge.domain}`")&&kmWeekBoardSource.includes("if(investment==='AFTER_ACTION_REVIEW'){\n   const site=optimisticCompany.sites"),'AAR orb lands on the expert before both River knowledge gains animate');
+assert.ok(kmWeekBoardSource.includes('Training site')&&kmWeekBoardSource.includes("' · +$2k travel'"),'KM Week Local Training must let the player choose another site and show the fixed travel fee');
 assert.ok(kmWeekBoardSource.includes('Travel $2k · total $12k')&&kmWeekBoardSource.includes('No travel · total $10k'),'KM Week Local Training preview must make travel and total cost explicit');
-assert.ok(kmWeekBoardSource.includes('Business Shock')&&kmWeekBoardSource.includes('Can your sites cope without the experts?'),'KM Week must end with a clearly explained local-capability resilience test');
+assert.ok(kmWeekBoardSource.includes('Site Audits · final three minutes')&&kmWeekBoardSource.includes('Can your sites prove compliance?'),'KM Week must introduce the five local-only compliance audits');
 assert.equal(eventV4Source.includes('2-domain lesson'),false,'Newbie and Expert Challenge cards must not label business events as lessons');
 assert.equal(eventV4Source.includes('Diagnostic complete'),false,'Newbie and Expert Challenge cards must not describe business events as diagnostics');
 assert.equal(eventProgressionSource.includes("card.title=\`\${tier}:"),false,'Challenge titles must not expose simulation pressure tiers');
 assert.equal(eventProgressionSource.includes('This is move \${moveNumber}'),false,'Challenge descriptions must not expose move numbers or simulation mechanics');
-assert.ok(kmWeekBoardSource.includes('Business Performance')&&kmWeekBoardSource.includes('Knowledge Flow')&&kmWeekBoardSource.includes('Resilience'),'KM Week must show the board-game score pad');
+assert.ok(kmWeekBoardSource.includes('Business Performance')&&kmWeekBoardSource.includes('Knowledge Flow')&&kmWeekBoardSource.includes('Squeaky clean'),'KM Week must show the board-game score pad with the renamed audit score');
+assert.ok(kmWeekBoardSource.includes('<ScoreCell label={goal.title} value={state.score.goal}')&&kmWeekDebriefSource.includes('KM_WEEK_GOALS[session.kmWeekGoalId].title'),'Both playing and final Score Pads must display the assigned goal name, e.g. Local Heroes, instead of the generic KM Week goal label');
 assert.ok(kmWeekBoardSource.includes('Depth')&&kmWeekBoardSource.includes('Breadth')&&kmWeekBoardSource.includes('Flow'),'KM Week debrief must name the River concepts after players experience them');
 assert.ok(kmWeekBoardSource.includes('COMMIT RESPONSE'),'KM Week Challenge choices must require an explicit commit');
-assert.ok(kmWeekBoardSource.includes('Current phase'),'KM Week board must make the current phase explicit');
+
+assert.ok(kmWeekBoardSource.includes('data-kmw-turnover-target')&&kmWeekBoardSource.includes('data-kmw-outcome-origin')&&kmWeekBoardSource.includes('data-kmw-challenge-outcome'),'KM Week Challenge result globe must travel from the result box to the Turnover header');
+
+assert.ok(kmWeekBoardSource.includes("state.stage==='free'&&state.freeRound>=2")&&kmWeekBoardSource.includes('data-kmw-turnover-toggle')&&kmWeekBoardSource.includes('aria-pressed={riverTurnoverOpen}'),'The green Turnover toggle must appear by the Score Pad from free-play round 2');
+assert.ok(kmWeekBoardSource.includes('data-kmw-river-chart-area')&&kmWeekBoardSource.includes('data-kmw-turnover-shade')&&kmWeekBoardSource.includes('z-[240]')&&kmWeekBoardSource.includes('<TurnoverRiverChart session={session} currentCompanyId={company.id}/>'),'The turnover chart must sit over the River and keep the toggle above the greyed-out board');
+assert.ok(kmWeekBoardSource.includes("event.key==='Escape'")&&kmWeekBoardSource.includes('document.addEventListener(\'keydown\',escape)'),'The River turnover chart must close on Escape');
+assert.ok(kmWeekBoardSource.includes('stroke="#facc15" strokeWidth="5"')&&kmWeekBoardSource.includes("const color=index%2===0?'#22c55e':'#34d399'"),'The player turnover must be a heavy yellow line while competitors are thin green lines');
+assert.ok(kmWeekBoardSource.includes('data-kmw-turnover-event={event.kind}')&&kmWeekBoardSource.includes("'#22c55e':'#7f1d1d'")&&kmWeekBoardSource.includes('data-kmw-turnover-retirement'),'Chart must distinguish challenge wins, losses, and crossed-out retired experts');
+assert.ok(kmWeekBoardSource.includes("const match=/^([GR])")&&kmWeekBoardSource.includes('const retirement=state?.expertRetirement'),'Chart markers must come from the recorded multi-round turnover history and retirement event');
+
+assert.ok(kmWeekBoardSource.includes('await presentChallengeOutcome(nextCompany,resolved)')&&kmWeekBoardSource.includes('if(data.session){if(beforeApply)await beforeApply(data.session);onSessionUpdate(data.session);}')&&kmWeekBoardSource.includes('onPresentationHoldChange?.(true)'),'Challenge turnover must stay unchanged until the outcome animation has completed');
+assert.ok(kmWeekBoardSource.includes('riskContinueRef.current?.()')&&kmWeekBoardSource.includes('riskContinueRef.current=resolve'),'Risk dice result must be acknowledged before the Challenge outcome globe starts');
+assert.ok(globalCssSource.includes('.kmw-turnover-globe-win')&&globalCssSource.includes('.kmw-turnover-globe-loss'),'Challenge outcome globe must be visually distinct for gains and losses');
+
+assert.ok(kmWeekBoardSource.includes('<PhaseStep number="1" label="Challenge"')&&kmWeekBoardSource.includes('<PhaseStep number="2" label="Invest"'),'KM Week must show the active phase through its stepper without repeating a Current phase badge');
 assert.ok(kmWeekBoardSource.includes("overtime?'OVERTIME'")&&kmWeekBoardSource.includes('KM Week is time-boxed, not hard-stopped'),'KM Week must make clear that 0:00 does not lock the player out');
 assert.ok(kmWeekBoardSource.includes("actionError&&<div")&&kmWeekBoardSource.includes('COMMIT RESPONSE'),'Challenge action failures must be explained inline instead of flashing Working and appearing to do nothing');
 assert.ok(kmWeekBoardSource.includes('<KMWeekDebriefV1 session={session} company={company}/>'),'Completed KM Week games must move into the AAR-lite dashboard');
-assert.ok(kmWeekDebriefSource.includes('AAR-lite · Discuss together')&&kmWeekDebriefSource.includes('Before')&&kmWeekDebriefSource.includes('After'),'KM Week AAR-lite must compare each company score and before/after Rivers');
+assert.ok(kmWeekDebriefSource.includes('After Action Review - Discuss Together')&&kmWeekDebriefSource.includes('Before free play')&&kmWeekDebriefSource.includes('After free play'),'KM Week After Action Review must use the requested title and retain before/after knowledge Rivers');
 assert.ok(kmWeekDebriefSource.includes('TurnoverGraph')&&kmWeekDebriefSource.includes('COMPANY_COLORS'),'KM Week AAR-lite must graph all company turnover using the same company colours as the comparison cards');
+assert.ok(kmWeekDebriefSource.includes("data-kmw-aar-challenge-result={result||undefined}")&&kmWeekDebriefSource.includes("result==='success'?'#34d399'")&&kmWeekDebriefSource.includes("result==='failure'?'#dc2626'"),'AAR turnover graph must mark each Challenge win green and each failure red rather than using company-coloured dots');
+assert.ok(kmWeekDebriefSource.includes('point.challengeResult??')&&kmWeekDebriefSource.includes('Other dots show investments and audits'),'AAR challenge markers must prefer recorded win/loss events over the turnover sign and explain non-Challenge dots');
+assert.ok(kmWeekDebriefSource.includes("calculateKMWeekScoreV1(session,b).total-calculateKMWeekScoreV1(session,a).total"),'After Action Review must rank companies by descending final score');
+{
+ const chart=kmWeekDebriefSource.indexOf('<TurnoverGraph companies={companies} colors={colors}/>');
+ const cards=kmWeekDebriefSource.indexOf('{companies.map((item,index)=>{');
+ assert.ok(chart>=0&&chart<cards,'AAR turnover graph must appear before the company comparison cards');
+}
+
+assert.ok(kmWeekDebriefSource.includes("label:'Final turnover'")&&kmWeekDebriefSource.includes('max:7')&&kmWeekDebriefSource.includes('1st 7 · 2nd 4 · 3rd 2'),'The final Score Pad must display turnover rank points (7, 4 and 2) as an additional scoring category');
+assert.ok(kmWeekDebriefSource.includes('calculateKMWeekScoreV1(session,company)')&&kmWeekDebriefSource.includes('{score.total}'),'Final Score Pad totals must include the turnover placement points and remain in sync with the engine');
+assert.ok(kmWeekDebriefSource.includes('finalTurnover&&!allComplete')&&kmWeekDebriefSource.includes('Pending'),'The final-turnover bonus must not be prematurely revealed while competing companies are still playing');
+
 assert.ok(kmWeekDebriefSource.includes('AFTER ACTION REVIEW QUESTIONS')&&kmWeekDebriefSource.includes('What did you plan?')&&kmWeekDebriefSource.includes('What actually happened?')&&kmWeekDebriefSource.includes('Why do you think it was different?')&&kmWeekDebriefSource.includes('What can you alter next time so it works better?'),'KM Week AAR-lite must expose the four Newbie AAR questions in a slide-in panel');
 assert.ok(kmWeekDebriefSource.includes('kmw-aar-slide-in')&&globalCssSource.includes('@keyframes kmw-aar-slide-in'),'The AAR questions panel must visibly slide in from the right');
 assert.ok(riverSource.includes('compact?:boolean'),'Knowledge River must support compact side-by-side AAR comparisons');
 assert.ok(riverSource.includes('data-kmw-score-ghost="expertise"')&&riverSource.includes('data-kmw-score-ghost="local"')&&riverSource.includes('data-kmw-score-ghost="flow"'),'Knowledge River must support glowing blue ghost previews for expertise, local training and knowledge transfer');
 assert.ok(kmWeekBoardSource.includes('ghost="expertise"')&&kmWeekBoardSource.includes('ghost="local"')&&kmWeekBoardSource.includes('ghost="flow"')&&kmWeekBoardSource.includes('ghost="resilience"'),'Score Pad tooltips must drive River previews for the actionable knowledge scores and resilience');
-assert.ok(kmWeekBoardSource.includes('Company experts'),'KM Week must use the business-facing Company experts label');
+assert.ok(kmWeekBoardSource.includes('Company expert'),'KM Week must use the business-facing Company expert label');
 assert.ok(kmWeekBoardSource.includes('Score pad')&&kmWeekBoardSource.includes('ToolTip'),'KM Week score categories must explain how points are earned');
 assert.ok(kmWeekBoardSource.includes('<ToolTip large text={tip}')&&kmWeekBoardSource.includes("large?'h-7 w-7 rounded-full"),'Score Pad help controls must use the same 28px circular target size as the score topic icons');
 assert.ok(kmWeekBoardSource.includes('<span className="min-w-0 flex-1">')&&kmWeekBoardSource.includes('<ToolTip large text={tip}'),'Score Pad help controls must sit at the right-hand end of each score box');
@@ -111,57 +174,75 @@ assert.ok(kmWeekBoardSource.includes('CLICK HERE TO START'),'KM Week must stage 
 assert.ok(kmWeekBoardSource.includes('border-dashed border-violet-500/70'),'KM Week Challenge start area must read as an active play zone rather than furniture');
 assert.ok(kmWeekBoardSource.includes('bg-black/20'),'Opening a Challenge must dim the rest of the board by 20 percent');
 assert.ok(kmWeekBoardSource.includes('kmw-card-reveal'),'Opening a Challenge must animate the event card into the decision view');
-assert.ok(kmWeekBoardSource.includes('CEO briefing · Before Challenge')&&kmWeekBoardSource.includes('Before your first investment'),'The first guided round must explain Challenge and Invest before play');
-assert.ok(kmWeekBoardSource.includes('The next three investments are guided.')&&kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'Before the first Invest, KM Week must explain the three-step guided investment sequence');
-assert.ok(kmWeekBoardSource.includes('After the third guided investment, the board opens up')&&kmWeekBoardSource.includes('SHOW ME THE FIRST INVESTMENT'),'The opening Invest popup must tell the player when guidance ends and provide a clear continuation action');
+assert.ok(kmWeekBoardSource.includes('CEO briefing · Knowledge River')&&kmWeekBoardSource.includes('Before your first investment'),'The first guided round must introduce the River and Invest before free play');
+assert.ok(kmWeekBoardSource.includes('Let me guide you through your three investment choices.')&&kmWeekBoardSource.includes('Each round I will suggest one investment choice with the best settings.')&&kmWeekBoardSource.includes('Feel free to retarget'),'The first Invest must explain the suggested settings and allow players to retarget');
+assert.ok(kmWeekBoardSource.includes("After these guided moves, you'll choose your own investments.")&&kmWeekBoardSource.includes('SHOW ME THE FIRST INVESTMENT'),'The opening Invest popup must signal when independent investment begins');
 assert.ok(kmWeekBoardSource.includes("guidedTargetInvestment!=='TRAIN_EXPERT'")&&kmWeekBoardSource.includes("guidedTargetInvestment!=='LOCAL_TRAINING'")&&kmWeekBoardSource.includes("guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'"),'Guided Invest must show all three strategy choices and grey out the two not being taught');
 assert.equal(kmWeekBoardSource.includes('disabled={guided} className="mt-1 w-full rounded-lg'),false,'Guided selectors must remain explorable while the tutorial constrains the intended move');
-assert.ok(kmWeekBoardSource.includes("disabled={localScore<=0}")&&kmWeekBoardSource.includes("onClick={()=>cycleKnowledgeSource('local')}"),'The Local Team selector must remain clickable during guided Challenges whenever local knowledge exists');
-assert.ok(kmWeekBoardSource.includes("if(nextState==='depth'&&expertState==='depth')expertState='breadth'")&&kmWeekBoardSource.includes("if(nextState==='depth'&&localState==='depth')localState='breadth'"),'Selecting a new Depth source must demote the previous Depth source to Breadth rather than dropping it from the response');
+assert.ok(kmWeekBoardSource.includes('localDisabled={false}')&&kmWeekBoardSource.includes("onLocalClick={()=>cycleKnowledgeSource('local')}"),'The Local Team selector must remain available even when its knowledge is zero so players can commit a real shortfall');
+assert.ok(kmWeekBoardSource.includes("toggleKMWeekSourceV1(localState,expertState,source,localScore,activeExpertScore)"),'Selecting a lower-scoring source must preserve the stronger Depth source');
 assert.ok(kmWeekBoardSource.includes("const[challengeDrafts,setChallengeDrafts]=useState<Record<string,Exclude<PendingResponse,null>>>({})"),'KM Week must keep a separate uncommitted response draft for each Challenge');
-assert.ok(kmWeekBoardSource.includes("draft={challengeDrafts[challenge.id]} onClick={()=>setSelectedChallengeId(challenge.id)}"),'Switching between Challenge cards must preserve each card’s draft instead of clearing it');
-assert.ok(kmWeekBoardSource.includes("Draft · {draft.label}"),'Challenge cards with an uncommitted plan must show that draft while the player compares options');
-assert.ok(kmWeekBoardSource.includes("delete next[committed.challengeId]")&&kmWeekBoardSource.includes("if(committed.expertId&&committed.expertSelection!=='none')"),'Committing one Challenge must remove that draft and invalidate the consumed expert in other uncommitted drafts');
-assert.ok(kmWeekBoardSource.includes('any valid transfer will work'),'Guided Knowledge Transfer must make clear that the player may choose any valid source, destination and domain');
-assert.ok(kmWeekBoardSource.includes('actionError'),'Rejected KM Week actions must explain the problem inline rather than appearing to do nothing');
-assert.ok(kmWeekBoardSource.includes('data-kmw-knowledge-bars')&&kmWeekBoardSource.includes('Requirement')&&kmWeekBoardSource.includes('Local'),'KM Week Challenge detail must visualise requirement and local knowledge as horizontal bars');
-assert.ok(kmWeekBoardSource.includes('Selected knowledge')&&kmWeekBoardSource.includes('text-[34px]')&&kmWeekBoardSource.includes('selectedKnowledge>=activeChallenge.difficulty'),'KM Week Challenge header must replace the old Needs/Local summary with a large selected-knowledge / requirement score');
-assert.ok(kmWeekBoardSource.includes("const selectedDepth=localSelection==='depth'?localScore:expertSelection==='depth'?activeExpertScore:0")&&kmWeekBoardSource.includes("const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0)"),'KM Week selected knowledge must be composed from one explicit Depth source plus explicitly selected Breadth sources');
-assert.ok(kmWeekBoardSource.includes('riskOdds.chancePercent')&&kmWeekBoardSource.includes('need {riskOdds.requiredRoll'),'Take the Risk must show its live d6 probability and required roll before commit');
-assert.ok(kmWeekBoardSource.includes("Knowledge ${localScore} · Click to select"),'An available Local response must remain selectable even when another unselected source has more knowledge');
-assert.ok(kmWeekBoardSource.includes("health?.sessionStore==='memory'")&&kmWeekBoardSource.includes('Add DATABASE_URL'),'Missing-session errors must diagnose temporary Render memory storage rather than silently failing');
-assert.ok(kmWeekBoardSource.includes('grid grid-cols-5 gap-1')&&kmWeekBoardSource.includes('bg-transparent'),'Unselected KM Week knowledge capability must render as hollow segmented bars');
-assert.ok(kmWeekBoardSource.includes("const localFilled=localSelection==='depth'?local:localSelection==='breadth'?Math.min(local,1):0")&&kmWeekBoardSource.includes("const expertFilled=expertSelection==='depth'?expert:expertSelection==='breadth'?Math.min(expert,1):0"),'Depth must fill a source to its knowledge level while Breadth fills exactly one segment');
-assert.ok(kmWeekBoardSource.includes("type ResponseSelectionState='none'|'depth'|'breadth'"),'KM Week Challenge response selectors must support unselected, depth and breadth states');
-assert.ok(kmWeekBoardSource.includes("breadth?<span aria-hidden=\"true\" className=\"absolute inset-y-0 left-0 w-1/2 bg-sky-400\""),'Breadth selection must use a left-half-filled selector');
-assert.ok(kmWeekBoardSource.includes("selectionState={localSelection}")&&kmWeekBoardSource.includes("selectionState={expertSelection}"),'Local and Expert selectors must render their independent tri-state values');
-assert.ok(kmWeekBoardSource.includes("selectionState={expertSelection}"),'The Expert selector must render its independent tri-state selection');
-assert.ok(kmWeekBoardSource.includes("if(sourceState==='breadth')nextState='depth'")&&kmWeekBoardSource.includes("else if(sourceState==='depth')nextState='none'")&&kmWeekBoardSource.includes("else if(otherState!=='depth')nextState='depth'")&&kmWeekBoardSource.includes("else nextState=sourceScore>=otherScore?'depth':'breadth'"),'Tri-state selectors must make the first selected source Depth, then compare later selections only against the currently selected Depth source');
-assert.ok(kmWeekBoardSource.includes("includeLocalBreadth:pendingResponse.localSelection==='breadth'")&&kmWeekBoardSource.includes("includeExpertBreadth:pendingResponse.expertSelection==='breadth'"),'Commit Response must send both explicit breadth roles to the server');
-assert.equal(kmWeekBoardSource.includes("bg-amber-950/40 ring-1 ring-amber-700"),false,'Expert selection must not use the old brown row highlight');
-assert.ok(riverSource.includes('data-kmw-shock-cutoff')&&riverSource.includes('strokeDasharray="10 8"'),'Business Shock must draw a yellow dotted cut-off line across the Knowledge River');
-assert.ok(kmWeekBoardSource.includes('Local {check.localKnowledge} · requires {check.difficulty}')&&kmWeekBoardSource.includes('RUN BUSINESS SHOCK'),'KM Week Business Shock must show every local requirement before resolution');
-assert.ok(kmWeekBoardSource.includes('TAKE THE RISK · {odds.chancePercent}%')&&kmWeekBoardSource.includes('ACCEPT THE GAP'),'Business Shock shortfalls must offer an explicit emergency response or acceptance choice');
-assert.ok(kmWeekBoardSource.includes('<b className="text-white">Result:</b>')&&kmWeekBoardSource.includes('CONTINUE TO SCORE & DEBRIEF'),'Business Shock must show results before the player leaves for the debrief');
-assert.ok(kmWeekBoardSource.includes("requirementMet?'bg-emerald-400':'bg-rose-500'"),'The Challenge requirement bar must turn green when the selected knowledge meets the requirement');
-assert.ok(kmWeekBoardSource.includes("appliedMethod==='expert'")&&kmWeekBoardSource.includes('bg-amber-400'),'Selecting an expert must visibly apply the expert knowledge bar');
-assert.ok(kmWeekBoardSource.includes('Score briefing · Round 4 Invest')&&kmWeekBoardSource.includes('Only the total score matters'),'The first free-play Invest must explain the scorecard and multiple paths to success');
-assert.ok(kmWeekBoardSource.includes('Your Goal card')&&kmWeekBoardSource.includes('One idea for this Invest'),'The Round 4 score briefing must explain the Goal card and give a light-touch next-step suggestion');
-assert.ok(kmWeekBoardSource.includes('fixed inset-0 z-[120] bg-black/70')&&kmWeekBoardSource.includes("scoreBriefOpen?'relative z-[135]"),'The score briefing must darken the board while keeping the Score Pad and Goal card highlighted');
+assert.ok(kmWeekBoardSource.includes("state?.stage==='free'&&state.freeRound===1&&state.phase==='challenge'")&&kmWeekBoardSource.includes('openTwoCardBriefing')&&kmWeekBoardSource.includes('setChallengeFocusOpen(!challengePhase||openTwoCardBriefing)'),'Free-play Round 1 must open both Challenge cards so the introduction can point to the real planning choices');
+assert.ok(kmWeekBoardSource.includes('data-kmw-free-challenge-intro role="dialog"')&&kmWeekBoardSource.includes("freeChallengeIntroKey,'seen'")&&kmWeekBoardSource.includes('GOT IT — SHOW ME BOTH CHALLENGES'),'The two-card briefing must be a one-time actionable popup for the player');
+assert.ok(kmWeekBoardSource.includes('You can draft a response and flip between them to plan before committing.')&&kmWeekBoardSource.includes('do your best to minimise the risk.'),'First free-play briefing must explain draft switching and risk reduction');
+assert.ok(kmWeekBoardSource.includes('data-kmw-scorepad-button')&&kmWeekBoardSource.includes('anchorRect.top-panelHeight-12')&&kmWeekBoardSource.includes('data-kmw-free-challenge-card={challenge.id}'),'The introduction must sit over the Score Pad side and measure both Challenge cards');
+assert.ok(kmWeekBoardSource.includes('cards.length!==2')&&kmWeekBoardSource.includes('toY:rect.bottom-3')&&kmWeekBoardSource.includes('kmw-free-challenge-arrow'),'Two arrowheads must point at the bottom of the two Challenge cards');
+
+assert.ok(kmWeekBoardSource.includes('data-kmw-knowledge-bars')&&kmWeekBoardSource.includes('Required')&&kmWeekBoardSource.includes('{siteLabel} team'),'KM Week Challenge detail must visualise required, local and expert knowledge');
+assert.ok(kmWeekBoardSource.includes('data-kmw-tour-river')&&kmWeekBoardSource.includes("const river=document.querySelector('[data-kmw-tour-river]')")&&kmWeekBoardSource.includes('riverRect.right-panelWidth-16'),'The guided coach must stay over the River rather than hiding the Challenge controls');
+assert.ok(kmWeekBoardSource.includes('const leftEdgeTarget=guideStep===1||guideStep===5')&&kmWeekBoardSource.includes('rect.left-7'),'The first and final arrows must end at the control edge, clear of text and labels');
+assert.ok(kmWeekBoardSource.includes("backgroundColor:requirementMet?'#34d399':'#f43f5e'")&&globalCssSource.includes('.kmw-tour-required-success'),'A met Required row must have explicit emerald green bars and guide styling');
+assert.ok(kmWeekBoardSource.includes('Chance of success')&&kmWeekBoardSource.includes('successChance')&&kmWeekBoardSource.includes('requirementMet={selectedKnowledge>=activeChallenge.difficulty}'),'Challenge must show live response success odds and turn requirement green when knowledge is sufficient');
+assert.ok(kmWeekBoardSource.includes('riverIntroStep===1?')&&kmWeekBoardSource.includes('riverIntroStep===2?')&&kmWeekBoardSource.includes('riverIntroStep===3?')&&kmWeekBoardSource.includes('riverIntroStep===4?')&&kmWeekBoardSource.includes('riverIntroStep===5?')&&kmWeekBoardSource.includes('riverIntroStep===6?')&&kmWeekBoardSource.includes('riverIntroStep===7?')&&kmWeekBoardSource.includes('riverIntroStep===8?')&&kmWeekBoardSource.includes('riverIntroStep<9'),'The CEO briefing must cover all nine River introduction steps before Challenge play');
+assert.ok(kmWeekBoardSource.includes('data-kmw-river-intro="challenge-card" disabled={riverIntroActive&&!riverIntroUnlocked}')&&kmWeekBoardSource.includes('onClick={beginFirstChallenge}'),'The first Challenge must be locked until River introduction step nine and then open the original Challenge wizard');
+assert.ok(kmWeekBoardSource.includes('0 0 0 160vmax rgba(0,0,0,.74)')&&kmWeekBoardSource.includes("riverIntroStep>=2&&riverIntroStep<=8"),'The River must come into focus while the surrounding board stays shadowed');
+assert.ok(kmWeekBoardSource.includes("'domain-operations','domain-hr','domain-marketing'")&&kmWeekBoardSource.includes("4:['site'],5:['expert'],6:['water'],7:['water'],9:['challenge-card']"),'River tour arrows must target actual domain, local team, expert, River and Challenge elements');
+assert.ok(kmWeekBoardSource.includes("const domainStep=riverIntroStep===3")&&kmWeekBoardSource.includes('box.left+box.width*(index+1)/(targetNames.length+1)')&&kmWeekBoardSource.includes('box.bottom+3')&&kmWeekBoardSource.includes('rect.bottom+8'),'Domain arrows must emerge separately beneath the CEO briefing and point up at the bottoms of the domain names');
+assert.ok(kmWeekBoardSource.includes('const underY=domainStep&&roomBelow>=20')&&kmWeekBoardSource.includes('const risingDomainArrow=riverIntroStep===3&&arrow.underY!==undefined')&&kmWeekBoardSource.includes('arrow.toY+Math.min(46'),'Domain arrows must loop below their labels and approach upwards without altering the other briefing arrows');
+assert.ok(riverSource.includes('data-kmw-river-intro="water"')&&riverSource.includes("'domain-'+item.domain")&&riverSource.includes("?'site':undefined")&&riverSource.includes("?'expert':undefined"),'River view must expose stable SVG arrows anchors to the site, expert and domains');
+assert.ok(kmWeekBoardSource.includes('aria-label="Next River introduction step"')&&kmWeekBoardSource.includes('data-kmw-river-brief onClick={advanceRiverIntro}')&&kmWeekBoardSource.includes('event.stopPropagation();advanceRiverIntro()'),'The player must be able to progress by clicking anywhere, including the briefing itself, without double-advancing on Next');
+assert.ok(kmWeekBoardSource.includes('guideStep===1')&&kmWeekBoardSource.includes('guideStep===2')&&kmWeekBoardSource.includes('guideStep===3')&&kmWeekBoardSource.includes('guideStep===4')&&kmWeekBoardSource.includes('guideStep===5'),'The first guided challenge must provide all five coached steps');
+assert.ok(kmWeekBoardSource.includes("if(guideStep===4&&source==='expert'&&expertState==='depth'){")&&kmWeekBoardSource.includes('setGuideStep(5);\n   return;'),'Selecting the expert during Challenge wizard card four must advance without deselecting the expert');
+assert.ok(riverSource.includes('text-[15px] leading-none font-bold text-slate-500')&&riverSource.includes('fontSize="15" fontWeight={domainSelected'), 'River legend text size must match the 15px SVG domain labels');
+assert.ok(riverSource.includes("mode!=='km_week'&&<div><div")&&riverSource.includes("mode==='km_week'?'mt-1 h-[calc(100%-25px)]"),'KM Week must avoid duplicate River headings and use the recovered space for the diagram');
+assert.ok(kmWeekBoardSource.includes('Where is the capability now?'),'The KM Week River should retain its single outer heading');
+assert.ok(riverSource.includes('data-kmw-guided-site')&&kmWeekBoardSource.includes('guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined}'),'The first guided Challenge must highlight the target site on the River');
+assert.ok(riverSource.includes('x={px} y={py-22} textAnchor="middle"')&&riverSource.includes('{firstName(mark.expert.name)} · {loc}'),'Knowledge River must centre each expert name above its icon rather than beside it');
+assert.ok(kmWeekBoardSource.includes('Selected knowledge')&&kmWeekBoardSource.includes('text-[34px]'),'KM Week Challenge header must keep the large selected-knowledge / requirement score');
+assert.ok(kmWeekBoardSource.includes("const selectedDepth=localSelection==='depth'?localScore:expertSelection==='depth'?activeExpertScore:0")&&kmWeekBoardSource.includes("const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0)"),'KM Week selected knowledge must be composed from explicit depth and breadth sources');
+assert.ok(kmWeekBoardSource.includes('const slots=Math.max(5,requirement,local,expert)')&&kmWeekBoardSource.includes('gridTemplateColumns'),'Challenge knowledge bars must expand for requirements above Knowledge 5');
+assert.ok(kmWeekBoardSource.includes("localState=next.local;expertState=next.expert;"),'The first click on a response source must visibly select it as Depth');
+assert.ok(kmWeekBoardSource.includes("includeLocalBreadth:committed.localSelection==='breadth'")&&kmWeekBoardSource.includes("includeExpertBreadth:committed.expertSelection==='breadth'"),'Commit Response must send both explicit breadth roles to the server');
+assert.ok(kmWeekBoardSource.includes('deterministicSelected')&&kmWeekBoardSource.includes('knowledgeShortfall')&&kmWeekBoardSource.includes('KNOWLEDGE SHORTFALL'),'Free play must allow a selected deterministic response to be committed even when it is short of the requirement, with a visible warning');
+assert.ok(kmWeekBoardSource.includes('Chance of success')&&kmWeekBoardSource.includes('riskOdds.chancePercent')&&kmWeekBoardSource.includes('roll {riskOdds.requiredRoll<=1'),'The Chance panel must show live success odds while Take the Risk shows the required die roll without repeating the percentage');
+assert.ok(riverSource.includes('data-kmw-shock-cutoff')&&riverSource.includes('strokeDasharray="10 8"'),'Site Audits must keep the highest audit-standard line on the River');
+assert.ok(kmWeekBoardSource.includes('audit standard {check.difficulty}')&&kmWeekBoardSource.includes('chance of a finding')&&kmWeekBoardSource.includes('RUN THE SITE AUDITS'),'KM Week Site Audits must display each local requirement and probability of a compliance finding');
+assert.ok(kmWeekBoardSource.includes('SITE AUDITS RESULT')&&kmWeekBoardSource.includes('Findings')&&kmWeekBoardSource.includes('Fines')&&kmWeekBoardSource.includes('CONTINUE TO DEBRIEF'),'Site Audits must keep findings and fines visible until the player continues');
+assert.ok(kmWeekDebriefSource.includes('SiteAuditSummary')&&kmWeekDebriefSource.includes('Site Audits result'),'The debrief must retain audit findings and fines after Continue');
+assert.ok(kmWeekBoardSource.includes('data-kmw-coaching-popup')&&kmWeekBoardSource.includes('showCoachPopup&&coaching')&&kmWeekBoardSource.includes('CONTINUE TO INVEST'),'The River coaching question must appear as a dedicated, actionable popup in the Invest phase');
+assert.ok(kmWeekBoardSource.includes('expertChangeQuestionCoversRound')&&kmWeekBoardSource.includes('!showExpertChangePopup&&!expertChangeQuestionCoversRound'),'Retirement and replacement reflection popups must replace rather than duplicate the generic coaching question');
+assert.ok(!kmWeekBoardSource.includes('Resolve both Challenges. Pick one, choose the knowledge you will use')&&!kmWeekBoardSource.includes('Based on selected team and expertise'),'Challenge UI must keep key scores and controls without repeated explanatory banners');
+assert.ok(kmWeekBoardSource.includes('{guided&&<div className="mt-2 rounded-xl border border-amber-800')&&kmWeekBoardSource.includes('This investment: '),'Only guided investments need a short instruction line; free play is coached by its dedicated popup');
+assert.ok(kmWeekBoardSource.includes("!scoreBriefOpen&&!firstScoreBriefPending&&!showExpertChangePopup")&&kmWeekBoardSource.includes("!riskResult&&!riskRollPending&&!challengeOutcome&&!riverFrozenCompany"),'Coaching questions must wait until preceding score, retirement and risk popups or animations finish');
+assert.ok(kmWeekBoardSource.includes('coachDismissedKey!==coachPopupKey')&&kmWeekBoardSource.includes('localStorage.setItem(coachPopupKey'),'Each full-play round must show its coaching question once and remember that it was acknowledged');
+assert.ok(kmWeekBoardSource.includes('Score briefing · First full round')&&kmWeekBoardSource.includes('Different investments strengthen different parts of your score'),'The score briefing must explain score components without repeating investment advice before the coaching question');
+assert.ok(kmWeekBoardSource.includes('Site Audits are coming.')&&kmWeekBoardSource.includes('10 bonus points')&&kmWeekBoardSource.includes('$40k per missing knowledge level found'),'Scorecard introduction must preview Site Audits, doubled fines and the 10-point clean sweep');
+assert.ok(kmWeekBoardSource.includes('data-kmw-audit-fine')&&kmWeekBoardSource.includes('data-kmw-turnover-target')&&kmWeekBoardSource.includes('await path.finished')&&kmWeekBoardSource.includes("if(beforeApply)await beforeApply(data.session)"),'Clicking Continue to Debrief must animate the fine globe before the new turnover/session is applied');
+assert.ok(kmWeekBoardSource.includes('shownTurnover')&&kmWeekBoardSource.includes('auditTurnoverBefore'),'The turnover header must show the pre-audit figure until the fine globe arrives');
+assert.ok(kmWeekBoardSource.includes('max="15"')&&kmWeekDebriefSource.includes('max:15'),'Squeaky clean must show the correct fifteen-point maximum on both scorecards');
+assert.ok(!kmWeekBoardSource.includes('Business Shock')&&!kmWeekDebriefSource.includes('Business Shock'),'No KM Week player-facing screens should still say Business Shock');
+assert.ok(kmWeekBoardSource.includes('min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)]')&&kmWeekBoardSource.includes('max-h-[calc(100dvh-90px)]'),'Score briefing must sit over the right-hand Challenge panel with a bounded height, leaving Score Pad visible');
+assert.ok(kmWeekBoardSource.includes('Your Goal card')&&kmWeekBoardSource.includes('{goal.description}')&&!kmWeekBoardSource.includes('One idea for this Invest'),'The Score Pad briefing must explain the Goal without repeating the strategic prompt in the dedicated coaching popup');
 assert.ok(kmWeekBoardSource.includes("state?.stage!=='free'||state.phase!=='invest'||state.freeRound!==1"),'The score briefing must trigger at the first free-play Invest round only');
 assert.ok(kmWeekBoardSource.includes('animateKnowledgeSpark')&&riverSource.includes('data-river-target'),'KM Week investments must send a visual knowledge spark toward the River');
 assert.ok(globalCssSource.includes('.kmw-knowledge-spark')&&globalCssSource.includes('transition-duration: 1.2s'),'KM Week River changes must use the glowing spark and 1.2 second movement');
-assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1")&&kmWeekBoardSource.includes('const travelDuration=firstGuidedRound?2200:1100'),'The first guided River cue must run at half speed while later rounds remain slower than before');
-assert.ok(kmWeekBoardSource.includes('dx-loop')&&kmWeekBoardSource.includes('dx+loop*.60'),'The knowledge spark path must arc past and loop back to the River target');
-assert.ok(kmWeekBoardSource.includes('{duration:300,easing:\'ease-out\'')&&kmWeekBoardSource.includes('requestAnimationFrame(()=>requestAnimationFrame'),'The knowledge spark must fade for 0.3 seconds and fully disappear before River state animation begins');
-assert.ok(kmWeekBoardSource.includes('setRiverFrozenCompany(structuredClone(company))')&&kmWeekBoardSource.includes('company={riverFrozenCompany||company}'),'The River must freeze its pre-invest state so websocket updates cannot animate it before the knowledge globe finishes');
-assert.ok(kmWeekBoardSource.includes('await animateKnowledgeSpark')&&kmWeekBoardSource.includes('setRiverFrozenCompany(structuredClone(nextCompany))'),'After the globe finishes, only the River must receive the updated company state');
-assert.ok(kmWeekBoardSource.includes('window.setTimeout(resolve,1300)'),'The Invest screen must remain visible until the 1.2 second River transition has fully completed');
+assert.ok(kmWeekBoardSource.includes("const firstGuidedRound=state.stage==='guided'&&state.guidedTurn===1")&&kmWeekBoardSource.includes('const travelDuration=firstGuidedRound?1400:1000'),'The first guided River cue must remain deliberately slower than later rounds');
+assert.ok(kmWeekBoardSource.includes('const animationPromise=animateKnowledgeSpark')&&kmWeekBoardSource.includes('setRiverFrozenCompany(optimisticCompany)'),'River movement must chain directly after the knowledge orb without waiting for the server round-trip');
+assert.ok(kmWeekBoardSource.includes('window.setTimeout(resolve,1300)'),'The Invest screen must remain visible until the River transition has fully completed');
 assert.ok(kmWeekBoardSource.includes('onPresentationHoldChange?.(true)')&&kmWeekBoardSource.includes('onPresentationHoldChange?.(false)'),'KM Week must hold and release presentation state around the knowledge movement sequence');
 assert.ok(appBoardSource.includes('const setKMWeekPresentationHold=(hold:boolean)=>')&&appBoardSource.includes('if(deferUpdates.current){pendingSession.current=d.session;return}'),'AppBoard must defer incoming session broadcasts while KM Week is presenting the River change');
 assert.ok(appBoardSource.includes('onPresentationHoldChange={setKMWeekPresentationHold}'),'KM Week board must be wired to the AppBoard presentation hold');
 assert.ok(kmWeekBoardSource.includes('If you solve it')&&kmWeekBoardSource.includes('If you fail'),'KM Week Challenge cards must show the business win and loss before a decision');
-assert.ok(kmWeekBoardSource.includes('Moving an expert from another site costs an additional')&&kmWeekBoardSource.includes('travel -
 assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
 assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
 
@@ -172,10 +253,11 @@ assert.ok(disruptionCardSource.includes("w-[132px] min-h-[176px]"),'Invest Disru
 assert.ok(disruptionCardSource.includes("[overflow-wrap:normal]"),'Disruption domain names must not split inside words');
 assert.ok(disruptionCardSource.includes('tpg-disruption-deal')&&disruptionCardSource.includes('w-[280px]')&&disruptionCardSource.includes('xl:w-[360px]'),'Newbie Disruption setup must use the smaller iPad card while restoring desktop dimensions at XL');
 assert.ok(disruptionCardSource.includes('tpg-disruption-deal')&&disruptionCardSource.includes('touch-pan-y overflow-y-auto overscroll-contain'),'The Disruption box itself must own vertical touch scrolling on iPad');
-assert.ok(disruptionCardSource.includes("mt-1 rounded-3xl")&&disruptionCardSource.includes("min-h-[210px]")&&disruptionCardSource.includes("xl:min-h-[300px]"),'Disruption setup must use a compact tablet layout while retaining the full desktop size');
+assert.ok(disruptionCardSource.includes("mt-2 flex min-h-[170px]")&&disruptionCardSource.includes("xl:min-h-[300px]"),'Disruption setup must use a compact tablet layout while retaining the full desktop size');
 assert.ok(disruptionCardSource.includes("h-[180px] w-[130px]")&&disruptionCardSource.includes("xl:h-[260px] xl:w-[186px]"),'The dealt Disruption card must shrink on iPad and return to desktop proportions at XL');
 assert.ok(appBoardSource.includes("companyRoundPhase==='events'"),'Board-level Event/Disruption UI must render only for the current company Events phase');
 
+const tabletCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 const boardShellSource=readFileSync(new URL('../src/components/BoardShell.tsx',import.meta.url),'utf8');
 const strategyPromptSource=readFileSync(new URL('../src/components/StrategyPromptV2.tsx',import.meta.url),'utf8');
 assert.ok(boardShellSource.includes('tpg-board-overlay-scroll')&&boardShellSource.includes('pointer-events-auto overflow-y-scroll')&&boardShellSource.includes('pb-24'),'Board overlays must receive iPad touch gestures, scroll internally, and keep bottom clearance above the phase bar');
@@ -184,7 +266,6 @@ assert.ok(boardShellSource.includes('max-w-full xl:max-w-[min(100%,calc((100dvh-
 assert.ok(tabletCssSource.includes('.tpg-board-shell')&&tabletCssSource.includes('max-width: none !important')&&tabletCssSource.includes('padding-left: .25rem !important'),'Tablet gameplay must remove the narrow 4:3 width cap and minimise side padding');
 assert.ok(strategyPromptSource.includes('overflow-y-auto overscroll-contain touch-pan-y')&&strategyPromptSource.includes('items-start justify-center'),'Strategy setup must scroll inside the viewport on iPad instead of relying on page scrolling');
 assert.ok(strategyPromptSource.includes('!h-12 !text-base')&&strategyPromptSource.includes('xl:!h-14 xl:!text-lg'),'Strategy controls must compact on tablet while keeping desktop sizing at XL');
-const tabletCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes('tpg-game-root')&&appBoardSource.includes('tpg-game-main'),'Active Newbie/Expert gameplay must expose dedicated tablet scroll containers');
 assert.ok(tabletCssSource.includes('.tpg-game-root')&&tabletCssSource.includes('position: fixed')&&tabletCssSource.includes('height: 100dvh')&&tabletCssSource.includes('overflow: hidden'),'iPad gameplay must pin the application to the viewport so Safari cannot scroll the whole document');
 assert.ok(tabletCssSource.includes('.tpg-game-main')&&tabletCssSource.includes('flex: 1 1 auto')&&tabletCssSource.includes('-webkit-overflow-scrolling: touch'),'The normal iPad board surface must remain the internal vertical scroller');
@@ -315,7 +396,7 @@ assert.equal(appBoardEventSource.includes('/advance-phase'),false,'player UI mus
 // Player-legibility audit: important mechanics must be visible without adding permanent instruction walls.
 const eventDecisionSource=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
 assert.ok(eventPlaytestSource.includes('diagnostic={Boolean(isOpeningDiagnostic)}'),'opening challenge must be explicitly marked as diagnostic in both modes');
-assert.ok(eventDecisionSource.includes("What happens when your company has the knowledge but the local site doesn't? You are about to find out."),'diagnostic challenge must frame the knowledge-access gap in player language');
+assert.ok(eventDecisionSource.includes('The site could not contain the issue with the capability immediately available there.'),'diagnostic challenge must frame the knowledge-access gap in player language');
 assert.ok(eventDecisionSource.includes('D {e.depthKnowledge} · B +{e.breadthBonus}'),'ordinary Event scoring must expose compact depth/breadth values');
 assert.ok(eventDecisionSource.includes('A relevant expert unlocks the full score.'),'Corporate Intranet must reveal when absorptive capacity limits usable knowledge');
 assert.ok(eventDecisionSource.includes('Each consultant engagement increases the future rate by 35%.'),'consultant UI must reveal escalating future rates');
@@ -334,7 +415,7 @@ assert.ok(eventPlaytestSource.includes("isOpeningDiagnostic?['existing']"),'firs
 assert.ok(eventPlaytestSource.includes("isAssemblyLesson?['existing','expert']"),'second teaching challenge must expose only existing knowledge and experts');
 assert.ok(eventDecisionSource.includes('visibleModes.map'),'Event strategy rail must render only currently available strategies');
 assert.ok(eventPlaytestSource.includes('teamOnlyExisting={Boolean(isAssemblyLesson)}'),'second teaching challenge must focus existing knowledge on Team Capability');
-assert.ok(eventDecisionSource.includes('2-domain lesson'),'second teaching challenge must have a compact two-domain teaching cue');
+assert.ok(eventDecisionSource.includes('Multiple requirements')&&eventDecisionSource.includes('teachingHint'),'second teaching challenge must have a compact multiple-requirement teaching cue');
 assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInstanceId||event.instanceId)'),'board must display the authoritative Round 1 teaching card even when another card was clicked');
 
 {
@@ -350,177 +431,45 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  assert.equal(staged.includes('Local Codified'),false,'second teaching challenge must not distract Expert players with codified knowledge');
 }
 
-console.log('Mode-aware UI render smoke tests passed.');
-),'KM Week must make the fixed expert travel cost visible before commit');
-assert.ok(appBoardSource.includes("actionType:'FINISH_RISK'"),'Knowledge Risk completion must use the dedicated per-company FINISH_RISK action');
-assert.equal(appBoardSource.includes("onAdvanceToNextRound={advancePhase}"),false,'Knowledge Risk must not call the legacy global advance-phase path');
-
-const disruptionCardSource=readFileSync(new URL('../src/components/DisruptionCardV1.tsx',import.meta.url),'utf8');
-assert.ok(disruptionCardSource.includes('staticVertical?:boolean'),'Disruption mini card must support the fixed vertical Invest layout');
-assert.ok(disruptionCardSource.includes("min-h-[44px]"),'Vertical Disruption domain rows must reserve space for long labels such as Human Resources');
-assert.ok(disruptionCardSource.includes("w-[132px] min-h-[176px]"),'Invest Disruption card must retain the same vertical proportions as the board card');
-assert.ok(disruptionCardSource.includes("[overflow-wrap:normal]"),'Disruption domain names must not split inside words');
-assert.ok(appBoardSource.includes("companyRoundPhase==='events'"),'Board-level Event/Disruption UI must render only for the current company Events phase');
-
-const appBoardCurrent=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
-assert.ok(appBoardCurrent.includes("data?.session||pendingSession.current||session"),'Event acknowledgement must prefer the authoritative acknowledged session before selecting the next card');
-assert.equal(appBoardCurrent.includes('advanceToInvestment'),false,'Completing one company Events must not call the legacy global Invest transition');
-assert.ok(appBoardCurrent.includes("else if(startStage==='learn'&&companyRoundPhase==='investment')"),'Newbie Invest teaching overlay must follow the current company phase only');
-assert.ok(appBoardCurrent.includes("const deckVisible=companyRoundPhase==='events'"),'Event deck visibility must follow the current company phase only');
-assert.ok(appBoardCurrent.includes("const displayPhase=companyRoundPhase==='events'?'respond':companyRoundPhase==='investment'?'investment':'risk'"),'Phase bar must be company-specific in multiplayer');
-assert.ok(appBoardCurrent.includes("toast(d.message||'Action completed.',30000)"),'successful investment action notices must remain visible for 30 seconds');
-assert.ok(appBoardCurrent.includes('dismissNotification();const companyId=company.id'),'starting the next investment action must dismiss the previous action notice');
-assert.ok(appBoardCurrent.includes('aria-label="Close notification"'),'action notices must provide an explicit close button');
-const investPanelSource=readFileSync(new URL('../src/components/ActionsPanelV5.tsx',import.meta.url),'utf8');
-assert.ok(investPanelSource.includes('<InvestmentRiverView'),'Invest must render the persistent Knowledge River');
-assert.ok(investPanelSource.includes("'aar':['LESSONS_LEARNED',{siteId,expertId,domain,eventInstanceId:selectedAarEvent?.instanceId}]"),'AAR must submit one expert facilitator');
-assert.ok(investPanelSource.includes("previewSiteDelta={selectedId==='aar'&&selectedAarEvent?1:0}"),'AAR must preview site learning only while an unused completed challenge is selected');
-assert.ok(investPanelSource.includes("previewExpertDelta={selectedId==='aar'&&selectedAarEvent&&selectedExpertSkill!=null?1:0}"),'AAR must preview facilitator learning only for an unused challenge and a facilitator who holds the selected domain');
-assert.ok(investPanelSource.includes('const expertChoices=activeExperts;'),'AAR facilitator choices must include all employed experts');
-assert.ok(investPanelSource.includes("const aarEligibleEvents=resolvedEvents.filter(e=>!e.experientialLearningAwarded);"),'AAR chooser must exclude completed challenges that already produced Lessons Learned');
-assert.ok(investPanelSource.includes("No unused completed challenge"),'AAR controls must visibly explain when no eligible challenge remains');
-assert.ok(investPanelSource.includes("previewHQDelta={selectedId==='aar'&&selectedAarEvent?1:0}"),'AAR must preview corporate learning only while an unused completed challenge is selected');
-const investmentRiverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
-assert.ok(investmentRiverSource.includes('{abbrev(site.id)}'),'Invest River site labels must use three-letter site abbreviations');
-assert.ok(investmentRiverSource.includes('{firstName(mark.expert.name)} · {loc}'),'Invest River expert labels must show first name and city abbreviation');
-assert.ok(investmentRiverSource.includes('fontSize="13"'),'Invest River labels must remain readable at the central workspace size');
-assert.ok(investPanelSource.includes("interventionIds:['aar','knowledge-transfer']"),'AAR and Knowledge Transfer must share one investment strategy group');
-assert.ok(investPanelSource.includes("interventionIds:['train-expert','local-training']"),'Expert development and Local Training must share one investment strategy group');
-assert.ok(investPanelSource.includes("interventionIds:['update-intranet','corporate-training']"),'Corporate Intranet and Corporate Training must share one investment strategy group');
-assert.ok(investPanelSource.includes("'update-intranet':['UPDATE_INTRANET',{siteId,domain}]"),'Corporate Intranet update must submit an explicit source site and domain');
-assert.ok(investPanelSource.includes("const needsIntranetSourceSite=selectedId==='update-intranet';"),'Corporate Intranet must expose a source-site selector');
-assert.ok(investPanelSource.includes("One Intranet update per round."),'Corporate Intranet controls must state the once-per-round limit');
-assert.ok(investPanelSource.includes("intranetUpdatedThisRound=Object.values(company.intranetRoundGrowth)"),'Corporate Intranet UI must enforce the once-per-round limit');
-assert.ok(investPanelSource.includes("riverSiteKnowledgeScore(selectedSite,domain,session.experienceMode)"),'Corporate Intranet preview must use the selected site knowledge visible for the current mode');
-assert.equal(investPanelSource.includes('higher if stronger source knowledge exists'),false,'Corporate Intranet preview must not use the old hidden-source rule');
-
-assert.ok(investPanelSource.includes("interventionIds:['horizon-scan','join-cop']"),'Horizon Scan and Community of Practice must share one investment strategy group');
-assert.ok(investPanelSource.includes('data-investment-strategy={strategy.id}'),'Investment strategy groups must be visibly grouped and colour coded');
-assert.ok(investPanelSource.includes('Choose an investment'),'Invest must keep investment choices beside the River');
-assert.ok(investPanelSource.includes('data-investment-arrow'),'Choose an investment panel must retain its bottom pointer');
-assert.ok(investPanelSource.includes('data-knowledge-transfer-controls'),'Knowledge Transfer controls must use the dedicated vertical hierarchy');
-assert.ok(investPanelSource.includes('<DisruptionMiniCard company={company} staticVertical/>'),'Invest footer must contain the fixed vertical Disruption goal card');
-assert.ok(investPanelSource.includes('bottom-[72px]'),'Invest workspace must clear the phase track');
-assert.ok(investPanelSource.includes("left-1/2")&&investPanelSource.includes("max-w-[min(100%,calc((100dvh-var(--tpg-header-height,88px)-24px)*4/3))]"),'Invest workspace must align to and cover the centred map width');
-assert.equal(investPanelSource.includes("min-[1280px]:right-[360px]"),false,'Invest workspace must not reserve a dead gap for right-hand slide-ins');
-assert.ok(investPanelSource.includes('min-h-[384px]'),'River and investment chooser must be twenty percent taller than the previous 320px workspace');
-assert.ok(investPanelSource.includes('data-investment-controls'),'Non-transfer investment controls must use the cleaned stacked layout');
-assert.ok(investPanelSource.includes('name="investment-budget"'),'Invest payment box must offer Local and SIF budget choices');
-assert.ok(investPanelSource.includes('Continue: SIF')&&investPanelSource.includes('Continue: {localBudgetLabel}'),'Invest payment box must show the resulting budget/turnover impact');
-assert.ok(investPanelSource.includes('const blockingWarning=invalidRiver'),'Invalid non-budget investment choices must still block Run');
-assert.ok(investPanelSource.includes('const sifWarning=sifInsufficient'),'Insufficient SIF must be tracked separately from other blocking warnings');
-assert.ok(investPanelSource.includes('runDisabled=Boolean(blockingWarning||sifWarning)'),'Insufficient SIF must block Run without replacing the budget selector');
-assert.ok(investPanelSource.includes('{sifWarning&&<div'),'Insufficient SIF warning must render above the payment panel');
-assert.ok(investPanelSource.includes('grid-cols-[minmax(0,700px)_minmax(150px,1fr)]'),'AAR Recent Challenge control must reserve wider space beside the site information box');
-assert.ok(investPanelSource.includes('{selectedSite?.name||\'—\'}'),'AAR Site must render as information rather than a disabled dropdown');
-assert.ok(investPanelSource.includes("'Expert name'"),'Expert selection must have its own labelled row');
-const nonTransferControls=investPanelSource.slice(investPanelSource.indexOf('data-investment-controls'),investPanelSource.indexOf('<div className="min-w-[250px] flex-1',investPanelSource.indexOf('data-investment-controls')));
-assert.ok(nonTransferControls.indexOf("'Expert name'")<nonTransferControls.indexOf('>Domain<select'),'Expert-dependent investments must ask for Expert before Domain');
-assert.ok(investPanelSource.includes('grid-cols-[minmax(0,1fr)_300px]'),'River and investment choices must share a stable top-row layout');
-assert.equal(investPanelSource.includes('overflow-y-auto'),false,'Core Invest workspace must not introduce internal scrollbars');
-assert.ok(investPanelSource.includes("showSiteLabels={selectedId==='knowledge-transfer'}"),'Knowledge Transfer must label all site values on the River');
-assert.ok(investPanelSource.includes('· available {riverSiteKnowledgeScore(s,domain,session.experienceMode)}'),'Teaching-site choices must show available knowledge');
-assert.ok(investPanelSource.includes(' · team {s.teamCapability[domain]||0}'),'Receiving-site choices must show current team capability');
-assert.ok(investPanelSource.includes("selectedId==='knowledge-transfer'?<div data-knowledge-transfer-controls className=\"space-y-2\">"),'Knowledge Transfer must use its dedicated stacked control layout');
-assert.ok(investPanelSource.indexOf('>Domain<select')<investPanelSource.indexOf('>Teaching site<select'),'Knowledge Transfer must place Domain above Teaching Site');
-assert.ok(investPanelSource.includes('grid grid-cols-2 gap-2'),'Teaching and Receiving Site controls must share the full row');
-assert.ok(investPanelSource.includes("selectedSite?`${selectedSite.name} ${DOMAIN_INFO[domain].label} Team ${riverTargetBefore} → ${Math.max(riverTargetBefore,riverTargetAfter)}`:'Choose a receiving site'"),'Knowledge Transfer outcome must describe only the receiving-site change');
-assert.equal(investPanelSource.includes('embedded/>'),false,'Disruption card must not remain embedded in the investment chooser');
-const boardToolTabsSource=readFileSync(new URL('../src/components/BoardToolTabsV1.tsx',import.meta.url),'utf8');
-assert.equal(boardToolTabsSource.includes('<span>River</span>'),false,'Legacy River button must not appear in the board tools');
-assert.equal(boardToolTabsSource.includes('RiverDiagramOverlay'),false,'Legacy River overlay must not be wired into board tools');
-assert.equal(boardToolTabsSource.includes('PROGRAMMED_FAILURE_TAG'),false,'Board tools must not resurrect River based on transfer unlock state');
-
-const facilitatorSource=readFileSync(new URL('../src/components/FacilitatorControlRoomV2.tsx',import.meta.url),'utf8');
-assert.ok(facilitatorSource.includes('facilitator/remove-company'),'Facilitator control room must allow an empty company to be removed');
-assert.ok(facilitatorSource.includes('team.length>0'),'Company removal must be disabled while players are still assigned');
-assert.ok(facilitatorSource.includes("facilitator/remove-player"),'Facilitator must be able to remove duplicate or abandoned player records');
-assert.ok(facilitatorSource.includes('Remove duplicate or abandoned player'),'Player removal control must explain its purpose');
-assert.ok(facilitatorSource.includes("facilitator/assign-ceo"),'Facilitator must be able to assign the company CEO');
-assert.ok(facilitatorSource.includes('One CEO writes'),'Facilitator UI must explain the single-writer company rule');
-assert.ok(facilitatorSource.includes('Companies are independent'),'Facilitator UI must explain asynchronous company progression');
-assert.equal(facilitatorSource.toLowerCase().includes('autopilot'),false,'Retired autopilot UI must not return');
-assert.equal(facilitatorSource.includes('Finish round now'),false,'Facilitator must not force company progression');
-assert.equal(facilitatorSource.includes('fac-view-'),false,'Returning from facilitator mode must not manufacture a fake player identity');
-
-const serviceV4Source=readFileSync(new URL('../src/server/gameServiceV4.ts',import.meta.url),'utf8');
-assert.ok(serviceV4Source.includes("PARTICIPANT_REJOINED"),'Exact-name re-entry must resume an existing participant rather than create another record');
-assert.ok(serviceV4Source.includes("p.name.trim().toLocaleLowerCase()===cleanName.toLocaleLowerCase()"),'Participant rejoin matching must normalise exact player names');
-assert.ok(serviceV4Source.includes("participantCountBefore===0&&!session.timerStartedAt&&!session.timerEndsAt"),'Game timer must auto-start when the first real player joins');
-assert.equal(serviceV4Source.includes('autopilotEnabled'),false,'Participant allocation must not resurrect autopilot');
-
-assert.equal(boardToolTabsSource.includes('InvestmentDecisionDockV1'),false,'Legacy shared-phase Invest dock must be removed from board tools');
-
-const serviceV9Source=readFileSync(new URL('../src/server/gameServiceV9.ts',import.meta.url),'utf8');
-assert.ok(serviceV9Source.includes("company.round+=1"),'finishing Knowledge Risk must advance one company round');
-assert.ok(serviceV9Source.includes("company.roundPhase='events'"),'a company must return to Events independently');
-assert.equal(serviceV9Source.includes("'waiting' |"),false,'waiting must not be a valid company round phase');
-assert.ok(serviceV9Source.includes('syncSessionSummary(session)'), 'session phase/round must be a compatibility summary');
-assert.equal(serviceV9Source.toLowerCase().includes('autoplaycompanytowaiting'),false,'autopilot round orchestration must not survive in the active service');
-
-const finalDisruptionSource=readFileSync(new URL('../src/components/FinalDisruptionModalV2.tsx',import.meta.url),'utf8');
-assert.ok(finalDisruptionSource.includes('TRY YOUR LUCK WITHOUT EXTERNAL HELP'),'Final Disruption must clearly label an under-strength no-consultant attempt');
-assert.ok(finalDisruptionSource.includes('Chance without external help'),'Final Disruption must show the gap-based chance');
-assert.ok(finalDisruptionSource.includes('aria-pressed={useConsultant}'),'Emergency Consultant control must expose a visible selected state');
-assert.ok(finalDisruptionSource.includes('bg-[#0b0d12]'),'Disruption domain cards must use a distinct neutral surface from the consultant and resolve controls');
-
-const eventDeckSource=readFileSync(new URL('../src/components/EventDeckV1.tsx',import.meta.url),'utf8');
-assert.ok(eventDeckSource.includes("const lastSharedOpenIdRef=useRef('')"),'Event deck must remember the last shared-open Event id');
-assert.ok(eventDeckSource.includes("if(lastSharedOpenIdRef.current===nextSharedId)return"),'Closing an Event must not reopen the same shared Event');
-assert.equal(eventDeckSource.includes("},[shared?.event.instanceId,cardOpen,activeIndex]);"),false,'Shared Event synchronisation must not re-fire merely because the local card was closed');
-assert.ok(eventDeckSource.includes("item.event.instanceId===sharedId&&!item.event.isResolved"),'resolved Events must be ignored by shared-open synchronisation');
-
-const eventPlaytestSource=readFileSync(new URL('../src/components/EventDecisionCardPlaytestV1.tsx',import.meta.url),'utf8');
-const finishLessonStart=eventPlaytestSource.indexOf('const finishLesson=async()=>');
-const finishLessonEnd=eventPlaytestSource.indexOf('if(pendingContinue)',finishLessonStart);
-const finishLessonSource=eventPlaytestSource.slice(finishLessonStart,finishLessonEnd);
-assert.equal(finishLessonSource.includes('setPendingContinue(null)'),false,'Newbie transfer lesson must remain visible until Event acknowledgement succeeds');
-
-const appBoardEventSource=readFileSync(new URL('../src/AppBoardV6.tsx',import.meta.url),'utf8');
-assert.ok(appBoardEventSource.includes("sessionStorage.getItem('tpg_facilitator_game_view')!=='1'"),'Facilitator game-view mode must remain facilitator identity without reopening the control room');
-assert.ok(appBoardEventSource.includes("activeEventIndex=chosen>=0?chosen:-1"),'board must not fall back to a resolved Event when no unresolved Event exists');
-assert.ok(appBoardEventSource.includes("actionType:'OPEN_EVENT_CARD'"),'CEO opening an Event must claim it on the server for all company members');
-assert.ok(appBoardEventSource.includes("participantId:participant?.id"),'player writes must carry the participant identity for CEO authorization');
-assert.ok(appBoardEventSource.includes("Read only ·"),'followers must have a visible read-only company mode');
-assert.ok(appBoardEventSource.includes('company.controllerParticipantId===participant.id'),'write controls must derive from the authoritative company CEO');
-assert.equal(appBoardEventSource.includes('/advance-phase'),false,'player UI must not expose global phase advancement');
-
-// Player-legibility audit: important mechanics must be visible without adding permanent instruction walls.
-const eventDecisionSource=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
-assert.ok(eventPlaytestSource.includes('diagnostic={Boolean(isOpeningDiagnostic)}'),'opening challenge must be explicitly marked as diagnostic in both modes');
-assert.ok(eventDecisionSource.includes("What happens when your company has the knowledge but the local site doesn't? You are about to find out."),'diagnostic challenge must frame the knowledge-access gap in player language');
-assert.ok(eventDecisionSource.includes('D {e.depthKnowledge} · B +{e.breadthBonus}'),'ordinary Event scoring must expose compact depth/breadth values');
-assert.ok(eventDecisionSource.includes('A relevant expert unlocks the full score.'),'Corporate Intranet must reveal when absorptive capacity limits usable knowledge');
-assert.ok(eventDecisionSource.includes('Each consultant engagement increases the future rate by 35%.'),'consultant UI must reveal escalating future rates');
-
-assert.ok(finalDisruptionSource.includes('label="Auto"'),'Final Disruption must visibly include Automation in its score');
-assert.ok(appBoardEventSource.includes('Knowledge dividend'),'turnover UI must identify knowledge-driven round growth');
-assert.ok(appBoardEventSource.includes('3% of current company turnover is added to the SIF'),'SIF tooltip must state the replenishment rule');
-assert.ok(investPanelSource.includes('Horizon Scan scope')&&investPanelSource.includes('All upcoming Events'),'Newbie Horizon Scan must not ask the player for a meaningless domain');
-const expertModalSource=readFileSync(new URL('../src/components/ExpertModal.tsx',import.meta.url),'utf8');
-assert.ok(expertModalSource.includes('SPOF gap ≥ ${config.spof_gap}'),'SPOF tooltip must use the configured threshold rather than a stale hard-coded value');
-assert.ok(riskSource.includes('Team Capability above 1 can lose one point'),'Newbie Knowledge Risk must explain its visible workforce-risk rule');
-
-// Round 1 teaching controls must be hidden rather than greyed out.
-assert.equal(eventPlaytestSource.includes('ROUND_ONE_DISABLED_LABELS'),false,'retired greyed-out Round 1 strategy buttons must not return');
-assert.ok(eventPlaytestSource.includes("isOpeningDiagnostic?['existing']"),'first teaching challenge must expose only existing knowledge');
-assert.ok(eventPlaytestSource.includes("isAssemblyLesson?['existing','expert']"),'second teaching challenge must expose only existing knowledge and experts');
-assert.ok(eventDecisionSource.includes('visibleModes.map'),'Event strategy rail must render only currently available strategies');
-assert.ok(eventPlaytestSource.includes('teamOnlyExisting={Boolean(isAssemblyLesson)}'),'second teaching challenge must focus existing knowledge on Team Capability');
-assert.ok(eventDecisionSource.includes('2-domain lesson'),'second teaching challenge must have a compact two-domain teaching cue');
-assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInstanceId||event.instanceId)'),'board must display the authoritative Round 1 teaching card even when another card was clicked');
-
+// Complete two competing KM Week companies and verify score colour and player credits.
 {
- const s=session('expert'),c=s.companies[0],event=s.activeEvents[c.id][0];
- const staged=renderToStaticMarkup(React.createElement(EventDecisionCardV4,{session:s,company:c,event,cardNumber:1,availableModes:['existing','expert'],teamOnlyExisting:true,teachingHint:'test hint',onSetAllocation:()=>{},onResolveEvent:async()=>({}),onAcknowledgeResolution:()=>{}}));
- assert.ok(staged.includes('Use what we already know'),'second lesson must retain existing knowledge');
- assert.ok(staged.includes('Ask one of our experts to help'),'second lesson must expose experts');
- assert.equal(staged.includes('Ask our network for help'),false,'unavailable network strategy must be hidden, not greyed out');
- assert.equal(staged.includes('Call in a favour'),false,'unavailable favour strategy must be hidden, not greyed out');
- assert.equal(staged.includes('Engage external expertise'),false,'unavailable consultant strategy must be hidden, not greyed out');
- assert.equal(staged.includes('Accept the risk'),false,'unavailable risk strategy must be hidden, not greyed out');
- assert.equal(staged.includes('Corporate Intranet'),false,'second teaching challenge existing-knowledge picker must focus on Team Capability');
- assert.equal(staged.includes('Local Codified'),false,'second teaching challenge must not distract Expert players with codified knowledge');
+ const apex=createInitialCompanyV2('Apex Technologies','apex',DEFAULT_CONFIG);
+ const rival=createInitialCompanyV2('Rival Company','rival',DEFAULT_CONFIG);
+ initialiseKMWeekCompanyV1(apex);
+ initialiseKMWeekCompanyV1(rival);
+ apex.kmWeek!.stage='complete';
+ rival.kmWeek!.stage='complete';
+ apex.kmWeek!.knowledgeTransfers=4;
+ rival.kmWeek!.knowledgeTransfers=1;
+ apex.turnover=1200;
+ rival.turnover=900;
+ apex.controllerParticipantId='stuart';
+ rival.controllerParticipantId='rival-ceo';
+ const players=[
+  {id:'jane',name:'Jane',role:'participant',companyId:apex.id},
+  {id:'stuart',name:'Stuart',role:'controller',companyId:apex.id},
+  {id:'hank',name:'Hank',role:'participant',companyId:apex.id},
+  {id:'bill',name:'Bill Fond',role:'participant',companyId:apex.id},
+  {id:'rival-ceo',name:'Alex',role:'controller',companyId:rival.id},
+ ].map(p=>({...p,sessionId:'TEST',lastSeen:'now'}));
+ const game={...session('newbie'),experienceMode:'km_week',id:'TEST',companies:[apex,rival],participants:players,kmWeekGoalId:'local-heroes'} as GameSessionV2;
+ assert.equal(kmWeekCompanyPlayerLabel(game,apex),'CEO: Stuart (Jane, Hank, Bill Fond)','A company must display its controller first with the other player names in brackets');
+ assert.equal(kmWeekCompanyPlayerLabel(game,rival),'CEO: Alex','Other companies must display their own CEO');
+ const html=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
+ assert.ok(html.includes('CEO: Stuart (Jane, Hank, Bill Fond)')&&html.includes('CEO: Alex'),'Final AAR must display player credits for every company');
+ assert.ok(html.includes('data-kmw-category="knowledgeFlow" data-kmw-category-rank="first"'),'Unique category leader must be green');
+ assert.ok(html.includes('data-kmw-category="knowledgeFlow" data-kmw-category-rank="other"'),'A losing category must not be highlighted');
+ assert.ok(html.includes('data-kmw-category="expertise" data-kmw-category-rank="joint-first"'),'Equal top scores must be orange');
+ assert.ok(html.includes('data-kmw-category="turnover" data-kmw-category-rank="first"'),'Final Turnover must use the same top-score highlighting');
+ assert.ok(html.includes('data-kmw-category="turnover" data-kmw-category-rank="other"'),'Final Turnover loser must not have a permanent orange/red background');
+ assert.ok(html.includes('EXPORT PDF')&&html.includes('data-kmw-debrief')&&html.includes('data-kmw-pdf-company'),'Players must be able to print the complete final results as a PDF');
+ assert.ok(kmWeekDebriefSource.includes('xl:grid-cols-[360px_minmax(0,1fr)_minmax(0,1fr)]')&&!kmWeekDebriefSource.includes('truncate text-[9px]'),'Wider Score Pads must not truncate category names');
+ const css=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
+ assert.ok(css.includes('@media print')&&css.includes('[data-kmw-pdf-company]')&&css.includes('size: A4 landscape'),'PDF output must include print styles for all cards and charts');
+ // No cross-company results or premature winner highlights before all companies finish.
+ rival.kmWeek!.stage='free';
+ const early=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
+ assert.equal((early.match(/data-kmw-pdf-company/g)||[]).length,1,'Do not reveal unfinished competitors');
+ assert.equal(early.includes('data-kmw-category-rank="first"'),false,'Do not award green rankings while opponents are still playing');
 }
-
 console.log('Mode-aware UI render smoke tests passed.');

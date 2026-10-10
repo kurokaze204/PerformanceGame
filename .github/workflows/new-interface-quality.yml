@@ -2,7 +2,7 @@ name: New Interface Quality
 
 on:
   push:
-    branches: [feat/new-interface, feat/optimistic-ui-speed]
+    branches: [feat/new-interface, feat/optimistic-ui-speed, KMWeek2]
   workflow_dispatch:
 
 jobs:

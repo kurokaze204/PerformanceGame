@@ -3,7 +3,7 @@ import type { KnowledgeDomain } from './game.ts';
 export type KMWeekStage = 'guided' | 'free' | 'shock' | 'complete';
 export type KMWeekPhase = 'challenge' | 'invest';
 export type KMWeekResolutionMethod = 'local' | 'expert' | 'risk';
-export type KMWeekInvestment = 'TRAIN_EXPERT' | 'LOCAL_TRAINING' | 'KNOWLEDGE_TRANSFER';
+export type KMWeekInvestment = 'TRAIN_EXPERT' | 'LOCAL_TRAINING' | 'KNOWLEDGE_TRANSFER' | 'AFTER_ACTION_REVIEW';
 export type KMWeekGoalId = 'local-heroes' | 'deep-bench' | 'broad-base' | 'balanced-network';
 
 export interface KMWeekChallenge {
@@ -34,11 +34,16 @@ export interface KMWeekInvestmentRecord {
   before: number;
   after: number;
   meaningfulFlow?: boolean;
+  challengeId?: string;
+  expertBefore?: number;
+  expertAfter?: number;
 }
 
 export interface KMWeekTurnoverPoint {
   label: string;
   turnover: number;
+  /** Actual Challenge outcome, so the AAR can show red/green dots even when travel costs exceed a win. */
+  challengeResult?: 'success' | 'failure';
 }
 
 export interface KMWeekScore {
@@ -48,6 +53,8 @@ export interface KMWeekScore {
   knowledgeFlow: number;
   resilience: number;
   goal: number;
+  /** Final turnover placement points, awarded once all companies finish. */
+  turnover: number;
   total: number;
 }
 
@@ -82,7 +89,9 @@ export interface KMWeekCompanyState {
   freeRound: number;
   challenges: KMWeekChallenge[];
   usedExpertIds: string[];
+  trainingCommitments?: Record<string, number>;
   freeSuccesses: number;
+  businessDifficultySolved?: number;
   localSuccesses: number;
   expertSuccesses: number;
   riskSuccesses: number;
@@ -92,6 +101,10 @@ export interface KMWeekCompanyState {
   turnoverHistory: KMWeekTurnoverPoint[];
   shockChecks: KMWeekShockCheck[];
   shockResolved: boolean;
+  /** Turnover before the Site Audits; the UI applies the result when the fine orb arrives. */
+  auditTurnoverBefore?: number;
+  /** Recorded fines, including zero for a clean audit result. */
+  auditFineTotal?: number;
   expertRetirement?: KMWeekExpertRetirement;
   score: KMWeekScore;
   lastMessage?: string;
