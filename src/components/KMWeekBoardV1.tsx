@@ -408,13 +408,18 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     return current&&Object.keys(next).every(key=>current[key as keyof typeof next]===next[key as keyof typeof next])?current:next;
    });
   };
-  frame=requestAnimationFrame(position);
-  const panel=document.querySelector('[data-kmw-tour-panel]');
   const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(position);
-  if(panel)observer?.observe(panel);
+  frame=requestAnimationFrame(position);
+  // The coach mounts after the first measurement; measure and observe it once
+  // mounted so long copy and smaller screens cannot push it outside the viewport.
+  const panelFrame=requestAnimationFrame(()=>requestAnimationFrame(()=>{
+   const panel=document.querySelector('[data-kmw-tour-panel]');
+   if(panel)observer?.observe(panel);
+   position();
+  }));
   window.addEventListener('resize',position);
   window.addEventListener('scroll',position,true);
-  return()=>{cancelAnimationFrame(frame);observer?.disconnect();window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true)};
+  return()=>{cancelAnimationFrame(frame);cancelAnimationFrame(panelFrame);observer?.disconnect();window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true)};
  },[guideStep,challengeFocusOpen,state?.stage,state?.guidedTurn,state?.phase]);
 
  useEffect(()=>{setScorePadOpen(false)},[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
