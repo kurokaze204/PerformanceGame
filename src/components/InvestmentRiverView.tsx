@@ -151,9 +151,6 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
      {domainExperts.map((mark,ei)=>{
        const {px,py}=expertPoints[ei];
        const selected=domainSelected&&mark.expert.id===selectedExpertId;
-       const rightEdge=px>W-padR-120;
-       const labelX=rightEdge?px-26:px+26;
-       const labelAnchor=rightEdge?'end':'start';
        const loc=abbrev(mark.expert.location);
        const expertGhost=ghostPreview?.kind==='expert'&&ghostPreview.domain===item.domain&&ghostPreview.expertId===mark.expert.id&&ghostPreview.delta>0;
        const expertGhostY=expertGhost?y(Math.min(mode==='km_week'?6:5,mark.score+ghostPreview.delta)):py;
@@ -163,7 +160,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
         {selected&&previewExpertDelta>0&&<><line x1={px} y1={py} x2={px} y2={y(mark.score+previewExpertDelta)} stroke="#fde047" strokeWidth="2" strokeDasharray="4 3"/><circle cx={px} cy={y(mark.score+previewExpertDelta)} r="17" fill="#0f172a" stroke="#fde047" strokeWidth="2" strokeDasharray="3 2"/><text x={px+22} y={y(mark.score+previewExpertDelta)-7} fill="#fde047" fontSize="12" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">+{previewExpertDelta}</text></>}
         <circle data-kmw-river-intro={mode==='km_week'&&!compact&&di===domains.length-1&&ei===domainExperts.length-1?'expert':undefined} cx={px} cy={py} r="16" fill="#facc15" stroke="#713f12" strokeWidth="1.5"/>
         <circle cx={px} cy={py-5} r="4" fill="#374151"/><path d={`M ${px-7} ${py+9} Q ${px-6} ${py-1} ${px} ${py-1} Q ${px+6} ${py-1} ${px+7} ${py+9} Z`} fill="#374151"/>
-        <text x={labelX} y={labelYs[item.scores.length+ei]} textAnchor={labelAnchor} fill="#fde047" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3" strokeLinejoin="round">{firstName(mark.expert.name)} · {loc}</text>
+        <text x={px} y={py-22} textAnchor="middle" fill="#fde047" fontSize="13" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3" strokeLinejoin="round">{firstName(mark.expert.name)} · {loc}</text>
        </g>
      })}
     </g>
