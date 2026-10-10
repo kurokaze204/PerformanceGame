@@ -405,12 +405,12 @@ assert.ok((company.kmWeek?.score.total||0)>0);
 // automatically, even when a failure requires a larger learning uplift.
 {
  assert.equal(KM_WEEK_AAR_COST,50);
- assert.equal(KM_WEEK_AAR_UNLOCK_ROUND,8);
+ assert.equal(KM_WEEK_AAR_UNLOCK_ROUND,7);
  const makeReview=(status:'success'|'failure',startingSite:number,startingExpert:number)=>{
   const co=createInitialCompanyV2('Lessons Review '+status,'kmw-aar-'+status,config);
   initialiseKMWeekCompanyV1(co);
   const st=co.kmWeek!;
-  st.stage='free';st.phase='invest';st.freeRound=4;co.round=7;
+  st.stage='free';st.phase='invest';st.freeRound=3;co.round=6;
   const site=co.sites.find(site=>site.id==='brisbane')!;
   const expert=co.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
   const skill=expert.domains.find(skill=>skill.domain==='operations')!;
@@ -421,9 +421,9 @@ assert.ok((company.kmWeek?.score.total||0)>0);
    {id:'EASY',title:'Minor delay',story:'Routine',siteId:site.id,domain:'operations',difficulty:4,impact:20,status:'success'},
   ];
   const s={...session,companies:[co]} as GameSessionV2;
-  assert.deepEqual(kmWeekAARCandidatesV1(co),[],'The AAR must stay unavailable through game round seven (including the guided rounds)');
+  assert.deepEqual(kmWeekAARCandidatesV1(co),[],'The AAR must stay unavailable before the seventh game-round Challenge is resolved');
   assert.equal(investKMWeekV1(s,co,{investment:'AFTER_ACTION_REVIEW',challengeId:'TOUGH'}).success,false,'Server must reject early reviews');
-  st.freeRound=5;co.round=8;
+  st.freeRound=4;co.round=7;
   assert.deepEqual(kmWeekAARCandidatesV1(co).map(challenge=>challenge.id),['TOUGH'],'Only completed Challenges needing at least five may be reviewed');
   assert.equal(investKMWeekV1(s,co,{investment:'AFTER_ACTION_REVIEW',challengeId:'EASY'}).success,false,'A review must not be available for an easy Challenge');
   const beforeTurnover=co.turnover;
