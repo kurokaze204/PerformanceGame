@@ -1161,7 +1161,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         {!state.shockResolved?KM_WEEK_SHOCK_SPECS.map(check=>{
          const site=company.sites.find(item=>item.id===check.siteId);
          return <div key={check.id} className="rounded-xl border border-slate-700 bg-slate-950/70 p-2 text-left">
-          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-400">Site Knowledge {site?.teamCapability[check.domain]||0} · audit standard {check.difficulty}</div></div><div className="rounded-full border border-slate-600 px-2 py-1 text-[8px] font-black text-slate-300">AWAITING AUDIT</div></div>
+          <div className="flex items-center gap-2"><div className="min-w-0 flex-1"><div className="text-[10px] font-black text-white">{site?.name||check.siteId} · {domainLabel(check.domain)}</div><div className="text-[9px] text-slate-400">Site Knowledge {site?.teamCapability[check.domain]||0} · audit standard {check.difficulty} · <span className="text-amber-300">{100-kmWeekRiskOddsV1(site?.teamCapability[check.domain]||0,check.difficulty).chancePercent}% chance of a finding</span></div></div><div className="rounded-full border border-slate-600 px-2 py-1 text-[8px] font-black text-slate-300">AWAITING AUDIT</div></div>
          </div>;
         }):state.shockChecks.map(check=>{
          const site=company.sites.find(item=>item.id===check.siteId);
