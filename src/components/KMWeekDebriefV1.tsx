@@ -1,7 +1,7 @@
 import React,{useMemo,useState}from'react';
-import{ArrowRight,Brain,CircleDollarSign,Medal,ShieldCheck,Target,Trophy,Users,Workflow,X}from'lucide-react';
+import{ArrowRight,Brain,CircleDollarSign,FileDown,Medal,ShieldCheck,Target,Trophy,Users,Workflow,X}from'lucide-react';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
-import type{KMWeekTurnoverPoint}from'../types/kmWeek.ts';
+import type{KMWeekScore,KMWeekTurnoverPoint}from'../types/kmWeek.ts';
 import{formatCurrency}from'../utils/format.ts';
 import{KM_WEEK_GOALS,KM_WEEK_SHOCK_GAP_COST,calculateKMWeekScoreV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -9,17 +9,29 @@ import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 type Props={session:GameSessionV2;company:CompanyV2};
 
 const COMPANY_COLORS=['#facc15','#38bdf8','#a78bfa','#34d399','#fb7185','#fb923c','#22d3ee','#c084fc'];
+type ScoreKey=Exclude<keyof KMWeekScore,'total'>;
+type ScoreItem={key:ScoreKey;label:string;value:number;max:number;icon:React.ReactNode};
+type CategoryLeader={value:number;ties:number};
 
-const scoreItems=(company:CompanyV2,session:GameSessionV2)=>{
+/** Show the controller and all colleagues for this company, not the person viewing the page. */
+export function kmWeekCompanyPlayerLabel(session:GameSessionV2,company:CompanyV2):string{
+ const members=session.participants.filter(player=>player.role!=='facilitator'&&player.companyId===company.id&&player.name.trim());
+ if(!members.length)return'CEO: Unassigned';
+ const ceo=members.find(player=>player.id===company.controllerParticipantId)||members.find(player=>player.role==='controller')||members[0];
+ const others=members.filter(player=>player.id!==ceo.id).map(player=>player.name.trim());
+ return`CEO: ${ceo.name.trim()}${others.length?` (${others.join(', ')})`:''}`;
+}
+
+const scoreItems=(company:CompanyV2,session:GameSessionV2):ScoreItem[]=>{
  const score=calculateKMWeekScoreV1(session,company);
  return [
-  {label:'Business Performance',value:score.business,max:12,icon:<CircleDollarSign className="h-3.5 w-3.5"/>},
-  {label:'Expertise',value:score.expertise,max:6,icon:<Brain className="h-3.5 w-3.5"/>},
-  {label:'Local capability',value:score.localCapability,max:9,icon:<Users className="h-3.5 w-3.5"/>},
-  {label:'Knowledge Flow',value:score.knowledgeFlow,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
-  {label:'Squeaky clean',value:score.resilience,max:15,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
-  {label:session.kmWeekGoalId?KM_WEEK_GOALS[session.kmWeekGoalId].title:'KM Week goal',value:score.goal,max:5,icon:<Target className="h-3.5 w-3.5"/>},
-  {label:'Final turnover',value:score.turnover,max:7,icon:<Trophy className="h-3.5 w-3.5"/>},
+  {key:'business',label:'Business Performance',value:score.business,max:12,icon:<CircleDollarSign className="h-3.5 w-3.5"/>},
+  {key:'expertise',label:'Expertise',value:score.expertise,max:6,icon:<Brain className="h-3.5 w-3.5"/>},
+  {key:'localCapability',label:'Local capability',value:score.localCapability,max:9,icon:<Users className="h-3.5 w-3.5"/>},
+  {key:'knowledgeFlow',label:'Knowledge Flow',value:score.knowledgeFlow,max:6,icon:<Workflow className="h-3.5 w-3.5"/>},
+  {key:'resilience',label:'Squeaky clean',value:score.resilience,max:15,icon:<ShieldCheck className="h-3.5 w-3.5"/>},
+  {key:'goal',label:session.kmWeekGoalId?KM_WEEK_GOALS[session.kmWeekGoalId].title:'KM Week goal',value:score.goal,max:5,icon:<Target className="h-3.5 w-3.5"/>},
+  {key:'turnover',label:'Final turnover',value:score.turnover,max:7,icon:<Trophy className="h-3.5 w-3.5"/>},
  ];
 };
 
@@ -28,16 +40,19 @@ function beforeCompany(company:CompanyV2):CompanyV2{
  return snapshot?{...company,sites:snapshot.sites,experts:snapshot.experts}:company;
 }
 
-const MiniScorePad:React.FC<{company:CompanyV2;color:string;session:GameSessionV2;allComplete:boolean}>=({company,color,session,allComplete})=>{
+const MiniScorePad:React.FC<{company:CompanyV2;color:string;session:GameSessionV2;allComplete:boolean;leaders:Partial<Record<ScoreKey,CategoryLeader>>}>=({company,color,session,allComplete,leaders})=>{
  const score=calculateKMWeekScoreV1(session,company);
- return <section className="rounded-2xl border-2 bg-slate-950/75 p-3" style={{borderColor:color}}>
+ return <section data-kmw-final-scorepad className="min-w-0 rounded-2xl border-2 bg-slate-950/75 p-3" style={{borderColor:color}}>
   <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><div className="text-xs font-black text-white">Score Pad</div><div className="ml-auto text-2xl font-black text-white">{score.total}</div></div>
   <div className="mt-2 grid grid-cols-2 gap-1.5">{scoreItems(company,session).map(item=>{
-   const finalTurnover=item.label==='Final turnover';
-   return <div key={item.label} title={finalTurnover?'Final company turnover after Site Audit fines: 1st 7 points, 2nd 4, 3rd 2, all others 0. Ties share the same position.':undefined} className={'flex items-center gap-1.5 rounded-lg border px-2 py-1.5 '+(finalTurnover?'col-span-2 border-amber-700/60 bg-amber-950/20':'border-slate-800 bg-slate-900/80')}>
-    <span className={finalTurnover?'text-amber-300':'text-slate-500'}>{item.icon}</span>
-    <span className="min-w-0 flex-1 truncate text-[9px] font-black text-slate-300">{item.label}{finalTurnover&&<span className="ml-1 text-[8px] text-slate-500">1st 7 · 2nd 4 · 3rd 2</span>}</span>
-    <b className="text-sm text-white">{finalTurnover&&!allComplete?'Pending':item.value}<span className="ml-0.5 text-[8px] text-slate-600">{finalTurnover&&!allComplete?'':'/'+item.max}</span></b>
+   const finalTurnover=item.key==='turnover';
+   const leader=leaders[item.key];
+   const rank=leader&&leader.value>0&&item.value===leader.value?(leader.ties>1?'joint-first':'first'):'other';
+   const rankStyle=rank==='first'?'border-emerald-400 bg-emerald-800/80':rank==='joint-first'?'border-orange-400 bg-orange-800/80':'border-slate-800 bg-slate-900/80';
+   return <div key={item.key} data-kmw-category={item.key} data-kmw-category-rank={rank} title={rank==='first'?'Highest score in this category':rank==='joint-first'?'Joint highest score in this category':finalTurnover?'Final turnover: 1st 7 points, 2nd 4, 3rd 2; tied companies share a place.':undefined} className={'flex min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 '+(finalTurnover?'col-span-2 ':'')+rankStyle}>
+    <span className={rank==='other'?'shrink-0 text-slate-400':'shrink-0 text-white'}>{item.icon}</span>
+    <span className={'min-w-0 flex-1 break-words text-[10px] font-black leading-tight '+(rank==='other'?'text-slate-200':'text-white')}>{item.label}{finalTurnover&&<span className={'ml-1 text-[9px] font-semibold '+(rank==='other'?'text-slate-400':'text-white/90')}>1st 7 · 2nd 4 · 3rd 2</span>}</span>
+    <b className="shrink-0 text-sm text-white">{finalTurnover&&!allComplete?'Pending':item.value}<span className="ml-0.5 text-[9px] text-slate-300">{finalTurnover&&!allComplete?'':'/'+item.max}</span></b>
    </div>;
   })}</div>
  </section>;
