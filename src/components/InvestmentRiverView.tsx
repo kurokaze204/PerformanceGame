@@ -77,7 +77,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
    {ghostPreview&&<defs><filter id="kmw-blue-ghost-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>}
    {ticks.map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
    {highlightDomain&&domainIndex>=0&&<rect x={Math.max(padL-42,x(domainIndex)-72)} y={padT-12} width="144" height={H-padT-padB+28} rx="16" fill="#facc15" fillOpacity=".06" stroke="#facc15" strokeOpacity=".38" strokeWidth="2"/>}
-   <path d={fill} fill="#0c4a6e" fillOpacity=".72"/><path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>
+   <path d={fill} fill="#0c4a6e" fillOpacity=".72"/>{mode==='km_week'&&!compact&&<circle data-kmw-river-intro="water" cx={x(domains.length-1)-52} cy={(y(data[data.length-1].north)+y(data[data.length-1].south))/2} r="6" fill="transparent" stroke="none" pointerEvents="none"/>}<path d={northPath} fill="none" stroke="#22c55e" strokeWidth="3"/><path d={southPath} fill="none" stroke="#22c55e" strokeWidth="3"/>
    {thresholdLine&&<g data-kmw-shock-cutoff>
     <line x1={padL} x2={W-padR} y1={y(thresholdLine.value)} y2={y(thresholdLine.value)} stroke="#facc15" strokeWidth="9" strokeOpacity=".10"/>
     <line x1={padL} x2={W-padR} y1={y(thresholdLine.value)} y2={y(thresholdLine.value)} stroke="#fde047" strokeWidth="3" strokeDasharray="10 8"/>
@@ -113,7 +113,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
       <path d={transferGhost.path} fill="none" stroke="#38bdf8" strokeWidth="3" strokeDasharray="8 7" strokeLinecap="round" opacity=".9"/>
       <circle cx={transferGhost.targetPoint.px} cy={transferGhost.targetY} r="8" fill="#082f49" stroke="#7dd3fc" strokeWidth="2.5" strokeDasharray="4 3"/>
      </g>}
-     <text x={x(di)} y={H-12} textAnchor="middle" fill={domainSelected?'#fde047':'#cbd5e1'} fontSize="15" fontWeight={domainSelected?'900':'800'}>{DOMAIN_INFO[item.domain].label}</text>
+     <text data-kmw-river-intro={mode==='km_week'&&!compact?'domain-'+item.domain:undefined} x={x(di)} y={H-12} textAnchor="middle" fill={domainSelected?'#fde047':'#cbd5e1'} fontSize="15" fontWeight={domainSelected?'900':'800'}>{DOMAIN_INFO[item.domain].label}</text>
      {item.scores.map(({site,score},si)=>{
        const {px,py}=sitePoints[si];
        const target=domainSelected&&(site.id===selectedSiteId||highlightAllSites);
@@ -125,7 +125,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const guidedSite=mode==='km_week'&&domainSelected&&site.id===guidedSiteId;
        const siteGhost=ghostPreview?.kind==='site'&&ghostPreview.domain===item.domain&&ghostPreview.siteId===site.id&&ghostPreview.delta>0;
        const siteGhostY=siteGhost?y(Math.min(5,score+ghostPreview.delta)):py;
-       return <g key={site.id} className="kmw-river-motion" data-river-target={`site:${site.id}:${item.domain}`}>
+       return <g key={site.id} className="kmw-river-motion" data-kmw-river-intro={mode==='km_week'&&!compact&&di===domains.length-1&&si===0?'site':undefined} data-river-target={`site:${site.id}:${item.domain}`}>
         {guidedSite&&<circle className="kmw-guided-site-pulse" data-kmw-guided-site={site.id} cx={px} cy={py} r="17" fill="#082f49" fillOpacity=".20" stroke="#38bdf8" strokeWidth="3" strokeDasharray="5 5"/>}
         {siteGhost&&<g data-kmw-score-ghost="local" filter="url(#kmw-blue-ghost-glow)"><line x1={px} y1={py} x2={px} y2={siteGhostY} stroke="#38bdf8" strokeWidth="3" strokeDasharray="6 5"/><circle cx={px} cy={siteGhostY} r="8" fill="#082f49" stroke="#7dd3fc" strokeWidth="2.5" strokeDasharray="4 3"/></g>}
         {(target||source||reference)&&<circle cx={px} cy={py} r="12" fill={source?'#10b981':'#facc15'} fillOpacity=".15" stroke={source?'#34d399':'#fde047'} strokeWidth="3"/>}
@@ -156,7 +156,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const loc=abbrev(mark.expert.location);
        const expertGhost=ghostPreview?.kind==='expert'&&ghostPreview.domain===item.domain&&ghostPreview.expertId===mark.expert.id&&ghostPreview.delta>0;
        const expertGhostY=expertGhost?y(Math.min(mode==='km_week'?6:5,mark.score+ghostPreview.delta)):py;
-       return <g key={`${mark.expert.id}-${item.domain}`} className="kmw-river-motion" data-river-target={`expert:${mark.expert.id}:${item.domain}`}>
+       return <g key={`${mark.expert.id}-${item.domain}`} className="kmw-river-motion" data-kmw-river-intro={mode==='km_week'&&!compact&&di===domains.length-1&&ei===domainExperts.length-1?'expert':undefined} data-river-target={`expert:${mark.expert.id}:${item.domain}`}>
         {expertGhost&&<g data-kmw-score-ghost="expertise" filter="url(#kmw-blue-ghost-glow)"><line x1={px} y1={py} x2={px} y2={expertGhostY} stroke="#38bdf8" strokeWidth="3" strokeDasharray="6 5"/><circle cx={px} cy={expertGhostY} r="18" fill="#082f49" fillOpacity=".72" stroke="#7dd3fc" strokeWidth="2.5" strokeDasharray="5 4"/></g>}
         {selected&&<circle cx={px} cy={py} r="25" fill="#facc15" fillOpacity=".12" stroke="#fde047" strokeWidth="3.5"/>}
         {selected&&previewExpertDelta>0&&<><line x1={px} y1={py} x2={px} y2={y(mark.score+previewExpertDelta)} stroke="#fde047" strokeWidth="2" strokeDasharray="4 3"/><circle cx={px} cy={y(mark.score+previewExpertDelta)} r="17" fill="#0f172a" stroke="#fde047" strokeWidth="2" strokeDasharray="3 2"/><text x={px+22} y={y(mark.score+previewExpertDelta)-7} fill="#fde047" fontSize="12" fontWeight="900" paintOrder="stroke" stroke="#020617" strokeWidth="3">+{previewExpertDelta}</text></>}
