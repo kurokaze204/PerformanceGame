@@ -226,7 +226,10 @@ const ChallengeKnowledgeBars:React.FC<{
    const applied=index<filled;
    const colour=tone==='requirement'?(requirementMet?'border-emerald-200 bg-emerald-400':'border-rose-300 bg-rose-500'):tone==='local'?'border-sky-300 bg-sky-400':'border-amber-300 bg-amber-400';
    const idle=tone==='requirement'?(requirementMet?'border-emerald-400/80 bg-emerald-950/30':'border-rose-400/90 bg-rose-950/30'):tone==='local'?'border-sky-500/85 bg-sky-950/25':'border-amber-500/85 bg-amber-950/20';
-   return <span key={index} className={'h-4 rounded-md border-2 transition-all duration-200 '+(available?(applied?colour:idle):'border-slate-800 bg-slate-950')}/>;
+   return <span key={index}
+    className={'h-4 rounded-md border-2 transition-all duration-200 '+(available?(applied?colour:idle):'border-slate-800 bg-slate-950')}
+    style={tone==='requirement'&&available&&applied?{backgroundColor:requirementMet?'#34d399':'#f43f5e',borderColor:requirementMet?'#a7f3d0':'#fda4af'}:undefined}
+   />;
   })}
  </div>;
  const Selector:React.FC<{state:ResponseSelectionState;disabled?:boolean;anchor?:string}>=({state,disabled=false,anchor})=>{
@@ -236,7 +239,7 @@ const ChallengeKnowledgeBars:React.FC<{
  const localFilled=localSelection==='depth'?local:localSelection==='breadth'?Math.min(local,1):0;
  const expertFilled=expertSelection==='depth'?expert:expertSelection==='breadth'?Math.min(expert,1):0;
  return <div className="mt-2 space-y-1.5" data-kmw-knowledge-bars>
-  <div data-kmw-tour="required" className={'grid w-full grid-cols-[100px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 '+(requirementMet?'border-emerald-400/80 bg-emerald-950/20': 'border-rose-900/70 bg-rose-950/10')+(guideStep===1?' kmw-tour-highlight':'')}>
+  <div data-kmw-tour="required" className={'grid w-full grid-cols-[100px_minmax(0,1fr)_26px] items-center gap-2 rounded-xl border px-2 py-2 '+(requirementMet?'border-emerald-400/80 bg-emerald-950/20': 'border-rose-900/70 bg-rose-950/10')+(guideStep===1?' kmw-tour-highlight':'')+(requirementMet?' kmw-tour-required-success':'')}>
    <span><span className="block text-[13px] font-black text-white">Required</span><span className={'block text-[12px] font-bold '+(requirementMet?'text-emerald-300':'text-rose-300')}>{domainLabel(domain)} {requirement}</span></span>
    <SegmentBar value={requirement} filled={requirement} tone="requirement"/>
    <b className={'text-center text-sm font-black '+(requirementMet?'text-emerald-300':'text-rose-300')}>{requirement}</b>
@@ -264,7 +267,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[challengeDrafts,setChallengeDrafts]=useState<Record<string,Exclude<PendingResponse,null>>>({});
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
  const[guideStep,setGuideStep]=useState(0);
- const[guideAnchor,setGuideAnchor]=useState<{left:number;top:number;targetX:number;targetY:number;panelWidth:number}|null>(null);
+ const[guideAnchor,setGuideAnchor]=useState<{left:number;top:number;targetX:number;targetY:number;panelWidth:number;startY:number}|null>(null);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
  const[scorePadOpen,setScorePadOpen]=useState(false);
@@ -381,18 +384,37 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   let frame=0;
   const position=()=>{
    const target=document.querySelector('[data-kmw-tour="'+targetKey+'"]');
-   if(!target)return;
+   const river=document.querySelector('[data-kmw-tour-river]');
+   if(!target||!river)return;
    const rect=target.getBoundingClientRect();
-   const panelWidth=Math.min(350,window.innerWidth-24);
-   const roomLeft=rect.left-panelWidth-26;
-   const left=roomLeft>=12?roomLeft:rect.right+panelWidth+26<window.innerWidth?rect.right+18:12;
-   const top=Math.max(72,Math.min(window.innerHeight-330,rect.top-72));
-   setGuideAnchor({left,top,targetX:rect.left+rect.width/2,targetY:rect.top+rect.height/2,panelWidth});
+   const riverRect=river.getBoundingClientRect();
+
+   // Park the entire lesson over the River, never over the response controls.
+   // Leave a gutter so even the card's shadow cannot obscure the first column.
+   const panelWidth=Math.min(350,Math.max(180,riverRect.width-28),window.innerWidth-24);
+   const left=Math.max(12,Math.min(riverRect.right-panelWidth-16,window.innerWidth-panelWidth-12));
+   const panelHeight=document.querySelector('[data-kmw-tour-panel]')?.getBoundingClientRect().height||270;
+   const maxTop=Math.max(65,window.innerHeight-panelHeight-12);
+   const preferredTop=riverRect.top+Math.min(70,Math.max(18,(riverRect.height-panelHeight)/2));
+   const top=Math.max(65,Math.min(maxTop,preferredTop));
+
+   // End at the outside left edge of the Required row / Commit button.
+   // Never draw the arrowhead across those controls' labels.
+   const leftEdgeTarget=guideStep===1||guideStep===5;
+   const targetX=leftEdgeTarget?rect.left-7:rect.left+rect.width/2;
+   const targetY=rect.top+rect.height/2;
+   setGuideAnchor(current=>{
+    const next={left,top,targetX,targetY,panelWidth,startY:top+Math.min(130,panelHeight/2)};
+    return current&&Object.keys(next).every(key=>current[key as keyof typeof next]===next[key as keyof typeof next])?current:next;
+   });
   };
   frame=requestAnimationFrame(position);
+  const panel=document.querySelector('[data-kmw-tour-panel]');
+  const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(position);
+  if(panel)observer?.observe(panel);
   window.addEventListener('resize',position);
   window.addEventListener('scroll',position,true);
-  return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true)};
+  return()=>{cancelAnimationFrame(frame);observer?.disconnect();window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true)};
  },[guideStep,challengeFocusOpen,state?.stage,state?.guidedTurn,state?.phase]);
 
  useEffect(()=>{setScorePadOpen(false)},[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
@@ -718,9 +740,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   {firstGuidedTour&&guideAnchor&&activeChallenge&&<>
    <svg className="pointer-events-none fixed inset-0 z-[150]" style={{width:'100vw',height:'100vh'}} aria-hidden="true">
     <defs><marker id="kmw-tour-arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#38bdf8" strokeWidth="1.5"/></marker></defs>
-    <path d={`M ${guideAnchor.left+(guideAnchor.left<guideAnchor.targetX?guideAnchor.panelWidth:0)} ${guideAnchor.top+112} Q ${(guideAnchor.left+guideAnchor.panelWidth/2+guideAnchor.targetX)/2} ${guideAnchor.targetY-35} ${guideAnchor.targetX} ${guideAnchor.targetY}`} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" markerEnd="url(#kmw-tour-arrowhead)"/>
+    <path d={`M ${guideAnchor.left+guideAnchor.panelWidth+6} ${guideAnchor.startY} C ${guideAnchor.left+guideAnchor.panelWidth+65} ${guideAnchor.startY}, ${guideAnchor.targetX-66} ${guideAnchor.targetY}, ${guideAnchor.targetX} ${guideAnchor.targetY}`} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" markerEnd="url(#kmw-tour-arrowhead)"/>
    </svg>
-   <section role="status" aria-live="polite" aria-label="Guided challenge walkthrough" className="fixed z-[160] rounded-[22px] border-[3px] border-sky-400 bg-[#071526] p-4 text-left text-white shadow-[0_14px_55px_rgba(8,145,178,.4)]" style={{left:guideAnchor.left,top:guideAnchor.top,width:guideAnchor.panelWidth,maxWidth:'calc(100vw - 24px)',maxHeight:'calc(100vh - 96px)',overflowY:'auto'}}>
+   <section data-kmw-tour-panel role="status" aria-live="polite" aria-label="Guided challenge walkthrough" className="fixed z-[160] rounded-[22px] border-[3px] border-sky-400 bg-[#071526] p-4 text-left text-white shadow-[0_14px_55px_rgba(8,145,178,.4)]" style={{left:guideAnchor.left,top:guideAnchor.top,width:guideAnchor.panelWidth,maxWidth:'calc(100vw - 24px)',maxHeight:'calc(100vh - 96px)',overflowY:'auto'}}>
     <div className="mb-2 flex items-center justify-between gap-3"><span className="text-xs font-black uppercase tracking-wide text-sky-200">{guideStep} of 5</span><span className="flex gap-1">{[1,2,3,4,5].map(i=><span key={i} className={'h-2 w-2 rounded-full '+(i===guideStep?'bg-sky-300':i<guideStep?'bg-sky-600':'bg-slate-600')}/>)}</span></div>
     <h3 className="text-lg font-black text-white">{guideStep===1?'The business problem':guideStep===2?'Start with the local team':guideStep===3?'Bring in our expert':guideStep===4?'The team still contributes':'Solve the problem'}</h3>
     <p className="mt-2 text-sm leading-relaxed text-slate-200">{guideStep===1?<>A surprise business problem has happened in {siteName(company,activeChallenge.siteId)}. Solving it requires significant {domainLabel(activeChallenge.domain)} expertise.</>:guideStep===2?<>Your {siteName(company,activeChallenge.siteId)} team is usually pretty good, but doesn’t have enough knowledge to handle this problem alone. Click their circle to involve them and watch the chance of success increase.</>:guideStep===3?<>Thankfully {activeExpert?.name.split(' ')[0]||'our specialist'} is our company expert in {domainLabel(activeChallenge.domain)}. Based in {activeExpert?siteName(company,activeExpert.location):'another city'}, we can fly them in for a small travel and accommodation cost. Select their circle. Their expertise will guarantee success.</>:guideStep===4?<>Notice how {siteName(company,activeChallenge.siteId)} has moved into a supporting role. We call this <b className="text-sky-300">knowledge breadth</b>. Each additional supporting source contributes one point alongside the expert’s depth.</>:<>Now click <b className="text-amber-300">Commit Response</b> to solve the problem.</>}</p>
@@ -840,7 +862,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         </button>
        </div>
       </div>
-      <div className="relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+      <div data-kmw-tour-river className="relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]"><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
       {scorePadOpen&&<div data-kmw-scorepad className={`absolute left-2 right-2 top-[54px] z-[90] h-fit overflow-visible rounded-[18px] border-2 border-amber-700 bg-[#101827]/[.98] p-3 shadow-[0_20px_60px_rgba(0,0,0,.7)] min-[700px]:left-auto min-[700px]:w-2/3 ${scoreBriefOpen?'z-[135] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}`}>
        <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
        <div className="mt-2 grid grid-cols-2 gap-1.5">
