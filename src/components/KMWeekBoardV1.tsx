@@ -699,7 +699,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const finalShockWindow=state.stage==='free'&&remaining<=KM_WEEK_SHOCK_WINDOW_SECONDS;
  const guided=state.stage==='guided';
  const guidedCopy=currentGuidedCopy(company);
- const activeChallenge=state.challenges.find(challenge=>challenge.id===selectedChallengeId)||state.challenges.find(challenge=>challenge.status==='open')||state.challenges[0];
+ const activeChallenge=state.challenges.find(challenge=>challenge.id===selectedChallengeId&&challenge.status==='open')||state.challenges.find(challenge=>challenge.status==='open')||state.challenges.find(challenge=>challenge.id===selectedChallengeId)||state.challenges[0];
+ // Follow the selected open Challenge, then clear or move the marker on resolution.
+ const riverChallenge=(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'&&challengeFocusOpen&&activeChallenge?.status==='open'?activeChallenge:undefined;
  const pendingResponse:PendingResponse=activeChallenge?challengeDrafts[activeChallenge.id]||null:null;
  const setPendingResponse=(next:PendingResponse)=>{
   setChallengeDrafts(current=>{
@@ -1369,7 +1371,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        </div>
       </div>
       <div data-kmw-tour-river data-kmw-river-chart-area className={'relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]'+(riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?' z-[145] rounded-2xl':'')} style={riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?{boxShadow:'0 0 0 160vmax rgba(0,0,0,.74)'}:undefined}>
-       <InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={state.phase==='invest'&&infoPreviewDomain?infoPreviewDomain:state.phase==='invest'&&investment==='AFTER_ACTION_REVIEW'&&aarChallenge?aarChallenge.domain:selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/>
+       <InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={riverChallenge?riverChallenge.domain:state.phase==='invest'&&infoPreviewDomain?infoPreviewDomain:state.phase==='invest'&&investment==='AFTER_ACTION_REVIEW'&&aarChallenge?aarChallenge.domain:selectedDomain} challengeTarget={riverChallenge?{domain:riverChallenge.domain,level:riverChallenge.difficulty}:undefined} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/>
        <button type="button" data-kmw-site-panels-toggle aria-expanded={sitePanelsOpen} aria-label={sitePanelsOpen?'Hide site details':'Show site details'} title={sitePanelsOpen?'Hide site details':'Show site details'} onClick={()=>setSitePanelsOpen(open=>!open)} className={'absolute bottom-2 left-2 z-20 grid h-11 w-11 place-items-center rounded-xl border-2 shadow-lg transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 '+(sitePanelsOpen?'border-emerald-300 bg-emerald-600 text-white':'border-slate-500 bg-slate-900/95 text-emerald-300 hover:border-emerald-300 hover:bg-slate-800')}>
         <Building2 className="h-5 w-5"/>
        </button>
