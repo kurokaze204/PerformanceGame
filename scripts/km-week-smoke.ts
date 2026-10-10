@@ -14,6 +14,9 @@ import {
   KM_WEEK_MAX_EXPERT_KNOWLEDGE,
   freeChallengesForRound,
   kmWeekRiskOddsV1,
+  kmWeekAARCandidatesV1,
+  KM_WEEK_AAR_COST,
+  KM_WEEK_AAR_UNLOCK_ROUND,
 } from '../src/engine/kmWeekV1.ts';
 import type { GameSessionV2 } from '../src/types/gameV2.ts';
 import { riverSiteKnowledgeScore } from '../src/engine/riverKnowledgeV1.ts';
@@ -396,4 +399,47 @@ assert.ok((company.kmWeek?.score.total||0)>0);
  assert.deepEqual(teams.map(team=>kmWeekFinalTurnoverPointsV1(rankedSession,team)),[7,7,2,0],'Tied first-place turnover shares seven points, and the next company is third');
 }
 
+
+// After the seventh full-play round, tough resolved Challenges can produce a
+// one-off After Action Review investment. The company's specialist facilitates
+// automatically, even when a failure requires a larger learning uplift.
+{
+ assert.equal(KM_WEEK_AAR_COST,50);
+ assert.equal(KM_WEEK_AAR_UNLOCK_ROUND,8);
+ const makeReview=(status:'success'|'failure',startingSite:number,startingExpert:number)=>{
+  const co=createInitialCompanyV2('Lessons Review '+status,'kmw-aar-'+status,config);
+  initialiseKMWeekCompanyV1(co);
+  const st=co.kmWeek!;
+  st.stage='free';st.phase='invest';st.freeRound=7;co.round=10;
+  const site=co.sites.find(site=>site.id==='brisbane')!;
+  const expert=co.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
+  const skill=expert.domains.find(skill=>skill.domain==='operations')!;
+  site.teamCapability.operations=startingSite;
+  skill.score=startingExpert;
+  st.challenges=[
+   {id:'TOUGH',title:'Maintenance crisis',story:'Difficult incident',siteId:site.id,domain:'operations',difficulty:6,impact:90,status},
+   {id:'EASY',title:'Minor delay',story:'Routine',siteId:site.id,domain:'operations',difficulty:4,impact:20,status:'success'},
+  ];
+  const s={...session,companies:[co]} as GameSessionV2;
+  assert.deepEqual(kmWeekAARCandidatesV1(co),[],'An AAR cannot unlock before completing seven full rounds');
+  assert.equal(investKMWeekV1(s,co,{investment:'AFTER_ACTION_REVIEW',challengeId:'TOUGH'}).success,false,'Server must reject early reviews');
+  st.freeRound=8;co.round=11;
+  assert.deepEqual(kmWeekAARCandidatesV1(co).map(challenge=>challenge.id),['TOUGH'],'Only completed Challenges needing at least five may be reviewed');
+  assert.equal(investKMWeekV1(s,co,{investment:'AFTER_ACTION_REVIEW',challengeId:'EASY'}).success,false,'A review must not be available for an easy Challenge');
+  const beforeTurnover=co.turnover;
+  const result=investKMWeekV1(s,co,{investment:'AFTER_ACTION_REVIEW',challengeId:'TOUGH'});
+  assert.equal(result.success,true,result.message);
+  assert.equal(co.turnover,beforeTurnover-50,'AAR must deduct $50k');
+  assert.equal(co.kmWeek!.investmentHistory.at(-1)?.type,'AFTER_ACTION_REVIEW');
+  assert.equal(co.kmWeek!.investmentHistory.at(-1)?.challengeId,'TOUGH');
+  assert.equal(co.kmWeek!.investmentHistory.at(-1)?.expertId,expert.id,'The company domain expert facilitates automatically');
+  return {site,skill,co};
+ };
+ const won=makeReview('success',2,4);
+ assert.equal(won.site.teamCapability.operations,3,'Success should improve local knowledge by one');
+ assert.equal(won.skill.score,5,'Success should improve the facilitating expert by one');
+ const lost=makeReview('failure',4,5);
+ assert.equal(lost.site.teamCapability.operations,5,'Failure should improve site knowledge by two, capped at five');
+ assert.equal(lost.skill.score,6,'Failure should improve the expert by two, capped at six');
+}
 console.log('KM Week smoke passed');
