@@ -355,7 +355,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[challengeFocusOpen,setChallengeFocusOpen]=useState(false);
  const[guideStep,setGuideStep]=useState(0);
  const[riverIntroStep,setRiverIntroStep]=useState(1);
- const[riverIntroArrows,setRiverIntroArrows]=useState<{fromX:number;fromY:number;toX:number;toY:number}[]>([]);
+ const[riverIntroArrows,setRiverIntroArrows]=useState<{fromX:number;fromY:number;toX:number;toY:number;underY?:number}[]>([]);
  const[guideAnchor,setGuideAnchor]=useState<{left:number;top:number;targetX:number;targetY:number;panelWidth:number;startY:number}|null>(null);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
@@ -550,13 +550,21 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const fromRight=riverIntroStep===9;
    const fromX=fromRight?box.right+3:box.left-3;
    const fromY=box.top+Math.min(box.height*.52,135);
-   const arrows=targetNames.flatMap(name=>{
+   const arrows=targetNames.flatMap((name,index)=>{
     const target=document.querySelector('[data-kmw-river-intro="'+name+'"]');
     if(!target)return [];
     const rect=target.getBoundingClientRect();
+    const domainStep=riverIntroStep===3;
+    // Three separate exits underneath the CEO briefing and three rising
+    // arrowheads beneath the actual domain labels. The staggered lower
+    // arcs keep the lines from cutting through the names or the River.
+    const startX=domainStep?box.left+box.width*(index+1)/(targetNames.length+1):fromX;
+    const startY=domainStep?box.bottom+3:fromY;
     const toX=name==='challenge-card'?rect.left+4:rect.left+rect.width/2;
-    const toY=name==='challenge-card'?rect.top+rect.height/2:rect.top+rect.height/2;
-    return[{fromX,fromY,toX,toY}];
+    const toY=domainStep?rect.bottom+8:rect.top+rect.height/2;
+    const roomBelow=Math.max(0,window.innerHeight-toY-14);
+    const underY=domainStep&&roomBelow>=20?toY+Math.min(roomBelow,96-index*21):undefined;
+    return[{fromX:startX,fromY:startY,toX,toY,underY}];
    });
    setRiverIntroArrows(old=>old.length===arrows.length&&old.every((a,i)=>Object.keys(a).every(key=>a[key as keyof typeof a]===arrows[i][key as keyof typeof a]))?old:arrows);
   };
@@ -1185,7 +1193,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    {riverIntroStep<9&&<button type="button" aria-label="Next River introduction step" className="fixed inset-0 z-[160] cursor-pointer bg-transparent" onClick={advanceRiverIntro}/>}
    {riverIntroArrows.length>0&&<svg className="pointer-events-none fixed inset-0 z-[180] h-screen w-screen" aria-hidden="true">
     <defs><marker id="kmw-river-intro-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" stroke="#7dd3fc" fill="none" strokeWidth="1.8"/></marker></defs>
-    {riverIntroArrows.map((arrow,index)=><path key={index} d={`M ${arrow.fromX} ${arrow.fromY} C ${arrow.fromX+(riverIntroUnlocked?48:-46)} ${arrow.fromY}, ${arrow.toX+(riverIntroUnlocked?-60:38)} ${arrow.toY}, ${arrow.toX} ${arrow.toY}`} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" markerEnd="url(#kmw-river-intro-arrow)"/>)}
+    {riverIntroArrows.map((arrow,index)=>{
+     const risingDomainArrow=riverIntroStep===3&&arrow.underY!==undefined;
+     // Sweep below the labels, then approach each domain vertically upwards.
+     // Other tutorial stages keep the existing direct curved arrows.
+     const path=risingDomainArrow
+      ?`M ${arrow.fromX} ${arrow.fromY} C ${arrow.fromX} ${arrow.fromY+54}, ${arrow.fromX-14} ${arrow.underY}, ${arrow.fromX-76} ${arrow.underY} C ${arrow.toX+95} ${arrow.underY}, ${arrow.toX} ${arrow.toY+Math.min(46,(arrow.underY!-arrow.toY)*.65)}, ${arrow.toX} ${arrow.toY}`
+      :`M ${arrow.fromX} ${arrow.fromY} C ${arrow.fromX+(riverIntroUnlocked?48:-46)} ${arrow.fromY}, ${arrow.toX+(riverIntroUnlocked?-60:38)} ${arrow.toY}, ${arrow.toX} ${arrow.toY}`;
+     return <path key={index} d={path} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" markerEnd="url(#kmw-river-intro-arrow)"/>;
+    })}
    </svg>}
    <section role="dialog" aria-modal={riverIntroStep<9} aria-label="CEO briefing: the Knowledge River" data-kmw-river-brief onClick={advanceRiverIntro} className={'fixed top-1/2 z-[190] max-h-[calc(100dvh-80px)] w-[min(380px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,.75)] min-[700px]:w-[min(400px,calc(38vw-24px))] '+(riverIntroUnlocked?'left-1/2 min-[700px]:left-[30%]':'left-1/2 min-[700px]:left-[80%]')}>
     <div className="flex items-center justify-between gap-2"><div className="text-[11px] font-black uppercase tracking-[.14em] text-amber-300">CEO briefing · Knowledge River</div><div className="text-xs font-black text-sky-300">{riverIntroStep}/9</div></div>
