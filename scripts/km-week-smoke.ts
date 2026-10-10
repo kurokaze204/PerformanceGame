@@ -89,6 +89,16 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.equal(new Set(rounds.flat().map(card=>card.title)).size,12,'Story descriptions must not repeat within a six-round cycle');
   const secondCycle=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+7));
   assert.deepEqual(secondCycle.flat().length,12,'A new six-round cycle must generate another twelve Challenges from the same six value profiles');
+  const thirdCycle=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+13));
+  const profileSignature=(cycleCards:typeof rounds,increment:number)=>cycleCards.map(cards=>
+   cards.map(card=>card.domain+':'+(card.difficulty-increment)).sort().join('|')
+  ).sort();
+  assert.deepEqual(profileSignature(secondCycle,1),signatures,'Every Challenge requirement must increase by one in free-play rounds 7–12');
+  assert.deepEqual(profileSignature(thirdCycle,2),signatures,'Every Challenge requirement must increase by two in rounds 13–18');
+  assert.deepEqual(secondCycle[0].map(card=>card.difficulty),rounds[0].map(card=>card.difficulty+1),'The approachable opening profile must increase by one when the deck repeats');
+  assert.ok(secondCycle.flat().every(card=>card.impact===(card.difficulty-1)*15),'A higher Challenge knowledge requirement must not silently change the existing financial impact');
+  assert.ok(thirdCycle.flat().every(card=>card.impact===(card.difficulty-2)*15),'Monetary consequences should still be based on the original six profiles after two rotations');
+  assert.deepEqual(freeChallengesForRound(session,company,7),secondCycle[0],'Escalated rounds must remain reproducible for a given game');
 }
 
 {
