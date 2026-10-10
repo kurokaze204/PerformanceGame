@@ -363,6 +363,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[freeChallengeIntroPlacement,setFreeChallengeIntroPlacement]=useState<{left:number;top:number;width:number;arrows:{fromX:number;fromY:number;toX:number;toY:number}[]}|null>(null);
  const[coachDismissedKey,setCoachDismissedKey]=useState('');
  const[scorePadOpen,setScorePadOpen]=useState(false);
+ const[sitePanelsOpen,setSitePanelsOpen]=useState(false);
  const[turnoverChartOpen,setTurnoverChartOpen]=useState(false);
  const[riverTurnoverOpen,setRiverTurnoverOpen]=useState(false);
  const[riverTurnoverRect,setRiverTurnoverRect]=useState<{left:number;top:number;width:number;height:number}|null>(null);
@@ -1251,7 +1252,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         </button>
        </div>
       </div>
-      <div data-kmw-tour-river data-kmw-river-chart-area className={'relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]'+(riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?' z-[145] rounded-2xl':'')} style={riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?{boxShadow:'0 0 0 160vmax rgba(0,0,0,.74)'}:undefined}><InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/></div>
+      <div data-kmw-tour-river data-kmw-river-chart-area className={'relative top-8 h-[360px] min-[700px]:h-[calc(100%-76px)] min-[700px]:min-h-[210px] xl:h-[calc(100%-78px)] xl:min-h-[285px]'+(riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?' z-[145] rounded-2xl':'')} style={riverIntroActive&&riverIntroStep>=2&&riverIntroStep<=8?{boxShadow:'0 0 0 160vmax rgba(0,0,0,.74)'}:undefined}>
+       <InvestmentRiverView company={riverFrozenCompany||company} mode="km_week" selectedDomain={selectedDomain} highlightDomain guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined} ghostPreview={scoreGhostPreview} thresholdLine={state.stage==='shock'||state.stage==='complete'?{value:KM_WEEK_SHOCK_CUTOFF,label:`SHOCK CUT-OFF · ${KM_WEEK_SHOCK_CUTOFF}`}:undefined}/>
+       <button type="button" data-kmw-site-panels-toggle aria-expanded={sitePanelsOpen} aria-label={sitePanelsOpen?'Hide site details':'Show site details'} title={sitePanelsOpen?'Hide site details':'Show site details'} onClick={()=>setSitePanelsOpen(open=>!open)} className={'absolute bottom-2 left-2 z-20 grid h-11 w-11 place-items-center rounded-xl border-2 shadow-lg transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 '+(sitePanelsOpen?'border-emerald-300 bg-emerald-600 text-white':'border-slate-500 bg-slate-900/95 text-emerald-300 hover:border-emerald-300 hover:bg-slate-800')}>
+        <Building2 className="h-5 w-5"/>
+       </button>
+      </div>
       {scorePadOpen&&<div data-kmw-scorepad className={`absolute left-2 right-2 top-[54px] z-[90] h-fit overflow-visible rounded-[18px] border-2 border-amber-700 bg-[#101827]/[.98] p-3 shadow-[0_20px_60px_rgba(0,0,0,.7)] min-[700px]:left-auto min-[700px]:w-2/3 ${scoreBriefOpen?'z-[135] ring-4 ring-amber-300/80 shadow-[0_0_40px_rgba(250,204,21,.45)]':''}`}>
        <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
        <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -1266,14 +1272,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       </div>}
      </Card>
 
-     <div className="grid shrink-0 gap-2 md:grid-cols-3 min-[700px]:gap-1.5 xl:gap-2">
+     {sitePanelsOpen&&<div data-kmw-site-panels className="grid shrink-0 gap-2 md:grid-cols-3 min-[700px]:gap-1.5 xl:gap-2">
       {sites.map((site,index)=><Card key={site.id} className={`relative overflow-hidden p-3 min-[700px]:p-2 xl:p-3 ${index===0?'rotate-[-.2deg]':index===2?'rotate-[.2deg]':''}`}>
        <div className="absolute right-2 top-2 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[8px] font-black text-slate-500">{SITE_ABBR[site.id]}</div>
        <div className="flex items-center gap-2 min-[700px]:gap-1.5"><MapPin className="h-4 w-4 text-emerald-300 min-[700px]:h-3.5 min-[700px]:w-3.5"/><h3 className="text-sm font-black text-white min-[700px]:text-xs xl:text-sm">{site.name}</h3></div>
        <div className="mt-2 space-y-1.5 min-[700px]:mt-1.5 min-[700px]:space-y-1 xl:mt-2 xl:space-y-1.5">{KM_WEEK_DOMAINS.map(domain=><button key={domain} onClick={()=>setSelectedDomain(domain)} className="flex w-full items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-2 py-1 text-left min-[700px]:gap-1 min-[700px]:px-1.5 min-[700px]:py-0.5 xl:gap-2 xl:px-2 xl:py-1"><span className="w-16 truncate text-[9px] font-black text-slate-400 min-[700px]:w-10 min-[700px]:text-[8px] xl:w-16 xl:text-[9px]">{domainLabel(domain)}</span><KnowledgePips value={site.teamCapability[domain]||0} domain={domain} compact/><b className="ml-auto text-xs text-white">{site.teamCapability[domain]||0}</b></button>)}</div>
        <div className="mt-2 border-t border-slate-800 pt-1.5 text-[9px] font-bold text-slate-500 min-[700px]:mt-1 min-[700px]:pt-1 min-[700px]:text-[8px] xl:mt-2 xl:pt-1.5 xl:text-[9px]">Expert here: <span className="text-amber-200">{experts.filter(expert=>expert.location===site.id).map(expert=>expert.name.split(' ')[0]).join(', ')||'—'}</span></div>
       </Card>)}
-     </div>
+     </div>}
     </div>
 
     <aside className="kmw-controls min-w-0 space-y-2 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2">
