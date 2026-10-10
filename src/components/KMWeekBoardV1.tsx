@@ -245,7 +245,7 @@ function phaseTitle(company:CompanyV2){
 function currentPhaseLabel(company:CompanyV2){
  const state=company.kmWeek;
  if(!state)return'Preparing';
- if(state.stage==='shock')return'Site Audits';
+ if(state.stage==='shock')return'Site Audit Report';
  if(state.stage==='complete')return'Score & Debrief';
  return state.phase==='challenge'?'Challenge':'Invest';
 }
