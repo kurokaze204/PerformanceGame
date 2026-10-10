@@ -89,6 +89,7 @@ assert.equal(eventV4Source.includes('Diagnostic complete'),false,'Newbie and Exp
 assert.equal(eventProgressionSource.includes("card.title=\`\${tier}:"),false,'Challenge titles must not expose simulation pressure tiers');
 assert.equal(eventProgressionSource.includes('This is move \${moveNumber}'),false,'Challenge descriptions must not expose move numbers or simulation mechanics');
 assert.ok(kmWeekBoardSource.includes('Business Performance')&&kmWeekBoardSource.includes('Knowledge Flow')&&kmWeekBoardSource.includes('Squeaky clean'),'KM Week must show the board-game score pad with the renamed audit score');
+assert.ok(kmWeekBoardSource.includes('<ScoreCell label={goal.title} value={state.score.goal}')&&kmWeekDebriefSource.includes('KM_WEEK_GOALS[session.kmWeekGoalId].title'),'Both playing and final Score Pads must display the assigned goal name, e.g. Local Heroes, instead of the generic KM Week goal label');
 assert.ok(kmWeekBoardSource.includes('Depth')&&kmWeekBoardSource.includes('Breadth')&&kmWeekBoardSource.includes('Flow'),'KM Week debrief must name the River concepts after players experience them');
 assert.ok(kmWeekBoardSource.includes('COMMIT RESPONSE'),'KM Week Challenge choices must require an explicit commit');
 
