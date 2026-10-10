@@ -264,7 +264,10 @@ export function freeChallengesForRound(session:GameSessionV2,company:CompanyV2,r
       story:description.story.split('{site}').join(siteLabel),
       siteId,
       domain:value.domain,
-      difficulty:value.difficulty,
+      // Knowledge requirements rise by one each time the six-pattern
+      // challenge deck cycles (Rounds 1-6 base, 7-12 +1, 13-18 +2, etc).
+      // Keep the existing monetary impacts unchanged.
+      difficulty:value.difficulty+cycle,
       impact:value.impact,
       status:'open',
     };
