@@ -8,6 +8,7 @@ export type RiverGhostPreview =
  | {kind:'expert';domain:KnowledgeDomain;expertId:string;delta:number}
  | {kind:'site';domain:KnowledgeDomain;siteId:string;delta:number}
  | {kind:'transfer';domain:KnowledgeDomain;sourceSiteId:string;targetSiteId:string;delta:number}
+ | {kind:'aar';domain:KnowledgeDomain;siteId:string;expertId:string;siteDelta:number;expertDelta:number}
  | {kind:'threshold';value:number;label:string};
 
 interface Props{
@@ -124,8 +125,9 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const labelX=rightEdge?px-10:px+10;
        const labelAnchor=rightEdge?'end':'start';
        const guidedSite=mode==='km_week'&&domainSelected&&site.id===guidedSiteId;
-       const siteGhost=ghostPreview?.kind==='site'&&ghostPreview.domain===item.domain&&ghostPreview.siteId===site.id&&ghostPreview.delta>0;
-       const siteGhostY=siteGhost?y(Math.min(5,score+ghostPreview.delta)):py;
+       const siteGhost=Boolean(ghostPreview?.domain===item.domain&&ghostPreview.siteId===site.id&&((ghostPreview.kind==='site'&&ghostPreview.delta>0)||(ghostPreview.kind==='aar'&&ghostPreview.siteDelta>0)));
+       const siteGhostDelta=ghostPreview?.kind==='aar'?ghostPreview.siteDelta:ghostPreview?.kind==='site'?ghostPreview.delta:0;
+       const siteGhostY=siteGhost?y(Math.min(5,score+siteGhostDelta)):py;
        return <g key={site.id} className="kmw-river-motion" data-river-target={`site:${site.id}:${item.domain}`}>
         {guidedSite&&<circle className="kmw-guided-site-pulse" data-kmw-guided-site={site.id} cx={px} cy={py} r="17" fill="#082f49" fillOpacity=".20" stroke="#38bdf8" strokeWidth="3" strokeDasharray="5 5"/>}
         {siteGhost&&<g data-kmw-score-ghost="local" filter="url(#kmw-blue-ghost-glow)"><line x1={px} y1={py} x2={px} y2={siteGhostY} stroke="#38bdf8" strokeWidth="3" strokeDasharray="6 5"/><circle cx={px} cy={siteGhostY} r="8" fill="#082f49" stroke="#7dd3fc" strokeWidth="2.5" strokeDasharray="4 3"/></g>}
@@ -152,8 +154,9 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
        const {px,py}=expertPoints[ei];
        const selected=domainSelected&&mark.expert.id===selectedExpertId;
        const loc=abbrev(mark.expert.location);
-       const expertGhost=ghostPreview?.kind==='expert'&&ghostPreview.domain===item.domain&&ghostPreview.expertId===mark.expert.id&&ghostPreview.delta>0;
-       const expertGhostY=expertGhost?y(Math.min(mode==='km_week'?6:5,mark.score+ghostPreview.delta)):py;
+       const expertGhost=Boolean(ghostPreview?.domain===item.domain&&ghostPreview.expertId===mark.expert.id&&((ghostPreview.kind==='expert'&&ghostPreview.delta>0)||(ghostPreview.kind==='aar'&&ghostPreview.expertDelta>0)));
+       const expertGhostDelta=ghostPreview?.kind==='aar'?ghostPreview.expertDelta:ghostPreview?.kind==='expert'?ghostPreview.delta:0;
+       const expertGhostY=expertGhost?y(Math.min(mode==='km_week'?6:5,mark.score+expertGhostDelta)):py;
        return <g key={`${mark.expert.id}-${item.domain}`} className="kmw-river-motion" data-river-target={`expert:${mark.expert.id}:${item.domain}`}>
         {expertGhost&&<g data-kmw-score-ghost="expertise" filter="url(#kmw-blue-ghost-glow)"><line x1={px} y1={py} x2={px} y2={expertGhostY} stroke="#38bdf8" strokeWidth="3" strokeDasharray="6 5"/><circle cx={px} cy={expertGhostY} r="18" fill="#082f49" fillOpacity=".72" stroke="#7dd3fc" strokeWidth="2.5" strokeDasharray="5 4"/></g>}
         {selected&&<circle cx={px} cy={py} r="25" fill="#facc15" fillOpacity=".12" stroke="#fde047" strokeWidth="3.5"/>}
