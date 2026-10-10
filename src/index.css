@@ -373,6 +373,15 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
 }
 .kmw-tour-highlight { position: relative; animation: kmw-tour-glow 1.4s ease-in-out infinite; }
 .kmw-tour-chance { animation: kmw-tour-glow 1s ease-in-out infinite; }
+/* Once the response can cover the requirement, success must read green,
+   including during a cyan coaching highlight. */
+.kmw-tour-required-success {
+  border-color: #34d399 !important;
+  background-color: rgb(6 78 59 / .24);
+  box-shadow: 0 0 0 2px rgb(52 211 153 / .4), 0 0 20px rgb(16 185 129 / .25);
+  animation: none;
+}
+
 @keyframes kmw-guided-site-glow {
   0%, 100% { opacity: .65; stroke-width: 2.5; }
   50% { opacity: 1; stroke-width: 4; }
