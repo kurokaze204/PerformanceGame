@@ -897,7 +897,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   {scoreBriefOpen&&<>
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/70"/>
    <div className="fixed left-1/2 top-1/2 z-[145] max-h-[calc(100dvh-90px)] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 shadow-[0_24px_80px_rgba(0,0,0,.72)] min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)] min-[700px]:translate-x-0 xl:p-5">
-    <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Score briefing · Round 4 Invest</div>
+    <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Score briefing · First full round</div>
     <h2 className="mt-2 text-2xl font-black text-white">Nice work — you’re up to {state.score.total} points.</h2>
     <p className="mt-2 text-sm leading-relaxed text-slate-200">Your Score Pad tracks <b className="text-amber-200">business results, expertise, local capability, knowledge flow and resilience</b>. Different investments strengthen different parts of your score.</p>
     <div className="mt-3 rounded-xl border border-slate-700 bg-slate-950/75 p-3">
