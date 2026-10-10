@@ -68,6 +68,101 @@ function companyPerformanceHistory(company:CompanyV2):PerformanceHistoryPoint[]{
  return points;
 }
 
+type RiverTurnoverEvent={kind:'win'|'loss';amount:number;challenge:number};
+type RiverTurnoverPoint={key:string;turnover:number;events:RiverTurnoverEvent[];retiredName?:string};
+
+/** The turnover log is kept across all rounds, unlike the active Challenge
+ * cards. Use each recorded Challenge delta to reconstruct win/loss markers. */
+function riverTurnoverSeries(company:CompanyV2):RiverTurnoverPoint[]{
+ const state=company.kmWeek;
+ const history=state?.turnoverHistory||[];
+ const first=history[0]?.turnover??company.startingTurnover??company.turnover;
+ const turns=new Map<string,RiverTurnoverPoint>();
+ turns.set('START',{key:'START',turnover:first,events:[]});
+ let previous=first;
+ for(const entry of history){
+  const match=/^([GR])(\d+)\s+(C\d*|I)$/.exec(entry.label);
+  const key=entry.label.startsWith('SITE AUDITS ')?'AUDITS':match?`${match[1]}${match[2]}`:null;
+  if(!key){previous=entry.turnover;continue;}
+  const item=turns.get(key)||{key,turnover:previous,events:[]};
+  if(match&&match[3].startsWith('C')){
+   item.events.push({kind:entry.turnover>=previous?'win':'loss',amount:entry.turnover-previous,challenge:match[3]==='C'?1:Number(match[3].slice(1))});
+  }
+  item.turnover=entry.turnover;
+  turns.set(key,item);
+  previous=entry.turnover;
+ }
+ const retirement=state?.expertRetirement;
+ if(retirement){
+  const key=`R${retirement.retiredAtRound}`;
+  const item=turns.get(key);
+  if(item)item.retiredName=retirement.retiredName;
+ }
+ return Array.from(turns.values());
+}
+
+const TurnoverRiverChart:React.FC<{session:GameSessionV2;currentCompanyId:string}>=({session,currentCompanyId})=>{
+ const companies=session.companies.filter(item=>item.kmWeek);
+ const series=companies.map(item=>({company:item,points:riverTurnoverSeries(item)}));
+ const allKeys=[...new Set(series.flatMap(item=>item.points.map(point=>point.key)))];
+ const order=(key:string)=>key==='START'?0:key==='AUDITS'?1000:key.startsWith('G')?Number(key.slice(1)):100+Number(key.slice(1));
+ const keys=allKeys.sort((a,b)=>order(a)-order(b));
+ const W=760,H=282,left=61,right=18,top=24,bottom=48,innerH=H-top-bottom,innerW=W-left-right;
+ const amounts=series.flatMap(item=>item.points.map(point=>point.turnover));
+ const minRaw=Math.min(...amounts,0),maxRaw=Math.max(...amounts,1);
+ const padding=Math.max(20,(maxRaw-minRaw)*.12);
+ const minValue=Math.max(0,Math.min(...amounts)-padding);
+ const maxValue=Math.max(...amounts)+padding;
+ const x=(key:string)=>left+Math.max(0,keys.indexOf(key))*innerW/Math.max(1,keys.length-1);
+ const y=(amount:number)=>top+innerH-(amount-minValue)/Math.max(1,maxValue-minValue)*innerH;
+ const ticks=Array.from({length:5},(_,i)=>minValue+(maxValue-minValue)*i/4);
+ return <div data-kmw-river-turnover-chart role="dialog" aria-modal="true" aria-label="Turnover by round" className="flex h-full w-full flex-col overflow-hidden rounded-2xl border-[3px] border-emerald-400 bg-[#071827] p-2 shadow-[0_20px_55px_rgba(0,0,0,.8)] sm:p-3">
+  <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+   <div><div className="text-[10px] font-black uppercase tracking-[.15em] text-emerald-300">Turnover</div><h3 className="text-[15px] font-black text-white">Business results by round</h3></div>
+   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold text-slate-200">
+    <span className="text-yellow-300">━ Your company</span><span className="text-emerald-400">━ Others</span>
+    <span className="text-green-400">↑ Win</span><span className="text-red-800">↓ Loss</span><span className="text-amber-300">● Expert retired <span className="text-red-500">✕</span></span>
+   </div>
+  </div>
+  <div className="mt-1 min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
+   <svg viewBox={`0 0 ${W} ${H}`} className="h-full min-h-[190px] w-full min-w-[570px]" role="img" aria-label="Current company turnover shown in bold yellow, other companies in green; arrows mark Challenge results and a crossed expert symbol marks retirement">
+    {ticks.map((amount,i)=><g key={'tick'+i}><line x1={left} x2={W-right} y1={y(amount)} y2={y(amount)} stroke="#233847" strokeDasharray="3 5"/><text x={left-7} y={y(amount)+4} textAnchor="end" fontSize="12" fill="#cbd5e1" fontWeight="800">{money(Math.round(amount))}</text></g>)}
+    {keys.map(key=><g key={key}><text x={x(key)} y={H-23} textAnchor="middle" fontSize="14" fill="#cbd5e1" fontWeight="800">{key==='START'?'Start':key==='AUDITS'?'Audits':key.startsWith('G')?'G'+key.slice(1):'R'+key.slice(1)}</text></g>)}
+    {series.filter(item=>item.company.id!==currentCompanyId).map((item,index)=>{
+     const color=index%2===0?'#22c55e':'#34d399';
+     const path=item.points.map((point,i)=>(i?'L':'M')+` ${x(point.key)} ${y(point.turnover)}`).join(' ');
+     return <g key={item.company.id} opacity=".65">
+      <path d={path} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={index%3===1?'6 3':undefined}/>
+      {item.points.map(point=><circle key={point.key} cx={x(point.key)} cy={y(point.turnover)} r="2.5" fill={color}><title>{item.company.name}: {point.key} — {money(point.turnover)}</title></circle>)}
+     </g>;
+    })}
+    {series.filter(item=>item.company.id===currentCompanyId).map(item=><g key={item.company.id}>
+     <path d={item.points.map((point,i)=>(i?'L':'M')+` ${x(point.key)} ${y(point.turnover)}`).join(' ')} fill="none" stroke="#facc15" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+     {item.points.map(point=><g key={point.key}>
+      <circle cx={x(point.key)} cy={y(point.turnover)} r="5" fill="#facc15" stroke="#111827" strokeWidth="2"><title>{item.company.name}: {point.key} — {money(point.turnover)}</title></circle>
+      {point.events.map((event,i)=>{
+       const iconX=x(point.key)+(i-(point.events.length-1)/2)*22;
+       const iconY=y(point.turnover)+(event.kind==='win'?-24:26);
+       return <g data-kmw-turnover-event={event.kind} key={i} transform={`translate(${iconX} ${iconY})`}>
+        <path d="M0 -10 L-8 -2 H-4 V10 H4 V-2 H8 Z" transform={event.kind==='loss'?'rotate(180)':undefined} fill={event.kind==='win'?'#22c55e':'#7f1d1d'} stroke={event.kind==='win'?'#14532d':'#fca5a5'} strokeWidth="1.3"/>
+        <title>{point.key} Challenge {event.challenge}: {event.kind==='win'?'won':'lost'} ({event.amount>=0?'+':''}{money(event.amount)})</title>
+       </g>;
+      })}
+      {point.retiredName&&<g data-kmw-turnover-retirement transform={`translate(${x(point.key)} ${y(point.turnover)-52})`}>
+       <circle r="13" fill="#facc15" stroke="#713f12" strokeWidth="2"/>
+       <circle cx="0" cy="-4" r="3.6" fill="#422006"/>
+       <path d="M-7 7 Q-7 0 0 0 Q7 0 7 7" fill="#422006"/>
+       <path d="M-14 -14 L14 14 M14 -14 L-14 14" stroke="#dc2626" strokeWidth="3.4" strokeLinecap="round"/>
+       <title>{point.retiredName} retired during {point.key}</title>
+      </g>}
+     </g>)}
+    </g>)}
+   </svg>
+  </div>
+  <div className="shrink-0 text-center text-[10px] font-bold text-slate-400">Use the green Turnover button again, or press Esc, to return to the River.</div>
+ </div>;
+};
+
 const TurnoverKnowledgeModal:React.FC<{open:boolean;session:GameSessionV2;currentCompanyId:string;onClose:()=>void}>=({open,session,currentCompanyId,onClose})=>{
  if(!open)return null;
  const companies=session.companies.filter(item=>item.kmWeek);
