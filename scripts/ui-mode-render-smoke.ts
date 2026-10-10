@@ -110,8 +110,17 @@ assert.ok(kmWeekBoardSource.includes('<PhaseStep number="1" label="Challenge"')&
 assert.ok(kmWeekBoardSource.includes("overtime?'OVERTIME'")&&kmWeekBoardSource.includes('KM Week is time-boxed, not hard-stopped'),'KM Week must make clear that 0:00 does not lock the player out');
 assert.ok(kmWeekBoardSource.includes("actionError&&<div")&&kmWeekBoardSource.includes('COMMIT RESPONSE'),'Challenge action failures must be explained inline instead of flashing Working and appearing to do nothing');
 assert.ok(kmWeekBoardSource.includes('<KMWeekDebriefV1 session={session} company={company}/>'),'Completed KM Week games must move into the AAR-lite dashboard');
-assert.ok(kmWeekDebriefSource.includes('AAR-lite · Discuss together')&&kmWeekDebriefSource.includes('Before')&&kmWeekDebriefSource.includes('After'),'KM Week AAR-lite must compare each company score and before/after Rivers');
+assert.ok(kmWeekDebriefSource.includes('After Action Review - Discuss Together')&&kmWeekDebriefSource.includes('Before free play')&&kmWeekDebriefSource.includes('After free play'),'KM Week After Action Review must use the requested title and retain before/after knowledge Rivers');
 assert.ok(kmWeekDebriefSource.includes('TurnoverGraph')&&kmWeekDebriefSource.includes('COMPANY_COLORS'),'KM Week AAR-lite must graph all company turnover using the same company colours as the comparison cards');
+assert.ok(kmWeekDebriefSource.includes("data-kmw-aar-challenge-result={result||undefined}")&&kmWeekDebriefSource.includes("result==='success'?'#34d399'")&&kmWeekDebriefSource.includes("result==='failure'?'#dc2626'"),'AAR turnover graph must mark each Challenge win green and each failure red rather than using company-coloured dots');
+assert.ok(kmWeekDebriefSource.includes('point.challengeResult??')&&kmWeekDebriefSource.includes('Other dots show investments and audits'),'AAR challenge markers must prefer recorded win/loss events over the turnover sign and explain non-Challenge dots');
+assert.ok(kmWeekDebriefSource.includes("calculateKMWeekScoreV1(session,b).total-calculateKMWeekScoreV1(session,a).total"),'After Action Review must rank companies by descending final score');
+{
+ const chart=kmWeekDebriefSource.indexOf('<TurnoverGraph companies={companies} colors={colors}/>');
+ const cards=kmWeekDebriefSource.indexOf('{companies.map((item,index)=>{');
+ assert.ok(chart>=0&&chart<cards,'AAR turnover graph must appear before the company comparison cards');
+}
+
 assert.ok(kmWeekDebriefSource.includes("label:'Final turnover'")&&kmWeekDebriefSource.includes('max:7')&&kmWeekDebriefSource.includes('1st 7 · 2nd 4 · 3rd 2'),'The final Score Pad must display turnover rank points (7, 4 and 2) as an additional scoring category');
 assert.ok(kmWeekDebriefSource.includes('calculateKMWeekScoreV1(session,company)')&&kmWeekDebriefSource.includes('{score.total}'),'Final Score Pad totals must include the turnover placement points and remain in sync with the engine');
 assert.ok(kmWeekDebriefSource.includes('finalTurnover&&!allComplete')&&kmWeekDebriefSource.includes('Pending'),'The final-turnover bonus must not be prematurely revealed while competing companies are still playing');
