@@ -269,6 +269,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[guideAnchor,setGuideAnchor]=useState<{left:number;top:number;targetX:number;targetY:number;panelWidth:number;startY:number}|null>(null);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
+ const[coachDismissedKey,setCoachDismissedKey]=useState('');
  const[scorePadOpen,setScorePadOpen]=useState(false);
  const[turnoverChartOpen,setTurnoverChartOpen]=useState(false);
  const[expertChangeDismissedKey,setExpertChangeDismissedKey]=useState('');
@@ -481,6 +482,19 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   :null;
  const expertChangeKey=expertChangeKind&&expertChange?`${expertChangeKind}:${expertChange.expertId}:${state.freeRound}`:'';
  const showExpertChangePopup=Boolean(expertChangeKind&&expertChangeKey!==expertChangeDismissedKey&&!riskRollPending&&!riskResult);
+ // Questions are specific to the River after each of the first six full-play
+ // rounds. They are presented once per round, after any score, dice, or expert
+ // change popup, and only after Challenge/Turnover animations have finished.
+ const coachPopupKey=`tpg:kmw-coach:${session.id}:${company.id}:free-${state.freeRound}`;
+ const firstScoreBriefPending=state.stage==='free'&&state.freeRound===1&&localStorage.getItem(`tpg:kmw-score-brief:${session.id}:${company.id}`)!=='seen';
+ const showCoachPopup=Boolean(state.stage==='free'&&state.phase==='invest'&&coaching&&
+  !readOnly&&!busy&&!riskResult&&!riskRollPending&&!challengeOutcome&&!riverFrozenCompany&&
+  !scoreBriefOpen&&!firstScoreBriefPending&&!showExpertChangePopup&&
+  coachDismissedKey!==coachPopupKey&&localStorage.getItem(coachPopupKey)!=='seen');
+ const dismissCoach=()=>{
+  localStorage.setItem(coachPopupKey,'seen');
+  setCoachDismissedKey(coachPopupKey);
+ };
 
  const post=async(payload:any,beforeApply?:(nextSession:GameSessionV2)=>Promise<void>)=>{
   if(readOnly){onToast(`Read only · ${controllerName||'Your CEO'} controls this company.`);return false}
@@ -880,6 +894,17 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>}
   </div>}
 
+  {showCoachPopup&&coaching&&<>
+   <div aria-hidden="true" className="fixed inset-0 z-[118] bg-black/65"/>
+   <section role="dialog" aria-modal="true" aria-label="Knowledge investment coaching question" data-kmw-coaching-popup className="fixed left-1/2 top-1/2 z-[145] max-h-[calc(100dvh-90px)] w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-sky-300 bg-[linear-gradient(145deg,#10253a,#111827)] p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,.75)] min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)] min-[700px]:translate-x-0">
+    <div className="text-[10px] font-black uppercase tracking-[.15em] text-sky-300">A question before you invest · Round {state.freeRound} of 6</div>
+    <h2 className="mt-2 text-lg font-black text-white">Look at your Knowledge River</h2>
+    <p className="mt-3 text-[15px] font-semibold leading-relaxed text-slate-100">{coaching.text}</p>
+    <p className="mt-3 text-xs leading-relaxed text-slate-400">Consider where expertise sits today, and what your next investment could change.</p>
+    <button type="button" onClick={dismissCoach} className="mt-4 h-11 w-full rounded-xl border-2 border-sky-200 bg-sky-400 text-sm font-black text-slate-950">CONTINUE TO INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+   </section>
+  </>}
+
   {scoreBriefOpen&&<>
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/70"/>
    <div className="fixed left-1/2 top-1/2 z-[145] max-h-[calc(100dvh-90px)] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 shadow-[0_24px_80px_rgba(0,0,0,.72)] min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)] min-[700px]:translate-x-0 xl:p-5">
@@ -893,7 +918,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      <p className="mt-2 text-xs leading-relaxed text-emerald-200"><b>One idea for this Invest:</b> {scoreSuggestion}</p>
     </div>
     <p className="mt-3 text-[11px] leading-relaxed text-slate-400">That is only a suggestion. From here, choose the investment that fits the company you want to build.</p>
-    <button type="button" onClick={()=>{localStorage.setItem(`tpg:kmw-score-brief:${session.id}:${company.id}`,'seen');setScoreBriefOpen(false)}} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">GOT IT — LET ME INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+    <button type="button" onClick={()=>{localStorage.setItem(`tpg:kmw-score-brief:${session.id}:${company.id}`,'seen');setScoreBriefOpen(false);setScorePadOpen(false)}} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">GOT IT — LET ME INVEST <ArrowRight className="ml-1 inline h-4 w-4"/></button>
    </div>
   </>}
 
@@ -910,8 +935,6 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     <PhaseStep number="4" label="Score" active={state.stage==='complete'} done={false}/>
     <div className="ml-auto rounded-xl border border-amber-800 bg-amber-950/20 px-3 py-1.5 text-xs font-black text-amber-100"><span className="mr-2 text-[9px] uppercase text-amber-500">Current phase</span>{currentPhaseLabel(company)}</div>
    </div>
-
-   {coaching&&state.phase==='challenge'&&challengeFocusOpen&&<div className="mb-2 shrink-0 rounded-xl border border-amber-800 bg-amber-950/25 px-3 py-2 text-sm text-amber-100">{coaching.text}</div>}
 
    {finalShockWindow&&<div className="mb-2 shrink-0 rounded-xl border-2 border-rose-500 bg-rose-950/35 px-3 py-2 text-[10px] font-bold leading-relaxed text-rose-100"><b className="text-rose-300">FINAL 3 MINUTES.</b> Finish this round. After your next investment, the Business Shock begins and company experts become unavailable.</div>}
 
@@ -1019,7 +1042,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       </>}
 
       {(state.stage==='guided'||state.stage==='free')&&state.phase==='invest'&&<>
-       <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5">{coaching&&<p className="mb-2 text-sm font-bold leading-snug text-amber-100">{coaching.text}</p>}<div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?<><span>{guidedCopy.invest}</span><br/><span className="font-black text-amber-200">Guided move: choose {guidedTargetInvestment==='TRAIN_EXPERT'?'Train Expert':guidedTargetInvestment==='LOCAL_TRAINING'?'Local Training':'Knowledge Transfer'}.</span></>:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
+       <div className="mt-2 rounded-xl border-2 border-amber-700 bg-amber-950/20 p-2.5"><div className="text-[9px] font-black uppercase tracking-[.14em] text-amber-300">What to do now</div><p className="mt-1 text-[11px] leading-relaxed text-slate-300">{guided?<><span>{guidedCopy.invest}</span><br/><span className="font-black text-amber-200">Guided move: choose {guidedTargetInvestment==='TRAIN_EXPERT'?'Train Expert':guidedTargetInvestment==='LOCAL_TRAINING'?'Local Training':'Knowledge Transfer'}.</span></>:'Choose exactly one investment. Check the preview, then press COMMIT INVESTMENT. The next round starts immediately.'}</p></div>
        <div className="mt-2 grid grid-cols-3 gap-1.5">
         <button disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>setInvestment('TRAIN_EXPERT')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}><GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+1 depth · $15k</div></button>
         <button disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>setInvestment('LOCAL_TRAINING')} className={`rounded-xl border-2 p-2 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}><Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+2 local · $10k</div></button>
