@@ -3,7 +3,7 @@ import type { KnowledgeDomain } from './game.ts';
 export type KMWeekStage = 'guided' | 'free' | 'shock' | 'complete';
 export type KMWeekPhase = 'challenge' | 'invest';
 export type KMWeekResolutionMethod = 'local' | 'expert' | 'risk';
-export type KMWeekInvestment = 'TRAIN_EXPERT' | 'LOCAL_TRAINING' | 'KNOWLEDGE_TRANSFER';
+export type KMWeekInvestment = 'TRAIN_EXPERT' | 'LOCAL_TRAINING' | 'KNOWLEDGE_TRANSFER' | 'AFTER_ACTION_REVIEW';
 export type KMWeekGoalId = 'local-heroes' | 'deep-bench' | 'broad-base' | 'balanced-network';
 
 export interface KMWeekChallenge {
@@ -34,6 +34,9 @@ export interface KMWeekInvestmentRecord {
   before: number;
   after: number;
   meaningfulFlow?: boolean;
+  challengeId?: string;
+  expertBefore?: number;
+  expertAfter?: number;
 }
 
 export interface KMWeekTurnoverPoint {
