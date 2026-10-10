@@ -1,10 +1,10 @@
 import React,{useEffect,useMemo,useRef,useState}from'react';
-import{ArrowRight,BarChart3,Brain,Building2,CheckCircle2,CircleDollarSign,Crown,Dices,GraduationCap,Info,LogOut,MapPin,Medal,ShieldCheck,Sparkles,Target,Users,Workflow,X}from'lucide-react';
+import{ArrowRight,BarChart3,BookOpenCheck,Brain,Building2,CheckCircle2,CircleDollarSign,Crown,Dices,GraduationCap,Info,LogOut,MapPin,Medal,ShieldCheck,Sparkles,Target,Users,Workflow,X}from'lucide-react';
 import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_AAR_COST,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{toggleKMWeekSourceV1}from'../engine/kmWeekSelectionV1.ts';
 import{kmWeekCoachV1}from'../engine/kmWeekCoachV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -52,7 +52,7 @@ function totalKnowledge(company:CompanyV2){
 function companyPerformanceHistory(company:CompanyV2):PerformanceHistoryPoint[]{
  const state=company.kmWeek;
  if(!state)return[{label:'Start',turnover:company.startingTurnover||company.turnover,knowledge:totalKnowledge(company)}];
- const investmentDeltas=state.investmentHistory.map(item=>Math.max(0,item.after-item.before));
+ const investmentDeltas=state.investmentHistory.map(item=>Math.max(0,item.after-item.before)+Math.max(0,(item.expertAfter??0)-(item.expertBefore??0)));
  const startKnowledge=Math.max(0,totalKnowledge(company)-investmentDeltas.reduce((sum,delta)=>sum+delta,0));
  const investments=(state.turnoverHistory||[]).filter(point=>/ I$/.test(point.label));
  const points:PerformanceHistoryPoint[]=[{label:'Start',turnover:company.startingTurnover||875,knowledge:startKnowledge}];
@@ -376,6 +376,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
  const[riverFrozenCompany,setRiverFrozenCompany]=useState<CompanyV2|null>(null);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
+ const[aarChallengeId,setAARChallengeId]=useState('');
+ const[aarIntroDismissed,setAARIntroDismissed]=useState(false);
+ const[aarIntroArrow,setAARIntroArrow]=useState<{x1:number;y1:number;x2:number;y2:number}|null>(null);
  const[expertId,setExpertId]=useState('');
  const[sourceSiteId,setSourceSiteId]=useState('brisbane');
  const[targetSiteId,setTargetSiteId]=useState('perth');
@@ -409,6 +412,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const specialist=expertId?experts.find(item=>item.id===expertId):specialistFor(company,selectedDomain);
  const specialistDomain=specialist?.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
  const localTrainingSite=company.sites.find(site=>site.id===trainingSiteId&&!site.isClosed);
+ const aarCandidates=kmWeekAARCandidatesV1(company);
+ const aarChallenge=aarCandidates.find(challenge=>challenge.id===aarChallengeId)||aarCandidates[0];
+ const aarSite=aarChallenge?company.sites.find(site=>site.id===aarChallenge.siteId):undefined;
+ const aarExpert=aarChallenge?specialistFor(company,aarChallenge.domain):undefined;
+ const aarUplift=aarChallenge?.status==='failure'?2:1;
+ const aarSiteBefore=aarSite&&aarChallenge?aarSite.teamCapability[aarChallenge.domain]||0:0;
+ const aarExpertBefore=aarExpert&&aarChallenge?specialistScore(company,aarChallenge.domain):0;
+ const aarSiteDelta=aarChallenge?Math.min(5,aarSiteBefore+aarUplift)-aarSiteBefore:0;
+ const aarExpertDelta=aarChallenge?Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,aarExpertBefore+aarUplift)-aarExpertBefore:0;
  const localTrainingTravelCost=specialist&&localTrainingSite&&specialist.location!==localTrainingSite.id?2:0;
  const standings=useMemo(()=>session.companies.map(item=>({id:item.id,name:item.name,score:item.kmWeek?.score.total||0,complete:item.kmWeek?.stage==='complete'})).sort((a,b)=>b.score-a.score),[session.companies,session.updatedAt]);
 
@@ -633,6 +645,22 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(state?.stage==='guided'||state?.stage==='complete'||(state?.stage==='free'&&state.freeRound<2))setRiverTurnoverOpen(false);
  },[state?.stage,state?.freeRound]);
 
+ useEffect(()=>{
+  if(!showAARIntro){setAARIntroArrow(null);return;}
+  const reposition=()=>{
+   const panel=document.querySelector('[data-kmw-aar-intro]')?.getBoundingClientRect();
+   const button=document.querySelector('[data-kmw-aar-button]')?.getBoundingClientRect();
+   if(!panel||!button)return;
+   setAARIntroArrow(current=>{
+    const next={x1:panel.right-25,y1:panel.bottom-12,x2:button.left+button.width*.5,y2:button.top+4};
+    return current&&Object.keys(next).every(key=>next[key as keyof typeof next]===current[key as keyof typeof next])?current:next;
+   });
+  };
+  const frame=requestAnimationFrame(reposition);
+  window.addEventListener('resize',reposition);
+  window.addEventListener('scroll',reposition,true);
+  return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',reposition);window.removeEventListener('scroll',reposition,true)};
+ },[showAARIntro]);
  useEffect(()=>{if(scoreBriefOpen)setScorePadOpen(true)},[scoreBriefOpen]);
 
  if(!state)return <div className="min-h-screen bg-slate-950 text-white grid place-items-center">Preparing KM Week board…</div>;
@@ -703,6 +731,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   !readOnly&&!busy&&!riskResult&&!riskRollPending&&!challengeOutcome&&!riverFrozenCompany&&
   !scoreBriefOpen&&!firstScoreBriefPending&&!showExpertChangePopup&&!expertChangeQuestionCoversRound&&
   coachDismissedKey!==coachPopupKey&&localStorage.getItem(coachPopupKey)!=='seen');
+ const aarIntroKey=`tpg:kmw-aar-intro:${session.id}:${company.id}`;
+ const showAARIntro=Boolean(aarCandidates.length&&state.stage==='free'&&state.phase==='invest'&&!readOnly&&!busy&&
+  !scoreBriefOpen&&!showCoachPopup&&!showExpertChangePopup&&!riverFrozenCompany&&!aarIntroDismissed&&
+  localStorage.getItem(aarIntroKey)!=='seen');
+ const dismissAARIntro=()=>{
+  localStorage.setItem(aarIntroKey,'seen');
+  setAARIntroDismissed(true);
+ };
  const dismissCoach=()=>{
   localStorage.setItem(coachPopupKey,'seen');
   setCoachDismissedKey(coachPopupKey);
@@ -944,7 +980,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const guidedTargetInvestment:KMWeekInvestment|undefined=guided?(state.guidedTurn===1?'TRAIN_EXPERT':state.guidedTurn===2?'LOCAL_TRAINING':'KNOWLEDGE_TRANSFER'):undefined;
  const source=company.sites.find(site=>site.id===sourceSiteId);
  const target=company.sites.find(site=>site.id===targetSiteId);
- const investmentPreview=investment==='TRAIN_EXPERT'
+ const investmentPreview=investment==='AFTER_ACTION_REVIEW'
+   ?aarChallenge&&aarSite&&aarExpert?`${aarChallenge.status==='success'?'SUCCESS':'FAILURE'}: ${aarSite.name} ${domainLabel(aarChallenge.domain)} ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]} ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} · $50k`:'Choose a qualifying Challenge'
+   :investment==='TRAIN_EXPERT'
    ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
    :investment==='LOCAL_TRAINING'
     ?specialist&&localTrainingSite?`${localTrainingSite.name} ${domainLabel(specialistDomain)}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min(5,specialistScore(company,specialistDomain),(localTrainingSite.teamCapability[specialistDomain]||0)+2)} · ${localTrainingTravelCost?`Travel $2k · total $12k`:'No travel · total $10k'}`:'Choose an expert and training site'
@@ -955,7 +993,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     })():'Choose two sites';
 
  const scoreGhostPreview:RiverGhostPreview|undefined=(()=>{
-  if(scoreGhost==='expertise'&&specialist){
+  if(state.phase==='invest'&&investment==='AFTER_ACTION_REVIEW'&&aarChallenge&&aarSite&&aarExpert){
+   return{kind:'aar',domain:aarChallenge.domain,siteId:aarSite.id,expertId:aarExpert.id,siteDelta:aarSiteDelta,expertDelta:aarExpertDelta};
+  }
+  if(scoreGhost='expertise'&&specialist){
    const score=specialistScore(company,specialistDomain);
    return score<KM_WEEK_MAX_EXPERT_KNOWLEDGE?{kind:'expert',domain:specialistDomain,expertId:specialist.id,delta:1}:undefined;
   }
@@ -975,7 +1016,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
  const invest=async(event:React.MouseEvent<HTMLButtonElement>)=>{
   let payload:any,targetKey='';
-  if(investment==='TRAIN_EXPERT'){
+  if(investment==='AFTER_ACTION_REVIEW'){
+    if(!aarChallenge||!aarExpert)return;
+    payload={type:'KM_WEEK_INVEST',investment,challengeId:aarChallenge.id};
+    targetKey=`expert:${aarExpert.id}:${aarChallenge.domain}`;
+  }else if(investment==='TRAIN_EXPERT'){
     const expert=specialist||experts[0];if(!expert)return;
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
     payload={type:'KM_WEEK_INVEST',investment,expertId:expert.id,domain};
@@ -995,7 +1040,15 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   // Build the River-only result locally so the capability change can begin
   // the instant the orb lands, even if the server round-trip is still finishing.
   const optimisticCompany=structuredClone(company);
-  if(investment==='TRAIN_EXPERT'){
+  if(investment==='AFTER_ACTION_REVIEW'){
+   const site=optimisticCompany.sites.find(item=>item.id===aarChallenge?.siteId);
+   const expert=optimisticCompany.experts.find(item=>item.id===aarExpert?.id);
+   const skill=expert?.domains.find(item=>item.domain===aarChallenge?.domain);
+   if(site&&skill&&aarChallenge){
+    site.teamCapability[aarChallenge.domain]=Math.min(5,(site.teamCapability[aarChallenge.domain]||0)+aarUplift);
+    skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,skill.score+aarUplift);
+   }
+  }else if(investment==='TRAIN_EXPERT'){
    const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
    const skill=expert?.domains.find(item=>item.domain===payload.domain);
    if(skill)skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,skill.score+1);
