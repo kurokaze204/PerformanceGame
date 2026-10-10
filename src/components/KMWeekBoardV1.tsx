@@ -276,6 +276,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[challengeAttention,setChallengeAttention]=useState(false);
  const[riskResult,setRiskResult]=useState<{roll:number;won:boolean;requiredRoll:number;performanceGap:number}|null>(null);
  const[riskRollPending,setRiskRollPending]=useState<{requiredRoll:number;performanceGap:number}|null>(null);
+ const riskContinueRef=useRef<(()=>void)|null>(null);
+ const[challengeOutcome,setChallengeOutcome]=useState<{won:boolean;change:number;travelCost:number;left:number;top:number;fading:boolean}|null>(null);
  const[scoreGhost,setScoreGhost]=useState<ScoreGhostKind|null>(null);
  const[riverFrozenCompany,setRiverFrozenCompany]=useState<CompanyV2|null>(null);
  const[investment,setInvestment]=useState<KMWeekInvestment>('TRAIN_EXPERT');
@@ -549,6 +551,47 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
  };
 
+ const presentChallengeOutcome=async(nextCompany:CompanyV2,resolved:KMWeekChallenge)=>{
+  // Show the server-confirmed result while the previous turnover is still on
+  // screen. The parent session is applied only after the globe lands.
+  const change=nextCompany.turnover-company.turnover;
+  const won=resolved.status==='success';
+  const origin=document.querySelector('[data-kmw-outcome-origin]')?.getBoundingClientRect();
+  const turnover=document.querySelector('[data-kmw-turnover-target]')?.getBoundingClientRect();
+  const panelWidth=238;
+  const left=Math.max(12,Math.min(window.innerWidth-panelWidth-12,(origin?.left||window.innerWidth*.5)+(origin?.width||0)/2-panelWidth/2));
+  const top=Math.max(80,Math.min(window.innerHeight-132,(origin?.top||window.innerHeight*.5)+(origin?.height||0)/2-44));
+  setChallengeOutcome({won,change,travelCost:resolved.travelCost||0,left,top,fading:false});
+  await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+  await new Promise<void>(resolve=>window.setTimeout(resolve,650));
+
+  if(turnover){
+   const startX=left+panelWidth/2,startY=top+42;
+   const endX=turnover.left+turnover.width/2,endY=turnover.top+turnover.height/2;
+   const dx=endX-startX,dy=endY-startY;
+   const rise=Math.min(100,Math.max(36,Math.abs(dy)*.14));
+   const globe=document.createElement('div');
+   globe.className='kmw-knowledge-spark'+(won?' kmw-turnover-globe-win':' kmw-turnover-globe-loss');
+   globe.style.left=`${startX-9}px`;
+   globe.style.top=`${startY-9}px`;
+   document.body.appendChild(globe);
+   setChallengeOutcome(current=>current?{...current,fading:true}:null);
+   try{
+    const motion=globe.animate([
+     {transform:'translate(0px,0px) scale(.7)',opacity:0},
+     {transform:`translate(${dx*.08}px,${-rise}px) scale(1.16)`,opacity:1,offset:.13},
+     {transform:`translate(${dx*.55}px,${dy*.43-rise}px) scale(1.1)`,opacity:1,offset:.53},
+     {transform:`translate(${dx}px,${dy}px) scale(.82)`,opacity:1}
+    ],{duration:1050,easing:'cubic-bezier(.24,.65,.28,1)',fill:'forwards'});
+    await motion.finished;
+   }catch{}finally{globe.remove();}
+  }else{
+   setChallengeOutcome(current=>current?{...current,fading:true}:null);
+   await new Promise<void>(resolve=>window.setTimeout(resolve,700));
+  }
+  setChallengeOutcome(null);
+ };
+
  const cycleKnowledgeSource=(source:'local'|'expert')=>{
   if(!activeChallenge)return;
   setChallengeAttention(false);
@@ -575,51 +618,63 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  };
 
  const commitResponse=async()=>{
-  if(!pendingResponse)return;
-  if(!pendingResponse.method)return;
+  if(!pendingResponse||!pendingResponse.method||busy||readOnly)return;
   if(guideStep===5)setGuideStep(0);
   const committed=pendingResponse;
   const payload={type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth',useLocalRisk:committed.method==='risk'&&committed.localSelection!=='none',useExpertRisk:committed.method==='risk'&&committed.expertSelection==='depth'};
+
+  // Defer incoming session broadcasts until the result has been shown and the
+  // turnover globe has reached the header.
+  onPresentationHoldChange?.(true);
   if(committed.method==='risk'){
-   const selectedLocal=riskKnowledge;
-   const immediateOdds=kmWeekRiskOddsV1(selectedLocal,activeChallenge?.difficulty||0);
-   // Show the dice surface immediately while the server resolves the authoritative roll.
-   // This masks network latency and also blocks Invest-phase teaching popups until
-   // the player has seen the result and explicitly continued.
+   const odds=kmWeekRiskOddsV1(riskKnowledge,activeChallenge?.difficulty||0);
    setScoreBriefOpen(false);
-   setRiskRollPending({requiredRoll:immediateOdds.requiredRoll,performanceGap:immediateOdds.performanceGap});
+   setRiskRollPending({requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
   }
-  const beforeApply=committed.method==='risk'?async(nextSession:GameSessionV2)=>{
-   const nextCompany=nextSession.companies.find(item=>item.id===company.id);
-   const resolved=nextCompany?.kmWeek?.challenges.find(item=>item.id===committed.challengeId);
-   if(resolved?.dieRoll!==undefined){
-    const odds=kmWeekRiskOddsV1(riskKnowledge,resolved.difficulty);
-    setRiskResult({roll:resolved.dieRoll,won:resolved.status==='success',requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
-    setRiskRollPending(null);
-   }
-  }:undefined;
-  const ok=await post(payload,beforeApply);
-  if(!ok&&committed.method==='risk')setRiskRollPending(null);
-  if(ok){
-   setChallengeDrafts(current=>{
-    const next={...current};
-    delete next[committed.challengeId];
-    if(committed.expertId&&committed.expertSelection!=='none'){
-     for(const [challengeId,draft] of Object.entries(next) as [string,Exclude<PendingResponse,null>][]){
-      if(draft.expertId!==committed.expertId||draft.expertSelection==='none')continue;
-      const localSelection=draft.localSelection;
-      next[challengeId]={
-       ...draft,
-       method:draft.method==='risk'?'risk':localSelection!=='none'?'local':undefined,
-       localSelection:localSelection!=='none'?'depth':'none',
-       expertId:undefined,
-       expertSelection:'none',
-       label:localSelection==='depth'?'Local depth':localSelection==='breadth'?'Local breadth · choose a new Depth source':'Expert already committed · choose another response',
-      };
-     }
+  try{
+   const ok=await post(payload,async nextSession=>{
+    const nextCompany=nextSession.companies.find(item=>item.id===company.id);
+    const resolved=nextCompany?.kmWeek?.challenges.find(item=>item.id===committed.challengeId);
+    if(!nextCompany||!resolved)return;
+
+    // On a risk response the player sees the authoritative die roll before
+    // the same win/loss → globe → turnover sequence as every other response.
+    if(committed.method==='risk'&&resolved.dieRoll!==undefined){
+     const odds=kmWeekRiskOddsV1(riskKnowledge,resolved.difficulty);
+     await new Promise<void>(resolve=>{
+      riskContinueRef.current=resolve;
+      setRiskResult({roll:resolved.dieRoll!,won:resolved.status==='success',requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
+      setRiskRollPending(null);
+     });
     }
-    return next;
+    await presentChallengeOutcome(nextCompany,resolved);
    });
+   if(ok){
+    setChallengeDrafts(current=>{
+     const next={...current};
+     delete next[committed.challengeId];
+     if(committed.expertId&&committed.expertSelection!=='none'){
+      for(const [challengeId,draft] of Object.entries(next) as [string,Exclude<PendingResponse,null>][]){
+       if(draft.expertId!==committed.expertId||draft.expertSelection==='none')continue;
+       const localSelection=draft.localSelection;
+       next[challengeId]={
+        ...draft,
+        method:draft.method==='risk'?'risk':localSelection!=='none'?'local':undefined,
+        localSelection:localSelection!=='none'?'depth':'none',
+        expertId:undefined,
+        expertSelection:'none',
+        label:localSelection==='depth'?'Local depth':localSelection==='breadth'?'Local breadth · choose a new Depth source':'Expert already committed · choose another response',
+       };
+      }
+     }
+     return next;
+    });
+   }
+  }finally{
+   setRiskRollPending(null);
+   riskContinueRef.current=null;
+   setChallengeOutcome(null);
+   onPresentationHoldChange?.(false);
   }
  };
 
@@ -734,7 +789,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   <header className="relative z-[100] border-b-2 border-amber-950/60 bg-[#09131f]/98 px-3 py-2 shadow-xl min-[700px]:h-[66px]">
    <div className="mx-auto flex h-full w-full items-center gap-2">
     <div className="mr-auto min-w-0"><div className="text-[8px] font-black uppercase tracking-[.22em] text-emerald-300">The Performance Gap · KM Week</div><div className="flex min-w-0 items-center gap-2"><Building2 className="h-5 w-5 shrink-0 text-amber-300"/><h1 className="truncate text-lg font-black text-white">{company.name}</h1><span className="hidden rounded-md border border-slate-700 px-1.5 py-0.5 text-[9px] font-black text-slate-500 sm:inline">{session.id}</span>{readOnly?<span className="hidden rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400 lg:inline">Watching · CEO {controllerName}</span>:<span className="hidden rounded-full border border-amber-600 bg-amber-950/50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-200 lg:inline"><Crown className="mr-1 inline h-3 w-3"/>CEO · You</span>}</div></div>
-    <button type="button" onClick={()=>setTurnoverChartOpen(true)} aria-haspopup="dialog" className="flex h-12 min-w-[112px] flex-col justify-center rounded-xl border-2 border-emerald-800 bg-emerald-950/25 px-3 text-left transition hover:border-emerald-500 hover:bg-emerald-950/40"><div className="text-[8px] font-black uppercase text-emerald-400">Turnover</div><div className="text-base font-black leading-none text-emerald-200">{money(company.turnover)}</div></button>
+    <button type="button" data-kmw-turnover-target onClick={()=>setTurnoverChartOpen(true)} aria-haspopup="dialog" className="flex h-12 min-w-[112px] flex-col justify-center rounded-xl border-2 border-emerald-800 bg-emerald-950/25 px-3 text-left transition hover:border-emerald-500 hover:bg-emerald-950/40"><div className="text-[8px] font-black uppercase text-emerald-400">Turnover</div><div className="text-base font-black leading-none text-emerald-200">{money(company.turnover)}</div></button>
     <div className="flex h-12 min-w-[82px] flex-col justify-center rounded-xl border-2 border-amber-700 bg-amber-950/25 px-3"><div className="text-[8px] font-black uppercase text-amber-400">Score</div><div className="text-base font-black leading-none text-amber-200">{state.score.total}</div></div>
     <div title={overtime?'KM Week is time-boxed, not hard-stopped. Finish the game at your own pace.':undefined} className="flex h-12 min-w-[92px] flex-col justify-center rounded-xl border-2 border-violet-800 bg-violet-950/25 px-3"><div className="text-[8px] font-black uppercase text-violet-400">Game time</div><div className={`font-black leading-none tabular-nums ${overtime?'text-xs text-amber-200':'text-base text-violet-100'}`}>{overtime?'OVERTIME':`${mm}:${ss}`}</div></div>
     {!readOnly&&members.length>1&&onTransferCeo&&<select defaultValue="" onChange={event=>{const id=event.target.value;event.currentTarget.value='';if(id)onTransferCeo(id)}} className="h-12 rounded-xl border-2 border-amber-800 bg-slate-950 px-2 text-[10px] font-black text-amber-100"><option value="">Pass CEO…</option>{members.filter(member=>member.id!==participant?.id).map(member=><option key={member.id} value={member.id}>{member.name}</option>)}</select>}
@@ -756,6 +811,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </section>
   </>}
 
+  {challengeOutcome&&<div data-kmw-challenge-outcome aria-live="polite" className={'pointer-events-none fixed z-[200] w-[238px] rounded-2xl border-[3px] px-4 py-3 text-center shadow-[0_15px_50px_rgba(0,0,0,.7)] transition-opacity duration-[900ms] '+(challengeOutcome.won?'border-emerald-300 bg-emerald-950 text-emerald-100':'border-rose-300 bg-rose-950 text-rose-100')+(challengeOutcome.fading?' opacity-0':' opacity-100')} style={{left:challengeOutcome.left,top:challengeOutcome.top}}>
+   <div className="text-xs font-black uppercase tracking-[.17em]">{challengeOutcome.won?'SUCCESS':'FAILURE'}</div>
+   <div className={'mt-1 text-2xl font-black tabular-nums '+(challengeOutcome.won?'text-emerald-300':'text-rose-300')}>{challengeOutcome.change>=0?'+':'−'}{money(Math.abs(challengeOutcome.change))}</div>
+   <div className="text-[10px] font-bold text-slate-300">Turnover {challengeOutcome.change>=0?'gain':'loss'}{challengeOutcome.travelCost?' · includes travel':''}</div>
+  </div>}
   <TurnoverKnowledgeModal open={turnoverChartOpen} session={session} currentCompanyId={company.id} onClose={()=>setTurnoverChartOpen(false)}/>
 
   {showExpertChangePopup&&expertChange&&<>
@@ -809,7 +869,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      <div className="mt-1 flex items-center justify-between"><span>Dice roll</span><b className="text-xl text-white">{riskResult.roll}</b></div>
     </div>
     <div className={`mt-3 text-xl font-black ${riskResult.won?'text-emerald-200':'text-rose-200'}`}>{riskResult.won?'SUCCESS':'FAILURE'}</div>
-    <button type="button" onClick={()=>setRiskResult(null)} className={`mt-4 h-11 w-full rounded-xl border-2 text-sm font-black ${riskResult.won?'border-emerald-200 bg-emerald-300 text-emerald-950':'border-rose-200 bg-rose-300 text-rose-950'}`}>CONTINUE</button>
+    <button type="button" onClick={()=>{setRiskResult(null);riskContinueRef.current?.();riskContinueRef.current=null}} className={`mt-4 h-11 w-full rounded-xl border-2 text-sm font-black ${riskResult.won?'border-emerald-200 bg-emerald-300 text-emerald-950':'border-rose-200 bg-rose-300 text-rose-950'}`}>CONTINUE</button>
    </div>:<div role="dialog" aria-modal="true" aria-label="Rolling risk response" className="w-[min(360px,calc(100vw-32px))] rounded-[24px] border-4 border-violet-300 bg-violet-950 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.75)]">
     <Dices className="mx-auto h-12 w-12 animate-spin text-violet-200"/>
     <div className="mt-3 text-[10px] font-black uppercase tracking-[.18em] text-violet-200">You took the chance</div>
@@ -948,7 +1008,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         </div>
         {!guided&&deterministicSelected&&knowledgeShortfall>0&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-1.5 text-[10px] font-black text-rose-200">KNOWLEDGE SHORTFALL {knowledgeShortfall} · If you commit this response, the Challenge will fail.</div>}
         {(!guided||state.guidedTurn===3)&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:riskSelected?(expertSelection==='depth'?'expert':localSelection==='depth'?'local':undefined):'risk',expertId:activePending?.expertId,localSelection,expertSelection,label:'Take the risk'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">{riskOdds.chancePercent}% · gap {riskOdds.performanceGap} · need {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+ on d6'}</span></ResponseButton></div>}
-        <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5">
+        <div data-kmw-outcome-origin className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5">
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
         </div>
