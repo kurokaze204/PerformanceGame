@@ -77,8 +77,9 @@ type KMWeekEventDescription={id:string;title:string;story:string};
 // shuffled for each company at the start of every six-round cycle.
 const FREE_ROUND_VALUES:KMWeekFreeValue[][]=[
   [
-    {id:'HR3',domain:'hr',difficulty:3,impact:45},
-    {id:'HR4',domain:'hr',difficulty:4,impact:60},
+    // The first full round is a manageable introduction before the pressure builds.
+    {id:'HR2',domain:'hr',difficulty:2,impact:30},
+    {id:'MKT3INTRO',domain:'marketing',difficulty:3,impact:45},
   ],
   [
     {id:'HR3B',domain:'hr',difficulty:3,impact:45},
@@ -217,8 +218,8 @@ function hireRetiredExpertReplacement(company:CompanyV2){
 
 function guidedChallenge(turn:number):KMWeekChallenge{
   if(turn===1)return {id:'G1',title:'Packaging line shutdown',story:'A conveyor-control fault has stopped Brisbane’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
-  if(turn===2)return {id:'G2',title:'Batch quality hold',story:'After production restarts, quality checks find inconsistent fill weights across two Brisbane batches. Shipments are on hold until the cause is identified and corrected.',siteId:'brisbane',domain:'operations',difficulty:1,impact:30,status:'open',guided:true};
-  return {id:'G3',title:'Perth shift handover breakdown',story:'Incomplete maintenance and dispatch notes leave Perth’s afternoon shift unable to safely release several urgent customer orders.',siteId:'perth',domain:'operations',difficulty:4,impact:35,status:'open',guided:true};
+  if(turn===2)return {id:'G2',title:'Roster coverage dispute',story:'A last-minute Melbourne staffing change raises concerns about shift coverage and fatigue limits. The local team needs to put a compliant roster in place before work begins.',siteId:'melbourne',domain:'hr',difficulty:1,impact:30,status:'open',guided:true};
+  return {id:'G3',title:'Perth distributor escalation',story:'A Perth distributor threatens to suspend urgent customer deliveries after receiving conflicting product and service advice. The team needs a clear, consistent response today.',siteId:'perth',domain:'marketing',difficulty:4,impact:35,status:'open',guided:true};
 }
 
 function cloneChallenges(items:KMWeekChallenge[]):KMWeekChallenge[]{
@@ -230,7 +231,9 @@ export function freeChallengesForRound(session:GameSessionV2,company:CompanyV2,r
   const cycle=Math.floor((safeRound-1)/FREE_ROUND_VALUES.length);
   const position=(safeRound-1)%FREE_ROUND_VALUES.length;
   const seedBase=`${session.id}|${company.id}|cycle:${cycle}`;
-  const shuffledProfiles=seededShuffle(FREE_ROUND_VALUES,`${seedBase}|profiles`);
+  // Keep the first full-play round approachable. Shuffle the five tougher
+  // pairs independently for every company and six-round cycle.
+  const shuffledProfiles=[FREE_ROUND_VALUES[0],...seededShuffle(FREE_ROUND_VALUES.slice(1),`${seedBase}|profiles`)];
   const profile=shuffledProfiles[position];
 
   const descriptionPools={
