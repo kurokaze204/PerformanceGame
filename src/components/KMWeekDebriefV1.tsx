@@ -80,10 +80,31 @@ const TurnoverGraph:React.FC<{companies:CompanyV2[];colors:string[]}>=({companie
  const longest=histories.reduce((a,b)=>a.length>=b.length?a:b,[] as {label:string;turnover:number}[]);
  return <section className="rounded-2xl border-2 border-slate-700 bg-slate-950/80 p-4">
   <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[.16em] text-emerald-300">Turnover</div><h3 className="text-lg font-black text-white">How the business moved while you built capability</h3></div><div className="flex flex-wrap gap-3">{companies.map((company,index)=><span key={company.id} className="flex items-center gap-1.5 text-[10px] font-black text-slate-300"><span className="h-2.5 w-5 rounded-full" style={{backgroundColor:colors[index]}}/>{company.name}</span>)}</div></div>
+  <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] font-bold text-slate-300">
+   <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-emerald-400"/>Challenge won</span>
+   <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-rose-600"/>Challenge lost</span>
+   <span>Other dots show investments and audits</span>
+  </div>
   <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full" role="img" aria-label="Turnover graph for all companies">
    {ticks.map((value,index)=><g key={index}><line x1={left} x2={W-right} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={left-10} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="11" fontWeight="700">{formatCurrency(Math.round(value))}</text></g>)}
    {longest.map((point,index)=>{const px=x(index,longest.length);return <g key={index}><line x1={px} x2={px} y1={top} y2={top+innerH} stroke="#172033"/><text x={px} y={H-14} textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="700">{point.label}</text></g>})}
-   {companies.map((company,index)=>{const history=histories[index];const points=history.map((point,i)=>`${x(i,history.length)},${y(point.turnover)}`).join(' ');return <g key={company.id}><polyline points={points} fill="none" stroke={colors[index]} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round"/>{history.map((point,i)=><circle key={i} cx={x(i,history.length)} cy={y(point.turnover)} r="4.5" fill={colors[index]} stroke="#020617" strokeWidth="2"/>)}</g>})}
+   {companies.map((company,index)=>{
+     const history=histories[index];
+     const points=history.map((point,i)=>`${x(i,history.length)},${y(point.turnover)}`).join(' ');
+     return <g key={company.id}>
+      <polyline points={points} fill="none" stroke={colors[index]} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round"/>
+      {history.map((point,i)=>{
+       const isChallenge=/^(G\d+ C|R\d+ C\d+)$/.test(point.label);
+       // Use recorded results; wins can still incur travel fees, so a negative
+       // net turnover movement is not necessarily a failed Challenge.
+       const result=isChallenge?(point.challengeResult??(i>0&&point.turnover>=history[i-1].turnover?'success':'failure')):null;
+       const fill=result==='success'?'#34d399':result==='failure'?'#dc2626':colors[index];
+       return <circle key={i} data-kmw-aar-challenge-result={result||undefined} cx={x(i,history.length)} cy={y(point.turnover)} r={result?6.5:4.5} fill={fill} stroke={result?'#f8fafc':'#020617'} strokeWidth={result?2.2:2}>
+        <title>{company.name} · {point.label} · {result==='success'?'Challenge won':result==='failure'?'Challenge lost':'Turnover'} · {formatCurrency(point.turnover)}</title>
+       </circle>;
+      })}
+     </g>;
+    })}
   </svg>
  </section>;
 };
@@ -111,19 +132,23 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
   return ids.size?session.companies.filter(candidate=>ids.has(candidate.id)):session.companies;
  },[session.companies,session.participants]);
  const allComplete=participating.length>0&&participating.every(candidate=>candidate.kmWeek?.stage==='complete');
- const companies=allComplete?participating:[company];
+ const companies=(allComplete?participating:[company]).slice().sort((a,b)=>
+  calculateKMWeekScoreV1(session,b).total-calculateKMWeekScoreV1(session,a).total||
+  b.turnover-a.turnover||a.name.localeCompare(b.name)
+ );
  const colors=companies.map((_,index)=>COMPANY_COLORS[index%COMPANY_COLORS.length]);
  return <main className="mx-auto h-[calc(100vh-66px)] max-w-[1500px] overflow-auto p-3 text-slate-100">
   <section className="rounded-2xl border-2 border-violet-700 bg-[linear-gradient(145deg,#19152d,#101827)] p-4">
-   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><div className="text-[9px] font-black uppercase tracking-[.18em] text-violet-300">AAR-lite · Discuss together</div><h2 className="mt-1 text-2xl font-black text-white">The score is finished. The learning starts here.</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, so nobody sees another team’s strategy while they are still playing.</p>}</div><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div>
+   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><h2 className="text-2xl font-black text-white">After Action Review - Discuss Together</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, so nobody sees another team’s strategy while they are still playing.</p>}</div><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div>
   </section>
 
+  <div className="mt-3"><TurnoverGraph companies={companies} colors={colors}/></div>
   <div className="mt-3 space-y-3">
    {companies.map((item,index)=>{
     const color=colors[index];
     const before=beforeCompany(item);
     return <section key={item.id} className="rounded-2xl border-2 bg-[#0b1420] p-3" style={{borderColor:color}}>
-     <div className="mb-2 flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:color}}/><h3 className="text-lg font-black text-white">{item.name}</h3>{item.id===company.id&&<span className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">Your company</span>}</div>
+     <div className="mb-2 flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:color}}/><span className="text-xs font-black text-amber-300">#{index+1}</span><h3 className="text-lg font-black text-white">{item.name}</h3>{item.id===company.id&&<span className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">Your company</span>}</div>
      <div className="grid gap-3 xl:grid-cols-[240px_minmax(0,1fr)_minmax(0,1fr)]">
       <MiniScorePad company={item} color={color} session={session} allComplete={allComplete}/>
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" compact/></div></div>
@@ -134,7 +159,6 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
    })}
   </div>
 
-  <div className="mt-3"><TurnoverGraph companies={companies} colors={colors}/></div>
   <AARQuestions open={questionsOpen} onClose={()=>setQuestionsOpen(false)}/>
  </main>;
 };
