@@ -94,6 +94,10 @@ export interface KMWeekCompanyState {
   turnoverHistory: KMWeekTurnoverPoint[];
   shockChecks: KMWeekShockCheck[];
   shockResolved: boolean;
+  /** Turnover before the Site Audits; the UI applies the result when the fine orb arrives. */
+  auditTurnoverBefore?: number;
+  /** Recorded fines, including zero for a clean audit result. */
+  auditFineTotal?: number;
   expertRetirement?: KMWeekExpertRetirement;
   score: KMWeekScore;
   lastMessage?: string;
