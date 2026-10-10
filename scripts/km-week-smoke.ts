@@ -287,7 +287,7 @@ const resolveFreeRound=()=>{
 };
 
 // Free play is now time-based, so completing three free rounds must not by
-// itself trigger the Business Shock while more than three minutes remain.
+// itself trigger the Site Audits while more than three minutes remain.
 session.timerEndsAt=null;
 session.timerPausedSecondsRemaining=600;
 for(let round=1;round<=3;round++){
@@ -296,11 +296,11 @@ for(let round=1;round<=3;round++){
   assert.equal(invested.success,true,invested.message);
 }
 assert.equal(company.kmWeek?.stage,'free','Free play must continue beyond three rounds when time remains');
-assert.equal(company.kmWeek?.freeRound,4,'The next free-play round must open instead of forcing the Shock');
+assert.equal(company.kmWeek?.freeRound,4,'The next free-play round must open instead of forcing the audits');
 assert.ok(company.kmWeek!.challenges[0].siteId!==company.kmWeek!.challenges[1].siteId,'Every shuffled free-play round must use two different sites');
 
 // Once the clock enters the final three minutes, finish the current round and
-// the next committed investment hands directly into the Business Shock.
+// the next committed investment hands directly into the Site Audits.
 resolveFreeRound();
 session.timerPausedSecondsRemaining=180;
 const finalInvestment=makeFreeInvestment();
@@ -309,16 +309,44 @@ assert.equal(finalInvestment.success,true,finalInvestment.message);
 assert.equal(company.kmWeek?.stage,'shock');
 assert.ok((company.kmWeek?.score.business||0)>=0&&(company.kmWeek?.score.business||0)<=12);
 const beforeShockTurnover=company.turnover;
-result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE_SHOCK'});
+// A low-dice audit run should reveal every local capability shortfall,
+// while sites meeting their standards must clear automatically.
+const naturalRandom=Math.random;
+Math.random=()=>0;
+try{result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE_SHOCK'});}
+finally{Math.random=naturalRandom;}
 assert.equal(result.success,true,result.message);
-assert.equal(company.kmWeek?.stage,'shock','Business Shock must show its result before leaving for the debrief');
+assert.equal(company.kmWeek?.stage,'shock','Site Audits result must stay visible before the debrief');
 assert.equal(company.kmWeek?.shockChecks.length,5);
-assert.ok(company.kmWeek!.shockChecks.every(check=>Number.isFinite(check.localKnowledge)),'Business Shock result must record the local capability tested at each site');
-const missingKnowledge=company.kmWeek!.shockChecks.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
-const shockCost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
-assert.equal(company.turnover,beforeShockTurnover-shockCost,'Business Shock must charge $20k for every missing local Knowledge point');
-assert.equal(company.kmWeek!.turnoverHistory.filter(point=>point.label.startsWith('SHOCK ')).length,1,'Business Shock must remain as one explicit turnover event in the final graph');
-assert.ok(company.kmWeek!.turnoverHistory.some(point=>point.label===`SHOCK -${shockCost}k`),'The turnover graph label must retain the exact Business Shock cost');
+assert.ok(company.kmWeek!.shockChecks.every(check=>Number.isFinite(check.localKnowledge)),'Every audit must persist the tested local capability');
+for(const check of company.kmWeek!.shockChecks){
+ const gap=Math.max(0,check.difficulty-check.localKnowledge);
+ assert.equal(check.passed,gap===0,'A minimum audit roll must find a shortfall; fully capable sites always clear');
+ if(gap)assert.equal(check.dieRoll,1,'Audits must record their individual d6 detection rolls');
+}
+const missingKnowledge=company.kmWeek!.shockChecks.filter(check=>!check.passed).reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+const auditFines=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
+assert.equal(KM_WEEK_SHOCK_GAP_COST,40,'Each non-compliance knowledge point now attracts a $40k fine');
+assert.equal(company.turnover,Math.max(0,beforeShockTurnover-auditFines),'Site Audits must apply double the previous financial penalty');
+assert.equal(company.kmWeek!.auditTurnoverBefore,beforeShockTurnover,'Audit presentation must retain turnover before fines for the orb animation');
+assert.equal(company.kmWeek!.auditFineTotal,auditFines);
+assert.equal(company.kmWeek!.turnoverHistory.filter(point=>point.label.startsWith('SITE AUDITS ')).length,1,'Site Audits should remain one explicit turnover event in the final graph');
+assert.ok(company.kmWeek!.turnoverHistory.some(point=>point.label===`SITE AUDITS -${auditFines}k`),'The graph should preserve the exact fine amount');
+assert.equal(company.kmWeek!.score.resilience,company.kmWeek!.shockChecks.filter(check=>check.passed).length,'Without a clean sweep only cleared audits score points');
+
+// Conversely a company meeting every local standard clears all five audits,
+// pays no fines and gains an additional ten Squeaky clean score points.
+const cleanCompany=createInitialCompanyV2('Clean Audit Co','kmw-clean-audit',config);
+initialiseKMWeekCompanyV1(cleanCompany);
+cleanCompany.kmWeek!.stage='shock';
+for(const site of cleanCompany.sites)for(const domain of KM_WEEK_DOMAINS)site.teamCapability[domain]=5;
+const cleanSession={...session,companies:[cleanCompany]} as GameSessionV2;
+const cleanBefore=cleanCompany.turnover;
+const cleanResult=applyKMWeekActionV1(cleanSession,cleanCompany.id,{type:'KM_WEEK_RESOLVE_SHOCK'});
+assert.equal(cleanResult.success,true,cleanResult.message);
+assert.ok(cleanCompany.kmWeek!.shockChecks.every(check=>check.passed&&check.dieRoll===undefined));
+assert.equal(cleanCompany.kmWeek!.score.resilience,15,'Five cleared audits plus ten bonus Squeaky clean points must total fifteen');
+assert.equal(cleanCompany.turnover,cleanBefore,'A clean audit earns no fine');
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_COMPLETE_SHOCK'});
 assert.equal(result.success,true,result.message);
 assert.equal(company.kmWeek?.stage,'complete');
