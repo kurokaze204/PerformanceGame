@@ -155,6 +155,7 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.equal(failed.success,true,'A committed underpowered free-play response must resolve as a real business outcome');
   assert.equal(failState.challenges[0].status,'failure','Knowledge 1 committed against Knowledge 4 must fail rather than return an invalid-move error');
   assert.equal(failCompany.turnover,beforeFailure-60,'A committed knowledge shortfall must apply the full business loss');
+  assert.equal(failState.turnoverHistory.at(-1)?.challengeResult,'failure','Final AAR history must retain red failure markers independent of the next investment');
   assert.equal(failState.phase,'invest','A failed committed response must still complete the Challenge and move the game forward');
 }
 
@@ -178,6 +179,7 @@ assert.equal(company.kmWeek?.challenges[0].status,'success','Explicitly selected
 assert.equal(company.kmWeek?.challenges[0].travelCost,2,'Expert travel between sites must cost $2k');
 assert.equal(company.kmWeek?.challenges[0].turnoverChange,28,'A +$30k Challenge solved by a travelling expert must net +$28k turnover');
 assert.equal(company.turnover,openingTurnover+28,'Challenge value and travel cost must both flow through company turnover');
+assert.equal(company.kmWeek!.turnoverHistory.at(-1)?.challengeResult,'success','Final AAR history must retain actual wins, even when their net turnover includes travel fees');
 let result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:opsExpert().id,domain:'operations'});
 assert.equal(result.success,true,result.message);
 assert.equal(opsExpert().domains[0].score,5);
