@@ -39,6 +39,8 @@ export interface KMWeekInvestmentRecord {
 export interface KMWeekTurnoverPoint {
   label: string;
   turnover: number;
+  /** Actual Challenge outcome, so the AAR can show red/green dots even when travel costs exceed a win. */
+  challengeResult?: 'success' | 'failure';
 }
 
 export interface KMWeekScore {
