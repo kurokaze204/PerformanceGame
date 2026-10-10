@@ -856,8 +856,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    <div aria-hidden="true" className="fixed inset-0 z-[120] bg-black/75"/>
    <div className="fixed left-1/2 top-1/2 z-[145] w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-5 shadow-[0_24px_80px_rgba(0,0,0,.72)]">
     <div className="text-[9px] font-black uppercase tracking-[.18em] text-amber-300">Before your first investment</div>
-    <h2 className="mt-2 text-xl font-black text-white">Three investments, three ways to build capability.</h2>
-    <p className="mt-2 text-sm leading-relaxed text-slate-200">First, deepen an expert. Next, train a local team. Then, share knowledge between sites. Watch the River after each investment.</p>
+    <h2 className="mt-2 text-xl font-black text-white">Let me guide you through your three investment choices.</h2>
+    <p className="mt-2 text-sm leading-relaxed text-slate-200">Each round I will suggest one investment choice with the best settings. Feel free to retarget if you want to try a slightly different strategy.</p>
     <p className="mt-2 text-xs text-slate-400">After these guided moves, you'll choose your own investments.</p>
     <button type="button" onClick={()=>setFirstInvestBriefDismissed(true)} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">SHOW ME THE FIRST INVESTMENT <ArrowRight className="ml-1 inline h-4 w-4"/></button>
    </div>
