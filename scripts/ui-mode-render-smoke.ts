@@ -6,6 +6,7 @@ import { DEFAULT_CONFIG } from '../src/engine/config.ts';
 import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import { ActionsPanelV5 } from '../src/components/ActionsPanelV5.tsx';
 import { EventDecisionCardV4 } from '../src/components/EventDecisionCardV4.tsx';
+import { InvestmentRiverView } from '../src/components/InvestmentRiverView.tsx';
 import type { ActiveEventV2, GameSessionV2 } from '../src/types/gameV2.ts';
 
 (globalThis as any).localStorage={getItem:()=>null,setItem:()=>{},removeItem:()=>{},clear:()=>{}};
@@ -68,6 +69,18 @@ assert.ok(appBoardSource.includes("actionType:'FINISH_INVESTING'"),'Invest compl
 const kmWeekBoardSource=readFileSync(new URL('../src/components/KMWeekBoardV1.tsx',import.meta.url),'utf8');
 const globalCssSource=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
 const riverSource=readFileSync(new URL('../src/components/InvestmentRiverView.tsx',import.meta.url),'utf8');
+// The selected KM Week requirement must track its domain and difficulty,
+// including values above the local-team capability scale.
+const targetCompany=createInitialCompanyV2('River Test Co','river-test',DEFAULT_CONFIG);
+const renderRiverTarget=(domain:'operations'|'hr'|'marketing',level:number)=>renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:domain,challengeTarget:{domain,level}}));
+const operationTarget=renderRiverTarget('operations',8);
+const marketingTarget=renderRiverTarget('marketing',3);
+assert.ok(operationTarget.includes('data-kmw-challenge-target="operations:8"')&&operationTarget.includes('NEEDS 8'),'The River must show the required level even when a Challenge is harder than local expertise');
+assert.ok(marketingTarget.includes('data-kmw-challenge-target="marketing:3"')&&marketingTarget.includes('NEEDS 3'),'Changing Challenges must move the requirement to the new domain and level');
+assert.notEqual(operationTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],marketingTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],'A different Challenge must move the bullseye');
+const noTarget=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations'}));
+assert.equal(noTarget.includes('data-kmw-challenge-target'),false,'The River must clear the bullseye when no Challenge is active');
+assert.ok(kmWeekBoardSource.includes("activeChallenge?.status==='open'?activeChallenge:undefined")&&kmWeekBoardSource.includes("riverChallenge?{domain:riverChallenge.domain,level:riverChallenge.difficulty}:undefined"),'Only the selected open Challenge may drive the River requirement');
 const kmWeekDebriefSource=readFileSync(new URL('../src/components/KMWeekDebriefV1.tsx',import.meta.url),'utf8');
 assert.ok(kmWeekDebriefSource.includes('Before free play')&&kmWeekDebriefSource.includes('selectedDomain="operations"'),'KM Week AAR Before River must use each company’s post-guided snapshot and a valid KM Week domain');
 const eventV4Source=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
