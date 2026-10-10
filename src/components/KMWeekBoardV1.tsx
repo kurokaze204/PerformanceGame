@@ -175,7 +175,7 @@ const ChallengeToken:React.FC<{challenge:KMWeekChallenge;company:CompanyV2;selec
  const done=challenge.status!=='open';
  const shell='min-w-0 rounded-xl border-2 p-2 text-left transition ';
  const stateClass=selected?'border-violet-300 bg-violet-950/35':done?(challenge.status==='success'?'border-emerald-800 bg-emerald-950/20':'border-rose-900 bg-rose-950/20'):'border-slate-700 bg-slate-950/70 hover:border-violet-600';
- return <button type="button" onClick={onClick} className={shell+stateClass}>
+ return <button type="button" data-kmw-free-challenge-card={challenge.id} onClick={onClick} className={shell+stateClass}>
   <div className="flex items-center justify-between gap-2"><div className="truncate text-xs font-black text-white">{challengeDisplayTitle(company,challenge)}</div>{done&&<span className={'shrink-0 text-[9px] font-black '+(challenge.status==='success'?'text-emerald-300':'text-rose-300')}>{challenge.status==='success'?'SOLVED':'MISSED'}</span>}</div>
   <div className="mt-1 text-[10px] font-bold text-slate-500">Needs: <b className="text-white">{domainLabel(challenge.domain)} {challenge.difficulty}</b> · Local knowledge: <b className={local>=challenge.difficulty?'text-emerald-300':'text-amber-300'}>{local}</b>{done&&challenge.dieRoll!==undefined&&<span className={'ml-2 font-black '+(challenge.status==='success'?'text-emerald-300':'text-rose-300')}>ROLL {challenge.dieRoll}</span>}{done&&challenge.travelCost&&<span className="ml-2 font-black text-amber-300">Travel -{money(challenge.travelCost)}</span>}</div>
   {!done&&draft&&<div className="mt-1 truncate rounded-md border border-sky-900/70 bg-sky-950/25 px-1.5 py-1 text-[8px] font-black uppercase tracking-[.08em] text-sky-300">Draft · {draft.label}</div>}
@@ -264,6 +264,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[guideAnchor,setGuideAnchor]=useState<{left:number;top:number;targetX:number;targetY:number;panelWidth:number;startY:number}|null>(null);
  const[firstInvestBriefDismissed,setFirstInvestBriefDismissed]=useState(false);
  const[scoreBriefOpen,setScoreBriefOpen]=useState(false);
+ const[freeChallengeIntroDismissed,setFreeChallengeIntroDismissed]=useState(false);
+ const[freeChallengeIntroPlacement,setFreeChallengeIntroPlacement]=useState<{left:number;top:number;width:number;arrows:{fromX:number;fromY:number;toX:number;toY:number}[]}|null>(null);
  const[coachDismissedKey,setCoachDismissedKey]=useState('');
  const[scorePadOpen,setScorePadOpen]=useState(false);
  const[turnoverChartOpen,setTurnoverChartOpen]=useState(false);
@@ -282,6 +284,13 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[trainingSiteId,setTrainingSiteId]=useState('brisbane');
  const[now,setNow]=useState(Date.now());
  const challengeDraftsRef=useRef(challengeDrafts);
+ const freeChallengeIntroKey=`tpg:kmw-free-challenge-intro:${session.id}:${company.id}`;
+ const firstFreeChallengeIntroPending=Boolean(state?.stage==='free'&&state.freeRound===1&&state.phase==='challenge'&&!readOnly&&!freeChallengeIntroDismissed&&localStorage.getItem(freeChallengeIntroKey)!=='seen');
+ const showFreeChallengeIntro=firstFreeChallengeIntroPending&&!busy&&!riskResult&&!riskRollPending&&!challengeOutcome&&!scoreBriefOpen;
+ const dismissFreeChallengeIntro=()=>{
+  localStorage.setItem(freeChallengeIntroKey,'seen');
+  setFreeChallengeIntroDismissed(true);
+ };
  const riverIntroActive=Boolean(state?.stage==='guided'&&state.guidedTurn===1&&state.phase==='challenge'&&!challengeFocusOpen);
  const riverIntroUnlocked=riverIntroActive&&riverIntroStep===9;
  const advanceRiverIntro=()=>{
@@ -321,7 +330,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
  useEffect(()=>{
   const challengePhase=state?.phase==='challenge'&&(state?.stage==='guided'||state?.stage==='free');
-  setChallengeFocusOpen(!challengePhase);
+  const openTwoCardBriefing=state?.stage==='free'&&state.freeRound===1&&state.phase==='challenge'&&!readOnly&&localStorage.getItem(`tpg:kmw-free-challenge-intro:${session.id}:${company.id}`)!=='seen';
+  setChallengeFocusOpen(!challengePhase||openTwoCardBriefing);
   setGuideStep(0);
   setChallengeDrafts({});
  },[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
@@ -458,6 +468,42 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   window.addEventListener('scroll',update,true);
   return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true)};
  },[riverIntroActive,riverIntroStep]);
+
+ useEffect(()=>{
+  if(!showFreeChallengeIntro||!challengeFocusOpen){setFreeChallengeIntroPlacement(null);return;}
+  // Anchor above the Score Pad on the River side while leaving the two
+  // Challenge cards visible. Re-measure on resize, scroll and text wrapping.
+  const update=()=>{
+   const scoreButton=document.querySelector('[data-kmw-scorepad-button]');
+   const popup=document.querySelector('[data-kmw-free-challenge-intro]');
+   const cards=Array.from(document.querySelectorAll('[data-kmw-free-challenge-card]')).slice(0,2);
+   if(!scoreButton||!popup||cards.length!==2)return;
+   const anchorRect=scoreButton.getBoundingClientRect();
+   const panelHeight=popup.getBoundingClientRect().height;
+   const width=Math.min(430,window.innerWidth-24);
+   const left=Math.max(12,Math.min(window.innerWidth-width-12,anchorRect.right-width));
+   // On smaller screens, keep the entire message visible rather than clip
+   // it above the browser viewport.
+   const top=Math.max(72,Math.min(anchorRect.top-panelHeight-12,window.innerHeight-panelHeight-12));
+   const fromX=left+width+4;
+   const fromY=top+Math.min(panelHeight-25,Math.max(75,panelHeight*.66));
+   const arrows=cards.map(card=>{
+    const rect=card.getBoundingClientRect();
+    return{fromX,fromY,toX:rect.left+rect.width/2,toY:rect.bottom-3};
+   });
+   setFreeChallengeIntroPlacement(previous=>{
+    const next={left,top,width,arrows};
+    return previous&&previous.left===left&&previous.top===top&&previous.width===width&&previous.arrows.length===arrows.length&&arrows.every((arrow,index)=>Object.keys(arrow).every(k=>arrow[k as keyof typeof arrow]===previous.arrows[index][k as keyof typeof arrow]))?previous:next;
+   });
+  };
+  const frame=requestAnimationFrame(update);
+  const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(update);
+  const popup=document.querySelector('[data-kmw-free-challenge-intro]');
+  if(popup)observer?.observe(popup);
+  window.addEventListener('resize',update);
+  window.addEventListener('scroll',update,true);
+  return()=>{cancelAnimationFrame(frame);observer?.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true)};
+ },[showFreeChallengeIntro,challengeFocusOpen]);
 
  useEffect(()=>{if(scoreBriefOpen)setScorePadOpen(true)},[scoreBriefOpen]);
 
@@ -967,6 +1013,19 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    </div>}
   </div>}
 
+  {showFreeChallengeIntro&&challengeFocusOpen&&<>
+   <div aria-hidden="true" className="fixed inset-0 z-[118] bg-black/35"/>
+   {freeChallengeIntroPlacement?.arrows.length===2&&<svg className="pointer-events-none fixed inset-0 z-[140] h-screen w-screen" aria-hidden="true">
+    <defs><marker id="kmw-free-challenge-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#7dd3fc" strokeWidth="1.8"/></marker></defs>
+    {freeChallengeIntroPlacement.arrows.map((arrow,index)=><path key={index} d={`M ${arrow.fromX} ${arrow.fromY} C ${arrow.fromX+55} ${arrow.fromY}, ${arrow.toX-35} ${arrow.toY+45}, ${arrow.toX} ${arrow.toY}`} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" markerEnd="url(#kmw-free-challenge-arrow)"/>)}
+   </svg>}
+   <section data-kmw-free-challenge-intro role="dialog" aria-modal="true" aria-label="Two challenges per round" className="fixed z-[160] max-h-[calc(100dvh-88px)] overflow-y-auto overscroll-contain rounded-[22px] border-[3px] border-amber-300 bg-[linear-gradient(145deg,#2b1f0b,#111827)] p-4 text-left text-white shadow-[0_24px_80px_rgba(0,0,0,.8)]" style={{left:freeChallengeIntroPlacement?.left??12,top:freeChallengeIntroPlacement?.top??72,width:freeChallengeIntroPlacement?.width??'min(430px,calc(100vw - 24px))'}}>
+    <div className="text-[10px] font-black uppercase tracking-[.16em] text-amber-300">Your first independent round</div>
+    <p className="mt-3 text-[14px] leading-relaxed text-slate-100">OK, you've got the hang of it now, from here on it's up to you. Please note, each round will now have two challenges at a time. You can draft a response and flip between them to plan before committing. Remember, sometimes things aren't certain. If you can't 100% nail a task, then do your best to minimise the risk.</p>
+    <button type="button" onClick={dismissFreeChallengeIntro} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">GOT IT — SHOW ME BOTH CHALLENGES <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+   </section>
+  </>}
+
   {showCoachPopup&&coaching&&<>
    <div aria-hidden="true" className="fixed inset-0 z-[118] bg-black/65"/>
    <section role="dialog" aria-modal="true" aria-label="Knowledge investment coaching question" data-kmw-coaching-popup className="fixed left-1/2 top-1/2 z-[145] max-h-[calc(100dvh-90px)] w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] border-2 border-sky-300 bg-[linear-gradient(145deg,#10253a,#111827)] p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,.75)] min-[700px]:left-[61%] min-[700px]:w-[calc(39%-16px)] min-[700px]:translate-x-0">
@@ -1039,7 +1098,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
        <div><div className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-300">Knowledge River</div><h2 className="text-lg font-black text-white min-[700px]:text-sm lg:text-base xl:text-lg">Where is the capability now?</h2></div>
        <div data-kmw-scorepad>
-        <button type="button" aria-expanded={scorePadOpen} onClick={()=>setScorePadOpen(open=>!open)} className={`flex min-w-[176px] items-center justify-between gap-3 rounded-xl border-2 px-3 py-2 text-left text-xs font-black shadow-lg transition ${scorePadOpen?'border-amber-300 bg-amber-400 text-slate-950':'border-amber-700 bg-amber-950/35 text-amber-100 hover:border-amber-400'}`}>
+        <button type="button" data-kmw-scorepad-button aria-expanded={scorePadOpen} onClick={()=>setScorePadOpen(open=>!open)} className={`flex min-w-[176px] items-center justify-between gap-3 rounded-xl border-2 px-3 py-2 text-left text-xs font-black shadow-lg transition ${scorePadOpen?'border-amber-300 bg-amber-400 text-slate-950':'border-amber-700 bg-amber-950/35 text-amber-100 hover:border-amber-400'}`}>
          <span className="flex items-center gap-2"><Medal className="h-4 w-4"/>SCORE PAD</span><span className={`rounded-lg border px-2 py-0.5 text-sm ${scorePadOpen?'border-slate-900/30 bg-slate-950/10':'border-amber-700 bg-slate-950/40'}`}>{state.score.total}</span>
         </button>
        </div>
