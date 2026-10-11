@@ -13,8 +13,9 @@ import type {
 
 export const KM_WEEK_DOMAINS: KnowledgeDomain[] = ['operations','hr','marketing'];
 export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
-export const KM_WEEK_MAX_KNOWLEDGE = 5;
-export const KM_WEEK_MAX_EXPERT_KNOWLEDGE = 6;
+// Knowledge levels grow with the escalating Challenges; only Score Pad points are capped.
+// Six is a Deep Bench goal milestone, NOT a limit on expert learning.
+export const KM_WEEK_DEEP_BENCH_TARGET = 6;
 export const KM_WEEK_AAR_COST = 50;
 export const KM_WEEK_AAR_UNLOCK_ROUND = 7;
 
@@ -62,7 +63,7 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
   'deep-bench': {
     id:'deep-bench',
     title:'Deep Bench',
-    description:'Finish with all three specialists at Knowledge 6.',
+    description:'Finish with all three specialists at Knowledge 6 or higher.',
     points:5,
   },
   'broad-base': {
@@ -217,7 +218,7 @@ function hireRetiredExpertReplacement(company:CompanyV2){
   const siteScores=activeSites(company).map(site=>site.teamCapability[retirement.domain]||0);
   const replacementScore=Math.max(3,...siteScores);
   expert.name=retirement.replacementName;
-  skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,replacementScore);
+  skill.score=replacementScore;
   expert.isVacant=false;
   expert.state='Available';
   expert.replacementDueRound=null;
@@ -439,17 +440,19 @@ function localCapabilityPoints(company:CompanyV2){
 }
 
 function expertisePoints(company:CompanyV2){
-  return activeExperts(company).reduce((sum,expert)=>{
+  // More than six points of expertise still helps solve tougher Challenges,
+  // but does not overflow the Score Pad's 6-point Expertise category.
+  return Math.min(6,activeExperts(company).reduce((sum,expert)=>{
     const skill=expert.domains.find(item=>KM_WEEK_DOMAINS.includes(item.domain));
     return sum+Math.max(0,(skill?.score||0)-3);
-  },0);
+  },0));
 }
 
 function goalAchieved(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek!;
   const goal=session.kmWeekGoalId||hashGoal(session.id);
   if(goal==='local-heroes')return state.localSuccesses>=2;
-  if(goal==='deep-bench')return activeExperts(company).every(expert=>(expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0)>=KM_WEEK_MAX_EXPERT_KNOWLEDGE);
+  if(goal==='deep-bench')return activeExperts(company).every(expert=>(expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0)>=KM_WEEK_DEEP_BENCH_TARGET);
   if(goal==='broad-base')return localCapabilityPoints(company)>=4;
   const totals=activeSites(company).map(site=>KM_WEEK_DOMAINS.reduce((sum,domain)=>sum+(site.teamCapability[domain]||0),0));
   return totals.length===3&&totals.every(total=>total>=3)&&totals.some(total=>total>=4);
@@ -684,26 +687,25 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const uplift=event.status==='failure'?2:1;
     selectedDomain=event.domain;siteId=site.id;expertId=expert.id;reviewedChallengeId=event.id;
     before=site.teamCapability[event.domain]||0;
-    after=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+uplift);
-    expertBefore=skill.score;expertAfter=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,expertBefore+uplift);
+    after=before+uplift;
+    expertBefore=skill.score;expertAfter=expertBefore+uplift;
     site.teamCapability[event.domain]=after;
     skill.score=expertAfter;
   }else if(type==='TRAIN_EXPERT'){
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!skill)return{success:false,message:'Choose an expert and one of their knowledge domains.'};
-    if(skill.score>=KM_WEEK_MAX_EXPERT_KNOWLEDGE)return{success:false,message:`${expert.name} is already at the KM Week expert maximum of ${KM_WEEK_MAX_EXPERT_KNOWLEDGE}.`};
     cost=15;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
-    before=skill.score;skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,skill.score+1);after=skill.score;expertId=expert.id;expert.state='Training';
+    before=skill.score;skill.score+=1;after=skill.score;expertId=expert.id;expert.state='Training';
   }else if(type==='LOCAL_TRAINING'){
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const site=company.sites.find(item=>item.id===payload?.siteId&&!item.isClosed);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!site||!skill)return{success:false,message:'Choose an expert, their domain and a site.'};
-    if((site.teamCapability[domain]||0)>=Math.min(KM_WEEK_MAX_KNOWLEDGE,skill.score))return{success:false,message:'The local team is already at this expert’s teaching ceiling.'};
+    if((site.teamCapability[domain]||0)>=skill.score)return{success:false,message:'The local team is already at this expert’s teaching ceiling.'};
     const travelCost=expert.location===site.id?0:2;
     cost=10+travelCost;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
-    before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+2,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.location=site.id;expert.state='Knowledge Transfer';
+    before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(before+2,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.location=site.id;expert.state='Knowledge Transfer';
     state.trainingCommitments={...state.trainingCommitments,[expert.id]:company.round+1};
   }else{
     const source=company.sites.find(item=>item.id===payload?.sourceSiteId&&!item.isClosed);
@@ -714,7 +716,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     if(sourceScore<=targetScore)return{success:false,message:`${source.name} must know more than ${target.name} in this domain before it can teach them.`};
     cost=8;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
     const uplift=Math.max(1,Math.ceil((sourceScore-targetScore)/2));
-    before=targetScore;target.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,targetScore+uplift,sourceScore);after=target.teamCapability[domain];
+    before=targetScore;target.teamCapability[domain]=Math.min(targetScore+uplift,sourceScore);after=target.teamCapability[domain];
     const actualUplift=after-before;
     sourceSiteId=source.id;targetSiteId=target.id;meaningfulFlow=before<2&&after>=2;
     if(state.stage==='free'){state.knowledgeTransfers+=actualUplift;if(meaningfulFlow)state.meaningfulTransfers+=1;}
