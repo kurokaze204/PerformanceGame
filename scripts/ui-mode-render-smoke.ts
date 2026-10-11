@@ -7,7 +7,7 @@ import { createInitialCompanyV2 } from '../src/engine/coreV2.ts';
 import { ActionsPanelV5 } from '../src/components/ActionsPanelV5.tsx';
 import { EventDecisionCardV4 } from '../src/components/EventDecisionCardV4.tsx';
 import { InvestmentRiverView } from '../src/components/InvestmentRiverView.tsx';
-import { KMWeekDebriefV1,kmWeekCompanyPlayerLabel } from '../src/components/KMWeekDebriefV1.tsx';
+import { KMWeekDebriefV1,kmWeekCompanyPlayerLabel,kmWeekDebriefRiverKnowledgeMax } from '../src/components/KMWeekDebriefV1.tsx';
 import { initialiseKMWeekCompanyV1 } from '../src/engine/kmWeekV1.ts';
 import type { ActiveEventV2, GameSessionV2 } from '../src/types/gameV2.ts';
 
@@ -468,6 +468,10 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  rival.kmWeek!.knowledgeTransfers=1;
  apex.turnover=1200;
  rival.turnover=900;
+ // Before may be higher than After; include both axes, even across companies.
+ apex.initialRiverSnapshot!.sites.find(site=>site.id==='perth')!.teamCapability.operations=13;
+ rival.initialRiverSnapshot!.experts[0].domains[0].score=9;
+ rival.sites.find(site=>site.id==='perth')!.teamCapability.hr=8;
  apex.controllerParticipantId='stuart';
  rival.controllerParticipantId='rival-ceo';
  const players=[
@@ -480,7 +484,13 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  const game={...session('newbie'),experienceMode:'km_week',id:'TEST',companies:[apex,rival],participants:players,kmWeekGoalId:'local-heroes'} as GameSessionV2;
  assert.equal(kmWeekCompanyPlayerLabel(game,apex),'CEO: Stuart (Jane, Hank, Bill Fond)','A company must display its controller first with the other player names in brackets');
  assert.equal(kmWeekCompanyPlayerLabel(game,rival),'CEO: Alex','Other companies must display their own CEO');
+ const sharedMax=kmWeekDebriefRiverKnowledgeMax([apex,rival]);
+ assert.equal(sharedMax,13,'Shared final River max must include sites and experts from every before/after snapshot');
  const html=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
+ const axes=[...html.matchAll(/data-kmw-river-scale-max="(\d+)"/g)].map(match=>Number(match[1]));
+ assert.equal(axes.length,4,'Two companies must each have a before and an after River');
+ assert.ok(axes.every(value=>value===axes[0])&&axes[0]>=sharedMax,'All before/after Rivers across all companies must share a vertical axis that fits the highest knowledge score');
+ assert.ok(html.includes('data-kmw-shared-river-scale'),'Final report must communicate the common scale to users');
  assert.ok(html.includes('CEO: Stuart (Jane, Hank, Bill Fond)')&&html.includes('CEO: Alex'),'Final AAR must display player credits for every company');
  assert.ok(html.includes('data-kmw-category="knowledgeFlow" data-kmw-category-rank="first"'),'Unique category leader must be green');
  assert.ok(html.includes('data-kmw-category="knowledgeFlow" data-kmw-category-rank="other"'),'A losing category must not be highlighted');
@@ -494,6 +504,9 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  // No cross-company results or premature winner highlights before all companies finish.
  rival.kmWeek!.stage='free';
  const early=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
+ const soloAxes=[...early.matchAll(/data-kmw-river-scale-max="(\d+)"/g)].map(match=>Number(match[1]));
+ assert.equal(soloAxes.length,2,'Only the player's two Rivers should appear before rivals finish');
+ assert.equal(soloAxes[0],soloAxes[1],'Before and after should use the same scale even while only one company is available');
  assert.equal((early.match(/data-kmw-pdf-company/g)||[]).length,1,'Do not reveal unfinished competitors');
  assert.equal(early.includes('data-kmw-category-rank="first"'),false,'Do not award green rankings while opponents are still playing');
 }
