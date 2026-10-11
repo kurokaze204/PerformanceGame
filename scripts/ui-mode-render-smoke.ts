@@ -140,6 +140,14 @@ assert.ok(kmWeekBoardSource.includes('Business Performance')&&kmWeekBoardSource.
 assert.ok(kmWeekBoardSource.includes('<ScoreCell label={goal.title} value={state.score.goal}')&&kmWeekDebriefSource.includes('KM_WEEK_GOALS[session.kmWeekGoalId].title'),'Both playing and final Score Pads must display the assigned goal name, e.g. Local Heroes, instead of the generic KM Week goal label');
 assert.ok(kmWeekBoardSource.includes('Depth')&&kmWeekBoardSource.includes('Breadth')&&kmWeekBoardSource.includes('Flow'),'KM Week debrief must name the River concepts after players experience them');
 assert.ok(kmWeekBoardSource.includes('COMMIT RESPONSE'),'KM Week Challenge choices must require an explicit commit');
+// One-time shortfall coaching: do not submit until the player explicitly
+// chooses whether to roll, accept the loss or keep editing.
+assert.ok(kmWeekBoardSource.includes('onClick={requestCommitResponse}')&&kmWeekBoardSource.includes('disabled={!responseReady||busy||readOnly}'),'Commit must route through the one-time shortfall guard without changing disabled states');
+assert.ok(kmWeekBoardSource.includes("!riskSelected&&selectedKnowledge<activeChallenge.difficulty&&!localStorage.getItem(riskCoachKey)")&&kmWeekBoardSource.includes("localStorage.setItem(riskCoachKey,'seen')"),'The warning must appear only on the first underpowered, non-risk commit per session and player');
+assert.ok(kmWeekBoardSource.includes('data-kmw-first-risk-coach')&&kmWeekBoardSource.includes('role="dialog" aria-modal="true"')&&kmWeekBoardSource.includes('Do you really want to just take the loss'),'A visible modal must explain the choice in business language');
+assert.ok(kmWeekBoardSource.includes('data-kmw-risk-coach-choice="risk"')&&kmWeekBoardSource.includes('data-kmw-risk-coach-choice="loss"')&&kmWeekBoardSource.includes('data-kmw-risk-coach-choice="edit"'),'Coaching must offer taking a risk, accepting the loss and changing the response');
+assert.ok(kmWeekBoardSource.includes("setPendingResponse({...pendingResponse,method:'risk',label:'Take the risk'})")&&kmWeekBoardSource.includes('onClick={()=>{setRiskCoachOpen(false);void commitResponse()}}'),'Choosing a risk must preserve selected knowledge without auto-committing, while accepting the loss must commit the existing response');
+assert.ok(kmWeekBoardSource.includes('onClick={()=>setRiskCoachOpen(false)}')&&kmWeekBoardSource.includes("if(event.key==='Escape')setRiskCoachOpen(false)"),'Players must be able to dismiss the prompt and keep selecting knowledge');
 
 assert.ok(kmWeekBoardSource.includes('data-kmw-turnover-target')&&kmWeekBoardSource.includes('data-kmw-outcome-origin')&&kmWeekBoardSource.includes('data-kmw-challenge-outcome'),'KM Week Challenge result globe must travel from the result box to the Turnover header');
 
