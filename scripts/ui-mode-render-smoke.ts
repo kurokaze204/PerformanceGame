@@ -85,6 +85,17 @@ assert.notEqual(operationTarget.match(/data-kmw-challenge-target="[^"]+" transfo
 const noTarget=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations'}));
 assert.equal(noTarget.includes('data-kmw-challenge-target'),false,'The River must clear the bullseye when no Challenge is active');
 assert.ok(kmWeekBoardSource.includes("activeChallenge?.status==='open'?activeChallenge:undefined")&&kmWeekBoardSource.includes("riverChallenge?{domain:riverChallenge.domain,level:riverChallenge.difficulty}:undefined"),'Only the selected open Challenge may drive the River requirement');
+// The site ring is blue and dotted, and must move with the selected
+// domain/site without retaining a highlight in another part of the River.
+const renderRiverSite=(domain:'operations'|'hr'|'marketing',siteId:string)=>renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:domain,guidedSiteId:siteId}));
+const brisbaneSite=renderRiverSite('operations','brisbane');
+const melbourneSite=renderRiverSite('hr','melbourne');
+assert.ok(brisbaneSite.includes('data-kmw-guided-site="brisbane"'),'Selected Brisbane Operations challenge must ring Brisbane');
+assert.ok(!brisbaneSite.includes('data-kmw-guided-site="melbourne"'),'Other sites must not be ringed for a Brisbane challenge');
+assert.ok(melbourneSite.includes('data-kmw-guided-site="melbourne"'),'Switching to Melbourne HR must move the ring to Melbourne');
+assert.ok(!melbourneSite.includes('data-kmw-guided-site="brisbane"'),'Changing Challenges must remove the previous site ring');
+assert.ok(riverSource.includes('stroke="#38bdf8" strokeWidth="3" strokeDasharray="5 5"'),'The highlighted site ring must remain blue and dotted');
+assert.ok(!noTarget.includes('data-kmw-guided-site='),'The unselected River must not show an affected-site ring');
 const kmWeekDebriefSource=readFileSync(new URL('../src/components/KMWeekDebriefV1.tsx',import.meta.url),'utf8');
 assert.ok(kmWeekDebriefSource.includes('Before free play')&&kmWeekDebriefSource.includes('selectedDomain="operations"'),'KM Week AAR Before River must use each company’s post-guided snapshot and a valid KM Week domain');
 const eventV4Source=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
@@ -208,7 +219,7 @@ assert.ok(kmWeekBoardSource.includes("if(guideStep===4&&source==='expert'&&exper
 assert.ok(riverSource.includes('text-[15px] leading-none font-bold text-slate-500')&&riverSource.includes('fontSize="15" fontWeight={domainSelected'), 'River legend text size must match the 15px SVG domain labels');
 assert.ok(riverSource.includes("mode!=='km_week'&&<div><div")&&riverSource.includes("mode==='km_week'?'mt-1 h-[calc(100%-25px)]"),'KM Week must avoid duplicate River headings and use the recovered space for the diagram');
 assert.ok(kmWeekBoardSource.includes('Where is the capability now?'),'The KM Week River should retain its single outer heading');
-assert.ok(riverSource.includes('data-kmw-guided-site')&&kmWeekBoardSource.includes('guidedSiteId={firstGuidedTour?activeChallenge?.siteId:undefined}'),'The first guided Challenge must highlight the target site on the River');
+assert.ok(riverSource.includes('data-kmw-guided-site')&&kmWeekBoardSource.includes('guidedSiteId={riverChallenge?.siteId}'),'Every selected open Challenge must highlight its affected site on the River');
 assert.ok(riverSource.includes('x={px} y={py-22} textAnchor="middle"')&&riverSource.includes('{firstName(mark.expert.name)} · {loc}'),'Knowledge River must centre each expert name above its icon rather than beside it');
 assert.ok(kmWeekBoardSource.includes('Selected knowledge')&&kmWeekBoardSource.includes('text-[34px]'),'KM Week Challenge header must keep the large selected-knowledge / requirement score');
 assert.ok(kmWeekBoardSource.includes("const selectedDepth=localSelection==='depth'?localScore:expertSelection==='depth'?activeExpertScore:0")&&kmWeekBoardSource.includes("const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0)"),'KM Week selected knowledge must be composed from explicit depth and breadth sources');
