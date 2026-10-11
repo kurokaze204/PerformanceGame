@@ -11,7 +11,7 @@ import {
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
   KM_WEEK_SHOCK_GAP_COST,
-  KM_WEEK_MAX_EXPERT_KNOWLEDGE,
+  KM_WEEK_DEEP_BENCH_TARGET,
   freeChallengesForRound,
   kmWeekRiskOddsV1,
   kmWeekAARCandidatesV1,
@@ -276,7 +276,7 @@ assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne
 }
 
 const makeFreeInvestment=()=>{
-  const trainable=company.experts.find(candidate=>candidate.domains[0].score<KM_WEEK_MAX_EXPERT_KNOWLEDGE);
+  const trainable=company.experts.find(candidate=>candidate.domains[0].score<KM_WEEK_DEEP_BENCH_TARGET);
   if(trainable){
     const skill=trainable.domains[0];
     return applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:trainable.id,domain:skill.domain});
@@ -411,14 +411,14 @@ assert.ok((company.kmWeek?.score.total||0)>0);
   initialiseKMWeekCompanyV1(co);
   const st=co.kmWeek!;
   st.stage='free';st.phase='invest';st.freeRound=3;co.round=6;
-  const site=co.sites.find(site=>site.id==='brisbane')!;
-  const expert=co.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
-  const skill=expert.domains.find(skill=>skill.domain==='operations')!;
-  site.teamCapability.operations=startingSite;
+  const site=co.sites.find(site=>site.id==='perth')!;
+  const expert=co.experts.find(expert=>expert.domains.some(skill=>skill.domain==='marketing'))!;
+  const skill=expert.domains.find(skill=>skill.domain==='marketing')!;
+  site.teamCapability.marketing=startingSite;
   skill.score=startingExpert;
   st.challenges=[
-   {id:'TOUGH',title:'Maintenance crisis',story:'Difficult incident',siteId:site.id,domain:'operations',difficulty:6,impact:90,status},
-   {id:'EASY',title:'Minor delay',story:'Routine',siteId:site.id,domain:'operations',difficulty:4,impact:20,status:'success'},
+   {id:'TOUGH',title:'Distributor failure',story:'Difficult Perth incident',siteId:site.id,domain:'marketing',difficulty:9,impact:135,status},
+   {id:'EASY',title:'Minor delay',story:'Routine',siteId:site.id,domain:'marketing',difficulty:4,impact:20,status:'success'},
   ];
   const s={...session,companies:[co]} as GameSessionV2;
   assert.deepEqual(kmWeekAARCandidatesV1(co),[],'The AAR must stay unavailable before the seventh game-round Challenge is resolved');
@@ -436,10 +436,47 @@ assert.ok((company.kmWeek?.score.total||0)>0);
   return {site,skill,co};
  };
  const won=makeReview('success',2,4);
- assert.equal(won.site.teamCapability.operations,3,'Success should improve local knowledge by one');
+ assert.equal(won.site.teamCapability.marketing,3,'Success should improve local knowledge by one');
  assert.equal(won.skill.score,5,'Success should improve the facilitating expert by one');
- const lost=makeReview('failure',4,5);
- assert.equal(lost.site.teamCapability.operations,5,'Failure should improve site knowledge by two, capped at five');
- assert.equal(lost.skill.score,6,'Failure should improve the expert by two, capped at six');
+ const lost=makeReview('failure',5,6);
+ assert.equal(lost.site.teamCapability.marketing,7,'Perth failure AAR must add +2 beyond the old level-five site cap');
+ assert.equal(lost.skill.score,8,'Failure AAR must add +2 beyond the old level-six expert cap');
+ assert.equal(lost.co.kmWeek!.investmentHistory.at(-1)?.after,7,'AAR records the full site uplift');
+ assert.equal(lost.co.kmWeek!.investmentHistory.at(-1)?.expertAfter,8,'AAR records the full expert uplift');
+ const high=makeReview('failure',9,10);
+ assert.equal(high.site.teamCapability.marketing,11,'Perth site knowledge must grow above ten');
+ assert.equal(high.skill.score,12,'Experts must grow above ten');
+ const highSuccess=makeReview('success',10,11);
+ assert.equal(highSuccess.site.teamCapability.marketing,11,'Success AAR adds one beyond ten');
+ assert.equal(highSuccess.skill.score,12,'Successful AAR also adds one to the expert beyond ten');
+ assert.ok(calculateKMWeekScoreV1(session,high.co).expertise<=6,'Higher knowledge must not overflow the six-point Score Pad category');
 }
+// Other investments must be able to strengthen expertise beyond difficulty ten.
+{
+ const co=createInitialCompanyV2('High Knowledge','kmw-high-knowledge',config);
+ initialiseKMWeekCompanyV1(co);
+ co.kmWeek!.stage='free';co.kmWeek!.phase='invest';co.kmWeek!.freeRound=4;co.round=7;
+ const s={...session,companies:[co]} as GameSessionV2;
+ const expert=co.experts.find(e=>e.domains.some(d=>d.domain==='marketing'))!;
+ const skill=expert.domains.find(d=>d.domain==='marketing')!;
+ skill.score=10;
+ let result=investKMWeekV1(s,co,{investment:'TRAIN_EXPERT',expertId:expert.id,domain:'marketing'});
+ assert.equal(result.success,true,result.message);
+ assert.equal(skill.score,11,'Train Expert must continue beyond ten');
+ co.kmWeek!.phase='invest';
+ skill.score=12;
+ const perth=co.sites.find(site=>site.id==='perth')!;
+ perth.teamCapability.marketing=9;
+ result=investKMWeekV1(s,co,{investment:'LOCAL_TRAINING',expertId:expert.id,siteId:perth.id,domain:'marketing'});
+ assert.equal(result.success,true,result.message);
+ assert.equal(perth.teamCapability.marketing,11,'Local Training must add two beyond ten, without exceeding the expert');
+ co.kmWeek!.phase='invest';
+ const brisbane=co.sites.find(site=>site.id==='brisbane')!;
+ brisbane.teamCapability.marketing=15;
+ result=investKMWeekV1(s,co,{investment:'KNOWLEDGE_TRANSFER',sourceSiteId:brisbane.id,targetSiteId:perth.id,domain:'marketing'});
+ assert.equal(result.success,true,result.message);
+ assert.equal(perth.teamCapability.marketing,13,'Knowledge Transfer must move half the gap even above ten');
+ assert.equal(co.kmWeek!.investmentHistory.at(-1)?.after,13);
+}
+
 console.log('KM Week smoke passed');
