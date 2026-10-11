@@ -347,6 +347,15 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
   background: radial-gradient(circle at 35% 35%, #fff7ae 0 18%, #fde047 38%, #f59e0b 70%, transparent 72%);
   box-shadow: 0 0 10px #fde047, 0 0 24px #facc15, 0 0 42px rgb(250 204 21 / .65);
 }
+/* Challenge outcomes travel to the Turnover box using the same glowing globe. */
+.kmw-turnover-globe-win {
+  background: radial-gradient(circle at 35% 35%, #ecfdf5 0 16%, #6ee7b7 38%, #10b981 70%, transparent 72%);
+  box-shadow: 0 0 10px #6ee7b7, 0 0 24px #10b981, 0 0 42px rgb(16 185 129 / .65);
+}
+.kmw-turnover-globe-loss {
+  background: radial-gradient(circle at 35% 35%, #fff1f2 0 16%, #fda4af 38%, #fb7185 70%, transparent 72%);
+  box-shadow: 0 0 10px #fda4af, 0 0 24px #fb7185, 0 0 42px rgb(244 63 94 / .6);
+}
 .kmw-river-motion,
 .kmw-river-motion * {
   transition-duration: 1.2s;
@@ -365,6 +374,28 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
   0% { transform: perspective(900px) rotateY(-82deg) scale(.96); opacity: .3; }
   100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; }
 }
+
+/* Guided Challenge 1: unobtrusive cyan signals connected to the real controls. */
+@keyframes kmw-tour-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgb(56 189 248 / .55), 0 0 8px rgb(56 189 248 / .2); }
+  50% { box-shadow: 0 0 0 3px rgb(56 189 248 / .85), 0 0 24px rgb(56 189 248 / .5); }
+}
+.kmw-tour-highlight { position: relative; animation: kmw-tour-glow 1.4s ease-in-out infinite; }
+.kmw-tour-chance { animation: kmw-tour-glow 1s ease-in-out infinite; }
+/* Once the response can cover the requirement, success must read green,
+   including during a cyan coaching highlight. */
+.kmw-tour-required-success {
+  border-color: #34d399 !important;
+  background-color: rgb(6 78 59 / .24);
+  box-shadow: 0 0 0 2px rgb(52 211 153 / .4), 0 0 20px rgb(16 185 129 / .25);
+  animation: none;
+}
+
+@keyframes kmw-guided-site-glow {
+  0%, 100% { opacity: .65; stroke-width: 2.5; }
+  50% { opacity: 1; stroke-width: 4; }
+}
+.kmw-guided-site-pulse { animation: kmw-guided-site-glow 1.3s ease-in-out infinite; }
 
 /* KM Week delayed action cue: after 8 seconds with no knowledge source selected,
    pulse the actionable source buttons, then their selection circles 300ms later. */
@@ -403,4 +434,65 @@ div[class*="max-w-[1100px]"] section[class*="border-violet-400"] button.text-lef
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Keep touch scrolling inside the controls; readable labels on tablets. */
+.kmw-controls [class*="text-[8px]"],
+.kmw-controls [class*="text-[9px]"],
+.kmw-controls [class*="text-[10px]"],
+.kmw-controls [class*="text-[11px]"] { font-size: 12px; }
+.kmw-controls select { min-height: 44px; font-size: 14px; }
+.kmw-controls label { display: block; min-width: 0; }
+.kmw-controls button { touch-action: manipulation; }
+@media (min-width: 700px) {
+ .kmw-controls { overflow: hidden; }
+ .kmw-controls > div { min-height: 0; }
+ .kmw-controls [class*="overflow-y-auto"] { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+}
+
+/* Print the complete KM Week debrief (including SVG turnover and Rivers).
+   EXPORT PDF opens the browser print dialog; players select Save as PDF. */
+@media print {
+ @page { size: A4 landscape; margin: 10mm; }
+ html, body, #root, .kmw-game-root {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+ }
+ html, body, #root { background: #fff !important; }
+ .kmw-game-root > header, [data-kmw-pdf-hide], .kmw-aar-slide-in { display: none !important; }
+ [data-kmw-debrief] {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+ }
+ [data-kmw-debrief] *,
+ [data-kmw-debrief] svg {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+ }
+ [data-kmw-debrief] > section, [data-kmw-pdf-chart], [data-kmw-pdf-company] {
+  break-inside: avoid;
+  page-break-inside: avoid;
+ }
+ [data-kmw-debrief] [data-kmw-pdf-company] { margin-top: 10px !important; }
+ [data-kmw-debrief] [data-kmw-pdf-company] > .grid {
+  display: grid !important;
+  grid-template-columns: 360px minmax(0,1fr) minmax(0,1fr) !important;
+  gap: 10px !important;
+ }
+ [data-kmw-debrief] section { box-shadow: none !important; }
+ [data-kmw-debrief] svg { max-width: 100% !important; }
 }

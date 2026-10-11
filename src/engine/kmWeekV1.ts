@@ -13,17 +13,28 @@ import type {
 
 export const KM_WEEK_DOMAINS: KnowledgeDomain[] = ['operations','hr','marketing'];
 export const KM_WEEK_SITE_IDS = ['melbourne','brisbane','perth'] as const;
-export const KM_WEEK_MAX_KNOWLEDGE = 5;
-export const KM_WEEK_MAX_EXPERT_KNOWLEDGE = 6;
+// Knowledge levels grow with the escalating Challenges; only Score Pad points are capped.
+// Six is a Deep Bench goal milestone, NOT a limit on expert learning.
+export const KM_WEEK_DEEP_BENCH_TARGET = 6;
+export const KM_WEEK_AAR_COST = 50;
+export const KM_WEEK_AAR_UNLOCK_ROUND = 7;
+
+export function kmWeekAARCandidatesV1(company:CompanyV2):KMWeekChallenge[]{
+ const state=company.kmWeek;
+ if(!state||state.stage!=='free'||state.phase!=='invest'||company.round<KM_WEEK_AAR_UNLOCK_ROUND)return [];
+ const reviewed=new Set(state.investmentHistory.filter(item=>item.type==='AFTER_ACTION_REVIEW').map(item=>item.challengeId));
+ return state.challenges.filter(item=>item.difficulty>=5&&item.status!=='open'&&!reviewed.has(item.id));
+}
+
 export const KM_WEEK_SHOCK_WINDOW_SECONDS = 180;
-export const KM_WEEK_SHOCK_FAILURE_COST = 15;
+export const KM_WEEK_SHOCK_GAP_COST = 40; // $40k per documented non-conformity knowledge point (fine)
 
 export const KM_WEEK_SHOCK_SPECS:{id:string;siteId:string;domain:KnowledgeDomain;difficulty:number}[]=[
-  {id:'S1',siteId:'brisbane',domain:'operations',difficulty:2},
-  {id:'S2',siteId:'perth',domain:'operations',difficulty:1},
-  {id:'S3',siteId:'melbourne',domain:'hr',difficulty:2},
-  {id:'S4',siteId:'brisbane',domain:'marketing',difficulty:2},
-  {id:'S5',siteId:'perth',domain:'marketing',difficulty:2},
+  {id:'S1',siteId:'brisbane',domain:'operations',difficulty:4},
+  {id:'S2',siteId:'perth',domain:'operations',difficulty:3},
+  {id:'S3',siteId:'melbourne',domain:'hr',difficulty:4},
+  {id:'S4',siteId:'brisbane',domain:'marketing',difficulty:3},
+  {id:'S5',siteId:'perth',domain:'marketing',difficulty:4},
 ];
 export const KM_WEEK_SHOCK_CUTOFF=Math.max(...KM_WEEK_SHOCK_SPECS.map(check=>check.difficulty));
 
@@ -52,7 +63,7 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
   'deep-bench': {
     id:'deep-bench',
     title:'Deep Bench',
-    description:'Finish with all three specialists at Knowledge 6.',
+    description:'Finish with all three specialists at Knowledge 6 or higher.',
     points:5,
   },
   'broad-base': {
@@ -77,30 +88,32 @@ type KMWeekEventDescription={id:string;title:string;story:string};
 // shuffled for each company at the start of every six-round cycle.
 const FREE_ROUND_VALUES:KMWeekFreeValue[][]=[
   [
-    {id:'HR3A',domain:'hr',difficulty:3,impact:45},
+    // The first full round is a manageable introduction before the pressure builds.
+    {id:'HR2',domain:'hr',difficulty:2,impact:30},
+    {id:'MKT3INTRO',domain:'marketing',difficulty:3,impact:45},
+  ],
+  [
     {id:'HR3B',domain:'hr',difficulty:3,impact:45},
+    {id:'MKT4A',domain:'marketing',difficulty:4,impact:60},
   ],
   [
-    {id:'HR1',domain:'hr',difficulty:1,impact:15},
-    {id:'MKT2',domain:'marketing',difficulty:2,impact:30},
+    {id:'MKT4B',domain:'marketing',difficulty:4,impact:60},
+    {id:'OPS8',domain:'operations',difficulty:8,impact:120},
   ],
   [
-    {id:'MKT3A',domain:'marketing',difficulty:3,impact:45},
-    {id:'OPS7',domain:'operations',difficulty:7,impact:105},
+    {id:'OPS6',domain:'operations',difficulty:6,impact:90},
+    {id:'OPS4A',domain:'operations',difficulty:4,impact:60},
   ],
   [
-    {id:'OPS5',domain:'operations',difficulty:5,impact:75},
-    {id:'OPS3B',domain:'operations',difficulty:3,impact:45},
+    {id:'MKT5A',domain:'marketing',difficulty:5,impact:75},
+    {id:'OPS4B',domain:'operations',difficulty:4,impact:60},
   ],
   [
-    {id:'MKT4',domain:'marketing',difficulty:4,impact:60},
-    {id:'OPS3C',domain:'operations',difficulty:3,impact:45},
-  ],
-  [
-    {id:'MKT5',domain:'marketing',difficulty:5,impact:75},
     {id:'MKT6',domain:'marketing',difficulty:6,impact:90},
+    {id:'MKT5B',domain:'marketing',difficulty:5,impact:75},
   ],
 ];
+const FREE_CYCLE_DIFFICULTY_TOTAL=FREE_ROUND_VALUES.flat().reduce((sum,card)=>sum+card.difficulty,0);
 
 // Eighteen story cards: six per knowledge domain. Only twelve are drawn in a
 // normal six-round cycle, so companies see different stories as well as a
@@ -205,7 +218,7 @@ function hireRetiredExpertReplacement(company:CompanyV2){
   const siteScores=activeSites(company).map(site=>site.teamCapability[retirement.domain]||0);
   const replacementScore=Math.max(3,...siteScores);
   expert.name=retirement.replacementName;
-  skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,replacementScore);
+  skill.score=replacementScore;
   expert.isVacant=false;
   expert.state='Available';
   expert.replacementDueRound=null;
@@ -216,8 +229,8 @@ function hireRetiredExpertReplacement(company:CompanyV2){
 
 function guidedChallenge(turn:number):KMWeekChallenge{
   if(turn===1)return {id:'G1',title:'Packaging line shutdown',story:'A conveyor-control fault has stopped Brisbane’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
-  if(turn===2)return {id:'G2',title:'Batch quality hold',story:'After production restarts, quality checks find inconsistent fill weights across two Brisbane batches. Shipments are on hold until the cause is identified and corrected.',siteId:'brisbane',domain:'operations',difficulty:1,impact:30,status:'open',guided:true};
-  return {id:'G3',title:'Perth shift handover breakdown',story:'Incomplete maintenance and dispatch notes leave Perth’s afternoon shift unable to safely release several urgent customer orders.',siteId:'perth',domain:'operations',difficulty:4,impact:35,status:'open',guided:true};
+  if(turn===2)return {id:'G2',title:'Roster coverage dispute',story:'A last-minute Melbourne staffing change raises concerns about shift coverage and fatigue limits. The local team needs to put a compliant roster in place before work begins.',siteId:'melbourne',domain:'hr',difficulty:1,impact:30,status:'open',guided:true};
+  return {id:'G3',title:'Perth distributor escalation',story:'A Perth distributor threatens to suspend urgent customer deliveries after receiving conflicting product and service advice. The team needs a clear, consistent response today.',siteId:'perth',domain:'marketing',difficulty:4,impact:35,status:'open',guided:true};
 }
 
 function cloneChallenges(items:KMWeekChallenge[]):KMWeekChallenge[]{
@@ -229,7 +242,9 @@ export function freeChallengesForRound(session:GameSessionV2,company:CompanyV2,r
   const cycle=Math.floor((safeRound-1)/FREE_ROUND_VALUES.length);
   const position=(safeRound-1)%FREE_ROUND_VALUES.length;
   const seedBase=`${session.id}|${company.id}|cycle:${cycle}`;
-  const shuffledProfiles=seededShuffle(FREE_ROUND_VALUES,`${seedBase}|profiles`);
+  // Keep the first full-play round approachable. Shuffle the five tougher
+  // pairs independently for every company and six-round cycle.
+  const shuffledProfiles=[FREE_ROUND_VALUES[0],...seededShuffle(FREE_ROUND_VALUES.slice(1),`${seedBase}|profiles`)];
   const profile=shuffledProfiles[position];
 
   const descriptionPools={
@@ -260,7 +275,10 @@ export function freeChallengesForRound(session:GameSessionV2,company:CompanyV2,r
       story:description.story.split('{site}').join(siteLabel),
       siteId,
       domain:value.domain,
-      difficulty:value.difficulty,
+      // Knowledge requirements rise by one each time the six-pattern
+      // challenge deck cycles (Rounds 1-6 base, 7-12 +1, 13-18 +2, etc).
+      // Keep the existing monetary impacts unchanged.
+      difficulty:value.difficulty+cycle,
       impact:value.impact,
       status:'open',
     };
@@ -277,7 +295,7 @@ function kmWeekShockWindowOpen(session:GameSessionV2){
   return kmWeekSecondsRemaining(session)<=KM_WEEK_SHOCK_WINDOW_SECONDS;
 }
 
-function enterBusinessShock(company:CompanyV2,message='The final three minutes have begun. The Business Shock is here.'){
+function enterSiteAudits(company:CompanyV2,message='The final three minutes have begun. Site Audits are starting.'){
   const state=company.kmWeek!;
   state.stage='shock';
   state.phase='challenge';
@@ -298,7 +316,7 @@ function hashGoal(sessionId:string):KMWeekGoalId{
 }
 
 function emptyScore():KMWeekScore{
-  return {business:0,expertise:0,localCapability:0,knowledgeFlow:0,resilience:0,goal:0,total:0};
+  return {business:0,expertise:0,localCapability:0,knowledgeFlow:0,resilience:0,goal:0,turnover:0,total:0};
 }
 
 function activeSites(company:CompanyV2){
@@ -355,6 +373,7 @@ export function initialiseKMWeekCompanyV1(company:CompanyV2){
     challenges:[guidedChallenge(1)],
     usedExpertIds:[],
     freeSuccesses:0,
+    businessDifficultySolved:0,
     localSuccesses:0,
     expertSuccesses:0,
     riskSuccesses:0,
@@ -401,7 +420,10 @@ export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
   if(session.finalWindowMinutes!==3){session.finalWindowMinutes=3;changed=true;}
   for(const company of session.companies){
     if(!company.kmWeek){initialiseKMWeekCompanyV1(company);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
-    else if(!company.kmWeek.turnoverHistory){company.kmWeek.turnoverHistory=[{label:'CURRENT',turnover:company.turnover}];changed=true;}
+    else{
+      if(!company.kmWeek.turnoverHistory){company.kmWeek.turnoverHistory=[{label:'CURRENT',turnover:company.turnover}];changed=true;}
+      if(company.kmWeek.businessDifficultySolved===undefined){company.kmWeek.businessDifficultySolved=company.kmWeek.freeSuccesses*3;changed=true;}
+    }
   }
   return changed;
 }
@@ -418,35 +440,55 @@ function localCapabilityPoints(company:CompanyV2){
 }
 
 function expertisePoints(company:CompanyV2){
-  return activeExperts(company).reduce((sum,expert)=>{
+  // More than six points of expertise still helps solve tougher Challenges,
+  // but does not overflow the Score Pad's 6-point Expertise category.
+  return Math.min(6,activeExperts(company).reduce((sum,expert)=>{
     const skill=expert.domains.find(item=>KM_WEEK_DOMAINS.includes(item.domain));
     return sum+Math.max(0,(skill?.score||0)-3);
-  },0);
+  },0));
 }
 
 function goalAchieved(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek!;
   const goal=session.kmWeekGoalId||hashGoal(session.id);
   if(goal==='local-heroes')return state.localSuccesses>=2;
-  if(goal==='deep-bench')return activeExperts(company).every(expert=>(expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0)>=KM_WEEK_MAX_EXPERT_KNOWLEDGE);
+  if(goal==='deep-bench')return activeExperts(company).every(expert=>(expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0)>=KM_WEEK_DEEP_BENCH_TARGET);
   if(goal==='broad-base')return localCapabilityPoints(company)>=4;
   const totals=activeSites(company).map(site=>KM_WEEK_DOMAINS.reduce((sum,domain)=>sum+(site.teamCapability[domain]||0),0));
   return totals.length===3&&totals.every(total=>total>=3)&&totals.some(total=>total>=4);
 }
 
+/** Final turnover placements are decided across the companies actually playing.
+ * Equal turnover shares the same place; the next place is skipped (competition ranking).
+ * Nobody earns a placement bonus while any participating company is still playing.
+ */
+export function kmWeekFinalTurnoverPointsV1(session:GameSessionV2,company:CompanyV2):number{
+  const participantCompanyIds=new Set(session.participants.filter(participant=>participant.role!=='facilitator'&&participant.companyId).map(participant=>participant.companyId));
+  const competitors=participantCompanyIds.size
+    ?session.companies.filter(candidate=>participantCompanyIds.has(candidate.id))
+    :session.companies;
+  if(!competitors.length||!competitors.some(candidate=>candidate.id===company.id)||!competitors.every(candidate=>candidate.kmWeek?.stage==='complete'))return 0;
+  const ahead=competitors.filter(candidate=>candidate.turnover>company.turnover).length;
+  return [7,4,2][ahead]??0;
+}
+
 export function calculateKMWeekScoreV1(session:GameSessionV2,company:CompanyV2):KMWeekScore{
   const state=company.kmWeek;
   if(!state)return emptyScore();
+  const weightedBusiness=state.businessDifficultySolved??state.freeSuccesses*3;
   const score:KMWeekScore={
-    business:Math.min(12,state.freeSuccesses*2),
+    business:Math.min(12,Math.round((weightedBusiness/FREE_CYCLE_DIFFICULTY_TOTAL)*12)),
     expertise:expertisePoints(company),
     localCapability:localCapabilityPoints(company),
     knowledgeFlow:Math.min(6,state.knowledgeTransfers+state.meaningfulTransfers),
-    resilience:state.shockChecks.filter(check=>check.passed).length,
+    // Squeaky clean: one point per cleared audit, plus ten if all five clear.
+    resilience:state.shockChecks.filter(check=>check.passed).length+
+      (state.shockChecks.length===KM_WEEK_SHOCK_SPECS.length&&state.shockChecks.every(check=>check.passed)?10:0),
     goal:goalAchieved(session,company)?5:0,
+    turnover:kmWeekFinalTurnoverPointsV1(session,company),
     total:0,
   };
-  score.total=score.business+score.expertise+score.localCapability+score.knowledgeFlow+score.resilience+score.goal;
+  score.total=score.business+score.expertise+score.localCapability+score.knowledgeFlow+score.resilience+score.goal+score.turnover;
   return score;
 }
 
@@ -461,7 +503,7 @@ function setChallengePhase(company:CompanyV2,challenges:KMWeekChallenge[]){
   state.usedExpertIds=[];
   company.roundPhase='events';
   company.actionsRemaining=1;
-  for(const expert of activeExperts(company))expert.state=expert.location==='HQ'?'HQ Assignment':'Available';
+  for(const expert of activeExperts(company))expert.state=state.trainingCommitments?.[expert.id]===company.round?'Knowledge Transfer':expert.location==='HQ'?'HQ Assignment':'Available';
 }
 
 function afterChallengeSet(session:GameSessionV2,company:CompanyV2){
@@ -495,6 +537,7 @@ export function resolveKMWeekChallengeV1(
   includeLocalBreadth=false,
   includeExpertBreadth=false,
   useLocalRisk=true,
+  useExpertRisk=false,
 ){
   const state=company.kmWeek;
   if(!state||state.phase!=='challenge'||state.stage==='shock'||state.stage==='complete')return{success:false,message:'No normal Challenge is ready to resolve.'};
@@ -503,9 +546,11 @@ export function resolveKMWeekChallengeV1(
   const site=company.sites.find(item=>item.id===challenge.siteId);
   if(!site)return{success:false,message:'Challenge site not found.'};
 
-  if(state.stage==='guided'&&state.guidedTurn!==2&&method!=='expert'){
+  if(state.stage==='guided'&&state.guidedTurn===1&&method!=='expert'){
     return{success:false,message:'This guided move is teaching expert deployment. Send the Operations expert.'};
   }
+
+  if(expertId&&(method==='expert'||includeExpertBreadth||useExpertRisk)&&state.trainingCommitments?.[expertId]===company.round)return{success:false,message:'Busy training staff'};
 
   let won=false;
   let roll:number|undefined;
@@ -526,14 +571,14 @@ export function resolveKMWeekChallengeV1(
     }
     const total=localKnowledge+breadth;
     won=total>=challenge.difficulty;
-    if(!won)return{success:false,message:`${site.name} provides depth ${localKnowledge}${breadth?' plus expert breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.`};
+    if(state.stage==='guided'&&!won)return{success:false,message:`${site.name} provides depth ${localKnowledge}${breadth?' plus expert breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.`};
     if(expert){
       travelCost=expert.location===site.id?0:2;
       expert.location=site.id;
       expert.state='Supporting Event';
       if(state.stage==='free')state.usedExpertIds.push(expert.id);
     }
-    if(state.stage==='free'&&!includeExpertBreadth)state.localSuccesses+=1;
+    if(won&&state.stage==='free'&&!includeExpertBreadth)state.localSuccesses+=1;
   }else if(method==='expert'){
     expert=company.experts.find(item=>item.id===expertId&&!item.isVacant);
     if(!expert)return{success:false,message:'Choose an available expert.'};
@@ -544,7 +589,7 @@ export function resolveKMWeekChallengeV1(
     const breadth=includeLocalBreadth&&localKnowledge>0?1:0;
     const total=skill.score+breadth;
     won=total>=challenge.difficulty;
-    if(!won){
+    if(state.stage==='guided'&&!won){
       const breadthHint=!includeLocalBreadth&&localKnowledge>0?' Select the Local Team as breadth to add +1.':'';
       return{success:false,message:`${expert.name} provides depth ${skill.score}${breadth?' plus local breadth +1':''}; total selected knowledge ${total}/${challenge.difficulty}.${breadthHint}`};
     }
@@ -552,10 +597,19 @@ export function resolveKMWeekChallengeV1(
     expert.location=site.id;
     expert.state='Supporting Event';
     if(state.stage==='free')state.usedExpertIds.push(expert.id);
-    if(state.stage==='free')state.expertSuccesses+=1;
+    if(won&&state.stage==='free')state.expertSuccesses+=1;
   }else{
     roll=Math.floor(Math.random()*6)+1;
-    const team=useLocalRisk?(site.teamCapability[challenge.domain]||0):0;
+    let team=useLocalRisk?(site.teamCapability[challenge.domain]||0):0;
+    if(useExpertRisk||includeExpertBreadth){
+      expert=company.experts.find(item=>item.id===expertId&&!item.isVacant);
+      const skill=expert?.domains.find(item=>item.domain===challenge.domain);
+      if(!expert||!skill||skill.score<=0||state.usedExpertIds.includes(expert.id))return{success:false,message:'Choose an available expert.'};
+      team=useExpertRisk?skill.score+(includeLocalBreadth&&team>0?1:0):team+1;
+      travelCost=expert.location===site.id?0:2;
+      expert.location=site.id;expert.state='Supporting Event';
+      if(state.stage==='free')state.usedExpertIds.push(expert.id);
+    }
     const odds=kmWeekRiskOddsV1(team,challenge.difficulty);
     riskRequiredRoll=odds.requiredRoll;
     riskPerformanceGap=odds.performanceGap;
@@ -574,8 +628,11 @@ export function resolveKMWeekChallengeV1(
   applyTurnover(company,turnoverChange);
   const challengeIndex=state.challenges.findIndex(item=>item.id===challenge.id)+1;
   const challengeLabel=state.stage==='guided'?`G${state.guidedTurn} C`:`R${state.freeRound} C${challengeIndex}`;
-  state.turnoverHistory.push({label:challengeLabel,turnover:company.turnover});
-  if(won&&state.stage==='free')state.freeSuccesses+=1;
+  state.turnoverHistory.push({label:challengeLabel,turnover:company.turnover,challengeResult:challenge.status});
+  if(won&&state.stage==='free'){
+    state.freeSuccesses+=1;
+    state.businessDifficultySolved=(state.businessDifficultySolved||0)+challenge.difficulty;
+  }
   const travelText=travelCost?` Expert travel -${travelCost}k.`:'';
   const rollText=roll!==undefined?` Dice roll ${roll}: ${won?'SUCCESS':'FAILURE'} (performance gap ${riskPerformanceGap}, needed ${riskRequiredRoll}+).`:'';
   state.lastMessage=won
@@ -601,6 +658,7 @@ function guidedRequirement(state:KMWeekCompanyState):KMWeekInvestment{
 function investmentLabel(type:KMWeekInvestment){
   if(type==='TRAIN_EXPERT')return'Train Expert';
   if(type==='LOCAL_TRAINING')return'Local Training';
+  if(type==='AFTER_ACTION_REVIEW')return'After Action Review';
   return'Knowledge Transfer';
 }
 
@@ -608,20 +666,37 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
   const state=company.kmWeek;
   if(!state||state.phase!=='invest'||state.stage==='shock'||state.stage==='complete')return{success:false,message:'Investment is not available right now.'};
   const type=String(payload?.investment||'') as KMWeekInvestment;
-  if(!['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER'].includes(type))return{success:false,message:'Choose one of the three KM Week investments.'};
+  if(!['TRAIN_EXPERT','LOCAL_TRAINING','KNOWLEDGE_TRANSFER','AFTER_ACTION_REVIEW'].includes(type))return{success:false,message:'Choose an available KM Week investment.'};
   if(state.stage==='guided'&&type!==guidedRequirement(state))return{success:false,message:`For this guided move, choose ${investmentLabel(guidedRequirement(state))}.`};
   const domain=String(payload?.domain||'') as KnowledgeDomain;
-  if(!KM_WEEK_DOMAINS.includes(domain))return{success:false,message:'Choose Operations, Human Resources or Marketing.'};
+  if(type!=='AFTER_ACTION_REVIEW'&&!KM_WEEK_DOMAINS.includes(domain))return{success:false,message:'Choose Operations, Human Resources or Marketing.'};
 
   let before=0,after=0,cost=0,expertId:string|undefined,siteId:string|undefined,sourceSiteId:string|undefined,targetSiteId:string|undefined,meaningfulFlow=false;
+  let reviewedChallengeId:string|undefined,expertBefore:number|undefined,expertAfter:number|undefined;
+  let selectedDomain=domain;
 
-  if(type==='TRAIN_EXPERT'){
+  if(type==='AFTER_ACTION_REVIEW'){
+    const event=kmWeekAARCandidatesV1(company).find(item=>item.id===payload?.challengeId);
+    if(!event)return{success:false,message:'Choose an eligible completed Challenge (knowledge requirement of 5 or more) from this round.'};
+    const site=company.sites.find(item=>item.id===event.siteId&&!item.isClosed);
+    const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===event.domain));
+    const skill=expert?.domains.find(item=>item.domain===event.domain);
+    if(!site||!expert||!skill)return{success:false,message:'A local site and a company expert in the Challenge domain are required for the review.'};
+    cost=KM_WEEK_AAR_COST;
+    if(!spend(company,cost))return{success:false,message:'Not enough turnover for the $50k After Action Review.'};
+    const uplift=event.status==='failure'?2:1;
+    selectedDomain=event.domain;siteId=site.id;expertId=expert.id;reviewedChallengeId=event.id;
+    before=site.teamCapability[event.domain]||0;
+    after=before+uplift;
+    expertBefore=skill.score;expertAfter=expertBefore+uplift;
+    site.teamCapability[event.domain]=after;
+    skill.score=expertAfter;
+  }else if(type==='TRAIN_EXPERT'){
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const skill=expert?.domains.find(item=>item.domain===domain);
     if(!expert||!skill)return{success:false,message:'Choose an expert and one of their knowledge domains.'};
-    if(skill.score>=KM_WEEK_MAX_EXPERT_KNOWLEDGE)return{success:false,message:`${expert.name} is already at the KM Week expert maximum of ${KM_WEEK_MAX_EXPERT_KNOWLEDGE}.`};
     cost=15;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
-    before=skill.score;skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,skill.score+1);after=skill.score;expertId=expert.id;expert.state='Training';
+    before=skill.score;skill.score+=1;after=skill.score;expertId=expert.id;expert.state='Training';
   }else if(type==='LOCAL_TRAINING'){
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const site=company.sites.find(item=>item.id===payload?.siteId&&!item.isClosed);
@@ -630,7 +705,8 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     if((site.teamCapability[domain]||0)>=skill.score)return{success:false,message:'The local team is already at this expert’s teaching ceiling.'};
     const travelCost=expert.location===site.id?0:2;
     cost=10+travelCost;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
-    before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,before+1,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.location=site.id;expert.state='Knowledge Transfer';
+    before=site.teamCapability[domain]||0;site.teamCapability[domain]=Math.min(before+2,skill.score);after=site.teamCapability[domain];expertId=expert.id;siteId=site.id;expert.location=site.id;expert.state='Knowledge Transfer';
+    state.trainingCommitments={...state.trainingCommitments,[expert.id]:company.round+1};
   }else{
     const source=company.sites.find(item=>item.id===payload?.sourceSiteId&&!item.isClosed);
     const target=company.sites.find(item=>item.id===payload?.targetSiteId&&!item.isClosed);
@@ -640,7 +716,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     if(sourceScore<=targetScore)return{success:false,message:`${source.name} must know more than ${target.name} in this domain before it can teach them.`};
     cost=8;if(!spend(company,cost))return{success:false,message:'Not enough turnover for this investment.'};
     const uplift=Math.max(1,Math.ceil((sourceScore-targetScore)/2));
-    before=targetScore;target.teamCapability[domain]=Math.min(KM_WEEK_MAX_KNOWLEDGE,targetScore+uplift,sourceScore);after=target.teamCapability[domain];
+    before=targetScore;target.teamCapability[domain]=Math.min(targetScore+uplift,sourceScore);after=target.teamCapability[domain];
     const actualUplift=after-before;
     sourceSiteId=source.id;targetSiteId=target.id;meaningfulFlow=before<2&&after>=2;
     if(state.stage==='free'){state.knowledgeTransfers+=actualUplift;if(meaningfulFlow)state.meaningfulTransfers+=1;}
@@ -648,10 +724,12 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
 
   state.investmentHistory.push({
     roundLabel:state.stage==='guided'?`Guided ${state.guidedTurn}`:`Free ${state.freeRound}`,
-    type,domain,expertId,siteId,sourceSiteId,targetSiteId,before,after,meaningfulFlow,
+    type,domain:selectedDomain,expertId,siteId,sourceSiteId,targetSiteId,before,after,meaningfulFlow,challengeId:reviewedChallengeId,expertBefore,expertAfter,
   });
   state.turnoverHistory.push({label:state.stage==='guided'?`G${state.guidedTurn} I`:`R${state.freeRound} I`,turnover:company.turnover});
-  state.lastMessage=`${investmentLabel(type)} complete: ${before} → ${after}. Cost $${cost}k.`;
+  state.lastMessage=type==='AFTER_ACTION_REVIEW'
+    ?`After Action Review complete: site ${before} → ${after}, expert ${expertBefore} → ${expertAfter}. Cost ${cost}k.`
+    :`${investmentLabel(type)} complete: ${before} → ${after}. Cost ${cost}k.`;
 
   if(state.stage==='guided'){
     if(state.guidedTurn<3){
@@ -664,23 +742,23 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
         experts:structuredClone(company.experts),
       };
       if(kmWeekShockWindowOpen(session)){
-        enterBusinessShock(company,'The guided section has ended just as the final three-minute window begins. Your organisation now has to cope without its specialists.');
+        enterSiteAudits(company,'The guided section has ended as the final three-minute window begins. Site Audits are now underway; auditors assess local teams only.');
       }else{
         state.stage='free';
         state.freeRound=1;
         company.round=4;
         setChallengePhase(company,freeChallengesForRound(session,company,1));
-        state.lastMessage='Guided section complete. From here, keep playing until the final three-minute Business Shock.';
+        state.lastMessage='Guided section complete. From here, keep playing until the final three-minute Site Audits.';
       }
     }
   }else{
     if(kmWeekShockWindowOpen(session)){
-      enterBusinessShock(company,'The clock has entered its final three minutes. The specialists are no longer available: reveal the Business Shock.');
+      enterSiteAudits(company,'The clock has entered its final three minutes. Site Audits now test local capability without expert assistance.');
     }else{
       state.freeRound+=1;
       company.round=3+state.freeRound;
       setChallengePhase(company,freeChallengesForRound(session,company,state.freeRound));
-      state.lastMessage=`Round ${state.freeRound} begins. Keep building capability before the final three-minute Business Shock.`;
+      state.lastMessage=`Round ${state.freeRound} begins. Keep building capability before the final three-minute Site Audits.`;
     }
   }
   syncScore(session,company);
@@ -689,12 +767,16 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
 
 export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek;
-  if(!state||state.stage!=='shock'||state.shockResolved)return{success:false,message:'The Business Shock is not ready.'};
+  if(!state||state.stage!=='shock'||state.shockResolved)return{success:false,message:'The Site Audits are not ready.'};
   const checks:KMWeekShockCheck[]=KM_WEEK_SHOCK_SPECS.map(spec=>{
     const site=company.sites.find(item=>item.id===spec.siteId);
     const localKnowledge=site?.teamCapability[spec.domain]||0;
-    const passed=localKnowledge>=spec.difficulty;
-    return{...spec,localKnowledge,passed,resolution:passed?'ready':undefined,recovered:passed};
+    const shortfall=Math.max(0,spec.difficulty-localKnowledge);
+    // A fully capable site always passes; every missing knowledge level adds
+    // another face of a d6 on which auditors identify a non-conformity.
+    const dieRoll=shortfall>0?Math.floor(Math.random()*6)+1:undefined;
+    const passed=shortfall===0||(dieRoll!==undefined&&dieRoll>shortfall);
+    return{...spec,localKnowledge,passed,dieRoll,resolution:passed?'ready':'accept',recovered:passed};
   });
   state.shockChecks=checks;
   state.shockResolved=true;
@@ -703,33 +785,34 @@ export function resolveKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
 
   const failures=checks.filter(check=>!check.passed);
   const failedSiteIds=[...new Set(failures.map(check=>check.siteId))];
-  for(const siteId of failedSiteIds){
-    applyTurnover(company,-KM_WEEK_SHOCK_FAILURE_COST);
-    const siteLabel=siteId.slice(0,3).toUpperCase();
-    state.turnoverHistory.push({label:`SHOCK ${siteLabel}`,turnover:company.turnover});
-  }
+  const missingKnowledge=failures.reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+  const totalCost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
+  state.auditTurnoverBefore=company.turnover;
+  state.auditFineTotal=totalCost;
+  if(totalCost>0)applyTurnover(company,-totalCost);
+  state.turnoverHistory.push({label:`SITE AUDITS -${totalCost}k`,turnover:company.turnover});
 
-  const totalCost=failedSiteIds.length*KM_WEEK_SHOCK_FAILURE_COST;
   state.lastMessage=failures.length
-    ? `The shock exposed ${failures.length} local capability gap${failures.length===1?'':'s'} across ${failedSiteIds.length} site${failedSiteIds.length===1?'':'s'}. Emergency external support cost ${totalCost}k in total.`
-    : `All ${checks.length} critical capability tests were handled locally. No emergency external support was needed.`;
+    ? `Auditors identified ${failures.length} non-conformit${failures.length===1?'y':'ies'} at ${failedSiteIds.length} site${failedSiteIds.length===1?'':'s'}. The knowledge shortfall of ${missingKnowledge} point${missingKnowledge===1?'':'s'} attracted fines totalling ${totalCost}k.`
+    : `All ${checks.length} Site Audits passed. No fines, and a 10-point Squeaky clean bonus!`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
 }
 
 export function completeKMWeekShockV1(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek;
-  if(!state||state.stage!=='shock'||!state.shockResolved)return{success:false,message:'Run the Business Shock first.'};
+  if(!state||state.stage!=='shock'||!state.shockResolved)return{success:false,message:'Run the Site Audits first.'};
   state.stage='complete';
   state.phase='challenge';
   company.roundPhase='risk';
   const ready=state.shockChecks.filter(check=>check.passed).length;
   const gaps=state.shockChecks.length-ready;
   const failedSites=new Set(state.shockChecks.filter(check=>!check.passed).map(check=>check.siteId));
-  const cost=failedSites.size*KM_WEEK_SHOCK_FAILURE_COST;
+  const missingKnowledge=state.shockChecks.filter(check=>!check.passed).reduce((sum,check)=>sum+Math.max(0,check.difficulty-check.localKnowledge),0);
+  const cost=missingKnowledge*KM_WEEK_SHOCK_GAP_COST;
   state.lastMessage=gaps
-    ? `${ready} of ${state.shockChecks.length} critical capabilities held locally. ${gaps} gap${gaps===1?'':'s'} across ${failedSites.size} site${failedSites.size===1?'':'s'} required emergency external support costing ${cost}k.`
-    : `All ${state.shockChecks.length} critical capabilities held locally. The organisation absorbed the shock without external rescue.`;
+    ? `${ready} of ${state.shockChecks.length} Site Audits passed; ${gaps} non-conformit${gaps===1?'y':'ies'} across ${failedSites.size} site${failedSites.size===1?'':'s'} attracted fines of ${cost}k.`
+    : `All ${state.shockChecks.length} Site Audits passed. No fines and an additional 10 Squeaky clean points.`;
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
 }
@@ -743,7 +826,7 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
   let result:{success:boolean;message:string};
   if(type==='KM_WEEK_RESOLVE'){
     const useLocalRisk=payload?.useLocalRisk===undefined?true:Boolean(payload?.useLocalRisk);
-    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth),Boolean(payload?.includeExpertBreadth),useLocalRisk);
+    result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth),Boolean(payload?.includeExpertBreadth),useLocalRisk,Boolean(payload?.useExpertRisk));
   }else if(type==='KM_WEEK_INVEST'){
     result=investKMWeekV1(session,company,payload);
   }else if(type==='KM_WEEK_RESOLVE_SHOCK'){
@@ -756,6 +839,11 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
   syncScore(session,company);
   const staffedIds=new Set(session.participants.filter(participant=>participant.role!=='facilitator').map(participant=>participant.companyId));
   const relevant=staffedIds.size?session.companies.filter(candidate=>staffedIds.has(candidate.id)):session.companies;
-  if(relevant.length&&relevant.every(candidate=>candidate.kmWeek?.stage==='complete'))session.finalDisruptionResolved=true;
+  if(relevant.length&&relevant.every(candidate=>candidate.kmWeek?.stage==='complete')){
+    session.finalDisruptionResolved=true;
+    // Turnover rankings only exist after the last team completes. Re-score all
+    // participants together so the persisted final totals match the debrief.
+    for(const candidate of relevant)syncScore(session,candidate);
+  }
   return{...result,session};
 }
