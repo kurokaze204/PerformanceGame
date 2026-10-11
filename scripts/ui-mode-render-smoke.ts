@@ -505,7 +505,7 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  rival.kmWeek!.stage='free';
  const early=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
  const soloAxes=[...early.matchAll(/data-kmw-river-scale-max="(\d+)"/g)].map(match=>Number(match[1]));
- assert.equal(soloAxes.length,2,'Only the player's two Rivers should appear before rivals finish');
+ assert.equal(soloAxes.length,2,"Only the player’s two Rivers should appear before rivals finish");
  assert.equal(soloAxes[0],soloAxes[1],'Before and after should use the same scale even while only one company is available');
  assert.equal((early.match(/data-kmw-pdf-company/g)||[]).length,1,'Do not reveal unfinished competitors');
  assert.equal(early.includes('data-kmw-category-rank="first"'),false,'Do not award green rankings while opponents are still playing');
