@@ -33,6 +33,8 @@ interface Props{
  ghostPreview?:RiverGhostPreview;
  /** The selected KM Week Challenge's required knowledge level. */
  challengeTarget?:{domain:KnowledgeDomain;level:number};
+ /** Common vertical axis ceiling for before/after comparison charts. */
+ maxKnowledgeLevel?:number;
 }
 
 const KM_WEEK:KnowledgeDomain[]=['operations','hr','marketing'];
@@ -42,7 +44,7 @@ const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',ad
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,guidedSiteId,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview,challengeTarget})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,guidedSiteId,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview,challengeTarget,maxKnowledgeLevel})=>{
  const[riverInfoOpen,setRiverInfoOpen]=useState(false);
  const domains=mode==='expert'?EXPERT:mode==='km_week'?KM_WEEK:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
@@ -63,7 +65,8 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
   :0;
  const rawMax=mode==='km_week'?Math.max(6,challengeTarget?.level||0,ghostScore,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),selectedExpertPreview+previewExpertDelta,selectedSitePreview+previewSiteDelta):Math.max(6,...data.flatMap(item=>item.scores.map(score=>score.score)),...expertMarks.map(mark=>mark.score),...domains.map(domain=>company.intranet[domain]||0),selectedSitePreview+previewSiteDelta,selectedExpertPreview+previewExpertDelta,selectedHQPreview+previewHQDelta);
  const niceStep=(max:number)=>{const raw=Math.max(1,max/4),power=Math.pow(10,Math.floor(Math.log10(raw))),scaled=raw/power;return(scaled<=1?1:scaled<=2?2:scaled<=5?5:10)*power};
- const tickStep=niceStep(rawMax),maxY=Math.max(tickStep,Math.ceil(rawMax/tickStep)*tickStep);
+ const axisInput=Math.max(rawMax,maxKnowledgeLevel??0);
+ const tickStep=niceStep(maxKnowledgeLevel??axisInput),maxY=Math.max(tickStep,Math.ceil(axisInput/tickStep)*tickStep);
  const ticks=Array.from({length:Math.floor(maxY/tickStep)+1},(_,index)=>index*tickStep);
  const W=mode==='km_week'&&!compact?660:920,H=350,padL=64,padR=92,padT=34,padB=58;
  const x=(index:number)=>padL+index*((W-padL-padR)/Math.max(1,domains.length-1));
@@ -83,7 +86,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
    {mode!=='km_week'&&<div><div className="text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">Knowledge River</div><div className="text-sm font-black text-white">Where is the knowledge now?</div></div>}
    <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[15px] leading-none font-bold text-slate-500"><span className="text-slate-50">● Site</span>{mode!=='km_week'&&<span className="text-sky-300">◆ HQ</span>}<span className="text-amber-300">● Expert</span>{challengeTarget&&<span className="text-rose-200">◎ Challenge requirement</span>}{thresholdLine&&<span className="text-yellow-300">┄ {mode==='km_week'?'Audit standard':'Shock cut-off'}</span>}</div>
   </div>}
-  <svg viewBox={`0 0 ${W} ${H}`} className={`${compact?'h-full min-h-[150px]':mode==='km_week'?'mt-1 h-[calc(100%-25px)] min-h-[220px]':'mt-1 h-[calc(100%-42px)] min-h-[220px]'} w-full`} role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
+  <svg data-kmw-river-scale-max={mode==='km_week'?maxY:undefined} viewBox={`0 0 ${W} ${H}`} className={`${compact?'h-full min-h-[150px]':mode==='km_week'?'mt-1 h-[calc(100%-25px)] min-h-[220px]':'mt-1 h-[calc(100%-42px)] min-h-[220px]'} w-full`} role="img" aria-label="Knowledge River showing sites, corporate knowledge and experts">
    {ghostPreview&&<defs><filter id="kmw-blue-ghost-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>}
    {ticks.map(value=><g key={value}><line x1={padL} x2={W-padR} y1={y(value)} y2={y(value)} stroke="#243047"/><text x={padL-9} y={y(value)+4} textAnchor="end" fill="#64748b" fontSize="13" fontWeight="700">{value}</text></g>)}
    {highlightDomain&&domainIndex>=0&&<rect x={Math.max(padL-42,x(domainIndex)-72)} y={padT-12} width="144" height={H-padT-padB+28} rx="16" fill="#facc15" fillOpacity=".06" stroke="#facc15" strokeOpacity=".38" strokeWidth="2"/>}
