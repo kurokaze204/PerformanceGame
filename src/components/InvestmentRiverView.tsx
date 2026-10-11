@@ -171,7 +171,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
      })}
     </g>
    })}
-   {challengeTarget&&domains.includes(challengeTarget.domain)&&<g data-kmw-challenge-target={`${challengeTarget.domain}:${challengeTarget.level}`} transform={`translate(${x(domains.indexOf(challengeTarget.domain))+42} ${y(challengeTarget.level)})`}>
+   {challengeTarget&&domains.includes(challengeTarget.domain)&&<g data-kmw-challenge-target={`${challengeTarget.domain}:${challengeTarget.level}`} transform={`translate(${x(domains.indexOf(challengeTarget.domain))+60} ${y(challengeTarget.level)}) scale(0.75)`}>
     <title>{DOMAIN_INFO[challengeTarget.domain].label} Challenge requires knowledge {challengeTarget.level}</title>
     <line x1="-42" y1="0" x2="-20" y2="0" stroke="#fda4af" strokeWidth="2.5" strokeDasharray="4 3"/>
     <circle r="19" fill="#fff" stroke="#991b1b" strokeWidth="2.5"/>
