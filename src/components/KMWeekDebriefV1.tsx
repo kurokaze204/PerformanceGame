@@ -40,6 +40,26 @@ function beforeCompany(company:CompanyV2):CompanyV2{
  return snapshot?{...company,sites:snapshot.sites,experts:snapshot.experts}:company;
 }
 
+/** Shared knowledge axis for every company's before AND after River.
+ *  Include experts as well as local sites so high-performing companies
+ *  do not distort the comparison by acquiring their own smaller scale.
+ */
+export function kmWeekDebriefRiverKnowledgeMax(companies:CompanyV2[]):number{
+ const levels=[6];
+ const domains=['operations','hr','marketing'];
+ for(const company of companies){
+  for(const snapshot of [beforeCompany(company),company]){
+   for(const site of snapshot.sites.filter(site=>!site.isClosed)){
+    for(const domain of domains)levels.push(site.teamCapability[domain as keyof typeof site.teamCapability]||0);
+   }
+   for(const expert of snapshot.experts.filter(expert=>!expert.isVacant)){
+    for(const skill of expert.domains.filter(skill=>domains.includes(skill.domain)))levels.push(skill.score);
+   }
+  }
+ }
+ return Math.max(...levels);
+}
+
 const MiniScorePad:React.FC<{company:CompanyV2;color:string;session:GameSessionV2;allComplete:boolean;leaders:Partial<Record<ScoreKey,CategoryLeader>>}>=({company,color,session,allComplete,leaders})=>{
  const score=calculateKMWeekScoreV1(session,company);
  return <section data-kmw-final-scorepad className="min-w-0 rounded-2xl border-2 bg-slate-950/75 p-3" style={{borderColor:color}}>
@@ -153,6 +173,7 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
   b.turnover-a.turnover||a.name.localeCompare(b.name)
  );
  const colors=companies.map((_,index)=>COMPANY_COLORS[index%COMPANY_COLORS.length]);
+ const riverKnowledgeMax=kmWeekDebriefRiverKnowledgeMax(companies);
  // Comparisons are only meaningful once every participating company is finished.
  const scoreKeys:ScoreKey[]=['business','expertise','localCapability','knowledgeFlow','resilience','goal','turnover'];
  const completeScores=allComplete&&companies.length>1?companies.map(item=>calculateKMWeekScoreV1(session,item)):[];
@@ -168,6 +189,7 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
 
   <div data-kmw-pdf-chart className="mt-3"><TurnoverGraph companies={companies} colors={colors}/></div>
   <div className="mt-3 space-y-3">
+   <p data-kmw-shared-river-scale className="text-xs font-bold text-slate-300">All before-and-after Knowledge Rivers use one shared vertical scale across these companies.</p>
    {companies.map((item,index)=>{
     const color=colors[index];
     const before=beforeCompany(item);
@@ -176,8 +198,8 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
      <p data-kmw-company-players className="mb-3 text-sm font-semibold text-emerald-100">{kmWeekCompanyPlayerLabel(session,item)}</p>
      <div className="grid gap-3 xl:grid-cols-[360px_minmax(0,1fr)_minmax(0,1fr)]">
       <MiniScorePad company={item} color={color} session={session} allComplete={allComplete} leaders={leaders}/>
-      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" compact/></div></div>
-      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After free play</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" compact/></div></div>
+      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" maxKnowledgeLevel={riverKnowledgeMax} compact/></div></div>
+      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After free play</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" maxKnowledgeLevel={riverKnowledgeMax} compact/></div></div>
      </div>
      <SiteAuditSummary company={item}/>
     </section>
