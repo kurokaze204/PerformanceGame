@@ -109,7 +109,7 @@ assert.ok(kmWeekBoardSource.includes('data-kmw-site-panels-toggle aria-expanded=
 assert.ok(kmWeekBoardSource.includes('absolute bottom-2 left-2 z-20 grid h-11 w-11'),'The 44px Buildings toggle must sit at the bottom-left of the River without obscuring other controls');
 
 assert.ok(kmWeekBoardSource.includes("min-[700px]:min-h-[210px]")&&kmWeekBoardSource.includes("min-[700px]:p-2 xl:p-3"),'Tablet-width KM Week must compact the River and site cards so the controls remain visible beside them');
-assert.ok(kmWeekBoardSource.includes("min-[700px]:w-10")&&kmWeekBoardSource.includes("min-[700px]:h-2 min-[700px]:w-2"),'Tablet site cards must shrink domain labels and knowledge pips enough to remain three-across in portrait');
+assert.ok(kmWeekBoardSource.includes("min-[700px]:w-10")&&kmWeekBoardSource.includes("compact?'h-2 w-2")&&kmWeekBoardSource.includes('Math.max(5,Math.min(10,value))'),'Tablet site cards must keep compact pips while representing knowledge above five');
 assert.ok(kmWeekBoardSource.includes("min-[700px]:flex-1")&&kmWeekBoardSource.includes("min-[700px]:h-full min-[700px]:min-h-0 min-[700px]:overflow-y-auto"),'Tablet right-side Challenge/Invest panel must fill the available column and scroll internally');
 assert.ok(kmWeekBoardSource.includes("min-[700px]:overflow-y-auto"),'The tablet Challenge/Invest panel must scroll internally rather than pushing below the River');
 assert.ok(kmWeekBoardSource.includes('Train Expert')&&kmWeekBoardSource.includes('Local Training')&&kmWeekBoardSource.includes('Knowledge Transfer'),'The three initial KM Week investments must remain');
@@ -124,6 +124,10 @@ assert.ok(kmWeekBoardSource.includes('data-kmw-intervention-help={infoInvestment
 assert.ok(kmWeekBoardSource.includes("const scoreGhostPreview:RiverGhostPreview|undefined=infoInvestment")&&kmWeekBoardSource.includes("previewForIntervention(infoInvestment)")&&kmWeekBoardSource.includes('infoPreviewDomain'),'Info button should preview the selected intervention on the River without changing the committed investment');
 assert.ok(kmWeekBoardSource.includes('setInfoInvestment(current=>current===')&&kmWeekBoardSource.includes('onClick={()=>setInfoInvestment(null)}'),'Information buttons must toggle and be closable');
 assert.ok(kmWeekBoardSource.includes('kind:\'aar\',domain:aarChallenge.domain')&&riverSource.includes('data-kmw-score-ghost="local"')&&riverSource.includes('data-kmw-score-ghost="expertise"'),'AAR information must show both site and expert projections using the established River ghost markers');
+assert.ok(kmWeekBoardSource.includes("const aarSiteDelta=aarChallenge?aarUplift:0;")&&kmWeekBoardSource.includes("const aarExpertDelta=aarChallenge?aarUplift:0;"),'Successful and failed AAR must preview full knowledge uplift regardless of prior levels');
+assert.ok(kmWeekBoardSource.includes('site.teamCapability[aarChallenge.domain]=(site.teamCapability[aarChallenge.domain]||0)+aarUplift')&&kmWeekBoardSource.includes('skill.score+=aarUplift'),'Optimistic River animation must apply full AAR uplift to both site and expert');
+assert.ok(riverSource.includes('const ghostScore=ghostPreview?.kind')&&riverSource.includes('y(score+siteGhostDelta)')&&riverSource.includes('mark.score+expertGhostDelta'),'The River must scale to show AAR gains even beyond ten');
+assert.equal(kmWeekBoardSource.includes('KM_WEEK_MAX_EXPERT_KNOWLEDGE'),false,'KM Week board must not retain the obsolete expert-level cap');
 
 assert.ok(kmWeekBoardSource.includes("item.status==='success'?'SUCCESS: ':'FAILURE: '")&&kmWeekBoardSource.includes('data-kmw-aar-select'),'AAR dropdown labels successful and failed Challenges');
 assert.ok(kmWeekBoardSource.includes('data-kmw-aar-intro')&&kmWeekBoardSource.includes('kmw-aar-arrow')&&kmWeekBoardSource.includes('dismissAARIntro'),'AAR opens a one-time briefing pointing at its button');
