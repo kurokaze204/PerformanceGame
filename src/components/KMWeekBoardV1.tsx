@@ -4,7 +4,7 @@ import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_MAX_EXPERT_KNOWLEDGE,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{toggleKMWeekSourceV1}from'../engine/kmWeekSelectionV1.ts';
 import{kmWeekCoachV1}from'../engine/kmWeekCoachV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -229,7 +229,7 @@ const TurnoverKnowledgeModal:React.FC<{open:boolean;session:GameSessionV2;curren
  </div>;
 };
 
-const KnowledgePips:React.FC<{value:number;domain:KnowledgeDomain;compact?:boolean}>=({value,domain,compact=false})=><div className={compact?'flex gap-1 min-[700px]:gap-0.5 xl:gap-1':'flex gap-1'} aria-label={`Knowledge ${value} of 5`}>{Array.from({length:5},(_,index)=><span key={index} title={`${index+1}`} className={`${compact?'h-2.5 w-2.5 min-[700px]:h-2 min-[700px]:w-2 xl:h-2.5 xl:w-2.5':'h-4 w-4'} rounded-full border shadow-inner ${index<value?'border-white/45':'border-slate-700 bg-slate-950'}`} style={index<value?{backgroundColor:DOMAIN_INFO[domain].color}:{}}/>)}</div>;
+const KnowledgePips:React.FC<{value:number;domain:KnowledgeDomain;compact?:boolean}>=({value,domain,compact=false})=><div className={compact?'flex gap-0.5':'flex gap-1'} aria-label={`Knowledge ${value}`} title={`Local knowledge ${value}`}>{Array.from({length:Math.max(5,Math.min(10,value))},(_,index)=><span key={index} title={`${index+1}`} className={`${compact?'h-2 w-2 xl:h-2.5 xl:w-2.5':'h-4 w-4'} rounded-full border shadow-inner ${index<value?'border-white/45':'border-slate-700 bg-slate-950'}`} style={index<value?{backgroundColor:DOMAIN_INFO[domain].color}:{}}/>)}</div>;
 
 const Card:React.FC<{children:React.ReactNode;className?:string}>=({children,className=''})=><section className={`rounded-[20px] border-2 border-slate-700 bg-[#111827] shadow-[0_10px_26px_rgba(0,0,0,.30)] ${className}`}>{children}</section>;
 
@@ -446,8 +446,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const aarUplift=aarChallenge?.status==='failure'?2:1;
  const aarSiteBefore=aarSite&&aarChallenge?aarSite.teamCapability[aarChallenge.domain]||0:0;
  const aarExpertBefore=aarExpert&&aarChallenge?specialistScore(company,aarChallenge.domain):0;
- const aarSiteDelta=aarChallenge?Math.min(5,aarSiteBefore+aarUplift)-aarSiteBefore:0;
- const aarExpertDelta=aarChallenge?Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,aarExpertBefore+aarUplift)-aarExpertBefore:0;
+ const aarSiteDelta=aarChallenge?aarUplift:0;
+ const aarExpertDelta=aarChallenge?aarUplift:0;
  const localTrainingTravelCost=specialist&&localTrainingSite&&specialist.location!==localTrainingSite.id?2:0;
  const standings=useMemo(()=>session.companies.map(item=>({id:item.id,name:item.name,score:item.kmWeek?.score.total||0,complete:item.kmWeek?.stage==='complete'})).sort((a,b)=>b.score-a.score),[session.companies,session.updatedAt]);
 
@@ -1039,9 +1039,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const investmentPreview=investment==='AFTER_ACTION_REVIEW'
    ?aarChallenge&&aarSite&&aarExpert?`${aarChallenge.status==='success'?'SUCCESS':'FAILURE'}: ${aarSite.name} ${domainLabel(aarChallenge.domain)} ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]} ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} · $50k`:'Choose a qualifying Challenge'
    :investment==='TRAIN_EXPERT'
-   ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
+   ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${(specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
    :investment==='LOCAL_TRAINING'
-    ?specialist&&localTrainingSite?`${localTrainingSite.name} ${domainLabel(specialistDomain)}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min(5,specialistScore(company,specialistDomain),(localTrainingSite.teamCapability[specialistDomain]||0)+2)} · ${localTrainingTravelCost?`Travel $2k · total $12k`:'No travel · total $10k'}`:'Choose an expert and training site'
+    ?specialist&&localTrainingSite?`${localTrainingSite.name} ${domainLabel(specialistDomain)}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min(specialistScore(company,specialistDomain),(localTrainingSite.teamCapability[specialistDomain]||0)+2)} · ${localTrainingTravelCost?`Travel $2k · total $12k`:'No travel · total $10k'}`:'Choose an expert and training site'
     :source&&target?(()=>{
       const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;
       const uplift=from>to?Math.max(1,Math.ceil((from-to)/2)):0;
@@ -1051,18 +1051,18 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const previewForIntervention=(kind:KMWeekInvestment):RiverGhostPreview|undefined=>{
   if(kind==='TRAIN_EXPERT'&&specialist){
    const score=specialistScore(company,specialistDomain);
-   return score<KM_WEEK_MAX_EXPERT_KNOWLEDGE?{kind:'expert',domain:specialistDomain,expertId:specialist.id,delta:1}:undefined;
+   return{kind:'expert',domain:specialistDomain,expertId:specialist.id,delta:1};
   }
   if(kind==='LOCAL_TRAINING'&&specialist&&localTrainingSite){
    const score=localTrainingSite.teamCapability[specialistDomain]||0;
    const ceiling=specialistScore(company,specialistDomain);
-   const delta=Math.max(0,Math.min(5,score+2,ceiling)-score);
+   const delta=Math.max(0,Math.min(score+2,ceiling)-score);
    return delta?{kind:'site',domain:specialistDomain,siteId:localTrainingSite.id,delta}:undefined;
   }
   if(kind==='KNOWLEDGE_TRANSFER'&&source&&target){
    const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;
    const delta=from>to?Math.max(1,Math.ceil((from-to)/2)):0;
-   return delta&&to<5?{kind:'transfer',domain:selectedDomain,sourceSiteId:source.id,targetSiteId:target.id,delta}:undefined;
+   return delta?{kind:'transfer',domain:selectedDomain,sourceSiteId:source.id,targetSiteId:target.id,delta}:undefined;
   }
   if(kind==='AFTER_ACTION_REVIEW'&&aarChallenge&&aarSite&&aarExpert){
    return{kind:'aar',domain:aarChallenge.domain,siteId:aarSite.id,expertId:aarExpert.id,siteDelta:aarSiteDelta,expertDelta:aarExpertDelta};
@@ -1083,11 +1083,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const infoPreviewText=infoInvestment==='AFTER_ACTION_REVIEW'
   ?aarChallenge&&aarSite&&aarExpert?`${aarSite.name}: ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]}: ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} (${aarChallenge.status==='failure'?'learning from failure':'learning from success'})`:'No eligible event in this round.'
   :infoInvestment==='TRAIN_EXPERT'
-   ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,specialistScore(company,specialistDomain)+1)} (${domainLabel(specialistDomain)})`:'Choose an expert to preview.'
+   ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${(specialistScore(company,specialistDomain)+1)} (${domainLabel(specialistDomain)})`:'Choose an expert to preview.'
    :infoInvestment==='LOCAL_TRAINING'
-    ?specialist&&localTrainingSite?`${localTrainingSite.name}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.max(localTrainingSite.teamCapability[specialistDomain]||0,Math.min(5,(localTrainingSite.teamCapability[specialistDomain]||0)+2,specialistScore(company,specialistDomain)))} (${domainLabel(specialistDomain)})`:'Choose an expert and a training site.'
+    ?specialist&&localTrainingSite?`${localTrainingSite.name}: ${localTrainingSite.teamCapability[specialistDomain]||0} → ${Math.min((localTrainingSite.teamCapability[specialistDomain]||0)+2,specialistScore(company,specialistDomain))} (${domainLabel(specialistDomain)})`:'Choose an expert and a training site.'
     :infoInvestment==='KNOWLEDGE_TRANSFER'
-     ?source&&target?(()=>{const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;return from>to?`${source.name} (${from}) → ${target.name} (${to} → ${Math.min(5,to+Math.max(1,Math.ceil((from-to)/2)))})`:'Choose a teaching site with more knowledge than the learning site.'})():'Choose two sites.'
+     ?source&&target?(()=>{const from=source.teamCapability[selectedDomain]||0,to=target.teamCapability[selectedDomain]||0;return from>to?`${source.name} (${from}) → ${target.name} (${to} → ${Math.min(from,to+Math.max(1,Math.ceil((from-to)/2)))})`:'Choose a teaching site with more knowledge than the learning site.'})():'Choose two sites.'
      :'';
  const infoPreviewDomain=infoInvestment==='AFTER_ACTION_REVIEW'?aarChallenge?.domain:infoInvestment==='KNOWLEDGE_TRANSFER'?selectedDomain:infoInvestment?specialistDomain:undefined;
 
@@ -1122,20 +1122,20 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const expert=optimisticCompany.experts.find(item=>item.id===aarExpert?.id);
    const skill=expert?.domains.find(item=>item.domain===aarChallenge?.domain);
    if(site&&skill&&aarChallenge){
-    site.teamCapability[aarChallenge.domain]=Math.min(5,(site.teamCapability[aarChallenge.domain]||0)+aarUplift);
-    skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,skill.score+aarUplift);
+    site.teamCapability[aarChallenge.domain]=(site.teamCapability[aarChallenge.domain]||0)+aarUplift;
+    skill.score+=aarUplift;
    }
   }else if(investment==='TRAIN_EXPERT'){
    const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
    const skill=expert?.domains.find(item=>item.domain===payload.domain);
-   if(skill)skill.score=Math.min(KM_WEEK_MAX_EXPERT_KNOWLEDGE,skill.score+1);
+   if(skill)skill.score+=1;
   }else if(investment==='LOCAL_TRAINING'){
    const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
    const site=optimisticCompany.sites.find(item=>item.id===payload.siteId);
    const skill=expert?.domains.find(item=>item.domain===payload.domain);
    if(expert&&site&&skill){
     const before=site.teamCapability[payload.domain]||0;
-    site.teamCapability[payload.domain]=Math.min(5,before+2,skill.score);
+    site.teamCapability[payload.domain]=Math.min(before+2,skill.score);
     expert.location=site.id;
    }
   }else{
@@ -1145,7 +1145,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     const from=sourceSite.teamCapability[payload.domain]||0;
     const to=targetSite.teamCapability[payload.domain]||0;
     const uplift=from>to?Math.max(1,Math.ceil((from-to)/2)):0;
-    if(uplift)targetSite.teamCapability[payload.domain]=Math.min(5,from,to+uplift);
+    if(uplift)targetSite.teamCapability[payload.domain]=Math.min(from,to+uplift);
    }
   }
 
@@ -1418,7 +1418,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><h2 className="text-sm font-black text-white">Score pad</h2><span className="ml-auto rounded-lg border border-amber-700 bg-amber-950/30 px-2 py-0.5 text-sm font-black text-amber-200">{state.score.total}</span></div>
        <div className="mt-2 grid grid-cols-2 gap-1.5">
         <ScoreCell label="Business Performance" value={state.score.business} max="12" icon={<CircleDollarSign className="h-3.5 w-3.5"/>} tip="Weighted by Challenge difficulty. Harder problems contribute more Business Performance points; solving the full six-round challenge set is worth 12."/>
-        <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability. Each expert scores 1 point per knowledge level above 3. Use Train Expert to improve it. Hover here to preview the next +1 on the River." ghost="expertise" onGhost={setScoreGhost}/>
+        <ScoreCell label="Expertise" value={state.score.expertise} max="6" icon={<Brain className="h-3.5 w-3.5"/>} tip="Rewards deep expert capability, up to 6 Score Pad points. Knowledge itself can keep growing beyond this score limit to solve tougher Challenges. Use Train Expert to improve it." ghost="expertise" onGhost={setScoreGhost}/>
         <ScoreCell label="Local capability" value={state.score.localCapability} max="9" icon={<Users className="h-3.5 w-3.5"/>} tip="Scores the strength of the whole local River: 1 point for every 2 local knowledge levels across the nine site/domain positions, up to 9 points. Improve it with Local Training or Knowledge Transfer." ghost="local" onGhost={setScoreGhost}/>
         <ScoreCell label="Knowledge Flow" value={state.score.knowledgeFlow} max="6" icon={<Workflow className="h-3.5 w-3.5"/>} tip="Rewards knowledge actually moved. A transfer now moves half the gap to the stronger source (rounded up), and each level moved scores here, with a bonus when the target crosses Knowledge 2." ghost="flow" onGhost={setScoreGhost}/>
         <ScoreCell label="Squeaky clean" value={state.score.resilience} max="15" icon={<ShieldCheck className="h-3.5 w-3.5"/>} tip="Site Audits: 1 point for each audit cleared, plus 10 extra if all five are clear. A knowledge shortfall risks a non-conformance finding, and company experts cannot answer for the site. Hover to see the highest audit target." ghost="resilience" onGhost={setScoreGhost}/>
