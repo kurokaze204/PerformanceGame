@@ -393,6 +393,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[riverTurnoverRect,setRiverTurnoverRect]=useState<{left:number;top:number;width:number;height:number}|null>(null);
  const[expertChangeDismissedKey,setExpertChangeDismissedKey]=useState('');
  const[challengeAttention,setChallengeAttention]=useState(false);
+ const[riskCoachOpen,setRiskCoachOpen]=useState(false);
  const[riskResult,setRiskResult]=useState<{roll:number;won:boolean;requiredRoll:number;performanceGap:number}|null>(null);
  const[riskRollPending,setRiskRollPending]=useState<{requiredRoll:number;performanceGap:number}|null>(null);
  const riskContinueRef=useRef<(()=>void)|null>(null);
@@ -411,6 +412,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[now,setNow]=useState(Date.now());
  const challengeDraftsRef=useRef(challengeDrafts);
  const freeChallengeIntroKey=`tpg:kmw-free-challenge-intro:${session.id}:${company.id}`;
+ const riskCoachKey=`tpg:kmw-first-shortfall-commit:${session.id}:${participant?.id||company.id}`;
  const firstFreeChallengeIntroPending=Boolean(state?.stage==='free'&&state.freeRound===1&&state.phase==='challenge'&&!readOnly&&!freeChallengeIntroDismissed&&localStorage.getItem(freeChallengeIntroKey)!=='seen');
  const showFreeChallengeIntro=firstFreeChallengeIntroPending&&!busy&&!riskResult&&!riskRollPending&&!challengeOutcome&&!scoreBriefOpen;
  const dismissFreeChallengeIntro=()=>{
@@ -690,6 +692,13 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',reposition);window.removeEventListener('scroll',reposition,true)};
  },[state?.stage,state?.phase,state?.freeRound,aarIntroDismissed,session.id,company.id,readOnly]);
  useEffect(()=>{if(scoreBriefOpen)setScorePadOpen(true)},[scoreBriefOpen]);
+ useEffect(()=>{setRiskCoachOpen(false)},[state?.stage,state?.phase,state?.guidedTurn,state?.freeRound]);
+ useEffect(()=>{
+  if(!riskCoachOpen)return;
+  const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setRiskCoachOpen(false)};
+  document.addEventListener('keydown',onKey);
+  return()=>document.removeEventListener('keydown',onKey);
+ },[riskCoachOpen]);
 
  if(!state)return <div className="min-h-screen bg-slate-950 text-white grid place-items-center">Preparing KM Week board…</div>;
 
@@ -913,6 +922,23 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    expertSelection:expertState,
    label:parts.length?parts.join(' + '):'No knowledge source selected',
   });
+ };
+
+ // Preserve the option to accept a loss, but teach the risk decision once.
+ const requestCommitResponse=()=>{
+  if(!responseReady||busy||readOnly||!activeChallenge||!pendingResponse?.method)return;
+  if(!riskSelected&&selectedKnowledge<activeChallenge.difficulty&&!localStorage.getItem(riskCoachKey)){
+   localStorage.setItem(riskCoachKey,'seen');
+   setRiskCoachOpen(true);
+   return;
+  }
+  void commitResponse();
+ };
+ const chooseRiskFromCoach=()=>{
+  if(!activeChallenge||!pendingResponse)return;
+  setPendingResponse({...pendingResponse,method:'risk',label:'Take the risk'});
+  setChallengeAttention(false);
+  setRiskCoachOpen(false);
  };
 
  const commitResponse=async()=>{
@@ -1181,6 +1207,18 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     {(guideStep===2||guideStep===3||guideStep===5)&&<p className="mt-3 text-xs font-bold text-sky-300">Select the highlighted {guideStep===5?'Commit Response button':'circle'} to continue.</p>}
    </section>
   </>}
+
+  {riskCoachOpen&&<div data-kmw-first-risk-coach className="fixed inset-0 z-[260] flex items-center justify-center bg-black/75 p-4">
+   <section role="dialog" aria-modal="true" aria-label="Before you accept the loss" aria-describedby="kmw-first-risk-description" className="w-full max-w-[480px] max-h-[calc(100dvh-32px)] overflow-y-auto overscroll-contain rounded-[22px] border-[3px] border-amber-300 bg-[#111827] p-5 text-left text-white shadow-[0_25px_90px_rgba(0,0,0,.85)]">
+    <div className="flex items-center gap-3"><Dices className="h-7 w-7 shrink-0 text-amber-300"/><h2 className="text-xl font-black">Give it a go?</h2></div>
+    <p id="kmw-first-risk-description" className="mt-3 text-sm leading-relaxed text-slate-200">Do you really want to just take the loss instead of giving it a go with the knowledge you have available? Click <b className="text-amber-300">Take a Risk</b> and a dice roll will determine if you succeed or fail.</p>
+    <div className="mt-5 flex flex-col gap-2">
+     <button type="button" autoFocus data-kmw-risk-coach-choice="risk" onClick={chooseRiskFromCoach} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 py-2 text-sm font-black text-slate-950"><Dices className="h-4 w-4"/>TAKE A RISK</button>
+     <button type="button" data-kmw-risk-coach-choice="loss" onClick={()=>{setRiskCoachOpen(false);void commitResponse()}} className="min-h-11 rounded-xl border-2 border-rose-700 bg-rose-950/40 px-4 py-2 text-sm font-black text-rose-100">ACCEPT THE LOSS</button>
+     <button type="button" data-kmw-risk-coach-choice="edit" onClick={()=>setRiskCoachOpen(false)} className="min-h-11 rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-bold text-slate-200">KEEP EDITING</button>
+    </div>
+   </section>
+  </div>}
 
   {challengeOutcome&&<div data-kmw-challenge-outcome aria-live="polite" className={'pointer-events-none fixed z-[200] w-[238px] rounded-2xl border-[3px] px-4 py-3 text-center shadow-[0_15px_50px_rgba(0,0,0,.7)] transition-opacity duration-[900ms] '+(challengeOutcome.won?'border-emerald-300 bg-emerald-950 text-emerald-100':'border-rose-300 bg-rose-950 text-rose-100')+(challengeOutcome.fading?' opacity-0':' opacity-100')} style={{left:challengeOutcome.left,top:challengeOutcome.top}}>
    <div className="text-xs font-black uppercase tracking-[.17em]">{challengeOutcome.won?'SUCCESS':'FAILURE'}</div>
@@ -1460,7 +1498,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
         </div>
         {actionError&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
-        <button type="button" onClick={()=>void commitResponse()} disabled={!responseReady||busy||readOnly} data-kmw-tour="commit" className={'mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-600'+(firstGuidedTour&&guideStep===5?' kmw-tour-highlight':'')}>{busy?'COMMITTING…':'COMMIT RESPONSE'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+        <button type="button" onClick={requestCommitResponse} disabled={!responseReady||busy||readOnly} data-kmw-tour="commit" className={'mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-600'+(firstGuidedTour&&guideStep===5?' kmw-tour-highlight':'')}>{busy?'COMMITTING…':'COMMIT RESPONSE'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>}
 
        {challengeDone&&<div className="mt-3 rounded-xl border-2 border-emerald-700 bg-emerald-950/25 p-3 text-xs font-black text-emerald-200">Challenges complete. Moving to Invest…</div>}
