@@ -499,6 +499,9 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  assert.ok(html.includes('data-kmw-category="turnover" data-kmw-category-rank="other"'),'Final Turnover loser must not have a permanent orange/red background');
  assert.ok(html.includes('EXPORT PDF')&&html.includes('data-kmw-debrief')&&html.includes('data-kmw-pdf-company'),'Players must be able to print the complete final results as a PDF');
  assert.ok(kmWeekDebriefSource.includes('xl:grid-cols-[360px_minmax(0,1fr)_minmax(0,1fr)]')&&!kmWeekDebriefSource.includes('truncate text-[9px]'),'Wider Score Pads must not truncate category names');
+ assert.ok(html.includes('At start of game')&&html.includes('At end of game'),'The final Rivers must compare the actual game opening with the end of play');
+ const expansionSource=readFileSync(new URL('../src/server/gameServiceV7.ts',import.meta.url),'utf8');
+ assert.ok(expansionSource.includes("if(session.experienceMode==='km_week')")&&expansionSource.includes("initialiseKMWeekCompanyV1(company)")&&expansionSource.includes("session.activeEvents[company.id]=[]"),'Late-joining KM Week companies must have the KM Week opening board, not legacy random starting knowledge');
  const css=readFileSync(new URL('../src/index.css',import.meta.url),'utf8');
  assert.ok(css.includes('@media print')&&css.includes('[data-kmw-pdf-company]')&&css.includes('size: A4 landscape'),'PDF output must include print styles for all cards and charts');
  // No cross-company results or premature winner highlights before all companies finish.
