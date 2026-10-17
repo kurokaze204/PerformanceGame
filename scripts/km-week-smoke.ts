@@ -94,6 +94,47 @@ assert.ok((company.sites.find(site=>site.id===company.kmWeek!.challenges[0].site
  assert.deepEqual(newcomer.initialRiverSnapshot?.sites,newcomer.sites,'The final AAR snapshot must capture the original sites');
  assert.deepEqual(newcomer.initialRiverSnapshot?.experts,newcomer.experts,'The final AAR snapshot must capture the original experts');
 }
+// Different workshops see different shuffled starting Rivers, but each
+// company's three guided lessons must remain valid for every session seed.
+for(let sample=0;sample<18;sample++){
+ const variantSession={...session,id:`KMWSTART-${sample}`,companies:[],activeEvents:{},participants:[],timerEndsAt:null,timerPausedSecondsRemaining:1200} as GameSessionV2;
+ const a=createInitialCompanyV2('First','kmw-sample-a-'+sample,config);
+ const b=createInitialCompanyV2('Second','kmw-sample-b-'+sample,config);
+ variantSession.companies=[a,b];
+ initialiseKMWeekSessionV1(variantSession);
+ for(const domain of KM_WEEK_DOMAINS){
+  const first=KM_WEEK_SITE_IDS.map(id=>a.sites.find(site=>site.id===id)!.teamCapability[domain]);
+  const second=KM_WEEK_SITE_IDS.map(id=>b.sites.find(site=>site.id===id)!.teamCapability[domain]);
+  assert.deepEqual(first,second,'Same-session companies must get identical per-domain allocation regardless of company ID');
+  assert.deepEqual([...first].sort(),[0,1,2],'Every knowledge-domain budget must be exactly three');
+ }
+ assert.deepEqual(a.experts.map(expert=>expert.domains[0].score),b.experts.map(expert=>expert.domains[0].score),'Starting experts must be identical within the session');
+ const specialist=(domain:string)=>a.experts.find(expert=>expert.domains.some(skill=>skill.domain===domain))!;
+ const first=a.kmWeek!.challenges[0];
+ assert.ok((a.sites.find(site=>site.id===first.siteId)!.teamCapability.operations||0)>0,'First guided problem needs real breadth');
+ assert.notEqual(first.siteId,specialist('operations').location,'First guided problem should involve expert travel');
+ let action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_RESOLVE',challengeId:first.id,method:'expert',expertId:specialist('operations').id,includeLocalBreadth:true});
+ assert.ok(action.success,action.message);
+ action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:specialist('operations').id,domain:'operations'});
+ assert.ok(action.success,action.message);
+ const second=a.kmWeek!.challenges[0];
+ assert.equal(second.domain,'hr');
+ assert.ok((a.sites.find(site=>site.id===second.siteId)!.teamCapability.hr||0)>=second.difficulty,'Guided local HR challenge must be winnable');
+ action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_RESOLVE',challengeId:second.id,method:'local'});
+ assert.ok(action.success,action.message);
+ const trainingSiteId=kmWeekGuidedTrainingSiteV1(a);
+ action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:specialist('operations').id,siteId:trainingSiteId,domain:'operations'});
+ assert.ok(action.success,action.message);
+ const third=a.kmWeek!.challenges[0];
+ assert.equal(third.domain,'marketing');
+ assert.ok(third.story.includes(a.sites.find(site=>site.id===third.siteId)!.name),'Third guided story must match its chosen site');
+ action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_RESOLVE',challengeId:third.id,method:'expert',expertId:specialist('marketing').id});
+ assert.ok(action.success,action.message);
+ const transfer=kmWeekGuidedTransferV1(a);
+ action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',...transfer});
+ assert.ok(action.success,action.message);
+ assert.equal(a.kmWeek!.stage,'free','All 3 guided lessons must complete for any starting allocation');
+}
 assert.deepEqual(kmWeekRiskOddsV1(1,2),{performanceGap:1,requiredRoll:2,successfulFaces:5,chancePercent:83},'A one-point performance gap must still carry risk and require 2+ on d6');
 assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successfulFaces:2,chancePercent:33},'Risk odds must worsen as the remaining performance gap grows');
 
