@@ -737,10 +737,8 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
       company.round=state.guidedTurn;
       setChallengePhase(company,[guidedChallenge(state.guidedTurn)]);
     }else{
-      company.initialRiverSnapshot={
-        sites:structuredClone(company.sites),
-        experts:structuredClone(company.experts),
-      };
+      // Preserve the true opening River for the final debrief, including
+      // all capability growth achieved during the three guided rounds.
       if(kmWeekShockWindowOpen(session)){
         enterSiteAudits(company,'The guided section has ended as the final three-minute window begins. Site Audits are now underway; auditors assess local teams only.');
       }else{
