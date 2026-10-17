@@ -129,8 +129,10 @@ assert.ok((company.sites.find(site=>site.id===company.kmWeek!.challenges[0].site
  first.kmWeek!.guidedTurn=2;
  first.kmWeek!.challenges=[{...first.kmWeek!.challenges[0],id:'G2',status:'open'}];
  first.sites.find(site=>site.id==='brisbane')!.teamCapability.operations=9;
- assert.equal(ensureKMWeekSessionV1(repairSession),false,'Progressed game state must not be reset by opening-board migration');
+ assert.equal(ensureKMWeekSessionV1(repairSession),true,'Progressed knowledge can update the Score Pad without resetting the company');
+ assert.equal(first.kmWeek!.guidedTurn,2,'Progressed guided rounds must not restart');
  assert.equal(first.sites.find(site=>site.id==='brisbane')!.teamCapability.operations,9,'Actual gameplay progress must remain untouched');
+ assert.equal(ensureKMWeekSessionV1(repairSession),false,'A reconciled and scored progressed company should require no further writes');
 }
 // Different workshops see different shuffled starting Rivers, but each
 // company's three guided lessons must remain valid for every session seed.
