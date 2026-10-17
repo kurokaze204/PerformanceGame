@@ -10,6 +10,8 @@ import {
   kmWeekFinalTurnoverPointsV1,
   KM_WEEK_DOMAINS,
   KM_WEEK_SITE_IDS,
+  kmWeekGuidedTrainingSiteV1,
+  kmWeekGuidedTransferV1,
   KM_WEEK_SHOCK_GAP_COST,
   KM_WEEK_DEEP_BENCH_TARGET,
   freeChallengesForRound,
@@ -63,18 +65,21 @@ assert.equal(company.kmWeek?.stage,'guided');
 assert.equal(company.kmWeek?.guidedTurn,1);
 assert.equal(company.kmWeek?.phase,'challenge');
 assert.deepEqual(company.sites.filter(site=>!site.isClosed).map(site=>site.id),[...KM_WEEK_SITE_IDS]);
-for(const site of company.sites.filter(site=>!site.isClosed)){
-  for(const domain of KM_WEEK_DOMAINS)assert.ok((site.teamCapability[domain]||0)>=0&&(site.teamCapability[domain]||0)<=5);
+for(const domain of KM_WEEK_DOMAINS){
+ assert.deepEqual(KM_WEEK_SITE_IDS.map(id=>company.sites.find(site=>site.id===id)!.teamCapability[domain]).sort(),[0,1,2],'KM Week starts each domain with the same 2/1/0 budget across its sites');
 }
 for(const site of company.sites.filter(site=>!site.isClosed)){
   for(const domain of KM_WEEK_DOMAINS)assert.equal(riverSiteKnowledgeScore(site,domain,'km_week'),site.teamCapability[domain]||0,'KM Week River must exactly match the visible site score');
 }
 assert.deepEqual(company.experts.map(expert=>expert.domains[0].domain),['operations','hr','marketing']);
+assert.deepEqual(company.experts.map(expert=>expert.domains[0].score).sort(),[4,5,5],'Two KM Week specialists must start at five and the third at four');
+assert.notEqual(company.kmWeek!.challenges[0].siteId,'melbourne','The first expert tutorial should teach deploying Priya to another city');
+assert.ok((company.sites.find(site=>site.id===company.kmWeek!.challenges[0].siteId)!.teamCapability.operations||0)>0,'First guided scenario must pick a site where local breadth is present');
 {
  // Random legacy starting data must be replaced with the standard KM Week baseline
  // for every company, including one created after the session has begun.
  const newcomer=createInitialCompanyV2('Late Arrival','kmw-late-arrival',config);
- initialiseKMWeekCompanyV1(newcomer);
+ initialiseKMWeekCompanyV1(newcomer,session.id);
  const initialSignature=(co:typeof company)=>({
   sites:KM_WEEK_SITE_IDS.map(siteId=>{
    const site=co.sites.find(item=>item.id===siteId)!;
@@ -200,9 +205,9 @@ const resolveGuidedExpert=(includeLocalBreadth=false)=>{
 };
 
 const openingTurnover=company.turnover;
-// Match the main-game composition rule: Expert depth 4 + one independent local
-// source = 5 total selected knowledge, so a difficulty-5 Challenge succeeds.
-company.kmWeek!.challenges[0].difficulty=5;
+// Verify local breadth is necessary at any starting expert depth (4 or 5).
+const startingOperationsExpert=opsExpert().domains[0].score;
+company.kmWeek!.challenges[0].difficulty=startingOperationsExpert+1;
 let breadthResult=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:company.kmWeek!.challenges[0].id,method:'expert',expertId:opsExpert().id});
 assert.equal(breadthResult.success,false,'Local breadth must not be assumed when an expert is selected');
 assert.match(breadthResult.message,/Select the Local Team as breadth/,'The player must be prompted to select Local explicitly for breadth');
@@ -214,27 +219,31 @@ assert.equal(company.turnover,openingTurnover+28,'Challenge value and travel cos
 assert.equal(company.kmWeek!.turnoverHistory.at(-1)?.challengeResult,'success','Final AAR history must retain actual wins, even when their net turnover includes travel fees');
 let result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:opsExpert().id,domain:'operations'});
 assert.equal(result.success,true,result.message);
-assert.equal(opsExpert().domains[0].score,5);
+assert.equal(opsExpert().domains[0].score,startingOperationsExpert+1);
 assert.equal(company.kmWeek?.guidedTurn,2);
 
 // Guided 2 uses Human Resources so the local team or Marcus can respond
 // without bringing Priya back in straight after her first investment.
 const guided2=company.kmWeek!.challenges[0];
 assert.equal(guided2.domain,'hr','Guided 2 should introduce HR rather than require Priya again');
-assert.equal(guided2.siteId,'melbourne');
-const melbourneHR=company.sites.find(site=>site.id==='melbourne')?.teamCapability.hr||0;
-assert.ok(melbourneHR>=guided2.difficulty,'Guided 2 must be solvable by Melbourne local HR');
+const guided2HR=company.sites.find(site=>site.id===guided2.siteId)?.teamCapability.hr||0;
+assert.ok(guided2HR>=guided2.difficulty,'Guided 2 must select a capable local HR team');
+assert.ok(guided2.story.includes(company.sites.find(site=>site.id===guided2.siteId)!.name),'Guided 2 narrative should name the actual site');
 result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:guided2.id,method:'local'});
 assert.equal(result.success,true,result.message);
 assert.equal(guided2.status,'success');
 assert.equal(guided2.resolution,'local');
 assert.equal(company.kmWeek?.phase,'invest');
 const beforeRemoteTraining=company.turnover;
-result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:opsExpert().id,siteId:'melbourne',domain:'operations'});
+const trainingSiteId=kmWeekGuidedTrainingSiteV1(company);
+const trainingSite=company.sites.find(site=>site.id===trainingSiteId)!;
+const beforeTraining=trainingSite.teamCapability.operations;
+assert.notEqual(trainingSiteId,opsExpert().location,'Guided training must suggest a team away from the expert');
+result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:opsExpert().id,siteId:trainingSiteId,domain:'operations'});
 assert.equal(result.success,true,result.message);
-assert.equal(company.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,3,'Local Training must allow an expert to teach another site');
-assert.equal(company.turnover,beforeRemoteTraining-12,'Remote KM Week Local Training must cost $10k plus the fixed $2k travel fee');
-assert.equal(opsExpert().location,'melbourne','Local Training travel must update the expert location used by both the River and Investment panel');
+assert.equal(trainingSite.teamCapability.operations,Math.min(beforeTraining+2,opsExpert().domains[0].score),'Local Training must develop the selected team');
+assert.equal(company.turnover,beforeRemoteTraining-12,'Remote KM Week training must cost $10k plus $2k travel');
+assert.equal(opsExpert().location,trainingSiteId,'Expert location must update after Local Training');
 assert.equal(company.kmWeek?.guidedTurn,3);
 
 const busyChallenge=company.kmWeek!.challenges[0];
@@ -246,9 +255,14 @@ const marketingExpert=company.experts.find(expert=>expert.domains.some(skill=>sk
 const availableExpert=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_RESOLVE',challengeId:busyChallenge.id,method:'expert',expertId:marketingExpert.id});
 assert.equal(availableExpert.success,true,availableExpert.message);
 assert.equal(busyChallenge.status,'success','Mary should be able to solve Guided 3 while Priya is training');
-result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',sourceSiteId:'melbourne',targetSiteId:'brisbane',domain:'hr'});
+const guidedTransfer=kmWeekGuidedTransferV1(company);
+const transferFrom=company.sites.find(site=>site.id===guidedTransfer.sourceSiteId)!;
+const transferTo=company.sites.find(site=>site.id===guidedTransfer.targetSiteId)!;
+const beforeTransfer=transferTo.teamCapability.hr;
+assert.ok(transferFrom.teamCapability.hr>beforeTransfer,'Guided transfer must suggest a stronger HR source');
+result=applyKMWeekActionV1(session,company.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',...guidedTransfer});
 assert.equal(result.success,true,result.message);
-assert.equal(company.sites.find(site=>site.id==='brisbane')?.teamCapability.hr,1,'Guided Knowledge Transfer must accept any valid domain/source/target choice');
+assert.ok(transferTo.teamCapability.hr>beforeTransfer,'The guided transfer must raise the learning site score');
 assert.equal(company.kmWeek?.stage,'free');
 assert.equal(company.kmWeek?.freeRound,1);
 {
@@ -271,10 +285,10 @@ assert.equal(company.kmWeek?.freeRound,1);
 assert.notEqual(company.kmWeek?.trainingCommitments?.[opsExpert().id],company.round,'Trainer must return after one round');
 assert.equal(company.kmWeek?.challenges.length,2);
 assert.ok(company.kmWeek!.challenges[0].siteId!==company.kmWeek!.challenges[1].siteId,'Free-play Challenges must be assigned to different sites');
-assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,1,'AAR Before River must show the initial Operations knowledge from before any guided investments');
-assert.equal(company.initialRiverSnapshot?.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))?.domains[0].score,4,'AAR Before River must show original expert knowledge, not guided expert training');
-assert.equal(company.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,3,'The current River still includes the guided investment learning');
-assert.equal(opsExpert().domains[0].score,5,'The guided expert improvement must appear in the current River');
+assert.deepEqual(KM_WEEK_SITE_IDS.map(id=>company.initialRiverSnapshot!.sites.find(site=>site.id===id)!.teamCapability.operations).sort(),[0,1,2],'The final AAR Before River shows the original 2/1/0 Ops budget');
+assert.equal(company.initialRiverSnapshot?.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))?.domains[0].score,startingOperationsExpert,'The final AAR preserves original expert depth');
+assert.equal(trainingSite.teamCapability.operations,Math.min(beforeTraining+2,startingOperationsExpert+1),'The current River includes guided local training');
+assert.equal(opsExpert().domains[0].score,startingOperationsExpert+1,'The current River includes guided expert training');
 {
   const transferCompany=createInitialCompanyV2('Transfer Test','kmw-transfer-test',config);
   initialiseKMWeekCompanyV1(transferCompany);
