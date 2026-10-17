@@ -2,6 +2,7 @@ import type { KnowledgeDomain, Participant } from '../types/game.ts';
 import type { GameSessionV2, PopulationMode } from '../types/gameV2.ts';
 import { createInitialCompanyV2, drawRoundEventsV2, recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { diversifyInitialKnowledge } from '../engine/eventProgressionV5.ts';
+import { initialiseKMWeekCompanyV1 } from '../engine/kmWeekV1.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
 import { dealCompanyDisruptionsV1, evaluateFinalDisruptionV1, finalDisruptionChanceV1, type FinalDisruptionSelectionsV1 } from '../engine/disruptionPlusV1.ts';
 import { recordCompanyMetric, saveSessionV2 } from './dbV2.ts';
@@ -71,13 +72,19 @@ async function addExpansionCompany(session:GameSessionV2){
   const index=session.companies.length;
   const name=COMPANY_NAMES[index]||`Company ${index+1}`;
   const company=createInitialCompanyV2(name,`comp-${index+1}-${session.id.toLowerCase()}`,session.config);
-
-  diversifyInitialKnowledge(company);
-  recalculateCompanySPOFV2(company,session.config);
   session.companies.push(company);
-  dealCompanyDisruptionsV1(session);
-  session.activeEvents[company.id]=drawRoundEventsV2(session,company);
-  applyInterfaceSimplificationV1(session);
+  if(session.experienceMode==='km_week'){
+    // Late-joining companies need the same initial River and guided
+    // progression as those created with the session, not legacy randomness.
+    initialiseKMWeekCompanyV1(company);
+    session.activeEvents[company.id]=[];
+  }else{
+    diversifyInitialKnowledge(company);
+    recalculateCompanySPOFV2(company,session.config);
+    dealCompanyDisruptionsV1(session);
+    session.activeEvents[company.id]=drawRoundEventsV2(session,company);
+    applyInterfaceSimplificationV1(session);
+  }
   await saveSessionV2(session);
   broadcastV2(session,'COMPANY_ADDED_FOR_PLAYERS',{companyId:company.id,companyName:company.name});
   return company;
