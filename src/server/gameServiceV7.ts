@@ -76,7 +76,7 @@ async function addExpansionCompany(session:GameSessionV2){
   if(session.experienceMode==='km_week'){
     // Late-joining companies need the same initial River and guided
     // progression as those created with the session, not legacy randomness.
-    initialiseKMWeekCompanyV1(company);
+    initialiseKMWeekCompanyV1(company,session.id);
     session.activeEvents[company.id]=[];
   }else{
     diversifyInitialKnowledge(company);
