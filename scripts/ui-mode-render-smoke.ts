@@ -93,6 +93,12 @@ assert.ok(operationTarget.includes('data-kmw-challenge-target="operations:8" tra
 assert.ok(marketingTarget.includes('data-kmw-challenge-target="marketing:3" transform="translate(628 ')&&marketingTarget.includes('scale(0.75)"'),'Marketing bullseye must be shifted right but remain inside River');
 assert.notEqual(operationTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],marketingTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],'A different Challenge must move the bullseye');
 const noTarget=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations'}));
+const compactRiver=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations',compact:true}));
+const tickMarkup=(markup:string)=>[...markup.matchAll(/<text[^>]*data-kmw-river-axis-tick="[^"]+"[^>]*>/g)].map(match=>match[0]);
+const compactTicks=tickMarkup(compactRiver),fullTicks=tickMarkup(noTarget);
+assert.ok(compactTicks.length>=3,'Compact AAR River must retain labelled numeric vertical ticks');
+assert.ok(compactTicks.every(tick=>tick.includes('font-size="39"')&&tick.includes('fill="#e2e8f0"')),'Every compact AAR River axis number should be three times the 13-unit gameplay font and high-contrast');
+assert.ok(fullTicks.length>=3&&fullTicks.every(tick=>tick.includes('font-size="13"')),'Regular full-size River tick numbers must remain unchanged');
 assert.equal(noTarget.includes('data-kmw-challenge-target'),false,'The River must clear the bullseye when no Challenge is active');
 assert.ok(kmWeekBoardSource.includes("activeChallenge?.status==='open'?activeChallenge:undefined")&&kmWeekBoardSource.includes("riverChallenge?{domain:riverChallenge.domain,level:riverChallenge.difficulty}:undefined"),'Only the selected open Challenge may drive the River requirement');
 // The site ring is blue and dotted, and must move with the selected
@@ -499,6 +505,8 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  const html=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
  const axes=[...html.matchAll(/data-kmw-river-scale-max="(\d+)"/g)].map(match=>Number(match[1]));
  assert.equal(axes.length,4,'Two companies must each have a before and an after River');
+const finalTicks=tickMarkup(html);
+assert.ok(finalTicks.length>=12&&finalTicks.every(tick=>tick.includes('font-size="39"')),'All before/after Rivers in the final comparison must use the enlarged knowledge-level numbers');
  assert.ok(axes.every(value=>value===axes[0])&&axes[0]>=sharedMax,'All before/after Rivers across all companies must share a vertical axis that fits the highest knowledge score');
  assert.ok(html.includes('data-kmw-shared-river-scale'),'Final report must communicate the common scale to users');
  assert.ok(html.includes('CEO: Stuart (Jane, Hank, Bill Fond)')&&html.includes('CEO: Alex'),'Final AAR must display player credits for every company');
