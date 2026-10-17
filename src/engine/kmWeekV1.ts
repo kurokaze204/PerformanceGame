@@ -446,6 +446,43 @@ export function initialiseKMWeekSessionV1(session:GameSessionV2){
   }
 }
 
+/** Older in-flight workshop sessions may have been created before the
+ * shared seed was deployed, and subsequently receive new companies after
+ * deployment. Only untouched Guided 1 boards can be safely reconciled.
+ */
+function kmWeekUnplayedOpening(company:CompanyV2):boolean{
+ const state=company.kmWeek;
+ return Boolean(state&&state.stage==='guided'&&state.phase==='challenge'
+  &&state.guidedTurn===1&&state.freeRound===0
+  &&state.challenges.length===1&&state.challenges[0].status==='open'
+  &&state.investmentHistory?.length===0
+  &&state.turnoverHistory?.length===1&&state.turnoverHistory[0]?.label==='START'
+  &&company.turnover===company.startingTurnover);
+}
+
+function kmWeekMatchesSessionOpening(company:CompanyV2,sessionId:string):boolean{
+ const reference=structuredClone(company);
+ applyStartingBoard(reference,sessionId);
+ const matchesSites=(sites:CompanyV2['sites'])=>KM_WEEK_SITE_IDS.every(id=>{
+  const actual=sites.find(site=>site.id===id),expected=reference.sites.find(site=>site.id===id);
+  return Boolean(actual&&expected&&KM_WEEK_DOMAINS.every(domain=>
+   (actual.teamCapability[domain]||0)===(expected.teamCapability[domain]||0)));
+ });
+ const matchesExperts=(experts:ExpertV2[])=>reference.experts.every(expected=>{
+  const actual=experts.find(expert=>expert.id===expected.id);
+  return Boolean(actual&&!actual.isVacant&&actual.location===expected.location
+   &&expected.domains.every(skill=>actual.domains.some(item=>item.domain===skill.domain&&item.score===skill.score)));
+ })&&experts.length===reference.experts.length;
+ const guided=guidedChallenge(reference,1);
+ return matchesSites(company.sites)&&matchesExperts(company.experts)
+  &&Boolean(company.initialRiverSnapshot
+   &&matchesSites(company.initialRiverSnapshot.sites)
+   &&matchesExperts(company.initialRiverSnapshot.experts))
+  &&company.kmWeek?.challenges[0]?.siteId===guided.siteId
+  &&company.kmWeek?.challenges[0]?.domain===guided.domain
+  &&company.startingTurnover===875;
+}
+
 export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
   if(session.experienceMode!=='km_week')return false;
   let changed=false;
@@ -459,11 +496,28 @@ export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
   if(!session.kmWeekGoalId){session.kmWeekGoalId=hashGoal(session.id);changed=true;}
   if(session.finalWindowMinutes!==3){session.finalWindowMinutes=3;changed=true;}
   for(const company of session.companies){
-    if(!company.kmWeek){initialiseKMWeekCompanyV1(company,session.id);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
-    else{
+    if(!company.kmWeek){
+      initialiseKMWeekCompanyV1(company,session.id);
+      session.activeEvents[company.id]=[];
+      changed=true;
+    }else if(kmWeekUnplayedOpening(company)&&!kmWeekMatchesSessionOpening(company,session.id)){
+      // Restore equality only before the player has acted. Never rewrite
+      // companies already progressing through the guided/free rounds.
+      initialiseKMWeekCompanyV1(company,session.id);
+      session.activeEvents[company.id]=[];
+      changed=true;
+    }else{
       if(!company.kmWeek.turnoverHistory){company.kmWeek.turnoverHistory=[{label:'CURRENT',turnover:company.turnover}];changed=true;}
       if(company.kmWeek.businessDifficultySolved===undefined){company.kmWeek.businessDifficultySolved=company.kmWeek.freeSuccesses*3;changed=true;}
     }
+  }
+  // Starting points are earned from the baseline knowledge, not from turns.
+  // Refresh every company's stored Score Pad, including late joins and any
+  // competitors whose finishing position has changed since the last action.
+  for(const company of session.companies){
+    const previous=JSON.stringify(company.kmWeek?.score);
+    syncScore(session,company);
+    if(previous!==JSON.stringify(company.kmWeek?.score))changed=true;
   }
   return changed;
 }
