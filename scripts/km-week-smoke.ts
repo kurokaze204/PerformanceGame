@@ -5,6 +5,7 @@ import {
   applyKMWeekActionV1,
   initialiseKMWeekSessionV1,
   initialiseKMWeekCompanyV1,
+  ensureKMWeekSessionV1,
   investKMWeekV1,
   calculateKMWeekScoreV1,
   kmWeekFinalTurnoverPointsV1,
@@ -93,6 +94,43 @@ assert.ok((company.sites.find(site=>site.id===company.kmWeek!.challenges[0].site
  assert.deepEqual(initialSignature(newcomer),initialSignature(company),'Late-joining KM Week companies must have exactly the same starting knowledge, experts, turnover and tutorial state');
  assert.deepEqual(newcomer.initialRiverSnapshot?.sites,newcomer.sites,'The final AAR snapshot must capture the original sites');
  assert.deepEqual(newcomer.initialRiverSnapshot?.experts,newcomer.experts,'The final AAR snapshot must capture the original experts');
+}
+// Regression: one company was created on an older release, while the others
+// joined after the shared-seed fix. Repair only untouched Guided-1 companies,
+// and populate all starting Score Pads rather than leaving joiners at zero.
+{
+ const repairSession={...session,id:'KMW-REPAIR-SESSION',companies:[],activeEvents:{},participants:[],timerStartedAt:null,timerEndsAt:null,timerPausedSecondsRemaining:1200} as GameSessionV2;
+ const first=createInitialCompanyV2('Apex','kmw-repair-1',config);
+ const second=createInitialCompanyV2('Vanguard','kmw-repair-2',config);
+ const third=createInitialCompanyV2('Horizon','kmw-repair-3',config);
+ repairSession.companies=[first];
+ initialiseKMWeekSessionV1(repairSession);
+ for(const other of [second,third]){
+  initialiseKMWeekCompanyV1(other,repairSession.id);
+  other.kmWeek!.score={business:0,expertise:0,localCapability:0,knowledgeFlow:0,resilience:0,goal:0,turnover:0,total:0};
+  repairSession.companies.push(other);
+ }
+ first.sites.find(site=>site.id==='brisbane')!.teamCapability.operations=3;
+ first.initialRiverSnapshot!.sites.find(site=>site.id==='brisbane')!.teamCapability.operations=3;
+ assert.equal(first.kmWeek!.challenges[0].status,'open');
+ assert.equal(first.kmWeek!.guidedTurn,1);
+ assert.equal(ensureKMWeekSessionV1(repairSession),true,'Inconsistent, untouched starting boards and zeroed Score Pads must be healed');
+ for(const domain of KM_WEEK_DOMAINS){
+  const base=KM_WEEK_SITE_IDS.map(id=>first.sites.find(site=>site.id===id)!.teamCapability[domain]);
+  assert.deepEqual([...base].sort(),[0,1,2]);
+  for(const other of [second,third])assert.deepEqual(KM_WEEK_SITE_IDS.map(id=>other.sites.find(site=>site.id===id)!.teamCapability[domain]),base,'All three companies must get the identical site allocation');
+ }
+ assert.deepEqual(first.experts.map(e=>e.domains[0].score),second.experts.map(e=>e.domains[0].score),'Expert scores must be equal across all three companies');
+ const scores=repairSession.companies.map(c=>c.kmWeek!.score.total);
+ assert.ok(scores[0]>0,'Starting knowledge contributes to the Score Pad');
+ assert.deepEqual(scores,[scores[0],scores[0],scores[0]],'Late-joining company Score Pads must match the first company rather than remain at zero');
+ assert.equal(ensureKMWeekSessionV1(repairSession),false,'Already repaired session must not trigger repeated writes');
+ // Preserve gameplay and knowledge already gained by an active company.
+ first.kmWeek!.guidedTurn=2;
+ first.kmWeek!.challenges=[{...first.kmWeek!.challenges[0],id:'G2',status:'open'}];
+ first.sites.find(site=>site.id==='brisbane')!.teamCapability.operations=9;
+ assert.equal(ensureKMWeekSessionV1(repairSession),false,'Progressed game state must not be reset by opening-board migration');
+ assert.equal(first.sites.find(site=>site.id==='brisbane')!.teamCapability.operations,9,'Actual gameplay progress must remain untouched');
 }
 // Different workshops see different shuffled starting Rivers, but each
 // company's three guided lessons must remain valid for every session seed.
