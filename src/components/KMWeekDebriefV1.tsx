@@ -198,8 +198,8 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
      <p data-kmw-company-players className="mb-3 text-sm font-semibold text-emerald-100">{kmWeekCompanyPlayerLabel(session,item)}</p>
      <div className="grid gap-3 xl:grid-cols-[360px_minmax(0,1fr)_minmax(0,1fr)]">
       <MiniScorePad company={item} color={color} session={session} allComplete={allComplete} leaders={leaders}/>
-      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">Before free play</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" maxKnowledgeLevel={riverKnowledgeMax} compact/></div></div>
-      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">After free play</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" maxKnowledgeLevel={riverKnowledgeMax} compact/></div></div>
+      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">At start of game</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" maxKnowledgeLevel={riverKnowledgeMax} compact/></div></div>
+      <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-emerald-300">At end of game</div><div className="h-[190px]"><InvestmentRiverView company={item} mode="km_week" selectedDomain="operations" maxKnowledgeLevel={riverKnowledgeMax} compact/></div></div>
      </div>
      <SiteAuditSummary company={item}/>
     </section>
