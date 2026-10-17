@@ -559,10 +559,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const preferredTop=riverRect.top+Math.min(70,Math.max(18,(riverRect.height-panelHeight)/2));
    const top=Math.max(65,Math.min(maxTop,preferredTop));
 
-   // End at the outside left edge of the Required row / Commit button.
-   // Never draw the arrowhead across those controls' labels.
-   const leftEdgeTarget=guideStep===1||guideStep===5;
-   const targetX=leftEdgeTarget?rect.left-7:rect.left+rect.width/2;
+   // Steps 2-4 target the tiny selection circle itself.
+   // End the arrow 16px BEFORE the circle's left edge so the arrowhead and
+   // line cannot obscure the control the player needs to click/tap.
+   // Steps 1 and 5 continue to point just outside their row/button.
+   const selectorTarget=guideStep>=2&&guideStep<=4;
+   const targetX=selectorTarget?rect.left-16:rect.left-7;
    const targetY=rect.top+rect.height/2;
    setGuideAnchor(current=>{
     const next={left,top,targetX,targetY,panelWidth,startY:top+Math.min(130,panelHeight/2)};
