@@ -4,7 +4,7 @@ import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekGuidedTrainingSiteV1,kmWeekGuidedTransferV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{toggleKMWeekSourceV1}from'../engine/kmWeekSelectionV1.ts';
 import{kmWeekCoachV1}from'../engine/kmWeekCoachV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -252,9 +252,15 @@ function currentPhaseLabel(company:CompanyV2){
 
 function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
- if(turn===1)return{title:'1. Solve the business problem',text:'Brisbane needs Operations 4. Build the response yourself: select Priya for depth, then select the Local Team if you want its knowledge to contribute breadth.',invest:'After the Challenge, you will deepen Priya’s expertise.'};
- if(turn===2)return{title:'2. Who should handle this one?',text:'Melbourne needs Human Resources 1 — the local team already knows how to solve this. Marcus is available if extra help is needed.',invest:'Now use Local Training. Priya can strengthen an Operations team at another site; travel to teach adds $2k.'};
- return{title:'3. Another problem, another expert',text:'Priya is busy training staff, but Marketing specialist Mary is available for Perth’s distributor problem. You can call on a different expert while Priya teaches.',invest:'Now try Knowledge Transfer. Choose a domain and two sites where the source knows more than the destination. Brisbane Operations → Perth is the suggested example, but any valid transfer will work.'};
+ const challenge=company.kmWeek?.challenges[0];
+ const challengeSite=challenge?siteName(company,challenge.siteId):'your local site';
+ if(turn===1)return{title:'1. Solve the business problem',text:`${challengeSite} needs Operations 4. Select Priya for depth, then the Local Team to see how its knowledge can contribute breadth.`,invest:'After the Challenge, deepen Priya’s expertise.'};
+ if(turn===2){
+  const site=siteName(company,kmWeekGuidedTrainingSiteV1(company));
+  return{title:'2. Who should handle this one?',text:`${challengeSite} needs Human Resources 1. The local team already knows how to solve it; Marcus is available if needed.`,invest:`Now use Local Training. Priya can strengthen the Operations team at ${site}. Travel to teach adds $2k.`};
+ }
+ const transfer=kmWeekGuidedTransferV1(company);
+ return{title:'3. Another problem, another expert',text:`Priya is busy training staff, but Marketing specialist Mary is available for the ${challengeSite} distributor problem.`,invest:`Try Knowledge Transfer. The suggested example is ${siteName(company,transfer.sourceSiteId)} HR → ${siteName(company,transfer.targetSiteId)}, where a more capable team can help a weaker one. You can choose any valid transfer.`};
 }
 
 const ToolTip:React.FC<{text:React.ReactNode;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
@@ -489,8 +495,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(!state)return;
   if(state.stage==='guided'&&state.phase==='invest'){
     if(state.guidedTurn===1){setInvestment('TRAIN_EXPERT');setSelectedDomain('operations');setExpertId(specialistFor(company,'operations')?.id||'');}
-    else if(state.guidedTurn===2){const expert=specialistFor(company,'operations');setInvestment('LOCAL_TRAINING');setSelectedDomain('operations');setExpertId(expert?.id||'');setTrainingSiteId(expert?.location&&expert.location!=='HQ'?expert.location:'brisbane');}
-    else{setInvestment('KNOWLEDGE_TRANSFER');setSelectedDomain('operations');setSourceSiteId('brisbane');setTargetSiteId('perth');}
+    else if(state.guidedTurn===2){const expert=specialistFor(company,'operations');setInvestment('LOCAL_TRAINING');setSelectedDomain('operations');setExpertId(expert?.id||'');setTrainingSiteId(kmWeekGuidedTrainingSiteV1(company));}
+    else{const transfer=kmWeekGuidedTransferV1(company);setInvestment('KNOWLEDGE_TRANSFER');setSelectedDomain(transfer.domain);setSourceSiteId(transfer.sourceSiteId);setTargetSiteId(transfer.targetSiteId);}
   }else if(state.stage==='free'&&state.phase==='invest'){
     setInvestment('TRAIN_EXPERT');
     const domain=coaching?.domain||'operations';const first=specialistFor(company,domain)||experts[0];setExpertId(first?.id||'');setSelectedDomain(domain);
