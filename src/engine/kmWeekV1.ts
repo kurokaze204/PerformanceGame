@@ -227,10 +227,41 @@ function hireRetiredExpertReplacement(company:CompanyV2){
   retirement.status='replaced';
 }
 
-function guidedChallenge(turn:number):KMWeekChallenge{
-  if(turn===1)return {id:'G1',title:'Packaging line shutdown',story:'A conveyor-control fault has stopped Brisbane’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.',siteId:'brisbane',domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
-  if(turn===2)return {id:'G2',title:'Roster coverage dispute',story:'A last-minute Melbourne staffing change raises concerns about shift coverage and fatigue limits. The local team needs to put a compliant roster in place before work begins.',siteId:'melbourne',domain:'hr',difficulty:1,impact:30,status:'open',guided:true};
-  return {id:'G3',title:'Perth distributor escalation',story:'A Perth distributor threatens to suspend urgent customer deliveries after receiving conflicting product and service advice. The team needs a clear, consistent response today.',siteId:'perth',domain:'marketing',difficulty:4,impact:35,status:'open',guided:true};
+/** Keep guided lessons winnable and meaningful for every shuffled River.
+ *  Guided 1 requires an Operations team with breadth > 0, Guided 2 a
+ *  genuinely capable HR team, and Guided 3 a weaker Marketing team.
+ */
+function guidedChallenge(company:CompanyV2,turn:number):KMWeekChallenge{
+ const sites=activeSites(company);
+ const choose=(domain:KnowledgeDomain,filter:(score:number,site:CompanyV2['sites'][number])=>boolean,preferred:string)=>{
+  const candidates=sites.filter(site=>filter(site.teamCapability[domain]||0,site));
+  const site=candidates.find(site=>site.id===preferred)||candidates[0]||sites[0];
+  return site;
+ };
+ if(turn===1){
+  const site=choose('operations',(score,site)=>score>0&&site.id!=='melbourne','brisbane');
+  return {id:'G1',title:'Packaging line shutdown',story:`A conveyor-control fault has stopped ${site.name}’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.`,siteId:site.id,domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
+ }
+ if(turn===2){
+  const site=choose('hr',score=>score>=1,'melbourne');
+  return {id:'G2',title:'Roster coverage dispute',story:`A last-minute ${site.name} staffing change raises concerns about shift coverage and fatigue limits. The local team needs to put a compliant roster in place before work begins.`,siteId:site.id,domain:'hr',difficulty:1,impact:30,status:'open',guided:true};
+ }
+ const site=choose('marketing',score=>score<=1,'perth');
+ return {id:'G3',title:'Distributor escalation',story:`A distributor in ${site.name} threatens to suspend urgent customer deliveries after receiving conflicting product and service advice. The team needs a clear, consistent response today.`,siteId:site.id,domain:'marketing',difficulty:4,impact:35,status:'open',guided:true};
+}
+
+/** Guided-investment recommendations follow the knowledge each team actually has. */
+export function kmWeekGuidedTrainingSiteV1(company:CompanyV2):string{
+ const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain==='operations'));
+ const sites=activeSites(company).filter(site=>site.id!==expert?.location);
+ return [...sites].sort((a,b)=>(a.teamCapability.operations||0)-(b.teamCapability.operations||0)||a.id.localeCompare(b.id))[0]?.id||activeSites(company)[0]?.id||'brisbane';
+}
+export function kmWeekGuidedTransferV1(company:CompanyV2):{domain:KnowledgeDomain;sourceSiteId:string;targetSiteId:string}{
+ // HR is independent of the Operations training lesson and always starts 2/1/0.
+ const sites=[...activeSites(company)].sort((a,b)=>a.id.localeCompare(b.id));
+ const source=[...sites].sort((a,b)=>(b.teamCapability.hr||0)-(a.teamCapability.hr||0))[0];
+ const target=[...sites].sort((a,b)=>(a.teamCapability.hr||0)-(b.teamCapability.hr||0))[0];
+ return {domain:'hr',sourceSiteId:source?.id||'melbourne',targetSiteId:target?.id||'perth'};
 }
 
 function cloneChallenges(items:KMWeekChallenge[]):KMWeekChallenge[]{
@@ -327,7 +358,7 @@ function activeExperts(company:CompanyV2){
   return company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
 }
 
-function applyStartingBoard(company:CompanyV2){
+function applyStartingBoard(company:CompanyV2,sessionSeed:string){
   for(const site of company.sites){
     site.isClosed=!KM_WEEK_SITE_IDS.includes(site.id as any);
     for(const domain of ['engineering','hr','marketing','operations','finance'] as KnowledgeDomain[]){
@@ -335,12 +366,17 @@ function applyStartingBoard(company:CompanyV2){
       site.codifiedKnowledge[domain]=0;
     }
   }
-  const mel=company.sites.find(site=>site.id==='melbourne');
-  const bne=company.sites.find(site=>site.id==='brisbane');
-  const per=company.sites.find(site=>site.id==='perth');
-  if(mel){mel.teamCapability.operations=1;mel.teamCapability.hr=1;mel.teamCapability.marketing=0;mel.turnover=300;}
-  if(bne){bne.teamCapability.operations=1;bne.teamCapability.hr=0;bne.teamCapability.marketing=1;bne.turnover=290;}
-  if(per){per.teamCapability.operations=0;per.teamCapability.hr=1;per.teamCapability.marketing=1;per.turnover=285;}
+  // One per-session seed creates a fair starting distribution for every
+  // company, while different workshops see different knowledge gaps.
+  for(const domain of KM_WEEK_DOMAINS){
+    const allocation=seededShuffle([2,1,0],`${sessionSeed}|km-week-start|${domain}`);
+    for(let index=0;index<KM_WEEK_SITE_IDS.length;index++){
+      const site=company.sites.find(item=>item.id===KM_WEEK_SITE_IDS[index]);
+      if(site)site.teamCapability[domain]=allocation[index];
+    }
+  }
+  const turnoverBySite:Record<string,number>={melbourne:300,brisbane:290,perth:285};
+  for(const site of company.sites)if(site.id in turnoverBySite)site.turnover=turnoverBySite[site.id];
   company.turnover=875;
   company.startingTurnover=875;
   for(const domain of ['engineering','hr','marketing','operations','finance'] as KnowledgeDomain[]){
@@ -351,18 +387,22 @@ function applyStartingBoard(company:CompanyV2){
   company.horizonScanDomain=null;
   company.horizonScanUsedThisRound=false;
   const id=company.id;
+  // Two specialists start at depth 5, the other at depth 4. The assignment is
+  // shared by every company in the session, not randomly advantaged per CEO.
+  const levelFiveDomains=new Set(seededShuffle(KM_WEEK_DOMAINS,`${sessionSeed}|km-week-experts`).slice(0,2));
+  const level=(domain:KnowledgeDomain)=>levelFiveDomains.has(domain)?5:4;
   const experts:ExpertV2[]=[
-    {id:`kmw-${id}-ops`,name:'Priya Patel',domains:[{domain:'operations',score:4}],location:'melbourne',homeLocation:'melbourne',state:'Available',isSPOF:true,spofDomains:['operations'],isVacant:false,replacementDueRound:null,replacementName:null},
-    {id:`kmw-${id}-hr`,name:'Marcus Sterling',domains:[{domain:'hr',score:4}],location:'brisbane',homeLocation:'brisbane',state:'Available',isSPOF:true,spofDomains:['hr'],isVacant:false,replacementDueRound:null,replacementName:null},
-    {id:`kmw-${id}-marketing`,name:'Mary Jackson',domains:[{domain:'marketing',score:4}],location:'perth',homeLocation:'perth',state:'Available',isSPOF:true,spofDomains:['marketing'],isVacant:false,replacementDueRound:null,replacementName:null},
+    {id:`kmw-${id}-ops`,name:'Priya Patel',domains:[{domain:'operations',score:level('operations')}],location:'melbourne',homeLocation:'melbourne',state:'Available',isSPOF:true,spofDomains:['operations'],isVacant:false,replacementDueRound:null,replacementName:null},
+    {id:`kmw-${id}-hr`,name:'Marcus Sterling',domains:[{domain:'hr',score:level('hr')}],location:'brisbane',homeLocation:'brisbane',state:'Available',isSPOF:true,spofDomains:['hr'],isVacant:false,replacementDueRound:null,replacementName:null},
+    {id:`kmw-${id}-marketing`,name:'Mary Jackson',domains:[{domain:'marketing',score:level('marketing')}],location:'perth',homeLocation:'perth',state:'Available',isSPOF:true,spofDomains:['marketing'],isVacant:false,replacementDueRound:null,replacementName:null},
   ];
   company.experts=experts;
   company.strategicInvestmentFund=0;
   company.actionsRemaining=1;
 }
 
-export function initialiseKMWeekCompanyV1(company:CompanyV2){
-  applyStartingBoard(company);
+export function initialiseKMWeekCompanyV1(company:CompanyV2,sessionSeed='KM_WEEK_DEFAULT'){
+  applyStartingBoard(company,sessionSeed);
   company.round=1;
   company.roundPhase='events';
   company.kmWeek={
@@ -370,7 +410,7 @@ export function initialiseKMWeekCompanyV1(company:CompanyV2){
     phase:'challenge',
     guidedTurn:1,
     freeRound:0,
-    challenges:[guidedChallenge(1)],
+    challenges:[guidedChallenge(company,1)],
     usedExpertIds:[],
     freeSuccesses:0,
     businessDifficultySolved:0,
@@ -400,7 +440,7 @@ export function initialiseKMWeekSessionV1(session:GameSessionV2){
   session.finalDisruptionResolved=false;
   session.riskResults=null;
   for(const company of session.companies){
-    initialiseKMWeekCompanyV1(company);
+    initialiseKMWeekCompanyV1(company,session.id);
     session.activeEvents[company.id]=[];
     syncScore(session,company);
   }
@@ -419,7 +459,7 @@ export function ensureKMWeekSessionV1(session:GameSessionV2):boolean{
   if(!session.kmWeekGoalId){session.kmWeekGoalId=hashGoal(session.id);changed=true;}
   if(session.finalWindowMinutes!==3){session.finalWindowMinutes=3;changed=true;}
   for(const company of session.companies){
-    if(!company.kmWeek){initialiseKMWeekCompanyV1(company);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
+    if(!company.kmWeek){initialiseKMWeekCompanyV1(company,session.id);session.activeEvents[company.id]=[];syncScore(session,company);changed=true;}
     else{
       if(!company.kmWeek.turnoverHistory){company.kmWeek.turnoverHistory=[{label:'CURRENT',turnover:company.turnover}];changed=true;}
       if(company.kmWeek.businessDifficultySolved===undefined){company.kmWeek.businessDifficultySolved=company.kmWeek.freeSuccesses*3;changed=true;}
@@ -735,7 +775,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     if(state.guidedTurn<3){
       state.guidedTurn+=1;
       company.round=state.guidedTurn;
-      setChallengePhase(company,[guidedChallenge(state.guidedTurn)]);
+      setChallengePhase(company,[guidedChallenge(company,state.guidedTurn)]);
     }else{
       // Preserve the true opening River for the final debrief, including
       // all capability growth achieved during the three guided rounds.
@@ -819,7 +859,7 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
   if(session.experienceMode!=='km_week')return{success:false,message:'This action is only available in KM Week mode.'};
   const company=session.companies.find(item=>item.id===companyId);
   if(!company)return{success:false,message:'Company not found.'};
-  if(!company.kmWeek)initialiseKMWeekCompanyV1(company);
+  if(!company.kmWeek)initialiseKMWeekCompanyV1(company,session.id);
   const type=String(payload?.type||'');
   let result:{success:boolean;message:string};
   if(type==='KM_WEEK_RESOLVE'){
