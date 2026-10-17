@@ -70,6 +70,25 @@ for(const site of company.sites.filter(site=>!site.isClosed)){
   for(const domain of KM_WEEK_DOMAINS)assert.equal(riverSiteKnowledgeScore(site,domain,'km_week'),site.teamCapability[domain]||0,'KM Week River must exactly match the visible site score');
 }
 assert.deepEqual(company.experts.map(expert=>expert.domains[0].domain),['operations','hr','marketing']);
+{
+ // Random legacy starting data must be replaced with the standard KM Week baseline
+ // for every company, including one created after the session has begun.
+ const newcomer=createInitialCompanyV2('Late Arrival','kmw-late-arrival',config);
+ initialiseKMWeekCompanyV1(newcomer);
+ const initialSignature=(co:typeof company)=>({
+  sites:KM_WEEK_SITE_IDS.map(siteId=>{
+   const site=co.sites.find(item=>item.id===siteId)!;
+   return [site.id,...KM_WEEK_DOMAINS.map(domain=>site.teamCapability[domain]||0),site.turnover];
+  }),
+  experts:co.experts.map(expert=>[expert.domains[0]?.domain,expert.domains[0]?.score,expert.isVacant]),
+  turnover:co.turnover,
+  stage:co.kmWeek?.stage,
+  guidedTurn:co.kmWeek?.guidedTurn,
+ });
+ assert.deepEqual(initialSignature(newcomer),initialSignature(company),'Late-joining KM Week companies must have exactly the same starting knowledge, experts, turnover and tutorial state');
+ assert.deepEqual(newcomer.initialRiverSnapshot?.sites,newcomer.sites,'The final AAR snapshot must capture the original sites');
+ assert.deepEqual(newcomer.initialRiverSnapshot?.experts,newcomer.experts,'The final AAR snapshot must capture the original experts');
+}
 assert.deepEqual(kmWeekRiskOddsV1(1,2),{performanceGap:1,requiredRoll:2,successfulFaces:5,chancePercent:83},'A one-point performance gap must still carry risk and require 2+ on d6');
 assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successfulFaces:2,chancePercent:33},'Risk odds must worsen as the remaining performance gap grows');
 
@@ -252,7 +271,10 @@ assert.equal(company.kmWeek?.freeRound,1);
 assert.notEqual(company.kmWeek?.trainingCommitments?.[opsExpert().id],company.round,'Trainer must return after one round');
 assert.equal(company.kmWeek?.challenges.length,2);
 assert.ok(company.kmWeek!.challenges[0].siteId!==company.kmWeek!.challenges[1].siteId,'Free-play Challenges must be assigned to different sites');
-assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,3,'AAR Before River must snapshot each company after its guided investments, at the start of free play');
+assert.equal(company.initialRiverSnapshot?.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,1,'AAR Before River must show the initial Operations knowledge from before any guided investments');
+assert.equal(company.initialRiverSnapshot?.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))?.domains[0].score,4,'AAR Before River must show original expert knowledge, not guided expert training');
+assert.equal(company.sites.find(site=>site.id==='melbourne')?.teamCapability.operations,3,'The current River still includes the guided investment learning');
+assert.equal(opsExpert().domains[0].score,5,'The guided expert improvement must appear in the current River');
 {
   const transferCompany=createInitialCompanyV2('Transfer Test','kmw-transfer-test',config);
   initialiseKMWeekCompanyV1(transferCompany);
