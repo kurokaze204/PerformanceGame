@@ -97,7 +97,7 @@ assert.ok(!melbourneSite.includes('data-kmw-guided-site="brisbane"'),'Changing C
 assert.ok(riverSource.includes('stroke="#38bdf8" strokeWidth="3" strokeDasharray="5 5"'),'The highlighted site ring must remain blue and dotted');
 assert.ok(!noTarget.includes('data-kmw-guided-site='),'The unselected River must not show an affected-site ring');
 const kmWeekDebriefSource=readFileSync(new URL('../src/components/KMWeekDebriefV1.tsx',import.meta.url),'utf8');
-assert.ok(kmWeekDebriefSource.includes('Before free play')&&kmWeekDebriefSource.includes('selectedDomain="operations"'),'KM Week AAR Before River must use each company’s post-guided snapshot and a valid KM Week domain');
+assert.ok(kmWeekDebriefSource.includes('At start of game')&&kmWeekDebriefSource.includes('selectedDomain="operations"'),'KM Week AAR Before River must show the original game-start knowledge rather than the post-guided snapshot');
 const eventV4Source=readFileSync(new URL('../src/components/EventDecisionCardV4.tsx',import.meta.url),'utf8');
 const eventProgressionSource=readFileSync(new URL('../src/engine/eventProgressionV5.ts',import.meta.url),'utf8');
 assert.ok(appBoardSource.includes("session.experienceMode==='km_week'")&&appBoardSource.includes('<KMWeekBoardV1'),'KM Week sessions must use their dedicated play surface');
