@@ -2,7 +2,7 @@ import type { KnowledgeDomain, Participant } from '../types/game.ts';
 import type { GameSessionV2, PopulationMode } from '../types/gameV2.ts';
 import { createInitialCompanyV2, drawRoundEventsV2, recalculateCompanySPOFV2 } from '../engine/coreV2.ts';
 import { diversifyInitialKnowledge } from '../engine/eventProgressionV5.ts';
-import { initialiseKMWeekCompanyV1 } from '../engine/kmWeekV1.ts';
+import { initialiseKMWeekCompanyV1,ensureKMWeekSessionV1 } from '../engine/kmWeekV1.ts';
 import { applyInterfaceSimplificationV1 } from '../engine/interfaceSimplificationV1.ts';
 import { dealCompanyDisruptionsV1, evaluateFinalDisruptionV1, finalDisruptionChanceV1, type FinalDisruptionSelectionsV1 } from '../engine/disruptionPlusV1.ts';
 import { recordCompanyMetric, saveSessionV2 } from './dbV2.ts';
@@ -78,6 +78,9 @@ async function addExpansionCompany(session:GameSessionV2){
     // progression as those created with the session, not legacy randomness.
     initialiseKMWeekCompanyV1(company,session.id);
     session.activeEvents[company.id]=[];
+    // Compute the new company's Score Pad immediately and reconcile any
+    // unplayed first-company board created by an older server release.
+    ensureKMWeekSessionV1(session);
   }else{
     diversifyInitialKnowledge(company);
     recalculateCompanySPOFV2(company,session.config);
