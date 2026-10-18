@@ -1,9 +1,10 @@
-import React,{useMemo,useState}from'react';
+import React,{useEffect,useId,useMemo,useRef,useState}from'react';
+import{createPortal}from'react-dom';
 import{ArrowRight,Brain,CircleDollarSign,FileDown,Medal,ShieldCheck,Target,Trophy,Users,Workflow,X}from'lucide-react';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekScore,KMWeekTurnoverPoint}from'../types/kmWeek.ts';
 import{formatCurrency}from'../utils/format.ts';
-import{KM_WEEK_GOALS,KM_WEEK_SHOCK_GAP_COST,calculateKMWeekScoreV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SITE_IDS,calculateKMWeekScoreV1,kmWeekGoalV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 
 type Props={session:GameSessionV2;company:CompanyV2};
@@ -60,20 +61,122 @@ export function kmWeekDebriefRiverKnowledgeMax(companies:CompanyV2[]):number{
  return Math.max(...levels);
 }
 
+
+/** The displayed formula always uses the same inputs and rules as the score engine. */
+const scoreMath=(item:ScoreItem,company:CompanyV2,session:GameSessionV2):string=>{
+ const state=company.kmWeek;
+ const localLevels=KM_WEEK_SITE_IDS.reduce((total,id)=>{
+  const site=company.sites.find(site=>site.id===id);
+  return total+KM_WEEK_DOMAINS.reduce((sum,domain)=>sum+(site?.teamCapability[domain]||0),0);
+ },0);
+ switch(item.key){
+  case'business':{
+   const won=state?.businessDifficultySolved??(state?.freeSuccesses||0)*3;
+   return 'Add the difficulty of every successful free-play Challenge (guided rounds do not count).\nScore = min(12, round('+won+' ÷ 54 × 12)) = '+item.value+'/12. The complete six-round set has 54 difficulty points.';
+  }
+  case'expertise':{
+   const levels=company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain))).map(expert=>expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0);
+   return 'Each active specialist earns 1 point per knowledge level above 3. Current levels: '+(levels.join(', ')||'none')+'.\nScore = min(6, sum of max(0, expert level − 3)) = '+item.value+'/6.';
+  }
+  case'localCapability':
+   return 'Add knowledge across Operations, HR and Marketing for the three local sites: '+localLevels+' levels.\nScore = min(9, floor('+localLevels+' ÷ 2)) = '+item.value+'/9. Two local knowledge levels earn one point.';
+  case'knowledgeFlow':{
+   const levels=state?.knowledgeTransfers||0;
+   const bonuses=state?.meaningfulTransfers||0;
+   return 'Only free-play Knowledge Transfers score. Earn 1 point per knowledge level gained by the receiving site, plus 1 bonus when a transfer raises that site/domain from below level 2 to at least 2.\nScore = min(6, '+levels+' transferred levels + '+bonuses+' threshold bonuses) = '+item.value+'/6.';
+  }
+  case'resilience':{
+   const checks=state?.shockChecks||[];
+   const passed=checks.filter(check=>check.passed).length;
+   const bonus=checks.length===5&&passed===5?10:0;
+   return 'Five final Site Audits each award 1 point if the local team meets its knowledge requirement. Clear all five for another 10 points.\nScore = '+passed+' passed audits + '+bonus+' perfect-audit bonus = '+item.value+'/15.';
+  }
+  case'goal':{
+   const goal=kmWeekGoalV1(session);
+   let progress='';
+   if(goal.id==='local-heroes')progress='Local-only free-play Challenge wins: '+(state?.localSuccesses||0)+'; need at least 2.';
+   else if(goal.id==='deep-bench')progress='Each of the three active specialists must have knowledge level 6 or higher.';
+   else if(goal.id==='broad-base')progress='Current scoring checks Local capability ≥ 4 (at least 8 combined local knowledge levels); current combined levels: '+localLevels+'.';
+   else{
+    const totals=KM_WEEK_SITE_IDS.map(id=>{
+     const site=company.sites.find(site=>site.id===id);
+     return KM_WEEK_DOMAINS.reduce((sum,domain)=>sum+(site?.teamCapability[domain]||0),0);
+    });
+    progress='Knowledge totals by site: '+totals.join(', ')+'. Each must be at least 3 and at least one must be 4 or more.';
+   }
+   return goal.title+': '+goal.description+'\n'+progress+'\nScore = 5 points if the condition is met; otherwise 0. Current: '+item.value+'/5.';
+  }
+  case'turnover':{
+   const ids=new Set(session.participants.filter(p=>p.role!=='facilitator'&&p.companyId).map(p=>p.companyId));
+   const competitors=ids.size?session.companies.filter(c=>ids.has(c.id)):session.companies;
+   const finished=competitors.length>0&&competitors.every(c=>c.kmWeek?.stage==='complete');
+   const ahead=competitors.filter(c=>c.turnover>company.turnover).length;
+   return 'Rank companies by final turnover (after Challenge outcomes, investment costs, travel and audit fines). 1st = 7 points, 2nd = 4, 3rd = 2; lower places = 0. Ties share a place and the next rank is skipped.\n'+(finished?'Companies with higher turnover: '+ahead+'. Score = '+item.value+'/7.':'Ranking points are pending until every participating company finishes.');
+  }
+ }
+};
+
+/** Portal the formula outside scroll containers, so it cannot obscure its score box. */
+const ScoreFormulaTip:React.FC<{title:string;description:string;children:React.ReactNode;className?:string}>=({title,description,children,className=''})=>{
+ const[open,setOpen]=useState(false);
+ const[position,setPosition]=useState<{top:number;left:number;width:number}|null>(null);
+ const anchorRef=useRef<HTMLDivElement>(null);
+ const tooltipId=useId();
+ useEffect(()=>{
+  if(!open)return;
+  const place=()=>{
+   const anchor=anchorRef.current;
+   if(!anchor)return;
+   const rect=anchor.getBoundingClientRect();
+   const card=anchor.closest('[data-kmw-final-scorepad]')?.getBoundingClientRect();
+   const width=Math.min(330,window.innerWidth-24);
+   // Prefer the right of the whole Score Pad, keeping both score columns readable.
+   let left=Math.max(rect.right,card?.right||rect.right)+12;
+   let top=rect.top;
+   if(left+width+12>window.innerWidth){
+    if(rect.left-width-12>=12)left=rect.left-width-12;
+    else{
+     left=Math.max(12,Math.min(rect.left,window.innerWidth-width-12));
+     // A small screen has no space beside the card: show below or above it.
+     top=window.innerHeight-rect.bottom>=180?rect.bottom+8:rect.top-220;
+    }
+   }
+   setPosition({left,top:Math.max(12,Math.min(top,window.innerHeight-180)),width});
+  };
+  place();
+  window.addEventListener('resize',place);
+  window.addEventListener('scroll',place,true);
+  return()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true)};
+ },[open]);
+ return <>
+  <div ref={anchorRef} tabIndex={0} aria-describedby={open?tooltipId:undefined} aria-label={title+' scoring formula'} data-kmw-score-math-anchor={title} className={'relative min-w-0 cursor-help focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 '+className}
+   onMouseEnter={()=>setOpen(true)} onMouseLeave={()=>setOpen(false)}
+   onFocus={()=>setOpen(true)} onBlur={()=>setOpen(false)}
+   onClick={()=>{if(window.matchMedia('(hover: none)').matches)setOpen(value=>!value)}}
+   onKeyDown={event=>{if(event.key==='Escape')setOpen(false)}}>
+   {children}
+  </div>
+  {open&&position&&createPortal(<div id={tooltipId} role="tooltip" data-kmw-score-math={title} className="pointer-events-none fixed z-[260] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-xl border-2 border-sky-400 bg-[#091827] p-3 text-left text-[10pt] font-normal leading-snug text-slate-100 shadow-[0_18px_45px_rgba(0,0,0,.8)] print:hidden" style={position}>
+   <div className="mb-1 font-black text-sky-300">{title} — scoring maths</div>
+   <div className="whitespace-pre-line">{description}</div>
+  </div>,document.body)}
+ </>;
+};
+
 const MiniScorePad:React.FC<{company:CompanyV2;color:string;session:GameSessionV2;allComplete:boolean;leaders:Partial<Record<ScoreKey,CategoryLeader>>}>=({company,color,session,allComplete,leaders})=>{
  const score=calculateKMWeekScoreV1(session,company);
  return <section data-kmw-final-scorepad className="min-w-0 rounded-2xl border-2 bg-slate-950/75 p-3" style={{borderColor:color}}>
-  <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><div className="text-xs font-black text-white">Score Pad</div><div className="ml-auto text-2xl font-black text-white">{score.total}</div></div>
+  <div className="flex items-center gap-2"><Medal className="h-4 w-4 text-amber-300"/><div className="text-xs font-black text-white">Score Pad</div><div className="ml-auto"><ScoreFormulaTip title="Total score" description={"Sum of all seven categories (maximum 60):\n"+score.business+" Business + "+score.expertise+" Expertise + "+score.localCapability+" Local + "+score.knowledgeFlow+" Flow + "+score.resilience+" Audits + "+score.goal+" Goal + "+score.turnover+" Turnover = "+score.total+" points."}><div className="text-2xl font-black text-white">{score.total}</div></ScoreFormulaTip></div></div>
   <div className="mt-2 grid grid-cols-2 gap-1.5">{scoreItems(company,session).map(item=>{
    const finalTurnover=item.key==='turnover';
    const leader=leaders[item.key];
    const rank=leader&&leader.value>0&&item.value===leader.value?(leader.ties>1?'joint-first':'first'):'other';
    const rankStyle=rank==='first'?'border-emerald-400 bg-emerald-800/80':rank==='joint-first'?'border-orange-400 bg-orange-800/80':'border-slate-800 bg-slate-900/80';
-   return <div key={item.key} data-kmw-category={item.key} data-kmw-category-rank={rank} title={rank==='first'?'Highest score in this category':rank==='joint-first'?'Joint highest score in this category':finalTurnover?'Final turnover: 1st 7 points, 2nd 4, 3rd 2; tied companies share a place.':undefined} className={'flex min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 '+(finalTurnover?'col-span-2 ':'')+rankStyle}>
+   return <ScoreFormulaTip key={item.key} title={item.label} description={scoreMath(item,company,session)} className={finalTurnover?'col-span-2':''}><div data-kmw-category={item.key} data-kmw-category-rank={rank} className={'flex min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 '+rankStyle}>
     <span className={rank==='other'?'shrink-0 text-slate-400':'shrink-0 text-white'}>{item.icon}</span>
     <span className={'min-w-0 flex-1 break-words text-[10px] font-black leading-tight '+(rank==='other'?'text-slate-200':'text-white')}>{item.label}{finalTurnover&&<span className={'ml-1 text-[9px] font-semibold '+(rank==='other'?'text-slate-400':'text-white/90')}>1st 7 · 2nd 4 · 3rd 2</span>}</span>
     <b className="shrink-0 text-sm text-white">{finalTurnover&&!allComplete?'Pending':item.value}<span className="ml-0.5 text-[9px] text-slate-300">{finalTurnover&&!allComplete?'':'/'+item.max}</span></b>
-   </div>;
+   </div></ScoreFormulaTip>;
   })}</div>
  </section>;
 };
