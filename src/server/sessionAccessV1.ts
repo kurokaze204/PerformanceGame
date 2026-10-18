@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import pg from 'pg';
-import { deleteSessionV2, getSessionV2 } from './dbV2.ts';
+import { deleteSessionV2, getSessionV2, listSessionsV2 } from './dbV2.ts';
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({
@@ -108,4 +108,55 @@ export async function listPublicSessionsV1(archived=false){
     companiesCount:row.companies_count,createdAt:row.created_at,updatedAt:row.updated_at,
     completed:Boolean(row.completed)
   }));
+}
+
+
+/** Master-facilitator-only session administration. Never return credentials. */
+export async function listManageableSessionsV1(){
+  const summaries=await listSessionsV2();
+  const rows=pool?(await (async()=>{
+    await initSessionAccessV1();
+    const result=await pool.query('SELECT session_id,is_public FROM performance_gap.session_access_v1');
+    return result.rows as {session_id:string;is_public:boolean}[];
+  })()):[];
+  const visibility=new Map(rows.map(row=>[row.session_id.toUpperCase(),Boolean(row.is_public)]));
+  return (await Promise.all(summaries.filter(item=>item.id!=='KM2026').map(async item=>{
+    const session=await getSessionV2(item.id);
+    if(!session)return null;
+    const finished=session.experienceMode==='km_week'
+      ?session.companies.length>0&&session.companies.every(company=>company.kmWeek?.stage==='complete')
+      :Boolean(session.finalDisruptionResolved);
+    if(finished)return null;
+    return {
+      id:session.id,title:session.title,round:session.round,
+      companiesCount:session.companies.length,createdAt:session.createdAt,updatedAt:session.updatedAt,
+      isPublic:visibility.get(session.id)??memory.get(session.id)?.isPublic??false,
+      experienceMode:session.experienceMode
+    };
+  }))).filter((row):row is NonNullable<typeof row>=>row!==null)
+    .sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
+}
+
+/** Toggle visibility without overwriting an existing facilitator password hash. */
+export async function setSessionPublicV1(sessionId:string,isPublic:boolean){
+  const id=sessionId.toUpperCase();
+  if(!await getSessionV2(id))return false;
+  if(pool){
+    await initSessionAccessV1();
+    await pool.query(
+      'INSERT INTO performance_gap.session_access_v1(session_id,is_public,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(session_id) DO UPDATE SET is_public=EXCLUDED.is_public,updated_at=NOW()',
+      [id,isPublic]);
+  }
+  const old=memory.get(id);
+  memory.set(id,{isPublic,passwordHash:old?.passwordHash??null});
+  return true;
+}
+
+export async function removeSessionAccessV1(sessionId:string){
+  const id=sessionId.toUpperCase();
+  memory.delete(id);
+  if(pool){
+    await initSessionAccessV1();
+    await pool.query('DELETE FROM performance_gap.session_access_v1 WHERE session_id=$1',[id]);
+  }
 }
