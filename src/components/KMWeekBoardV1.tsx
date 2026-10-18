@@ -777,6 +777,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const dismissAARIntro=()=>{
   localStorage.setItem(aarIntroKey,'seen');
   setAARIntroDismissed(true);
+  // Bring the newly introduced AAR into focus as soon as the player continues.
+  if(aarChallenge){
+   setInvestment('AFTER_ACTION_REVIEW');
+   setSelectedDomain(aarChallenge.domain);
+   setInfoInvestment(null);
+  }
  };
  const dismissCoach=()=>{
   localStorage.setItem(coachPopupKey,'seen');
