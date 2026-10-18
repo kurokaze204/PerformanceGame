@@ -1,10 +1,11 @@
 import React,{useEffect,useMemo,useState}from'react';
-import{ArrowRight,CheckCircle2,Copy,Gauge,GraduationCap,LockKeyhole,PlayCircle,RefreshCw,Sparkles,UsersRound,Video,X}from'lucide-react';
+import{ArrowRight,CheckCircle2,Copy,Eye,EyeOff,Gauge,GraduationCap,LockKeyhole,PlayCircle,RefreshCw,Sparkles,Trash2,UsersRound,Video,X}from'lucide-react';
 import type{GameEndMode,GameSessionV2,ExperienceMode,PopulationMode}from'../types/gameV2.ts';
 import{defaultActionsForMode}from'../engine/learningCurveBalanceV1.ts';
 
 interface CreateOptions{experienceMode:ExperienceMode;gameDurationMinutes:number;maxPlayersPerCompany:number;actionsPerRound:number;populationMode:PopulationMode;gameEndMode:GameEndMode;finalRoundCount:number;}
 interface PublicGame{id:string;title:string;round:number;phase:string;companiesCount:number;createdAt:string;updatedAt:string;completed:boolean;}
+interface ManagedGame{id:string;title:string;round:number;companiesCount:number;createdAt:string;updatedAt:string;isPublic:boolean;experienceMode:string;}
 interface Props{
  currentSession:GameSessionV2|null;
  onJoinSession:(sessionId:string,companyId:string,playerName:string)=>Promise<boolean|void>|boolean|void;
@@ -54,6 +55,13 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,onClose})=>{
  const[createError,setCreateError]=useState<string|null>(null);
  const[creating,setCreating]=useState(false);
  const[namePromptOpen,setNamePromptOpen]=useState(false);
+ const[adminOpen,setAdminOpen]=useState(false);
+ const[adminPasscode,setAdminPasscode]=useState('');
+ const[adminGames,setAdminGames]=useState<ManagedGame[]>([]);
+ const[adminUnlocked,setAdminUnlocked]=useState(false);
+ const[adminLoading,setAdminLoading]=useState(false);
+ const[adminBusyId,setAdminBusyId]=useState('');
+ const[adminError,setAdminError]=useState('');
  const hasName=playerName.trim().length>0;
  const rememberName=()=>{try{localStorage.setItem('tpg_entered_player_name',playerName.trim())}catch{}};
  const multiplayerOptions:CreateOptions={experienceMode,gameDurationMinutes:duration,maxPlayersPerCompany:maxPlayers,actionsPerRound,populationMode,gameEndMode:experienceMode==='expert'?gameEndMode:'time',finalRoundCount};
@@ -64,6 +72,46 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,onClose})=>{
   try{const r=await fetch(`/api/public-games${archive?'?archived=true':''}`);if(r.ok){const data=await r.json();archive?setArchiveGames(data):setPublicGames(data)}}finally{setLoadingGames(false)}
  };
  useEffect(()=>{if(mode==='join')void loadPublicGames(false)},[mode]);
+
+
+ const adminRequest=async(url:string,body:Record<string,unknown>)=>{
+  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode:adminPasscode,...body})});
+  const data=await response.json();
+  if(!response.ok)throw Error(data.error||'Management request failed.');
+  return data;
+ };
+ const refreshAdminGames=async()=>{
+  setAdminLoading(true);setAdminError('');
+  try{
+   const games=await adminRequest('/api/admin/games/list',{});
+   setAdminGames(games);
+   setAdminUnlocked(true);
+  }catch(e:any){setAdminError(e.message||'Could not load games.');setAdminUnlocked(false)}
+  finally{setAdminLoading(false)}
+ };
+ const closeAdmin=()=>{
+  setAdminOpen(false);setAdminUnlocked(false);setAdminPasscode('');setAdminGames([]);setAdminError('');
+ };
+ const toggleAdminGame=async(game:ManagedGame)=>{
+  if(adminBusyId)return;
+  setAdminBusyId(game.id);setAdminError('');
+  try{
+   const response=await adminRequest('/api/admin/games/'+encodeURIComponent(game.id)+'/visibility',{isPublic:!game.isPublic});
+   setAdminGames(current=>current.map(item=>item.id===game.id?{...item,isPublic:response.isPublic}:item));
+   if(mode==='join')void loadPublicGames(false);
+  }catch(e:any){setAdminError(e.message||'Could not change visibility.')}
+  finally{setAdminBusyId('')}
+ };
+ const closeAdminGame=async(game:ManagedGame)=>{
+  if(adminBusyId||!window.confirm('Close and DELETE "'+game.title+'" ('+game.id+')? All players will be disconnected and saved game data will be permanently removed.'))return;
+  setAdminBusyId(game.id);setAdminError('');
+  try{
+   await adminRequest('/api/admin/games/'+encodeURIComponent(game.id)+'/close',{});
+   setAdminGames(current=>current.filter(item=>item.id!==game.id));
+   if(mode==='join')void loadPublicGames(false);
+  }catch(e:any){setAdminError(e.message||'Could not close the game.')}
+  finally{setAdminBusyId('')}
+ };
 
  const selectExperience=(next:ExperienceMode)=>{setExperienceMode(next);setActionsPerRound(defaultActionsForMode(next));if(next==='km_week')setDuration(30);if(next!=='expert')setGameEndMode('time')};
  const selectSoloExperience=(next:ExperienceMode)=>{setSoloExperienceMode(next);setSoloActionsPerRound(defaultActionsForMode(next));setSoloDuration(next==='km_week'?30:next==='newbie'?45:60);if(next!=='expert')setSoloGameEndMode('time')};
@@ -86,6 +134,26 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,onClose})=>{
  const activeArchive=useMemo(()=>archiveGames,[archiveGames]);
  const selectedSetupExperience=mode==='solo'?soloExperienceMode:mode==='create'?experienceMode:null;
  return <>
+  {adminOpen&&<div className="fixed inset-0 z-[520] grid place-items-center bg-black/85 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Manage running games">
+   <div className="relative w-full max-w-[720px] max-h-[90dvh] overflow-y-auto rounded-3xl border-2 border-violet-500 bg-[#101827] p-5 text-white shadow-[0_30px_100px_rgba(0,0,0,.85)] sm:p-7">
+    <button type="button" onClick={closeAdmin} aria-label="Close game manager" className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-xl border border-slate-600 text-slate-300 hover:text-white"><X className="h-5 w-5"/></button>
+    <h2 className="pr-12 text-xl font-black">Running games</h2>
+    <p className="mt-1 text-xs text-slate-400">Master facilitator management. The eye controls public listing; the bin closes and permanently deletes a game.</p>
+    {!adminUnlocked?<form onSubmit={event=>{event.preventDefault();void refreshAdminGames()}} className="mt-5 space-y-3">
+     <label className="block text-xs font-black text-slate-300">Master facilitator password<input autoFocus type="password" autoComplete="off" value={adminPasscode} onChange={event=>setAdminPasscode(event.target.value)} placeholder="Master password" className="control mt-2"/></label>
+     <button type="submit" disabled={!adminPasscode.trim()||adminLoading} className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-black text-white disabled:opacity-40">{adminLoading?'CHECKING…':'SHOW RUNNING GAMES'}</button>
+    </form>:<div className="mt-4 space-y-3">
+     <div className="flex items-center justify-between"><span className="text-xs font-black text-slate-300">{adminGames.length} running {adminGames.length===1?'game':'games'}</span><button type="button" disabled={adminLoading||Boolean(adminBusyId)} onClick={()=>void refreshAdminGames()} className="flex items-center gap-1 rounded-lg border border-slate-600 px-3 py-2 text-xs font-black text-slate-300"><RefreshCw className="h-4 w-4"/>REFRESH</button></div>
+     {adminGames.length?adminGames.map(game=><div key={game.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/80 p-3">
+      <div className="min-w-[160px] flex-1"><div className="text-sm font-black text-white">{game.title}</div><div className="mt-1 text-[11px] text-slate-400"><b className="text-indigo-300">{game.id}</b> · {game.experienceMode==='km_week'?'KM Week':game.experienceMode} · {game.companiesCount} {game.companiesCount===1?'company':'companies'} · Round {game.round} · {ageLabel(game.createdAt)}</div></div>
+      <button type="button" disabled={Boolean(adminBusyId)} onClick={()=>void toggleAdminGame(game)} title={game.isPublic?'Public — click to make private':'Private — click to make public'} aria-label={(game.isPublic?'Make private: ':'Make public: ')+game.title} aria-pressed={game.isPublic} className={'grid h-11 w-11 place-items-center rounded-lg border disabled:opacity-35 '+(game.isPublic?'border-emerald-600 bg-emerald-950/35 text-emerald-300':'border-slate-600 bg-slate-900 text-slate-400')}>{game.isPublic?<Eye className="h-5 w-5"/>:<EyeOff className="h-5 w-5"/>}</button>
+      <button type="button" disabled={Boolean(adminBusyId)} onClick={()=>void closeAdminGame(game)} title="Close and delete game" aria-label={'Close and delete '+game.title} className="grid h-11 w-11 place-items-center rounded-lg border border-rose-800 bg-rose-950/30 text-rose-300 hover:bg-rose-950 disabled:opacity-35"><Trash2 className="h-5 w-5"/></button>
+     </div>):<div className="rounded-xl border border-slate-700 bg-slate-950 p-5 text-center text-sm text-slate-400">No running games found.</div>}
+    </div>}
+    {adminError&&<p role="alert" className="mt-3 rounded-lg border border-rose-700 bg-rose-950/40 px-3 py-2 text-xs font-bold text-rose-200">{adminError}</p>}
+   </div>
+  </div>}
+
   {namePromptOpen&&<div className="fixed inset-0 z-[420] grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="name-required-title">
    <div className="w-full max-w-sm rounded-2xl border-2 border-indigo-500 bg-slate-950 p-5 shadow-2xl">
     <div className="text-[10px] font-black uppercase tracking-[.18em] text-indigo-300">Before you start</div>
@@ -153,7 +221,7 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,onClose})=>{
     <aside className="border-t lg:border-t-0 lg:border-l border-slate-700 bg-slate-950/70 p-5 sm:p-6">
      <div className="sticky top-5"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.18em] text-violet-300"><Video className="h-4 w-4"/>How to play</div><h2 className="mt-2 text-xl font-black text-white">{selectedSetupExperience==='km_week'?'KM Week Intro Version':'New to The Performance Gap?'}</h2><p className="mt-2 text-sm leading-relaxed text-slate-400">{selectedSetupExperience==='km_week'?<>Can you improve the performance of a company by changing where its knowledge sits?<br/><br/>The Performance Gap Game is a short business simulation designed to give you a first-hand experience of looking at organisational performance through a knowledge lens.</>:'Watch this short tutorial before you begin. It stays available whichever way you choose to play.'}</p>
       {selectedSetupExperience==='km_week'?<><div className="mt-5 aspect-video overflow-hidden rounded-2xl border border-slate-700 bg-black shadow-lg"><iframe className="h-full w-full" src="https://www.youtube-nocookie.com/embed/muyDSTvDDbM?rel=0" title="The Performance Gap KM Week introduction" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/></div><a href="https://www.youtube.com/watch?v=muyDSTvDDbM" target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] font-black text-emerald-300 hover:text-emerald-200">VIDEO NOT LOADING? OPEN ON YOUTUBE ↗</a></>:<div className="mt-5 aspect-video overflow-hidden rounded-2xl border border-slate-700 bg-black shadow-lg"><iframe className="h-full w-full" src="https://www.youtube-nocookie.com/embed/xIcLBUq519Q?rel=0" title="The Performance Gap tutorial" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/></div>}{selectedSetupExperience!=='km_week'&&<a href="https://www.youtube.com/watch?v=xIcLBUq519Q" target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] font-black text-indigo-300 hover:text-indigo-200">VIDEO NOT LOADING? OPEN ON YOUTUBE ↗</a>}
-      <div className="mt-5 space-y-3 text-xs text-slate-400">{selectedSetupExperience==='km_week'?<><Step n="1" text="Follow three guided moves to learn the board."/><Step n="2" text="Play three rounds with two business Challenges each." onSecretShiftClick={revealMultiplayer}/><Step n="3" text="Make one knowledge investment each round and watch the River change."/><Step n="4" text="Face a short Business Shock and compare the organisation you built."/></>:<><Step n="1" text="You run a business facing changing Challenges."/><Step n="2" text="You decide how to use expertise, knowledge and resources."/><Step n="3" text="Your choices change the organisation's capability and resilience."/><Step n="4" text="Survive a major disruption and show your friends you know how to build org-wide capability."/></>}</div>
+      <div className="mt-5 space-y-3 text-xs text-slate-400">{selectedSetupExperience==='km_week'?<><Step n="1" text="Follow three guided moves to learn the board."/><Step n="2" text="Play three rounds with two business Challenges each." onSecretShiftClick={revealMultiplayer}/><Step n="3" text="Make one knowledge investment each round and watch the River change."/><Step n="4" text="Face a short Business Shock and compare the organisation you built." onShiftFour={()=>setAdminOpen(true)}/></>:<><Step n="1" text="You run a business facing changing Challenges."/><Step n="2" text="You decide how to use expertise, knowledge and resources."/><Step n="3" text="Your choices change the organisation's capability and resilience."/><Step n="4" text="Survive a major disruption and show your friends you know how to build org-wide capability." onShiftFour={()=>setAdminOpen(true)}/></>}</div>
       <div className="mt-6 border-t border-slate-800 pt-5"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.18em] text-amber-300"><UsersRound className="h-4 w-4"/>Facilitator tutorial</div><h3 className="mt-2 text-base font-black text-white">Setting up a multiplayer game</h3><p className="mt-1 text-xs leading-relaxed text-slate-500">Running a group session? This short guide covers the multiplayer setup.</p><div className="mt-3 aspect-video overflow-hidden rounded-2xl border border-slate-700 bg-black shadow-lg"><iframe className="h-full w-full" src="https://www.youtube-nocookie.com/embed/2sSzUT6uWbI?rel=0" title="The Performance Gap facilitator setup tutorial" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/></div><a href="https://www.youtube.com/watch?v=2sSzUT6uWbI" target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] font-black text-amber-300 hover:text-amber-200">VIDEO NOT LOADING? OPEN ON YOUTUBE ↗</a></div>
      </div>
     </aside>
@@ -177,6 +245,6 @@ const ChoiceCard:React.FC<{selected:boolean;title:string;text:string;onClick:()=
 const Summary:React.FC<{children:React.ReactNode}>=({children})=><div className="rounded-xl border border-indigo-800 bg-indigo-950/25 p-3 text-xs leading-relaxed text-slate-300">{children}</div>;
 const Hint:React.FC<{children:React.ReactNode}>=({children})=><p className="text-[11px] text-amber-300">{children}</p>;
 const ErrorText:React.FC<{children:React.ReactNode}>=({children})=><p className="text-[11px] text-rose-300">{children}</p>;
-const Step:React.FC<{n:string;text:string;onSecretShiftClick?:React.MouseEventHandler<HTMLSpanElement>}>=({n,text,onSecretShiftClick})=><div className="flex gap-3"><span data-kmw-guide-step={n} onClick={onSecretShiftClick} className="grid h-6 w-6 shrink-0 cursor-default select-none place-items-center rounded-full border border-slate-700 bg-slate-900 font-black text-slate-300">{n}</span><p className="pt-1 leading-relaxed">{text}</p></div>;
+const Step:React.FC<{n:string;text:string;onSecretShiftClick?:React.MouseEventHandler<HTMLSpanElement>;onShiftFour?:()=>void}>=({n,text,onSecretShiftClick,onShiftFour})=><div className="flex gap-3"><span data-kmw-guide-step={n} onClick={event=>{if(n==='4'&&event.shiftKey){event.preventDefault();onShiftFour?.();return;}onSecretShiftClick?.(event)}} className="grid h-6 w-6 shrink-0 cursor-default select-none place-items-center rounded-full border border-slate-700 bg-slate-900 font-black text-slate-300">{n}</span><p className="pt-1 leading-relaxed">{text}</p></div>;
 const EmptyGames:React.FC<{loading:boolean}>=({loading})=><div className="rounded-xl border border-slate-800 bg-slate-950 p-4 text-center text-xs text-slate-500">{loading?'Checking for public games…':'No public games are available in this section right now.'}</div>;
 const PublicGameCard:React.FC<{game:PublicGame;canJoin:boolean;onJoin:()=>void}>=({game,canJoin,onJoin})=><div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-slate-700 bg-slate-950 p-3"><div className="flex-1 min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="text-sm text-white truncate">{game.title}</b>{game.completed?<span className="rounded-full border border-slate-600 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">Finished</span>:<span className="rounded-full border border-emerald-700 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-300">Open</span>}</div><div className="mt-1 text-[11px] text-slate-500"><span className="font-black text-indigo-300">{game.id}</span> · {game.companiesCount} {game.companiesCount===1?'company':'companies'} · Round {game.round} · {ageLabel(game.createdAt)}</div></div>{game.completed?<div className="flex items-center gap-1 text-[11px] font-black text-slate-500"><CheckCircle2 className="h-4 w-4"/>COMPLETED</div>:<button disabled={!canJoin} onClick={onJoin} className="rounded-lg bg-indigo-600 px-4 py-2 text-[11px] font-black text-white disabled:opacity-35">JOIN GAME</button>}</div>;

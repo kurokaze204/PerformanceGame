@@ -39,7 +39,8 @@ import {
   setStrategyResponse,
 } from './src/server/analyticsHooksV2.ts';
 import { finaliseAnalyticsRun, getAARData, getBenchmarkSummary, saveSessionV2, sessionStoreModeV2 } from './src/server/dbV2.ts';
-import { listPublicSessionsV1, saveSessionAccessV1, verifySessionFacilitatorPasswordV1 } from './src/server/sessionAccessV1.ts';
+import { listManageableSessionsV1, listPublicSessionsV1, removeSessionAccessV1, saveSessionAccessV1, setSessionPublicV1, verifySessionFacilitatorPasswordV1 } from './src/server/sessionAccessV1.ts';
+import { broadcastV2 } from './src/server/gameServiceV2.ts';
 import { savePlayerOptInV1 } from './src/server/playerOptInV1.ts';
 import { resolveWithReputationV2 } from './src/server/reputationServiceV2.ts';
 import { applyCardDifficultyBumpV2 } from './src/engine/cardBalanceV2.ts';
@@ -345,6 +346,43 @@ async function startServer() {
     if (!await requireFacilitator(req, res)) return;
     res.json(await deleteSessionAndSelectNextV2(req.params.id));
   });
+  // Shift-click administration is a discoverability shortcut, NOT an authorisation mechanism.
+  // Every management operation requires the server-configured master secret.
+  const requireMasterFacilitator=(req:express.Request,res:express.Response)=>{
+    if(!process.env.FACILITATOR_SECRET||String(req.body?.passcode||'')!==process.env.FACILITATOR_SECRET){
+      res.status(403).json({error:'Master facilitator password required.'});
+      return false;
+    }
+    return true;
+  };
+  app.post('/api/admin/games/list',async(req,res)=>{
+    if(!requireMasterFacilitator(req,res))return;
+    try{res.setHeader('Cache-Control','no-store');res.json(await listManageableSessionsV1());}
+    catch(e:any){res.status(500).json({error:e.message||'Could not list games.'});}
+  });
+  app.post('/api/admin/games/:id/visibility',async(req,res)=>{
+    if(!requireMasterFacilitator(req,res))return;
+    if(typeof req.body?.isPublic!=='boolean')return res.status(400).json({error:'isPublic must be a boolean.'});
+    try{
+      const changed=await setSessionPublicV1(req.params.id,req.body.isPublic);
+      if(!changed)return res.status(404).json({error:'Game not found.'});
+      res.json({success:true,isPublic:req.body.isPublic});
+    }catch(e:any){res.status(500).json({error:e.message||'Could not update visibility.'});}
+  });
+  app.post('/api/admin/games/:id/close',async(req,res)=>{
+    if(!requireMasterFacilitator(req,res))return;
+    const id=req.params.id.toUpperCase();
+    if(id==='KM2026')return res.status(400).json({error:'The system default game cannot be closed here.'});
+    try{
+      const session=await getSessionV2(id);
+      if(!session)return res.status(404).json({error:'Game not found.'});
+      broadcastV2(session,'SESSION_CLOSED',{message:'This game was closed by the facilitator.'});
+      await deleteSessionAndSelectNextV2(id);
+      await removeSessionAccessV1(id);
+      res.json({success:true,id});
+    }catch(e:any){res.status(500).json({error:e.message||'Could not close the game.'});}
+  });
+
   app.post('/api/admin/reset-database', async (req, res) => {
     if (!process.env.FACILITATOR_SECRET||req.body?.passcode!==process.env.FACILITATOR_SECRET)return res.status(403).json({error:'Master facilitator password required.'});
     res.json({ success: true, defaultSession: await resetAllV2() });
