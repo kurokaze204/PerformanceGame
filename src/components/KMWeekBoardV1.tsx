@@ -413,6 +413,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const challengeDraftsRef=useRef(challengeDrafts);
  const freeChallengeIntroKey=`tpg:kmw-free-challenge-intro:${session.id}:${company.id}`;
  const riskCoachKey=`tpg:kmw-first-shortfall-commit:${session.id}:${participant?.id||company.id}`;
+ // Remember an explicit choice to attempt a risk for the rest of this game.
+ const riskPreferenceKey=`tpg:kmw-prefer-risk:${session.id}:${participant?.id||company.id}`;
+ const prefersRisk=localStorage.getItem(riskPreferenceKey)==='yes';
  const firstFreeChallengeIntroPending=Boolean(state?.stage==='free'&&state.freeRound===1&&state.phase==='challenge'&&!readOnly&&!freeChallengeIntroDismissed&&localStorage.getItem(freeChallengeIntroKey)!=='seen');
  const showFreeChallengeIntro=firstFreeChallengeIntroPending&&!busy&&!riskResult&&!riskRollPending&&!challengeOutcome&&!scoreBriefOpen;
  const dismissFreeChallengeIntro=()=>{
@@ -730,12 +733,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const activePending=pendingResponse?.challengeId===activeChallenge?.id?pendingResponse:null;
  const localSelection:ResponseSelectionState=activePending?.localSelection||'none';
  const expertSelection:ResponseSelectionState=activePending?.expertSelection||'none';
- const riskSelected=activePending?.method==='risk';
  const riskKnowledge=(expertSelection==='depth'?activeExpertScore:localSelection==='depth'?localScore:0)+(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0);
- const riskOdds=activeChallenge?kmWeekRiskOddsV1(riskKnowledge,activeChallenge.difficulty):{performanceGap:0,requiredRoll:7,successfulFaces:0,chancePercent:0};
  const selectedDepth=localSelection==='depth'?localScore:expertSelection==='depth'?activeExpertScore:0;
  const selectedBreadth=(localSelection==='breadth'&&localScore>0?1:0)+(expertSelection==='breadth'&&activeExpertScore>0?1:0);
- const selectedKnowledge=riskSelected?riskKnowledge:selectedDepth+selectedBreadth;
+ const deterministicKnowledge=selectedDepth+selectedBreadth;
+ // Once chosen in the warning, prefer a dice roll whenever a drafted response falls short.
+ const riskSelected=activePending?.method==='risk'||Boolean(prefersRisk&&activePending?.method&&activeChallenge&&deterministicKnowledge<activeChallenge.difficulty);
+ const riskOdds=activeChallenge?kmWeekRiskOddsV1(riskKnowledge,activeChallenge.difficulty):{performanceGap:0,requiredRoll:7,successfulFaces:0,chancePercent:0};
+ const selectedKnowledge=riskSelected?riskKnowledge:deterministicKnowledge;
  const successChance=activeChallenge
   ?selectedKnowledge>=activeChallenge.difficulty?100
    :riskSelected?riskOdds.chancePercent
@@ -938,19 +943,25 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    setRiskCoachOpen(true);
    return;
   }
-  void commitResponse();
+  // Respect the remembered risk preference without requiring a second button press.
+  const response=riskSelected?{...pendingResponse,method:'risk' as const,label:'Take the risk'}:pendingResponse;
+  void commitResponse(response);
  };
  const chooseRiskFromCoach=()=>{
-  if(!activeChallenge||!pendingResponse)return;
-  setPendingResponse({...pendingResponse,method:'risk',label:'Take the risk'});
+  if(!activeChallenge||!pendingResponse||busy||readOnly)return;
+  const response={...pendingResponse,method:'risk' as const,label:'Take the risk'};
+  localStorage.setItem(riskPreferenceKey,'yes');
+  setPendingResponse(response);
   setChallengeAttention(false);
   setRiskCoachOpen(false);
+  // Submit the selected response now: state updates are not synchronous.
+  void commitResponse(response);
  };
 
- const commitResponse=async()=>{
-  if(!pendingResponse||!pendingResponse.method||busy||readOnly)return;
+ const commitResponse=async(responseOverride?:Exclude<PendingResponse,null>)=>{
+  const committed=responseOverride||pendingResponse;
+  if(!committed||!committed.method||busy||readOnly)return;
   if(guideStep===5)setGuideStep(0);
-  const committed=pendingResponse;
   const payload={type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth',useLocalRisk:committed.method==='risk'&&committed.localSelection!=='none',useExpertRisk:committed.method==='risk'&&committed.expertSelection==='depth'};
 
   // Defer incoming session broadcasts until the result has been shown and the
