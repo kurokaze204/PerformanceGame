@@ -146,13 +146,19 @@ const ScoreFormulaTip:React.FC<{title:string;description:string;children:React.R
   place();
   window.addEventListener('resize',place);
   window.addEventListener('scroll',place,true);
-  return()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true)};
+  // Tap outside to dismiss on touch devices without affecting hover behaviour.
+  const dismissOutside=(event:PointerEvent)=>{
+   if(event.pointerType==='touch'&&!anchorRef.current?.contains(event.target as Node))setOpen(false);
+  };
+  document.addEventListener('pointerdown',dismissOutside);
+  return()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);document.removeEventListener('pointerdown',dismissOutside)};
  },[open]);
  return <>
   <div ref={anchorRef} tabIndex={0} aria-describedby={open?tooltipId:undefined} aria-label={title+' scoring formula'} data-kmw-score-math-anchor={title} className={'relative min-w-0 cursor-help focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 '+className}
-   onMouseEnter={()=>setOpen(true)} onMouseLeave={()=>setOpen(false)}
+   onMouseEnter={()=>{if(window.matchMedia('(hover: hover)').matches)setOpen(true)}}
+   onMouseLeave={()=>{if(window.matchMedia('(hover: hover)').matches)setOpen(false)}}
    onFocus={()=>setOpen(true)} onBlur={()=>setOpen(false)}
-   onClick={()=>{if(window.matchMedia('(hover: none)').matches)setOpen(value=>!value)}}
+   onClick={()=>{if(window.matchMedia('(hover: none)').matches)setOpen(true)}}
    onKeyDown={event=>{if(event.key==='Escape')setOpen(false)}}>
    {children}
   </div>
