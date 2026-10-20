@@ -184,7 +184,7 @@ assert.ok(kmWeekBoardSource.includes('data-kmw-turnover-event={event.kind}')&&km
 assert.ok(kmWeekBoardSource.includes("const match=/^([GR])")&&kmWeekBoardSource.includes('const retirement=state?.expertRetirement'),'Chart markers must come from the recorded multi-round turnover history and retirement event');
 
 assert.ok(kmWeekBoardSource.includes('await presentChallengeOutcome(nextCompany,resolved)')&&kmWeekBoardSource.includes('if(data.session){if(beforeApply)await beforeApply(data.session);onSessionUpdate(data.session);}')&&kmWeekBoardSource.includes('onPresentationHoldChange?.(true)'),'Challenge turnover must stay unchanged until the outcome animation has completed');
-assert.ok(kmWeekBoardSource.includes('riskContinueRef.current?.()')&&kmWeekBoardSource.includes('riskContinueRef.current=resolve'),'Risk dice result must be acknowledged before the Challenge outcome globe starts');
+assert.ok(kmWeekBoardSource.includes('riskContinueRef.current?.()')&&kmWeekBoardSource.includes('riskContinueRef.current=()=>')&&kmWeekBoardSource.includes('window.setTimeout(()=>{if(!completed)'),'Risk dice result must be acknowledged or auto-continued before Challenge outcome globe starts');
 assert.ok(globalCssSource.includes('.kmw-turnover-globe-win')&&globalCssSource.includes('.kmw-turnover-globe-loss'),'Challenge outcome globe must be visually distinct for gains and losses');
 
 assert.ok(kmWeekBoardSource.includes('<PhaseStep number="1" label="Challenge"')&&kmWeekBoardSource.includes('<PhaseStep number="2" label="Invest"'),'KM Week must show the active phase through its stepper without repeating a Current phase badge');
@@ -275,7 +275,7 @@ assert.ok(kmWeekBoardSource.includes("!scoreBriefOpen&&!firstScoreBriefPending&&
 assert.ok(kmWeekBoardSource.includes('coachDismissedKey!==coachPopupKey')&&kmWeekBoardSource.includes('localStorage.setItem(coachPopupKey'),'Each full-play round must show its coaching question once and remember that it was acknowledged');
 assert.ok(kmWeekBoardSource.includes('Score briefing · First full round')&&kmWeekBoardSource.includes('Different investments strengthen different parts of your score'),'The score briefing must explain score components without repeating investment advice before the coaching question');
 assert.ok(kmWeekBoardSource.includes('Site Audits are coming.')&&kmWeekBoardSource.includes('10 bonus points')&&kmWeekBoardSource.includes('$40k per missing knowledge level found'),'Scorecard introduction must preview Site Audits, doubled fines and the 10-point clean sweep');
-assert.ok(kmWeekBoardSource.includes('data-kmw-audit-fine')&&kmWeekBoardSource.includes('data-kmw-turnover-target')&&kmWeekBoardSource.includes('await path.finished')&&kmWeekBoardSource.includes("if(beforeApply)await beforeApply(data.session)"),'Clicking Continue to Debrief must animate the fine globe before the new turnover/session is applied');
+assert.ok(kmWeekBoardSource.includes('data-kmw-audit-fine')&&kmWeekBoardSource.includes('data-kmw-turnover-target')&&kmWeekBoardSource.includes('await Promise.race([path.finished')&&kmWeekBoardSource.includes("if(beforeApply)await beforeApply(data.session)"),'Clicking Continue to Debrief must animate the fine globe before the new turnover/session is applied');
 assert.ok(kmWeekBoardSource.includes('shownTurnover')&&kmWeekBoardSource.includes('auditTurnoverBefore'),'The turnover header must show the pre-audit figure until the fine globe arrives');
 assert.ok(kmWeekBoardSource.includes('max="15"')&&kmWeekDebriefSource.includes('max:15'),'Squeaky clean must show the correct fifteen-point maximum on both scorecards');
 assert.ok(!kmWeekBoardSource.includes('Business Shock')&&!kmWeekDebriefSource.includes('Business Shock'),'No KM Week player-facing screens should still say Business Shock');
@@ -537,5 +537,9 @@ assert.ok(finalTicks.length>=12&&finalTicks.every(tick=>tick.includes('font-size
  assert.equal(soloAxes[0],soloAxes[1],'Before and after should use the same scale even while only one company is available');
  assert.equal((early.match(/data-kmw-pdf-company/g)||[]).length,1,'Do not reveal unfinished competitors');
  assert.equal(early.includes('data-kmw-category-rank="first"'),false,'Do not award green rankings while opponents are still playing');
+ const postClock=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex,allowIncomplete:true}));
+ assert.equal((postClock.match(/data-kmw-pdf-company/g)||[]).length,2,'After the workshop deadline, both companies must appear even when one is unfinished');
+ assert.ok(postClock.includes('data-kmw-incomplete-notice')&&postClock.includes('data-kmw-unfinished'),'Incomplete comparison results must be marked provisional');
+ assert.ok(postClock.includes('CEO: Alex'),'Timed-out unfinished companies must not disappear from the workshop AAR');
 }
 console.log('Mode-aware UI render smoke tests passed.');
