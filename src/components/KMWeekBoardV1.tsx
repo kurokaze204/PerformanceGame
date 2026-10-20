@@ -1003,6 +1003,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       setRiskResult({roll:resolved.dieRoll!,won:resolved.status==='success',requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
       setRiskRollPending(null);
      });
+     // Also dismiss the dice popup if its acknowledgement timer expires.
+     setRiskResult(null);
     }
     await presentChallengeOutcome(nextCompany,resolved);
    });
