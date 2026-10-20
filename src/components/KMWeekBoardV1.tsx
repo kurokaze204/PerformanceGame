@@ -1408,7 +1408,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
    {finalShockWindow&&<div className="mb-2 shrink-0 rounded-xl border-2 border-rose-500 bg-rose-950/35 px-3 py-2 text-[10px] font-bold leading-relaxed text-rose-100"><b className="text-rose-300">FINAL 3 MINUTES.</b> Finish your current round or move directly to Site Audits. Auditors assess local teams, not company experts.
     <button type="button" data-kmw-go-audits disabled={busy||readOnly} onClick={()=>{const n=state.challenges.filter(item=>item.status==='open').length;if(window.confirm(n?`Forfeit ${n} unfinished Challenge(s) as losses and start Site Audits now?`:'Start Site Audits now, without making another investment?'))void post({type:'KM_WEEK_TO_AUDITS'})}} className="ml-3 rounded-md border border-rose-300 bg-rose-900 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-40">GO TO SITE AUDITS NOW</button>
-   </div>
+   </div>}
 
    <div className="grid gap-3 min-[700px]:min-h-0 min-[700px]:flex-1 min-[700px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
     <div className="space-y-3 min-[700px]:flex min-[700px]:min-h-0 min-[700px]:flex-col min-[700px]:space-y-0 min-[700px]:gap-2 xl:gap-3">
