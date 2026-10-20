@@ -864,7 +864,7 @@ function advanceAfterKMWeekInvestment(session:GameSessionV2,company:CompanyV2){
 export function skipKMWeekInvestmentV1(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek;
   if(!state||state.stage!=='free'||state.phase!=='invest')return{success:false,message:'Finish the current Challenges before skipping an investment.'};
-  state.investmentHistory.push({roundLabel:`Free ${state.freeRound}`,type:'SKIP_INVESTMENT',domain:'operations',before:0,after:0});
+  // No intervention was purchased, so leave investmentHistory unchanged.
   state.turnoverHistory.push({label:`R${state.freeRound} I`,turnover:company.turnover});
   advanceAfterKMWeekInvestment(session,company);
   syncScore(session,company);
