@@ -7,7 +7,7 @@ import{formatCurrency}from'../utils/format.ts';
 import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SITE_IDS,calculateKMWeekScoreV1,kmWeekGoalV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 
-type Props={session:GameSessionV2;company:CompanyV2};
+type Props={session:GameSessionV2;company:CompanyV2;allowIncomplete?:boolean;onBack?:()=>void};
 
 const COMPANY_COLORS=['#facc15','#38bdf8','#a78bfa','#34d399','#fb7185','#fb923c','#22d3ee','#c084fc'];
 type ScoreKey=Exclude<keyof KMWeekScore,'total'>;
@@ -270,14 +270,15 @@ const AARQuestions:React.FC<{open:boolean;onClose:()=>void}>=({open,onClose})=>!
  </aside>
 </>;
 
-export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
+export const KMWeekDebriefV1:React.FC<Props>=({session,company,allowIncomplete=false,onBack})=>{
  const[questionsOpen,setQuestionsOpen]=useState(false);
  const participating=useMemo(()=>{
   const ids=new Set(session.participants.filter(p=>p.role!=='facilitator'&&p.companyId).map(p=>p.companyId));
   return ids.size?session.companies.filter(candidate=>ids.has(candidate.id)):session.companies;
  },[session.companies,session.participants]);
  const allComplete=participating.length>0&&participating.every(candidate=>candidate.kmWeek?.stage==='complete');
- const companies=(allComplete?participating:[company]).slice().sort((a,b)=>
+ const comparisonVisible=allComplete||allowIncomplete;
+ const companies=(comparisonVisible?participating:[company]).slice().sort((a,b)=>
   calculateKMWeekScoreV1(session,b).total-calculateKMWeekScoreV1(session,a).total||
   b.turnover-a.turnover||a.name.localeCompare(b.name)
  );
@@ -293,7 +294,7 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
  }
  return <main data-kmw-debrief className="mx-auto h-[calc(100vh-66px)] max-w-[1700px] overflow-auto p-3 text-slate-100">
   <section className="rounded-2xl border-2 border-violet-700 bg-[linear-gradient(145deg,#19152d,#101827)] p-4">
-   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><h2 className="text-2xl font-black text-white">After Action Review - Discuss Together</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, so nobody sees another team’s strategy while they are still playing.</p>}{completeScores.length>1&&<p data-kmw-score-legend className="mt-2 text-[11px] font-bold text-slate-200"><span className="text-emerald-300">■ Green: highest category score</span><span className="ml-4 text-orange-300">■ Orange: joint highest</span></p>}</div><div data-kmw-pdf-hide className="flex flex-wrap items-center gap-2"><button type="button" onClick={()=>window.print()} title="Select Save as PDF in your browser's print dialog" className="flex h-12 items-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-700 px-4 text-xs font-black text-white shadow-lg hover:bg-emerald-600"><FileDown className="h-4 w-4"/> EXPORT PDF</button><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div></div>
+   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><h2 className="text-2xl font-black text-white">After Action Review - Discuss Together</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, or when the workshop clock ends.</p>}{allowIncomplete&&!allComplete&&<p data-kmw-incomplete-notice className="mt-2 text-sm font-bold text-amber-200">Workshop time has ended. All companies are shown, including unfinished rounds. Scores are provisional; final turnover rankings remain pending until everyone completes Site Audits.</p>}{completeScores.length>1&&<p data-kmw-score-legend className="mt-2 text-[11px] font-bold text-slate-200"><span className="text-emerald-300">■ Green: highest category score</span><span className="ml-4 text-orange-300">■ Orange: joint highest</span></p>}</div><div data-kmw-pdf-hide className="flex flex-wrap items-center gap-2">{onBack&&<button type="button" onClick={onBack} className="h-12 rounded-xl border-2 border-sky-300 px-4 text-xs font-black text-sky-100">BACK TO GAME</button>}<button type="button" onClick={()=>window.print()} title="Select Save as PDF in your browser's print dialog" className="flex h-12 items-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-700 px-4 text-xs font-black text-white shadow-lg hover:bg-emerald-600"><FileDown className="h-4 w-4"/> EXPORT PDF</button><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div></div>
   </section>
 
   <div data-kmw-pdf-chart className="mt-3"><TurnoverGraph companies={companies} colors={colors}/></div>
@@ -304,7 +305,7 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company})=>{
     const before=beforeCompany(item);
     return <section key={item.id} data-kmw-pdf-company className="rounded-2xl border-2 bg-[#0b1420] p-3" style={{borderColor:color}}>
      <div className="mb-1 flex flex-wrap items-center gap-2"><span className="h-3 w-3 rounded-full" style={{backgroundColor:color}}/><span className="text-xs font-black text-amber-300">#{index+1}</span><h3 className="text-lg font-black text-white">{item.name}</h3>{item.id===company.id&&<span className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[9px] font-black uppercase text-slate-400">Your company</span>}</div>
-     <p data-kmw-company-players className="mb-3 text-sm font-semibold text-emerald-100">{kmWeekCompanyPlayerLabel(session,item)}</p>
+     <p data-kmw-company-players className="mb-3 text-sm font-semibold text-emerald-100">{kmWeekCompanyPlayerLabel(session,item)}{item.kmWeek?.stage!=='complete'&&<span data-kmw-unfinished className="ml-3 rounded-lg border border-amber-500 bg-amber-950/40 px-2 py-0.5 text-amber-200">Unfinished · {item.kmWeek?.phase==='invest'?'Invest':'Challenge'}</span>}</p>
      <div className="grid gap-3 xl:grid-cols-[360px_minmax(0,1fr)_minmax(0,1fr)]">
       <MiniScorePad company={item} color={color} session={session} allComplete={allComplete} leaders={leaders}/>
       <div className="min-w-0 rounded-2xl border-2 bg-slate-950/50 p-2" style={{borderColor:color}}><div className="mb-1 text-[9px] font-black uppercase tracking-[.14em] text-slate-500">At start of game</div><div className="h-[190px]"><InvestmentRiverView company={before} mode="km_week" selectedDomain="operations" maxKnowledgeLevel={riverKnowledgeMax} compact/></div></div>
