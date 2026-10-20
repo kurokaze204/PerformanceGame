@@ -1,61 +1,41 @@
-name: One-off KM Week session health (read only)
+name: KMHSRBW forensic snapshot (read-only)
 on:
   push:
     branches: [diagnose-kmhsrbw]
 permissions:
   contents: read
 jobs:
-  inspect-session:
+  inspect:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Inspect live session status without revealing player details
+      - name: Inspect aggregate session records without names
         run: |
           node <<'NODE'
-          (async()=>{
+          const go=async()=>{
             const url='https://performancegapgame.deltaknowledge.net/api/sessions/KMHSRBW';
-            const ctrl=new AbortController();
-            const timer=setTimeout(()=>ctrl.abort(),12000);
-            try{
-              const response=await fetch(url,{signal:ctrl.signal,headers:{accept:'application/json'}});
-              console.log('HTTP_STATUS:',response.status);
-              const body=await response.text();
-              let session;
-              try{session=JSON.parse(body)}catch{console.log('NON_JSON_RESPONSE');return}
-              if(!response.ok){console.log('SESSION_FETCH_ERROR:',session.error||'no error detail');return}
-              const companies=Array.isArray(session.companies)?session.companies:[];
-              const summary={
-                sessionFound:true,
-                mode:session.experienceMode,
-                sessionRound:session.round,
-                globalPhase:session.phase,
-                timerStarted:!!session.timerStartedAt,
-                companyCount:companies.length,
-                companies:companies.map((company,index)=>({
-                  number:index+1,
-                  companyRound:company.round,
-                  roundPhase:company.roundPhase,
-                  kmWeekStage:company.kmWeek?.stage,
-                  kmWeekPhase:company.kmWeek?.phase,
-                  guidedTurn:company.kmWeek?.guidedTurn,
-                  freeRound:company.kmWeek?.freeRound,
-                  challengeCount:company.kmWeek?.challenges?.length,
-                  challenges:company.kmWeek?.challenges?.map(challenge=>({
-                    id:challenge.id,
-                    status:challenge.status,
-                    domain:challenge.domain,
-                    difficulty:challenge.difficulty,
-                    resolution:challenge.resolution
-                  })),
-                  investments:company.kmWeek?.investmentHistory?.length,
-                  score:company.kmWeek?.score?.total,
-                  hasController:!!company.controllerParticipantId,
-                }))
-              };
-              console.log('READ_ONLY_SESSION_SUMMARY_BEGIN');
-              console.log(JSON.stringify(summary,null,2));
-              console.log('READ_ONLY_SESSION_SUMMARY_END');
-            }catch(e){console.error('SESSION_INSPECTION_FAILURE:',e.message);process.exitCode=1}
-            finally{clearTimeout(timer)}
-          })();
+            const res=await fetch(url,{signal:AbortSignal.timeout(14000),cache:'no-store'});
+            console.log('HTTP',res.status);
+            if(!res.ok)return;
+            const g=await res.json();
+            const now=Date.now();
+            const deadline=g.timerEndsAt?new Date(g.timerEndsAt).toISOString():null;
+            console.log('SESSION',JSON.stringify({round:g.round,phase:g.phase,deadline,expired:!!deadline&&now>=Date.parse(deadline),pausedSeconds:g.timerPausedSecondsRemaining,finalDisruptionResolved:g.finalDisruptionResolved,companies:g.companies.length,participants:g.participants.length,updatedAt:g.updatedAt}));
+            g.companies.forEach((c,i)=>{
+              const k=c.kmWeek||{},turns=k.turnoverHistory||[],items=k.challenges||[];
+              const losses=turns.filter(t=>t.challengeResult==='failure').length;
+              const wins=turns.filter(t=>t.challengeResult==='success').length;
+              const scores=items.map(t=>({id:t.id,status:t.status,domain:t.domain,difficulty:t.difficulty,resolution:t.resolution,dieRoll:t.dieRoll,turnoverChange:t.turnoverChange}));
+              console.log('COMPANY',JSON.stringify({
+                n:i+1,stage:k.stage,phase:k.phase,round:c.round,freeRound:k.freeRound,guidedTurn:k.guidedTurn,
+                turnover:c.turnover,score:k.score?.total,business:k.score?.business,local:k.score?.localCapability,experts:k.score?.expertise,
+                completedChallenges:wins+losses,wins,losses,investmentCount:k.investmentHistory?.length,
+                historyLast:turns.slice(-10).map(t=>({label:t.label,status:t.challengeResult,turnover:t.turnover})),
+                challenges:scores,usedExpertIdsCount:k.usedExpertIds?.length,
+                availableExperts:c.experts.filter(e=>!e.isVacant).map(e=>({domain:e.domains.map(s=>s.domain),score:e.domains.map(s=>s.score),location:e.location,training:k.trainingCommitments?.[e.id]===c.round,used:k.usedExpertIds?.includes(e.id)})),
+                lastMessage:k.lastMessage,hasController:!!c.controllerParticipantId
+              }));
+            });
+          };
+          go().catch(e=>{console.error('ERROR',e.message);process.exitCode=1});
           NODE
