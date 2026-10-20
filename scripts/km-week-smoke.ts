@@ -596,4 +596,51 @@ assert.ok((company.kmWeek?.score.total||0)>0);
  assert.equal(co.kmWeek!.investmentHistory.at(-1)?.after,13);
 }
 
+// Regression from live webinar KMHSRBW: a company bankrupt at turnover 0
+// finished its Challenges but could not afford any Invest intervention, which
+// prevented all companies from reaching the full AAR comparison.
+{
+ const bankrupt=createInitialCompanyV2('Cash-strapped','kmw-bankrupt',config);
+ initialiseKMWeekCompanyV1(bankrupt,'KMW-WEBINAR');
+ const game={...session,id:'KMW-WEBINAR',companies:[bankrupt],timerEndsAt:null,timerPausedSecondsRemaining:0,finalDisruptionResolved:false} as GameSessionV2;
+ bankrupt.kmWeek!.stage='free';bankrupt.kmWeek!.phase='invest';
+ bankrupt.kmWeek!.freeRound=10;bankrupt.round=13;bankrupt.roundPhase='investment';
+ bankrupt.turnover=0;
+ const invested=applyKMWeekActionV1(game,bankrupt.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',domain:'operations',expertId:bankrupt.experts[0].id});
+ assert.equal(invested.success,false,'An unaffordable investment must fail without mutating knowledge');
+ const pastInvestments=bankrupt.kmWeek!.investmentHistory.length;
+ const skipped=applyKMWeekActionV1(game,bankrupt.id,{type:'KM_WEEK_SKIP_INVEST'});
+ assert.equal(skipped.success,true,skipped.message);
+ assert.equal(bankrupt.kmWeek!.stage,'shock','A bankrupt company can escape Invest and reach Site Audits');
+ assert.equal(bankrupt.kmWeek!.investmentHistory.length,pastInvestments,'Skipping must not invent knowledge or pretend an investment occurred');
+ assert.equal(bankrupt.turnover,0,'Skipping must never change turnover');
+ let after=applyKMWeekActionV1(game,bankrupt.id,{type:'KM_WEEK_RESOLVE_SHOCK'});
+ assert.equal(after.success,true,after.message);
+ after=applyKMWeekActionV1(game,bankrupt.id,{type:'KM_WEEK_COMPLETE_SHOCK'});
+ assert.equal(after.success,true,after.message);
+ assert.equal(bankrupt.kmWeek!.stage,'complete','The previously bankrupt player must be able to reach the final AAR');
+}
+{
+ const co=createInitialCompanyV2('Deadline Escape','kmw-deadline',config);
+ initialiseKMWeekCompanyV1(co,'KMW-CUTOFF');
+ const game={...session,id:'KMW-CUTOFF',companies:[co],timerEndsAt:null,timerPausedSecondsRemaining:0,finalDisruptionResolved:false} as GameSessionV2;
+ co.kmWeek!.stage='free';co.kmWeek!.phase='challenge';co.kmWeek!.freeRound=3;co.round=6;
+ co.kmWeek!.challenges=[
+  {id:'C1',title:'Resolved',story:'A resolved problem',siteId:'brisbane',domain:'operations',difficulty:5,impact:30,status:'success'},
+  {id:'C2',title:'Stuck',story:'Last unresolved problem',siteId:'perth',domain:'marketing',difficulty:6,impact:45,status:'open'},
+ ];
+ const original=co.turnover;
+ const outcome=applyKMWeekActionV1(game,co.id,{type:'KM_WEEK_TO_AUDITS'});
+ assert.equal(outcome.success,true,outcome.message);
+ assert.equal(co.kmWeek!.stage,'shock','The final deadline must release a company stranded on its last Challenge');
+ assert.equal(co.turnover,original-45,'Only unfinished Challenges are forfeited as losses');
+ assert.equal(co.kmWeek!.turnoverHistory.at(-1)?.challengeResult,'failure','Forfeited Challenges must be recorded in the AAR turnover chart');
+ const again=applyKMWeekActionV1(game,co.id,{type:'KM_WEEK_TO_AUDITS'});
+ assert.equal(again.success,false,'The deadline cannot be used twice');
+ const preDeadline=createInitialCompanyV2('Time Protected','kmw-timer-guard',config);
+ initialiseKMWeekCompanyV1(preDeadline,'KMW-NOT-YET');
+ preDeadline.kmWeek!.stage='free';preDeadline.kmWeek!.phase='challenge';
+ const protectedGame={...game,id:'KMW-NOT-YET',companies:[preDeadline],timerPausedSecondsRemaining:600} as GameSessionV2;
+ assert.equal(applyKMWeekActionV1(protectedGame,preDeadline.id,{type:'KM_WEEK_TO_AUDITS'}).success,false,'Players cannot bypass Challenges before the final three-minute window');
+}
 console.log('KM Week smoke passed');
