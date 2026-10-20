@@ -825,34 +825,75 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     ?`After Action Review complete: site ${before} → ${after}, expert ${expertBefore} → ${expertAfter}. Cost ${cost}k.`
     :`${investmentLabel(type)} complete: ${before} → ${after}. Cost ${cost}k.`;
 
+  advanceAfterKMWeekInvestment(session,company);
+  syncScore(session,company);
+  return{success:true,message:state.lastMessage};
+}
+
+/** Every accepted investment, or an explicit decision to skip one, must
+ * advance exactly one round. This transition is the only path to the next
+ * Challenge set; committing Challenges never skips an investment.
+ */
+function advanceAfterKMWeekInvestment(session:GameSessionV2,company:CompanyV2){
+  const state=company.kmWeek!;
   if(state.stage==='guided'){
     if(state.guidedTurn<3){
       state.guidedTurn+=1;
       company.round=state.guidedTurn;
       setChallengePhase(company,[guidedChallenge(company,state.guidedTurn)]);
+    }else if(kmWeekShockWindowOpen(session)){
+      enterSiteAudits(company,'The guided section has ended as the final three-minute window begins. Site Audits are now underway.');
     }else{
-      // Preserve the true opening River for the final debrief, including
-      // all capability growth achieved during the three guided rounds.
-      if(kmWeekShockWindowOpen(session)){
-        enterSiteAudits(company,'The guided section has ended as the final three-minute window begins. Site Audits are now underway; auditors assess local teams only.');
-      }else{
-        state.stage='free';
-        state.freeRound=1;
-        company.round=4;
-        setChallengePhase(company,freeChallengesForRound(session,company,1));
-        state.lastMessage='Guided section complete. From here, keep playing until the final three-minute Site Audits.';
-      }
+      state.stage='free';
+      state.freeRound=1;
+      company.round=4;
+      setChallengePhase(company,freeChallengesForRound(session,company,1));
+      state.lastMessage='Guided section complete. From here, play until the final three-minute Site Audits.';
     }
+  }else if(kmWeekShockWindowOpen(session)){
+    enterSiteAudits(company,'The final three minutes have begun. Site Audits assess local capability without expert assistance.');
   }else{
-    if(kmWeekShockWindowOpen(session)){
-      enterSiteAudits(company,'The clock has entered its final three minutes. Site Audits now test local capability without expert assistance.');
-    }else{
-      state.freeRound+=1;
-      company.round=3+state.freeRound;
-      setChallengePhase(company,freeChallengesForRound(session,company,state.freeRound));
-      state.lastMessage=`Round ${state.freeRound} begins. Keep building capability before the final three-minute Site Audits.`;
+    state.freeRound+=1;
+    company.round=3+state.freeRound;
+    setChallengePhase(company,freeChallengesForRound(session,company,state.freeRound));
+    state.lastMessage=`Round ${state.freeRound} begins. Invest again after completing both Challenges.`;
+  }
+}
+
+/** A cash-strapped or time-constrained company must not be trapped in Invest. */
+export function skipKMWeekInvestmentV1(session:GameSessionV2,company:CompanyV2){
+  const state=company.kmWeek;
+  if(!state||state.stage!=='free'||state.phase!=='invest')return{success:false,message:'Finish the current Challenges before skipping an investment.'};
+  state.investmentHistory.push({roundLabel:`Free ${state.freeRound}`,type:'SKIP_INVESTMENT',domain:'operations',before:0,after:0});
+  state.turnoverHistory.push({label:`R${state.freeRound} I`,turnover:company.turnover});
+  advanceAfterKMWeekInvestment(session,company);
+  syncScore(session,company);
+  return{success:true,message:state.lastMessage};
+}
+
+/** At the closing window, an unresolved Challenge must never strand an
+ * entire workshop. Forfeited Challenges count as failures (and cost turnover);
+ * already recorded wins and investments remain unchanged.
+ */
+export function advanceKMWeekToAuditsV1(session:GameSessionV2,company:CompanyV2){
+  const state=company.kmWeek;
+  if(!state||state.stage!=='free'||!kmWeekShockWindowOpen(session))
+    return{success:false,message:'Early Site Audits open only during the final three minutes.'};
+  if(state.phase!=='challenge'&&state.phase!=='invest')
+    return{success:false,message:'The company is already past its normal Challenges.'};
+  let forfeited=0;
+  if(state.phase==='challenge'){
+    for(const challenge of state.challenges){
+      if(challenge.status!=='open')continue;
+      challenge.status='failure';
+      challenge.resolution='local';
+      challenge.turnoverChange=-challenge.impact;
+      applyTurnover(company,-challenge.impact);
+      state.turnoverHistory.push({label:`R${state.freeRound} C${state.challenges.indexOf(challenge)+1}`,turnover:company.turnover,challengeResult:'failure'});
+      forfeited++;
     }
   }
+  enterSiteAudits(company,`Site Audits are ready. ${forfeited} unfinished Challenge${forfeited===1?' was':'s were'} forfeited at the deadline.`);
   syncScore(session,company);
   return{success:true,message:state.lastMessage};
 }
@@ -921,6 +962,10 @@ export function applyKMWeekActionV1(session:GameSessionV2,companyId:string,paylo
     result=resolveKMWeekChallengeV1(session,company,String(payload?.challengeId||''),payload?.method,payload?.expertId,Boolean(payload?.includeLocalBreadth),Boolean(payload?.includeExpertBreadth),useLocalRisk,Boolean(payload?.useExpertRisk));
   }else if(type==='KM_WEEK_INVEST'){
     result=investKMWeekV1(session,company,payload);
+  }else if(type==='KM_WEEK_SKIP_INVEST'){
+    result=skipKMWeekInvestmentV1(session,company);
+  }else if(type==='KM_WEEK_TO_AUDITS'){
+    result=advanceKMWeekToAuditsV1(session,company);
   }else if(type==='KM_WEEK_RESOLVE_SHOCK'){
     result=resolveKMWeekShockV1(session,company);
   }else if(type==='KM_WEEK_COMPLETE_SHOCK'){
