@@ -749,6 +749,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   ?selectedKnowledge>=activeChallenge.difficulty?100
    :riskSelected?riskOdds.chancePercent
    :guided&&state.guidedTurn===1&&selectedKnowledge>0?kmWeekRiskOddsV1(selectedKnowledge,activeChallenge.difficulty).chancePercent
+   :!guided&&selectedKnowledge>0?kmWeekRiskOddsV1(selectedDepth+selectedBreadth,activeChallenge.difficulty).chancePercent
    :0
   :0;
  const firstGuidedTour=state.stage==='guided'&&state.guidedTurn===1&&state.phase==='challenge'&&challengeFocusOpen&&activeChallenge?.status==='open'&&guideStep>0;
@@ -1522,8 +1523,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          onLocalClick={()=>cycleKnowledgeSource('local')}
          onExpertClick={()=>cycleKnowledgeSource('expert')}
         />
+        {(expertUsed||expertTraining)&&<p data-kmw-unavailable-expert className="mt-1.5 text-xs font-semibold text-amber-200">Expert unavailable: {expertTraining?'busy training staff':'already used this round'}. Choose the local team or Take the Risk.</p>}
         <div data-kmw-tour="chance" className={'mt-2 flex items-center justify-between gap-2 rounded-xl border-2 px-3 py-2 '+(selectedKnowledge>=activeChallenge.difficulty?'border-emerald-400 bg-emerald-950/30':'border-sky-500 bg-sky-950/30')+(firstGuidedTour&&guideStep===2?' kmw-tour-chance':'')}>
-         <div className="flex items-center gap-2"><Target className="h-5 w-5 text-sky-300"/><div><div className="text-[13px] font-black text-white">Chance of success</div></div></div>
+         <div className="flex items-center gap-2"><Target className="h-5 w-5 text-sky-300"/><div><div className="text-[13px] font-black text-white">{!guided&&!riskSelected&&knowledgeShortfall>0&&selectedKnowledge>0?'Chance IF YOU ROLL':'Chance of success'}</div></div></div>
          <b className={'text-2xl font-black tabular-nums '+(selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300')}>{successChance}%</b>
         </div>
         {!guided&&deterministicSelected&&knowledgeShortfall>0&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-1.5 text-[10px] font-black text-rose-200">KNOWLEDGE SHORTFALL {knowledgeShortfall} · If you commit this response, the Challenge will fail.</div>}
