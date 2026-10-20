@@ -400,6 +400,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[expertChangeDismissedKey,setExpertChangeDismissedKey]=useState('');
  const[challengeAttention,setChallengeAttention]=useState(false);
  const[riskCoachOpen,setRiskCoachOpen]=useState(false);
+ const[showFinalComparison,setShowFinalComparison]=useState(false);
  const[riskResult,setRiskResult]=useState<{roll:number;won:boolean;requiredRoll:number;performanceGap:number}|null>(null);
  const[riskRollPending,setRiskRollPending]=useState<{requiredRoll:number;performanceGap:number}|null>(null);
  const riskContinueRef=useRef<(()=>void)|null>(null);
@@ -935,24 +936,30 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  // Preserve the option to accept a loss, but teach the risk decision once.
  const requestCommitResponse=()=>{
   if(!responseReady||busy||readOnly||!activeChallenge||!pendingResponse?.method)return;
-  if(!riskSelected&&selectedKnowledge<activeChallenge.difficulty&&!localStorage.getItem(riskCoachKey)){
-   localStorage.setItem(riskCoachKey,'seen');
-   setRiskCoachOpen(true);
+  if(!riskSelected&&selectedKnowledge<activeChallenge.difficulty){
+   if(localStorage.getItem(riskCoachKey)==='always-risk'){
+    void commitResponse({...pendingResponse,method:'risk',label:'Take the risk'});
+   }else{
+    setRiskCoachOpen(true);
+   }
    return;
   }
   void commitResponse();
  };
  const chooseRiskFromCoach=()=>{
   if(!activeChallenge||!pendingResponse)return;
-  setPendingResponse({...pendingResponse,method:'risk',label:'Take the risk'});
+  const response={...pendingResponse,method:'risk' as const,label:'Take the risk'};
+  localStorage.setItem(riskCoachKey,'always-risk');
+  setPendingResponse(response);
   setChallengeAttention(false);
   setRiskCoachOpen(false);
+  void commitResponse(response);
  };
 
- const commitResponse=async()=>{
-  if(!pendingResponse||!pendingResponse.method||busy||readOnly)return;
+ const commitResponse=async(override?:Exclude<PendingResponse,null>)=>{
+  const committed=override||pendingResponse;
+  if(!committed||!committed.method||busy||readOnly)return;
   if(guideStep===5)setGuideStep(0);
-  const committed=pendingResponse;
   const payload={type:'KM_WEEK_RESOLVE',challengeId:committed.challengeId,method:committed.method,expertId:committed.expertId,includeLocalBreadth:committed.localSelection==='breadth',includeExpertBreadth:committed.expertSelection==='breadth',useLocalRisk:committed.method==='risk'&&committed.localSelection!=='none',useExpertRisk:committed.method==='risk'&&committed.expertSelection==='depth'};
 
   // Defer incoming session broadcasts until the result has been shown and the
@@ -1219,10 +1226,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   {riskCoachOpen&&<div data-kmw-first-risk-coach className="fixed inset-0 z-[260] flex items-center justify-center bg-black/75 p-4">
    <section role="dialog" aria-modal="true" aria-label="Before you accept the loss" aria-describedby="kmw-first-risk-description" className="w-full max-w-[480px] max-h-[calc(100dvh-32px)] overflow-y-auto overscroll-contain rounded-[22px] border-[3px] border-amber-300 bg-[#111827] p-5 text-left text-white shadow-[0_25px_90px_rgba(0,0,0,.85)]">
     <div className="flex items-center gap-3"><Dices className="h-7 w-7 shrink-0 text-amber-300"/><h2 className="text-xl font-black">Give it a go?</h2></div>
-    <p id="kmw-first-risk-description" className="mt-3 text-sm leading-relaxed text-slate-200">Do you really want to just take the loss instead of giving it a go with the knowledge you have available? Click <b className="text-amber-300">Take a Risk</b> and a dice roll will determine if you succeed or fail.</p>
+    <p id="kmw-first-risk-description" className="mt-3 text-sm leading-relaxed text-slate-200">Do you really want to just take the loss instead of giving it a go with the knowledge you have available? Click <b className="text-amber-300">Take a Risk</b> to roll the dice and try to succeed. We'll remember that choice for later Challenges.</p>
     <div className="mt-5 flex flex-col gap-2">
      <button type="button" autoFocus data-kmw-risk-coach-choice="risk" onClick={chooseRiskFromCoach} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 py-2 text-sm font-black text-slate-950"><Dices className="h-4 w-4"/>TAKE A RISK</button>
-     <button type="button" data-kmw-risk-coach-choice="loss" onClick={()=>{setRiskCoachOpen(false);void commitResponse()}} className="min-h-11 rounded-xl border-2 border-rose-700 bg-rose-950/40 px-4 py-2 text-sm font-black text-rose-100">ACCEPT THE LOSS</button>
+     <button type="button" data-kmw-risk-coach-choice="loss" onClick={()=>{setRiskCoachOpen(false);localStorage.setItem(riskCoachKey,'declined');void commitResponse()}} className="min-h-11 rounded-xl border-2 border-rose-700 bg-rose-950/40 px-4 py-2 text-sm font-black text-rose-100">ACCEPT THE LOSS</button>
      <button type="button" data-kmw-risk-coach-choice="edit" onClick={()=>setRiskCoachOpen(false)} className="min-h-11 rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-bold text-slate-200">KEEP EDITING</button>
     </div>
    </section>
@@ -1500,7 +1507,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          <b className={'text-2xl font-black tabular-nums '+(selectedKnowledge>=activeChallenge.difficulty?'text-emerald-300':'text-sky-300')}>{successChance}%</b>
         </div>
         {!guided&&deterministicSelected&&knowledgeShortfall>0&&<div className="mt-1.5 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-1.5 text-[10px] font-black text-rose-200">KNOWLEDGE SHORTFALL {knowledgeShortfall} · If you commit this response, the Challenge will fail.</div>}
-        {(!guided||state.guidedTurn===3)&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:riskSelected?(expertSelection==='depth'?'expert':localSelection==='depth'?'local':undefined):'risk',expertId:activePending?.expertId,localSelection,expertSelection,label:'Take the risk'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">· roll {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+'}</span></ResponseButton></div>}
+        {!guided&&knowledgeShortfall>0&&selectedKnowledge>0&&<p data-kmw-risk-hint className="mt-2 rounded-lg border border-amber-400 bg-amber-950/35 px-2 py-2 text-xs font-bold text-amber-100">Without a risk roll this response will fail. <b className="text-amber-300">TAKE THE RISK</b> for a {kmWeekRiskOddsV1(selectedDepth+selectedBreadth,activeChallenge.difficulty).chancePercent}% chance to succeed.</p>}
+         {(!guided||state.guidedTurn===3)&&<div className="mt-1.5"><ResponseButton selectionState={riskSelected?'depth':'none'} onClick={()=>{setChallengeAttention(false);setPendingResponse({challengeId:activeChallenge.id,method:riskSelected?(expertSelection==='depth'?'expert':localSelection==='depth'?'local':undefined):'risk',expertId:activePending?.expertId,localSelection,expertSelection,label:'Take the risk'})}}><Dices className="mr-1 inline h-4 w-4"/>TAKE THE RISK <span className="ml-1 text-slate-500">· roll {riskOdds.requiredRoll<=1?'1+':riskOdds.requiredRoll>6?'impossible':riskOdds.requiredRoll+'+'}</span></ResponseButton></div>}
         <div data-kmw-outcome-origin className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5">
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you solve it</div><div className="text-sm font-black text-emerald-300">+{money(activeChallenge.impact)} turnover</div></div>
          <div><div className="text-[8px] font-black uppercase tracking-[.12em] text-slate-500">If you fail</div><div className="text-sm font-black text-rose-300">-{money(activeChallenge.impact)} turnover</div></div>
