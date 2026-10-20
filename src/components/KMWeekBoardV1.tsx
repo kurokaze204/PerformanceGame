@@ -797,8 +797,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(busy)return false;
   setBusy(true);
   setActionError('');
+  const abort=new AbortController();
+  const timeout=window.setTimeout(()=>abort.abort(),18000);
   try{
-   const response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,participantId:participant?.id,actionType:payload.type,params:payload})});
+   const response=await fetch(`/api/sessions/${session.id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyId:company.id,participantId:participant?.id,actionType:payload.type,params:payload}),signal:abort.signal});
+   window.clearTimeout(timeout);
    const data=await response.json();
    if(!response.ok||data?.success===false){
     let message=data?.message||data?.error||'That move is not available.';
@@ -818,8 +821,17 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    if(data.session){if(beforeApply)await beforeApply(data.session);onSessionUpdate(data.session);}
    if(data.message)onToast(data.message,4500);
    return true;
-  }catch{setActionError('Could not complete that move.');onToast('Could not complete that move.');return false}
-  finally{setBusy(false)}
+  }catch{
+   // A timed-out POST may still have completed. Reconcile the authoritative
+   // game state rather than risking a duplicate Challenge submission.
+   try{
+    const refreshed=await fetch(`/api/sessions/${session.id}`,{cache:'no-store',signal:AbortSignal.timeout(6000)});
+    if(refreshed.ok)onSessionUpdate(await refreshed.json());
+   }catch{}
+   setActionError('Connection interrupted. Current game state refreshed if available. Check the Challenge before retrying.');
+   onToast('Connection interrupted. Check this round before retrying.');
+   return false;
+  }finally{window.clearTimeout(timeout);setBusy(false)}
  };
 
  const animateKnowledgeSpark=async(startX:number,startY:number,targetKey:string)=>{
@@ -892,7 +904,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
      {transform:`translate(${dx*.55}px,${dy*.43-rise}px) scale(1.1)`,opacity:1,offset:.53},
      {transform:`translate(${dx}px,${dy}px) scale(.82)`,opacity:1}
     ],{duration:1050,easing:'cubic-bezier(.24,.65,.28,1)',fill:'forwards'});
-    await motion.finished;
+    await Promise.race([motion.finished,new Promise<void>(resolve=>window.setTimeout(resolve,3500))]);
    }catch{}finally{globe.remove();}
   }else{
    setChallengeOutcome(current=>current?{...current,fading:true}:null);
@@ -981,7 +993,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     if(committed.method==='risk'&&resolved.dieRoll!==undefined){
      const odds=kmWeekRiskOddsV1(riskKnowledge,resolved.difficulty);
      await new Promise<void>(resolve=>{
-      riskContinueRef.current=resolve;
+      let completed=false;
+      const timer=window.setTimeout(()=>{if(!completed){completed=true;resolve()}},12000);
+      riskContinueRef.current=()=>{
+       if(completed)return;
+       completed=true;window.clearTimeout(timer);resolve();
+      };
       setRiskResult({roll:resolved.dieRoll!,won:resolved.status==='success',requiredRoll:odds.requiredRoll,performanceGap:odds.performanceGap});
       setRiskRollPending(null);
      });
@@ -1040,7 +1057,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       {transform:`translate(${dx*.55}px,${dy*.43-80}px) scale(1.08)`,opacity:1,offset:.58},
       {transform:`translate(${dx}px,${dy}px) scale(.85)`,opacity:1}
      ],{duration:1350,easing:'cubic-bezier(.25,.62,.3,1)',fill:'forwards'});
-     await path.finished;
+     await Promise.race([path.finished,new Promise<void>(resolve=>window.setTimeout(resolve,3500))]);
     }catch{}finally{globe.remove();}
     // The incoming completed session, including turnover, applies only now.
     await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
