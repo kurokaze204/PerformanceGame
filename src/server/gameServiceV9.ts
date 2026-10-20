@@ -50,7 +50,12 @@ function serialiseSession<T>(sessionId:string,work:()=>Promise<T>):Promise<T>{
   const key=sessionId.toUpperCase();
   const prior=queues.get(key)||Promise.resolve();
   const run=prior.then(work,work);
-  queues.set(key,run.finally(()=>{if(queues.get(key)===run)queues.delete(key);}));
+  // Store the actual settled queue tail, not a different promise from finally.
+  // Otherwise the identity comparison never succeeds and every completed
+  // multiplayer action leaves an unnecessary promise chain in memory.
+  const tail=run.then(()=>undefined,()=>undefined);
+  queues.set(key,tail);
+  void tail.then(()=>{if(queues.get(key)===tail)queues.delete(key);});
   return run;
 }
 
