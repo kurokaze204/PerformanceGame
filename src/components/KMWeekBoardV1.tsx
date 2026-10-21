@@ -266,7 +266,7 @@ function currentGuidedCopy(company:CompanyV2){
 const ToolTip:React.FC<{text:React.ReactNode;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
 
 const InvestmentInfoIcon:React.FC<{kind:KMWeekInvestment;open:boolean;onToggle:()=>void}>=({kind,open,onToggle})=>
- <button type="button" data-kmw-investment-info={kind} aria-label={`Information about ${KM_WEEK_INTERVENTION_HELP[kind].title}`} aria-controls="kmw-intervention-help" aria-expanded={open} onClick={onToggle} title={`Learn about ${KM_WEEK_INTERVENTION_HELP[kind].title} and preview it on the River`} className={'absolute right-1.5 top-1.5 z-10 grid h-8 w-8 place-items-center rounded-lg border-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 '+(open?'border-sky-300 bg-sky-900 text-sky-200':'border-slate-600 bg-slate-900 text-sky-300 hover:border-sky-400 hover:bg-slate-800')}>
+ <button type="button" data-kmw-investment-info={kind} aria-label={kind==='AFTER_ACTION_REVIEW'?'How After Action Review grows expert and site knowledge':`Information about ${KM_WEEK_INTERVENTION_HELP[kind].title}`} aria-controls="kmw-intervention-help" aria-expanded={open} onClick={onToggle} title={`Learn about ${KM_WEEK_INTERVENTION_HELP[kind].title} and preview it on the River`} className={'absolute right-1.5 top-1.5 z-10 grid place-items-center rounded-lg border-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 '+(kind==='AFTER_ACTION_REVIEW'?'h-11 w-11 border-amber-300':'h-8 w-8')+' '+(open?'border-sky-300 bg-sky-900 text-sky-200':kind==='AFTER_ACTION_REVIEW'?'border-amber-400 bg-amber-950/50 text-amber-200 hover:bg-amber-900':'border-slate-600 bg-slate-900 text-sky-300 hover:border-sky-400 hover:bg-slate-800')}>
   <Info className="h-4 w-4"/>
  </button>;
 
@@ -285,8 +285,8 @@ const KM_WEEK_INTERVENTION_HELP:Record<KMWeekInvestment,{title:string;descriptio
  },
  AFTER_ACTION_REVIEW:{
   title:'After Action Review',
-  description:'Originating in the military and emergency services, Lessons Management programs seek to maximise learning from both real events and exercises. Using an After Action Review, you pull the team together and, guided by the four key questions, you review what was planned, what happened, why and what can be done better next time. This can benefit all involved, unveiling root causes as well as practice and doctrine improvements. Having junior team members take part makes a big difference, and if the event was a failure, the learning can be even greater again.',
- },
+  description:"An After Action Review brings the team and company expert together to ask four questions: What was planned? What happened? Why? What should change? Reviewing a tough completed Challenge (knowledge requirement 5 or more) costs $50k. A success grows BOTH the site and expert by +1 knowledge level; a failure teaches even more, +2 each. Unlike Knowledge Transfer, this creates NEW knowledge. Experts and teams can grow ABOVE their current levels in the Knowledge River, including beyond level 10; Score Pad category caps are separate. Reviews can be used once per eligible Challenge in that round's Invest phase.",
+ }
 };
 
 type ScoreGhostKind='expertise'|'local'|'flow'|'resilience';
@@ -411,6 +411,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const[infoInvestment,setInfoInvestment]=useState<KMWeekInvestment|null>(null);
  const[aarChallengeId,setAARChallengeId]=useState('');
  const[aarIntroDismissed,setAARIntroDismissed]=useState(false);
+ const[aarReminderActive,setAARReminderActive]=useState(false);
  const[aarIntroArrow,setAARIntroArrow]=useState<{x1:number;y1:number;x2:number;y2:number}|null>(null);
  const[expertId,setExpertId]=useState('');
  const[sourceSiteId,setSourceSiteId]=useState('brisbane');
@@ -420,6 +421,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const challengeDraftsRef=useRef(challengeDrafts);
  const freeChallengeIntroKey=`tpg:kmw-free-challenge-intro:${session.id}:${company.id}`;
  const riskCoachKey=`tpg:kmw-first-shortfall-commit:${session.id}:${participant?.id||company.id}`;
+ const aarFirstOfferKey=`tpg:kmw-aar-first-offer:${session.id}:${company.id}`;
+ const aarReminderKey=`tpg:kmw-aar-reminded:${session.id}:${company.id}`;
  const firstFreeChallengeIntroPending=Boolean(state?.stage==='free'&&state.freeRound===1&&state.phase==='challenge'&&!readOnly&&!freeChallengeIntroDismissed&&localStorage.getItem(freeChallengeIntroKey)!=='seen');
  const showFreeChallengeIntro=firstFreeChallengeIntroPending&&!busy&&!riskResult&&!riskRollPending&&!challengeOutcome&&!scoreBriefOpen;
  const dismissFreeChallengeIntro=()=>{
@@ -683,6 +686,22 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
   if(state?.stage==='guided'||state?.stage==='complete'||(state?.stage==='free'&&state.freeRound<2))setRiverTurnoverOpen(false);
  },[state?.stage,state?.freeRound]);
 
+ // Only remind a player who passed on the first opportunity. AAR is
+ // sometimes ineligible next round, so flash the next time it is available.
+ useEffect(()=>{
+  if(state?.stage!=='free'||state.phase!=='invest'||!aarCandidates.length||readOnly)return;
+  const firstOffer=localStorage.getItem(aarFirstOfferKey);
+  if(firstOffer===null){
+   localStorage.setItem(aarFirstOfferKey,String(state.freeRound));
+   setAARReminderActive(false);
+   return;
+  }
+  const usedAAR=state.investmentHistory.some(item=>item.type==='AFTER_ACTION_REVIEW');
+  if(!usedAAR&&state.freeRound>Number(firstOffer)&&localStorage.getItem(aarReminderKey)!=='seen'){
+   localStorage.setItem(aarReminderKey,'seen');
+   setAARReminderActive(true);
+  }else setAARReminderActive(false);
+ },[session.id,company.id,state?.stage,state?.phase,state?.freeRound,state?.investmentHistory.length,aarCandidates.length,readOnly]);
  useEffect(()=>{
   const popupAvailable=Boolean(state?.stage==='free'&&state.phase==='invest'&&company.round>=KM_WEEK_AAR_UNLOCK_ROUND&&!aarIntroDismissed&&!readOnly&&localStorage.getItem(`tpg:kmw-aar-intro:${session.id}:${company.id}`)!=='seen');
   if(!popupAvailable){setAARIntroArrow(null);return;}
@@ -1348,7 +1367,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    <section data-kmw-aar-intro role="dialog" aria-modal="true" aria-label="After Action Review introduction" className="fixed left-[30%] top-[26%] z-[165] w-[min(420px,calc(100vw-24px))] max-h-[calc(100dvh-100px)] -translate-x-1/2 overflow-y-auto rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#30210b,#101827)] p-5 text-left shadow-[0_25px_65px_rgba(0,0,0,.8)] max-[699px]:left-1/2 max-[699px]:top-[10%]">
     <div className="text-[10px] font-black uppercase tracking-[.16em] text-amber-300">A new investment choice</div>
     <h3 className="mt-2 text-xl font-black text-white">Learn from a tough Challenge</h3>
-    <p className="mt-3 text-sm leading-relaxed text-slate-200">The last challenge was pretty tricky and is a good candidate for an After Action Review. Getting everyone involved will cost around <b className="text-amber-200">$50k</b> in travel and lost worktime, but the insights will benefit both the expert who is facilitating <b>and</b> the site where the challenge happened. This option only appears on tough events, so use it wisely. Remember, your people learn more from failure than success.</p>
+    <p className="mt-3 text-sm leading-relaxed text-slate-200">A tough Challenge is a chance to learn. An After Action Review costs <b className="text-amber-200">$50k</b> and grows knowledge for both the expert and the local site: <b className="text-amber-200">+1 after success or +2 after failure</b>. It creates knowledge <b>above the current River levels</b>, not merely redistributes what the company already knows. Tap the <b>i</b> icon for the four questions and full details.</p>
     <button type="button" onClick={dismissAARIntro} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">GOT IT — SHOW ME THE REVIEW <ArrowRight className="ml-1 inline h-4 w-4"/></button>
    </section>
   </>}
@@ -1415,7 +1434,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
 
   {challengeFocusOpen&&state.phase==='challenge'&&(state.stage==='guided'||state.stage==='free')&&<div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 top-[66px] z-40 bg-black/20"/>}
 
-  {state.stage==='complete'||(showFinalComparison&&overtime)?<KMWeekDebriefV1 session={session} company={company} allowIncomplete={overtime} onBack={state.stage!=='complete'?()=>setShowFinalComparison(false):undefined}/>:<main className="mx-auto w-full p-3 min-[700px]:flex min-[700px]:h-[calc(100dvh-66px)] min-[700px]:flex-col min-[700px]:overflow-hidden">
+  {state.stage==='complete'||(showFinalComparison&&overtime)?<KMWeekDebriefV1 session={session} company={company} onSessionUpdate={onSessionUpdate} allowIncomplete={overtime} onBack={state.stage!=='complete'?()=>setShowFinalComparison(false):undefined}/>:<main className="mx-auto w-full p-3 min-[700px]:flex min-[700px]:h-[calc(100dvh-66px)] min-[700px]:flex-col min-[700px]:overflow-hidden">
    <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
     <div className="rounded-xl border-2 border-indigo-700 bg-indigo-950/45 px-3 py-1.5 text-[10px] font-black text-indigo-100">{phaseTitle(company)}</div>
     <PhaseStep number="1" label="Challenge" active={(state.stage==='guided'||state.stage==='free')&&state.phase==='challenge'} done={challengeStepDone}/>
@@ -1548,28 +1567,28 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
        {guided&&<div className="mt-2 rounded-xl border border-amber-800 bg-amber-950/15 px-2.5 py-2 text-[11px] leading-snug text-slate-200"><span className="font-black text-amber-300">This investment: </span>{guidedCopy.invest}</div>}
        <div className="mt-2 grid grid-cols-3 gap-1.5">
         <div className="relative min-w-0">
-         <button type="button" disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>{setInvestment('TRAIN_EXPERT');setInfoInvestment(null)}} className={`h-full w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}>
+         <button type="button" disabled={guided&&guidedTargetInvestment!=='TRAIN_EXPERT'} onClick={()=>{setInvestment('TRAIN_EXPERT');setInfoInvestment(null)}} className={`h-[76px] w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='TRAIN_EXPERT'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='TRAIN_EXPERT'?'border-amber-300 bg-amber-950/40':'border-slate-700 bg-slate-950'}`}>
           <GraduationCap className="h-4 w-4 text-amber-300"/><div className="mt-1 text-[10px] font-black text-white">Train Expert</div><div className="text-[9px] text-slate-500">+1 depth · $15k</div>
          </button>
          <InvestmentInfoIcon kind="TRAIN_EXPERT" open={infoInvestment==='TRAIN_EXPERT'} onToggle={()=>setInfoInvestment(current=>current==='TRAIN_EXPERT'?null:'TRAIN_EXPERT')}/>
         </div>
         <div className="relative min-w-0">
-         <button type="button" disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>{setInvestment('LOCAL_TRAINING');setInfoInvestment(null)}} className={`h-full w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}>
+         <button type="button" disabled={guided&&guidedTargetInvestment!=='LOCAL_TRAINING'} onClick={()=>{setInvestment('LOCAL_TRAINING');setInfoInvestment(null)}} className={`h-[76px] w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='LOCAL_TRAINING'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='LOCAL_TRAINING'?'border-sky-300 bg-sky-950/40':'border-slate-700 bg-slate-950'}`}>
           <Users className="h-4 w-4 text-sky-300"/><div className="mt-1 text-[10px] font-black text-white">Local Training</div><div className="text-[9px] text-slate-500">+2 local · $10k</div>
          </button>
          <InvestmentInfoIcon kind="LOCAL_TRAINING" open={infoInvestment==='LOCAL_TRAINING'} onToggle={()=>setInfoInvestment(current=>current==='LOCAL_TRAINING'?null:'LOCAL_TRAINING')}/>
         </div>
         <div className="relative min-w-0">
-         <button type="button" disabled={guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'} onClick={()=>{setInvestment('KNOWLEDGE_TRANSFER');setInfoInvestment(null)}} className={`h-full w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='KNOWLEDGE_TRANSFER'?'border-emerald-300 bg-emerald-950/40':'border-slate-700 bg-slate-950'}`}>
+         <button type="button" disabled={guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'} onClick={()=>{setInvestment('KNOWLEDGE_TRANSFER');setInfoInvestment(null)}} className={`h-[76px] w-full rounded-xl border-2 p-2 pr-9 text-left transition ${guided&&guidedTargetInvestment!=='KNOWLEDGE_TRANSFER'?'cursor-not-allowed border-slate-800 bg-slate-950/55 opacity-35':investment==='KNOWLEDGE_TRANSFER'?'border-emerald-300 bg-emerald-950/40':'border-slate-700 bg-slate-950'}`}>
           <Workflow className="h-4 w-4 text-emerald-300"/><div className="mt-1 text-[10px] font-black text-white">Knowledge Transfer</div><div className="text-[9px] text-slate-500">Move half the gap · $8k</div>
          </button>
          <InvestmentInfoIcon kind="KNOWLEDGE_TRANSFER" open={infoInvestment==='KNOWLEDGE_TRANSFER'} onToggle={()=>setInfoInvestment(current=>current==='KNOWLEDGE_TRANSFER'?null:'KNOWLEDGE_TRANSFER')}/>
         </div>
        </div>
-       {aarCandidates.length>0&&<div className="relative">
-        <button type="button" data-kmw-aar-button onClick={()=>{setInvestment('AFTER_ACTION_REVIEW');setInfoInvestment(null);if(aarChallenge)setSelectedDomain(aarChallenge.domain)}} className={'mt-2 flex w-full items-center gap-3 rounded-xl border-2 p-2.5 pr-12 text-left transition '+(investment==='AFTER_ACTION_REVIEW'?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-950 hover:border-amber-500')}>
+       {aarCandidates.length>0&&<div className="relative mt-2">
+        <button type="button" data-kmw-aar-button onClick={()=>{setInvestment('AFTER_ACTION_REVIEW');setInfoInvestment(null);if(aarChallenge)setSelectedDomain(aarChallenge.domain)}} className={'flex h-[76px] w-full items-center gap-3 rounded-xl border-2 p-2.5 pr-14 text-left transition '+(investment==='AFTER_ACTION_REVIEW'?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-950 hover:border-amber-500')+(aarReminderActive&&!showAARIntro&&!showCoachPopup?' kmw-aar-reminder-flash':'')}>
          <BookOpenCheck className="h-5 w-5 shrink-0 text-amber-300"/>
-         <span className="flex-1"><span className="block text-xs font-black text-white">After Action Review</span><span className="block text-[10px] text-slate-400">Learn from tough Challenges · $50k</span></span>
+         <span className="flex-1"><span className="block text-xs font-black text-white">After Action Review</span><span className="block text-[10px] leading-tight text-slate-300">Grow expert + site beyond River peaks · $50k</span></span>
         </button>
         <InvestmentInfoIcon kind="AFTER_ACTION_REVIEW" open={infoInvestment==='AFTER_ACTION_REVIEW'} onToggle={()=>setInfoInvestment(current=>current==='AFTER_ACTION_REVIEW'?null:'AFTER_ACTION_REVIEW')}/>
        </div>}
