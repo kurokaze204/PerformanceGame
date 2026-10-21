@@ -1589,7 +1589,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
         </div>
        </div>
        {aarCandidates.length>0&&<div className="relative mt-2">
-        <button type="button" data-kmw-aar-button onClick={()=>{setInvestment('AFTER_ACTION_REVIEW');setInfoInvestment(null);if(aarChallenge)setSelectedDomain(aarChallenge.domain)}} className={'flex h-[76px] w-full items-center gap-3 rounded-xl border-2 p-2.5 pr-14 text-left transition '+(investment==='AFTER_ACTION_REVIEW'?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-950 hover:border-amber-500')+(aarReminderActive&&!showAARIntro&&!showCoachPopup?' kmw-aar-reminder-flash':'')}>
+        <button type="button" data-kmw-aar-button onClick={()=>{setInvestment('AFTER_ACTION_REVIEW');setInfoInvestment(null);if(aarChallenge)setSelectedDomain(aarChallenge.domain)}} className={'flex h-[76px] w-full items-center gap-3 rounded-xl border-2 p-2.5 pr-14 text-left transition '+(investment==='AFTER_ACTION_REVIEW'?'border-amber-300 bg-amber-950/35':'border-slate-700 bg-slate-950 hover:border-amber-500')+(aarReminderActive&&!showAARIntro&&!showCoachPopup&&!showExpertChangePopup&&!scoreBriefOpen&&!riskResult&&!riskRollPending&&!challengeOutcome&&!riverFrozenCompany?' kmw-aar-reminder-flash':'')}>
          <BookOpenCheck className="h-5 w-5 shrink-0 text-amber-300"/>
          <span className="flex-1"><span className="block text-xs font-black text-white">After Action Review</span><span className="block text-[10px] leading-tight text-slate-300">Grow expert + site beyond River peaks · $50k</span></span>
         </button>
