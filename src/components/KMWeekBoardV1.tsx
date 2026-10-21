@@ -689,7 +689,10 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  // Only remind a player who passed on the first opportunity. AAR is
  // sometimes ineligible next round, so flash the next time it is available.
  useEffect(()=>{
-  if(state?.stage!=='free'||state.phase!=='invest'||!aarCandidates.length||readOnly)return;
+  if(state?.stage!=='free'||state.phase!=='invest'||!aarCandidates.length||readOnly){
+   setAARReminderActive(false);
+   return;
+  }
   const firstOffer=localStorage.getItem(aarFirstOfferKey);
   if(firstOffer===null){
    localStorage.setItem(aarFirstOfferKey,String(state.freeRound));
