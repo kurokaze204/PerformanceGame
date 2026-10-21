@@ -1,13 +1,13 @@
 import React,{useEffect,useId,useMemo,useRef,useState}from'react';
 import{createPortal}from'react-dom';
-import{ArrowRight,Brain,CircleDollarSign,FileDown,Medal,ShieldCheck,Target,Trophy,Users,Workflow,X}from'lucide-react';
+import{ArrowRight,Brain,CircleDollarSign,FileDown,Medal,RefreshCw,ShieldCheck,Target,Trophy,Users,Workflow,X}from'lucide-react';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekScore,KMWeekTurnoverPoint}from'../types/kmWeek.ts';
 import{formatCurrency}from'../utils/format.ts';
 import{KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SITE_IDS,calculateKMWeekScoreV1,kmWeekGoalV1}from'../engine/kmWeekV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
 
-type Props={session:GameSessionV2;company:CompanyV2;allowIncomplete?:boolean;onBack?:()=>void};
+type Props={session:GameSessionV2;company:CompanyV2;allowIncomplete?:boolean;onBack?:()=>void;onSessionUpdate?:(updated:GameSessionV2)=>void};
 
 const COMPANY_COLORS=['#facc15','#38bdf8','#a78bfa','#34d399','#fb7185','#fb923c','#22d3ee','#c084fc'];
 type ScoreKey=Exclude<keyof KMWeekScore,'total'>;
@@ -270,8 +270,29 @@ const AARQuestions:React.FC<{open:boolean;onClose:()=>void}>=({open,onClose})=>!
  </aside>
 </>;
 
-export const KMWeekDebriefV1:React.FC<Props>=({session,company,allowIncomplete=false,onBack})=>{
+export const KMWeekDebriefV1:React.FC<Props>=({session,company,allowIncomplete=false,onBack,onSessionUpdate})=>{
  const[questionsOpen,setQuestionsOpen]=useState(false);
+ const[refreshing,setRefreshing]=useState(false);
+ const[refreshFeedback,setRefreshFeedback]=useState('');
+ const refreshResults=async()=>{
+  if(refreshing||!onSessionUpdate)return;
+  setRefreshing(true);
+  setRefreshFeedback('');
+  try{
+   const response=await fetch(`/api/sessions/${encodeURIComponent(session.id)}`,{cache:'no-store',signal:AbortSignal.timeout(12000)});
+   if(!response.ok)throw new Error('Unable to retrieve workshop results');
+   const latest=await response.json() as GameSessionV2;
+   if(latest.id!==session.id||!Array.isArray(latest.companies))throw new Error('Unexpected session response');
+   if(Date.parse(latest.updatedAt||'')<Date.parse(session.updatedAt||'')){
+    setRefreshFeedback('Your results are already up to date.');
+    return;
+   }
+   onSessionUpdate(latest);
+   setRefreshFeedback(`Results refreshed for ${latest.companies.length} companies.`);
+  }catch{
+   setRefreshFeedback('Could not refresh the results. Please try again.');
+  }finally{setRefreshing(false)}
+ };
  const participating=useMemo(()=>{
   const ids=new Set(session.participants.filter(p=>p.role!=='facilitator'&&p.companyId).map(p=>p.companyId));
   return ids.size?session.companies.filter(candidate=>ids.has(candidate.id)):session.companies;
@@ -294,9 +315,10 @@ export const KMWeekDebriefV1:React.FC<Props>=({session,company,allowIncomplete=f
  }
  return <main data-kmw-debrief className="mx-auto h-[calc(100vh-66px)] max-w-[1700px] overflow-auto p-3 text-slate-100">
   <section className="rounded-2xl border-2 border-violet-700 bg-[linear-gradient(145deg,#19152d,#101827)] p-4">
-   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><h2 className="text-2xl font-black text-white">After Action Review - Discuss Together</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, or when the workshop clock ends.</p>}{allowIncomplete&&!allComplete&&<p data-kmw-incomplete-notice className="mt-2 text-sm font-bold text-amber-200">Workshop time has ended. All companies are shown, including unfinished rounds. Scores are provisional; final turnover rankings remain pending until everyone completes Site Audits.</p>}{completeScores.length>1&&<p data-kmw-score-legend className="mt-2 text-[11px] font-bold text-slate-200"><span className="text-emerald-300">■ Green: highest category score</span><span className="ml-4 text-orange-300">■ Orange: joint highest</span></p>}</div><div data-kmw-pdf-hide className="flex flex-wrap items-center gap-2">{onBack&&<button type="button" onClick={onBack} className="h-12 rounded-xl border-2 border-sky-300 px-4 text-xs font-black text-sky-100">BACK TO GAME</button>}<button type="button" onClick={()=>window.print()} title="Select Save as PDF in your browser's print dialog" className="flex h-12 items-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-700 px-4 text-xs font-black text-white shadow-lg hover:bg-emerald-600"><FileDown className="h-4 w-4"/> EXPORT PDF</button><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div></div>
+   <div className="flex flex-wrap items-center gap-4"><div className="min-w-0 flex-1"><h2 className="text-2xl font-black text-white">After Action Review - Discuss Together</h2><p className="mt-1 max-w-4xl text-xs leading-relaxed text-slate-300">Compare your approaches, total scores, turnover and the shape of each Knowledge River. What worked? What didn’t? Where did you remain dependent on individuals? What changed when knowledge spread across the company?</p>{!allComplete&&participating.length>1&&<p className="mt-2 text-[10px] font-black text-amber-300">Other companies will appear here when they finish, or when the workshop clock ends.</p>}{allowIncomplete&&!allComplete&&<p data-kmw-incomplete-notice className="mt-2 text-sm font-bold text-amber-200">Workshop time has ended. All companies are shown, including unfinished rounds. Scores are provisional; final turnover rankings remain pending until everyone completes Site Audits.</p>}{completeScores.length>1&&<p data-kmw-score-legend className="mt-2 text-[11px] font-bold text-slate-200"><span className="text-emerald-300">■ Green: highest category score</span><span className="ml-4 text-orange-300">■ Orange: joint highest</span></p>}</div><div data-kmw-pdf-hide className="flex flex-wrap items-center gap-2"><button data-kmw-refresh-results type="button" disabled={refreshing||!onSessionUpdate} onClick={()=>void refreshResults()} className="flex h-12 items-center gap-2 rounded-xl border-2 border-sky-300 bg-sky-950 px-4 text-xs font-black text-sky-100 shadow-lg hover:bg-sky-900 disabled:opacity-50"><RefreshCw className={'h-4 w-4 '+(refreshing?'animate-spin':'')}/>{refreshing?'REFRESHING…':'REFRESH RESULTS'}</button>{onBack&&<button type="button" onClick={onBack} className="h-12 rounded-xl border-2 border-sky-300 px-4 text-xs font-black text-sky-100">BACK TO GAME</button>}<button type="button" onClick={()=>window.print()} title="Select Save as PDF in your browser's print dialog" className="flex h-12 items-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-700 px-4 text-xs font-black text-white shadow-lg hover:bg-emerald-600"><FileDown className="h-4 w-4"/> EXPORT PDF</button><button type="button" onClick={()=>setQuestionsOpen(true)} className="h-12 rounded-xl border-2 border-amber-200 bg-amber-400 px-4 text-xs font-black text-slate-950 shadow-lg">AFTER ACTION REVIEW QUESTIONS <ArrowRight className="ml-1 inline h-4 w-4"/></button></div></div>
   </section>
 
+  {refreshFeedback&&<p data-kmw-refresh-feedback aria-live="polite" className="mt-2 text-xs font-semibold text-sky-200">{refreshFeedback}</p>}
   <div data-kmw-pdf-chart className="mt-3"><TurnoverGraph companies={companies} colors={colors}/></div>
   <div className="mt-3 space-y-3">
    <p data-kmw-shared-river-scale className="text-xs font-bold text-slate-300">All before-and-after Knowledge Rivers use one shared vertical scale across these companies.</p>
