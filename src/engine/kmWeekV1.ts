@@ -23,9 +23,11 @@ export function kmWeekAARCandidatesV1(company:CompanyV2):KMWeekChallenge[]{
  const state=company.kmWeek;
  if(!state||state.stage!=='free'||state.phase!=='invest'||company.round<KM_WEEK_AAR_UNLOCK_ROUND)return [];
  const reviewed=new Set(state.investmentHistory.filter(item=>item.type==='AFTER_ACTION_REVIEW').map(item=>item.challengeId));
- return state.challenges.filter(item=>item.difficulty>=5
+ const opportunities=state.pressureDomain&&state.lastPressureFailure
+  ?[...state.challenges,state.lastPressureFailure]:state.challenges;
+ return opportunities.filter((item,index)=>item.difficulty>=5
   &&(state.pressureDomain?item.domain===state.pressureDomain&&item.status==='failure':item.status!=='open')
-  &&!reviewed.has(item.id));
+  &&!reviewed.has(item.id)&&opportunities.findIndex(other=>other.id===item.id)===index);
 }
 
 export const KM_WEEK_SHOCK_WINDOW_SECONDS = 180;
@@ -679,7 +681,7 @@ export function resolveKMWeekChallengeV1(
   if(!site)return{success:false,message:'Challenge site not found.'};
 
   if(state.stage==='guided'&&state.guidedTurn===1&&method!=='expert'){
-    return{success:false,message:'This guided move is teaching expert deployment. Send the Operations expert.'};
+    return{success:false,message:`This guided move is teaching expert deployment. Send the ${challenge.domain==='hr'?'Human Resources':challenge.domain==='marketing'?'Marketing':'Operations'} expert.`};
   }
 
   if(expertId&&(method==='expert'||includeExpertBreadth||useExpertRisk)&&state.trainingCommitments?.[expertId]===company.round)return{success:false,message:'Busy training staff'};
@@ -757,6 +759,10 @@ export function resolveKMWeekChallengeV1(
   const turnoverChange=businessChange-travelCost;
   challenge.travelCost=travelCost||undefined;
   challenge.turnoverChange=turnoverChange;
+  if(state.stage==='free'&&!won&&state.pressureDomain===challenge.domain&&challenge.difficulty>=5){
+    // Hold onto the most recent significant setback until AAR becomes available.
+    state.lastPressureFailure={...challenge};
+  }
   applyTurnover(company,turnoverChange);
   const challengeIndex=state.challenges.findIndex(item=>item.id===challenge.id)+1;
   const challengeLabel=state.stage==='guided'?`G${state.guidedTurn} C`:`R${state.freeRound} C${challengeIndex}`;
@@ -809,7 +815,7 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
 
   if(type==='AFTER_ACTION_REVIEW'){
     const event=kmWeekAARCandidatesV1(company).find(item=>item.id===payload?.challengeId);
-    if(!event)return{success:false,message:'Choose an eligible completed Challenge (knowledge requirement of 5 or more) from this round.'};
+    if(!event)return{success:false,message:'Choose an eligible completed Challenge (knowledge requirement of 5 or more).'};
     const site=company.sites.find(item=>item.id===event.siteId&&!item.isClosed);
     const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===event.domain));
     const skill=expert?.domains.find(item=>item.domain===event.domain);
