@@ -87,6 +87,8 @@ export interface KMWeekCompanyState {
   phase: KMWeekPhase;
   guidedTurn: number;
   freeRound: number;
+  /** Hidden, session-wide KMWeek3 business pressure; absent on existing games. */
+  pressureDomain?: KnowledgeDomain;
   challenges: KMWeekChallenge[];
   usedExpertIds: string[];
   trainingCommitments?: Record<string, number>;
