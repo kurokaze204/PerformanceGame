@@ -287,6 +287,45 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.equal(ops.domains[0].score,4,'Replacement expertise must be Knowledge 3 or the strongest site score, whichever is higher');
 }
 
+
+{
+ // UAT regression: after Round 5 the highest specialist may retire just as
+ // a player first selects the AAR from an earlier serious setback. Commit must
+ // still do something and the company must retain the expert learning.
+ const co=createInitialCompanyV2('Retirement AAR Review','kmw-retirement-aar',config);
+ const run={...session,id:'KM-RETIRE-AAR',companies:[co],activeEvents:{},timerEndsAt:null,timerPausedSecondsRemaining:900} as GameSessionV2;
+ initialiseKMWeekSessionV1(run);
+ const st=co.kmWeek!;
+ st.pressureDomain='operations';
+ st.stage='free';st.phase='challenge';st.freeRound=5;co.round=8;
+ const retiring=co.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
+ retiring.domains[0].score=9;
+ st.challenges=[{id:'BIG-FAILURE',title:'Major process breakdown',story:'Round five',siteId:'brisbane',domain:'operations',difficulty:8,impact:120,status:'open'}];
+ const challenge=applyKMWeekActionV1(run,co.id,{type:'KM_WEEK_RESOLVE',challengeId:'BIG-FAILURE',method:'local'});
+ assert.equal(challenge.success,true,challenge.message);
+ assert.equal(st.phase,'invest');
+ assert.equal(st.lastPressureFailure?.id,'BIG-FAILURE');
+ assert.equal(st.expertRetirement?.expertId,retiring.id,'High-scoring domain expert must still retire after Round 5');
+ assert.equal(retiring.isVacant,true);
+ assert.deepEqual(kmWeekAARCandidatesV1(co).map(c=>c.id),['BIG-FAILURE']);
+ const brisbane=co.sites.find(site=>site.id==='brisbane')!;
+ const before=brisbane.teamCapability.operations||0;
+ const aar=applyKMWeekActionV1(run,co.id,{type:'KM_WEEK_INVEST',investment:'AFTER_ACTION_REVIEW',challengeId:'BIG-FAILURE'});
+ assert.equal(aar.success,true,'An AAR must commit even while the domain specialist is retired: '+aar.message);
+ assert.equal(brisbane.teamCapability.operations,before+2,'AAR must immediately strengthen the affected local team');
+ assert.equal(st.expertRetirement?.pendingAARUplift,2,'AAR knowledge must be preserved for the future specialist');
+ assert.equal(retiring.isVacant,true,'The retired expert must still be absent from the next Challenge round');
+ assert.equal(st.freeRound,6,'Successful AAR advances exactly one round');
+ const expectedBase=Math.max(3,...co.sites.filter(site=>KM_WEEK_SITE_IDS.includes(site.id as typeof KM_WEEK_SITE_IDS[number])).map(site=>site.teamCapability.operations||0));
+ st.challenges=[{id:'NEXT-ROUND',title:'Next round',story:'Replacement',siteId:'perth',domain:'marketing',difficulty:1,impact:15,status:'open'}];
+ const end=applyKMWeekActionV1(run,co.id,{type:'KM_WEEK_RESOLVE',challengeId:'NEXT-ROUND',method:'local'});
+ assert.equal(end.success,true,end.message);
+ assert.equal(st.expertRetirement?.status,'replaced');
+ assert.equal(retiring.isVacant,false,'The replacement must arrive normally in Round 6');
+ assert.equal(retiring.domains[0].score,expectedBase+2,'The replacement must inherit the AAR learning on top of its normal starting level');
+ assert.deepEqual(kmWeekAARCandidatesV1(co).map(c=>c.id),[],'One reviewed failure cannot produce another AAR');
+}
+
 {
   const failCompany=createInitialCompanyV2('Shortfall Test','kmw-shortfall',config);
   const failSession={...session,id:'KMWEEKSHORTFALL',companies:[failCompany],activeEvents:{},participants:[],timerEndsAt:null,timerPausedSecondsRemaining:600} as GameSessionV2;
