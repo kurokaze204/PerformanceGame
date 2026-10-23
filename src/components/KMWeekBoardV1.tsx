@@ -4,7 +4,7 @@ import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekGuidedTrainingSiteV1,kmWeekGuidedTransferV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekAvailableInvestmentExpertV1,kmWeekGuidedTrainingSiteV1,kmWeekGuidedTransferV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{toggleKMWeekSourceV1}from'../engine/kmWeekSelectionV1.ts';
 import{kmWeekCoachV1}from'../engine/kmWeekCoachV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -450,7 +450,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const coaching=kmWeekCoachV1(company);
  const sites=KM_WEEK_SITE_IDS.map(id=>company.sites.find(site=>site.id===id)).filter((site):site is CompanyV2['sites'][number]=>Boolean(site));
  const experts=company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
- const specialist=expertId?experts.find(item=>item.id===expertId):specialistFor(company,selectedDomain);
+ const staleExpertSelection=Boolean(expertId&&!experts.some(item=>item.id===expertId));
+ const specialist=kmWeekAvailableInvestmentExpertV1(company,expertId,selectedDomain);
  const specialistDomain=specialist?.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
  const localTrainingSite=company.sites.find(site=>site.id===trainingSiteId&&!site.isClosed);
  const aarCandidates=kmWeekAARCandidatesV1(company);
@@ -1174,12 +1175,20 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
     targetKey=`expert:${aarExpert.id}:${aarChallenge.domain}`;
     if(aarExpert.isVacant)targetKey=`site:${aarChallenge.siteId}:${aarChallenge.domain}`;
   }else if(investment==='TRAIN_EXPERT'){
-    const expert=specialist||experts[0];if(!expert)return;
+    const expert=specialist;
+    if(!expert){
+      const message='No company expert is available to train. Choose Knowledge Transfer, or use GO TO SITE AUDITS NOW in the final three minutes.';
+      setActionError(message);onToast(message);return;
+    }
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
     payload={type:'KM_WEEK_INVEST',investment,expertId:expert.id,domain};
     targetKey=`expert:${expert.id}:${domain}`;
   }else if(investment==='LOCAL_TRAINING'){
-    const expert=specialist||experts[0];if(!expert||!localTrainingSite)return;
+    const expert=specialist;
+    if(!expert||!localTrainingSite){
+      const message=!expert?'No company expert is available for Local Training. Choose another intervention or go to Site Audits.':'The selected training site is unavailable. Choose another site before committing.';
+      setActionError(message);onToast(message);return;
+    }
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
     payload={type:'KM_WEEK_INVEST',investment,expertId:expert.id,siteId:localTrainingSite.id,domain};
     targetKey=`site:${localTrainingSite.id}:${domain}`;
@@ -1633,10 +1642,11 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
           </select>
           <span className="mt-2 block text-xs normal-case font-semibold text-slate-300">Facilitator: <b className="text-amber-200">{aarExpert?.isVacant?'Local team (lessons saved for replacement)':aarExpert?.name||'Company expert'}</b> · Site: <b className="text-white">{aarSite?.name||'—'}</b> · {aarExpert?.isVacant?`Site gains +${aarUplift}; incoming expert gains +${aarUplift} when appointed`:`Both gain +${aarUplift}`}</span>
          </label>:investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 items-start gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} ({SITE_ABBR[expert.location]||expert.location}) · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
+        {staleExpertSelection&&(investment==='TRAIN_EXPERT'||investment==='LOCAL_TRAINING')&&<p role="status" data-kmw-investment-expert-reassigned className="mt-2 rounded-lg border border-amber-700/70 bg-amber-950/25 px-2 py-1.5 text-[10px] font-bold text-amber-200">Your previously selected expert is no longer available. {specialist?`${specialist.name} (${domainLabel(specialistDomain)}) is selected instead.`:'Please choose another intervention.'}</p>}
         <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span>{investment==='LOCAL_TRAINING'&&<div className="mt-1 font-bold text-red-300">Training commitment — unavailable next round</div>}</div>
-        {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
+        {actionError&&<div role="alert" className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}{finalShockWindow&&<p className="mt-1 font-semibold text-rose-100">To finish without this investment, use GO TO SITE AUDITS NOW above.</p>}</div>}
         {!guided&&<button type="button" data-kmw-skip-invest disabled={busy||readOnly} onClick={()=>{if(window.confirm(finalShockWindow?'Skip this investment and start Site Audits?':'Skip investing this round and proceed to the next Challenges?'))void post({type:'KM_WEEK_SKIP_INVEST'})}} className="mb-2 w-full rounded-lg border border-slate-500 bg-slate-900 px-3 py-2.5 text-xs font-bold text-slate-100 disabled:opacity-40">{company.turnover<8?'NO FUNDS — ':''}SKIP INVESTMENT {finalShockWindow?'& START SITE AUDITS':'& CONTINUE'}</button>}
-        <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':finalShockWindow?'COMMIT FINAL INVESTMENT & FACE SITE AUDITS':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+        <button type="button" data-kmw-invest-commit onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':finalShockWindow?'COMMIT FINAL INVESTMENT & FACE SITE AUDITS':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>
       </>}
 
