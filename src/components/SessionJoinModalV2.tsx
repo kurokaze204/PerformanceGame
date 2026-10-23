@@ -132,7 +132,9 @@ export const SessionJoinModalV2:React.FC<Props>=({onJoinSession,onClose})=>{
  };
 
  const activeArchive=useMemo(()=>archiveGames,[archiveGames]);
- const selectedSetupExperience=mode==='solo'?soloExperienceMode:mode==='create'?experienceMode:null;
+ // Joining an existing game has no local experience-mode selection. Until other
+ // player-facing modes return, show the same KM Week introduction as Play Solo.
+ const selectedSetupExperience=mode==='solo'?soloExperienceMode:mode==='create'?experienceMode:'km_week';
  return <>
   {adminOpen&&<div className="fixed inset-0 z-[520] grid place-items-center bg-black/85 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Manage running games">
    <div className="relative w-full max-w-[720px] max-h-[90dvh] overflow-y-auto rounded-3xl border-2 border-violet-500 bg-[#101827] p-5 text-white shadow-[0_30px_100px_rgba(0,0,0,.85)] sm:p-7">
