@@ -10,6 +10,7 @@ import {
   calculateKMWeekScoreV1,
   kmWeekFinalTurnoverPointsV1,
   KM_WEEK_DOMAINS,
+  KM_WEEK_GOALS,
   KM_WEEK_SITE_IDS,
   kmWeekGuidedTrainingSiteV1,
   kmWeekGuidedTransferV1,
@@ -224,6 +225,19 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.ok(secondCycle.flat().every(card=>card.impact===(card.difficulty-1)*15),'A higher Challenge knowledge requirement must not silently change the existing financial impact');
   assert.ok(thirdCycle.flat().every(card=>card.impact===(card.difficulty-2)*15),'Monetary consequences should still be based on the original six profiles after two rotations');
   assert.deepEqual(freeChallengesForRound(session,company,7),secondCycle[0],'Escalated rounds must remain reproducible for a given game');
+}
+
+{
+  const localHero=createInitialCompanyV2('Local Heroes Threshold','kmw-local-heroes',config);
+  initialiseKMWeekCompanyV1(localHero);
+  const localGoalSession={...session,kmWeekGoalId:'local-heroes',companies:[localHero]} as GameSessionV2;
+  assert.match(KM_WEEK_GOALS['local-heroes'].description,/at least 5 free-play Challenges/,'The Local Heroes screen must describe the five-win target');
+  for(const wins of [0,2,4]){
+    localHero.kmWeek!.localSuccesses=wins;
+    assert.equal(calculateKMWeekScoreV1(localGoalSession,localHero).goal,0,`Local Heroes must not award points after ${wins} local-only wins`);
+  }
+  localHero.kmWeek!.localSuccesses=5;
+  assert.equal(calculateKMWeekScoreV1(localGoalSession,localHero).goal,5,'Five local-only wins must earn the Local Heroes award');
 }
 
 {
