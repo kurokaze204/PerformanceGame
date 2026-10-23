@@ -456,10 +456,14 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const aarCandidates=kmWeekAARCandidatesV1(company);
  const aarChallenge=aarCandidates.find(challenge=>challenge.id===aarChallengeId)||aarCandidates[0];
  const aarSite=aarChallenge?company.sites.find(site=>site.id===aarChallenge.siteId):undefined;
- const aarExpert=aarChallenge?specialistFor(company,aarChallenge.domain):undefined;
+ const aarExpert=aarChallenge
+  ?specialistFor(company,aarChallenge.domain)
+    ||(state?.expertRetirement?.status==='retired'&&state.expertRetirement.domain===aarChallenge.domain
+       ?company.experts.find(item=>item.id===state.expertRetirement?.expertId):undefined)
+  :undefined;
  const aarUplift=aarChallenge?.status==='failure'?2:1;
  const aarSiteBefore=aarSite&&aarChallenge?aarSite.teamCapability[aarChallenge.domain]||0:0;
- const aarExpertBefore=aarExpert&&aarChallenge?specialistScore(company,aarChallenge.domain):0;
+ const aarExpertBefore=aarExpert&&aarChallenge?aarExpert.domains.find(skill=>skill.domain===aarChallenge.domain)?.score||0:0;
  const aarSiteDelta=aarChallenge?aarUplift:0;
  const aarExpertDelta=aarChallenge?aarUplift:0;
  const localTrainingTravelCost=specialist&&localTrainingSite&&specialist.location!==localTrainingSite.id?2:0;
@@ -1099,7 +1103,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const source=company.sites.find(site=>site.id===sourceSiteId);
  const target=company.sites.find(site=>site.id===targetSiteId);
  const investmentPreview=investment==='AFTER_ACTION_REVIEW'
-   ?aarChallenge&&aarSite&&aarExpert?`${aarChallenge.status==='success'?'SUCCESS':'FAILURE'}: ${aarSite.name} ${domainLabel(aarChallenge.domain)} ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]} ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} · $50k`:'Choose a qualifying Challenge'
+   ?aarChallenge&&aarSite&&aarExpert?`${aarChallenge.status==='success'?'SUCCESS':'FAILURE'}: ${aarSite.name} ${domainLabel(aarChallenge.domain)} ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.isVacant?'Incoming expert receives +'+aarExpertDelta+' when appointed':aarExpert.name.split(' ')[0]+' '+aarExpertBefore+' → '+(aarExpertBefore+aarExpertDelta)} · $50k`:'Choose a qualifying Challenge'
    :investment==='TRAIN_EXPERT'
    ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${(specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
    :investment==='LOCAL_TRAINING'
@@ -1127,6 +1131,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    return delta?{kind:'transfer',domain:selectedDomain,sourceSiteId:source.id,targetSiteId:target.id,delta}:undefined;
   }
   if(kind==='AFTER_ACTION_REVIEW'&&aarChallenge&&aarSite&&aarExpert){
+   if(aarExpert.isVacant)return{kind:'site',domain:aarChallenge.domain,siteId:aarSite.id,delta:aarSiteDelta};
    return{kind:'aar',domain:aarChallenge.domain,siteId:aarSite.id,expertId:aarExpert.id,siteDelta:aarSiteDelta,expertDelta:aarExpertDelta};
   }
   return undefined;
@@ -1156,9 +1161,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const invest=async(event:React.MouseEvent<HTMLButtonElement>)=>{
   let payload:any,targetKey='';
   if(investment==='AFTER_ACTION_REVIEW'){
-    if(!aarChallenge||!aarExpert)return;
+    if(!aarChallenge||!aarExpert){
+      const message='A review needs a qualifying Challenge and domain knowledge to capture. Choose another investment if this review is not available.';
+      setActionError(message);onToast(message);return;
+    }
     payload={type:'KM_WEEK_INVEST',investment,challengeId:aarChallenge.id};
-    targetKey=`expert:${aarExpert.id}:${aarChallenge.domain}`;
+    targetKey=aarExpert.isVacant?`site:${aarChallenge.siteId}:${aarChallenge.domain}`:`expert:${aarExpert.id}:${aarChallenge.domain}`;
   }else if(investment==='TRAIN_EXPERT'){
     const expert=specialist||experts[0];if(!expert)return;
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
@@ -1185,7 +1193,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const skill=expert?.domains.find(item=>item.domain===aarChallenge?.domain);
    if(site&&skill&&aarChallenge){
     site.teamCapability[aarChallenge.domain]=(site.teamCapability[aarChallenge.domain]||0)+aarUplift;
-    skill.score+=aarUplift;
+    if(!expert?.isVacant)skill.score+=aarUplift;
    }
   }else if(investment==='TRAIN_EXPERT'){
    const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
@@ -1617,7 +1625,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
           <select data-kmw-aar-select value={aarChallenge?.id||''} onChange={event=>{const chosen=aarCandidates.find(item=>item.id===event.target.value);setAARChallengeId(event.target.value);if(chosen)setSelectedDomain(chosen.domain)}} className="mt-1 block w-full rounded-lg border border-amber-700 bg-[#071019] px-2 py-2.5 text-xs font-bold normal-case text-white">
            {aarCandidates.map(item=><option key={item.id} value={item.id}>{item.status==='success'?'SUCCESS: ':'FAILURE: '}{siteName(company,item.siteId)} — {item.title} · {domainLabel(item.domain)} {item.difficulty}</option>)}
           </select>
-          <span className="mt-2 block text-xs normal-case font-semibold text-slate-300">Facilitator: <b className="text-amber-200">{aarExpert?.name||'Company expert'}</b> · Site: <b className="text-white">{aarSite?.name||'—'}</b> · Both gain +{aarUplift}</span>
+          <span className="mt-2 block text-xs normal-case font-semibold text-slate-300">Facilitator: <b className="text-amber-200">{aarExpert?.isVacant?'Local team (lessons saved for replacement)':aarExpert?.name||'Company expert'}</b> · Site: <b className="text-white">{aarSite?.name||'—'}</b> · {aarExpert?.isVacant?`Site gains +${aarUplift}; incoming expert gains +${aarUplift} when appointed`:`Both gain +${aarUplift}`}</span>
          </label>:investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 items-start gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} ({SITE_ABBR[expert.location]||expert.location}) · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
         <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span>{investment==='LOCAL_TRAINING'&&<div className="mt-1 font-bold text-red-300">Training commitment — unavailable next round</div>}</div>
         {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
