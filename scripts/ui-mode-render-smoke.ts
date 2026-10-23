@@ -57,6 +57,9 @@ assert.ok(joinModalSource.includes('data-kmw-guide-step={n}')&&joinModalSource.i
 assert.ok(joinModalSource.includes("{multiplayerVisible&&<ModeChoice active={mode==='create'}")&&joinModalSource.includes("const[mode,setMode]=useState<'solo'|'join'|'create'>('solo')"),'The multiplayer tab and form must be hidden by default, even with a create setup URL');
 const defaultSetup=renderToStaticMarkup(React.createElement(SessionJoinModalV2,{currentSession:null,onJoinSession:()=>true,onCreateNewSession:()=>{},onSoloStart:()=>{},initialMode:'create'}));
 assert.ok(defaultSetup.includes('KM Week')&&defaultSetup.includes('data-kmw-guide-step="2"'),'The introductory KM Week steps must stay visible');
+assert.ok(joinModalSource.includes("mode==='solo'?soloExperienceMode:mode==='create'?experienceMode:'km_week'"),'Join a game must default to the same KM Week introduction video and four guidance steps as Play Solo');
+assert.ok(defaultSetup.includes('muyDSTvDDbM')&&defaultSetup.includes('KM Week Intro Version'),'Play Solo must show the KM Week video as the default introduction');
+assert.ok(joinModalSource.includes('https://www.youtube-nocookie.com/embed/muyDSTvDDbM?rel=0'),'The join fallback and solo introduction must share the existing KM Week video without changing its URL');
 assert.equal(defaultSetup.includes('Create multiplayer'),false,'Neither the normal entry nor a create setup URL may expose the multiplayer tab before the hidden gesture');
 assert.equal(defaultSetup.includes('CREATE MULTIPLAYER GAME'),false,'Multiplayer creation form must not be rendered before the hidden gesture');
 assert.equal(defaultSetup.includes('Full game · guided learning curve'),false,'The Newbie choice should not render during KM Week');
