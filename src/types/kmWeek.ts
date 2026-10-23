@@ -79,6 +79,8 @@ export interface KMWeekExpertRetirement {
   replacementRound: number;
   replacementName: string;
   replacementScore?: number;
+  /** AAR learning carried forward to the incoming expert during a vacancy. */
+  pendingAARUplift?: number;
   status: 'retired' | 'replaced';
 }
 
