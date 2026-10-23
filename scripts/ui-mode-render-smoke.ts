@@ -146,6 +146,8 @@ assert.ok(riverSource.includes('const ghostScore=ghostPreview?.kind')&&riverSour
 assert.equal(kmWeekBoardSource.includes('KM_WEEK_MAX_EXPERT_KNOWLEDGE'),false,'KM Week board must not retain the obsolete expert-level cap');
 
 assert.ok(kmWeekBoardSource.includes("item.status==='success'?'SUCCESS: ':'FAILURE: '")&&kmWeekBoardSource.includes('data-kmw-aar-select'),'AAR dropdown labels successful and failed Challenges');
+assert.equal(kmWeekBoardSource.includes('No eligible event in this round.'),false,'AAR help must never mislabel a selected qualifying event as ineligible when its expert has retired');
+assert.ok(kmWeekBoardSource.includes('knowledge saved for the incoming specialist when appointed')&&kmWeekBoardSource.includes('If that expert has just retired, the lessons are passed to their replacement'),'The AAR preview and help must explain replacement learning during the vacancy');
 assert.ok(kmWeekBoardSource.includes('data-kmw-aar-intro')&&kmWeekBoardSource.includes('kmw-aar-arrow')&&kmWeekBoardSource.includes('dismissAARIntro'),'AAR opens a one-time briefing pointing at its button');
 assert.ok(kmWeekBoardSource.includes("kind:'aar',domain:aarChallenge.domain")&&riverSource.includes("ghostPreview.kind==='aar'&&ghostPreview.siteDelta>0")&&riverSource.includes("ghostPreview.kind==='aar'&&ghostPreview.expertDelta>0"),'AAR previews both site and expert knowledge gains');
 assert.ok(kmWeekBoardSource.includes("targetKey=`expert:${aarExpert.id}:${aarChallenge.domain}`")&&kmWeekBoardSource.includes("if(investment==='AFTER_ACTION_REVIEW'){\n   const site=optimisticCompany.sites"),'AAR orb lands on the expert before both River knowledge gains animate');
