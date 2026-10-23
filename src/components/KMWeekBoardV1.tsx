@@ -254,13 +254,17 @@ function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
  const challenge=company.kmWeek?.challenges[0];
  const challengeSite=challenge?siteName(company,challenge.siteId):'your local site';
- if(turn===1)return{title:'1. Solve the business problem',text:`${challengeSite} needs Operations 4. Select Priya for depth, then the Local Team to see how its knowledge can contribute breadth.`,invest:'After the Challenge, deepen Priya’s expertise.'};
+ const focus=company.kmWeek?.pressureDomain||'operations';
+ const firstExpert=specialistFor(company,focus)?.name.split(' ')[0]||'your expert';
+ const currentDomain=challenge?.domain||'operations';
+ const currentExpert=specialistFor(company,currentDomain)?.name.split(' ')[0]||'the specialist';
+ if(turn===1)return{title:'1. Solve the business problem',text:`${challengeSite} needs ${domainLabel(currentDomain)} ${challenge?.difficulty||4}. Select ${firstExpert} for depth, then the Local Team to see how its knowledge can contribute breadth.`,invest:`After the Challenge, deepen ${firstExpert}’s expertise.`};
  if(turn===2){
   const site=siteName(company,kmWeekGuidedTrainingSiteV1(company));
-  return{title:'2. Who should handle this one?',text:`${challengeSite} needs Human Resources 1. The local team already knows how to solve it; Marcus is available if needed.`,invest:`Now use Local Training. Priya can strengthen the Operations team at ${site}. Travel to teach adds $2k.`};
+  return{title:'2. Who should handle this one?',text:`${challengeSite} needs ${domainLabel(currentDomain)} 1. The local team already knows how to solve it; ${currentExpert} is available if needed.`,invest:`Now use Local Training. ${firstExpert} can strengthen the ${domainLabel(focus)} team at ${site}. Travel to teach adds $2k.`};
  }
  const transfer=kmWeekGuidedTransferV1(company);
- return{title:'3. Another problem, another expert',text:`Priya is busy training staff, but Marketing specialist Mary is available for the ${challengeSite} distributor problem.`,invest:`Try Knowledge Transfer. The suggested example is ${siteName(company,transfer.sourceSiteId)} HR → ${siteName(company,transfer.targetSiteId)}, where a more capable team can help a weaker one. You can choose any valid transfer.`};
+ return{title:'3. Another problem, another expert',text:`${firstExpert} is busy training staff, but ${domainLabel(currentDomain)} specialist ${currentExpert} is available for the ${challengeSite} problem.`,invest:`Try Knowledge Transfer. The suggested example is ${siteName(company,transfer.sourceSiteId)} ${domainLabel(transfer.domain)} → ${siteName(company,transfer.targetSiteId)}, where a more capable team can help a weaker one. You can choose any valid transfer.`};
 }
 
 const ToolTip:React.FC<{text:React.ReactNode;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
@@ -498,8 +502,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  useEffect(()=>{
   if(!state)return;
   if(state.stage==='guided'&&state.phase==='invest'){
-    if(state.guidedTurn===1){setInvestment('TRAIN_EXPERT');setSelectedDomain('operations');setExpertId(specialistFor(company,'operations')?.id||'');}
-    else if(state.guidedTurn===2){const expert=specialistFor(company,'operations');setInvestment('LOCAL_TRAINING');setSelectedDomain('operations');setExpertId(expert?.id||'');setTrainingSiteId(kmWeekGuidedTrainingSiteV1(company));}
+    const guidedDomain=state.pressureDomain||'operations';
+    if(state.guidedTurn===1){setInvestment('TRAIN_EXPERT');setSelectedDomain(guidedDomain);setExpertId(specialistFor(company,guidedDomain)?.id||'');}
+    else if(state.guidedTurn===2){const expert=specialistFor(company,guidedDomain);setInvestment('LOCAL_TRAINING');setSelectedDomain(guidedDomain);setExpertId(expert?.id||'');setTrainingSiteId(kmWeekGuidedTrainingSiteV1(company));}
     else{const transfer=kmWeekGuidedTransferV1(company);setInvestment('KNOWLEDGE_TRANSFER');setSelectedDomain(transfer.domain);setSourceSiteId(transfer.sourceSiteId);setTargetSiteId(transfer.targetSiteId);}
   }else if(state.stage==='free'&&state.phase==='invest'){
     setInvestment('TRAIN_EXPERT');
