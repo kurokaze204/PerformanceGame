@@ -180,6 +180,12 @@ for(let sample=0;sample<18;sample++){
  action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',...transfer});
  assert.ok(action.success,action.message);
  assert.equal(a.kmWeek!.stage,'free','All 3 guided lessons must complete for any starting allocation');
+ const cycle=Array.from({length:6},(_,index)=>freeChallengesForRound(variantSession,a,index+1)).flat();
+ assert.equal(cycle.filter(card=>card.domain===focus).length,6,'Every variant must have six related Challenges');
+ assert.ok(cycle.filter(card=>card.difficulty>=5).every(card=>card.domain===focus),'Every variant must focus all high requirements in its selected domain');
+ assert.equal(new Set(cycle.map(card=>card.title)).size,12,'A recurring domain must not cause story repetition');
+ const nextCycle=Array.from({length:6},(_,index)=>freeChallengesForRound(variantSession,a,index+7)).flat();
+ assert.deepEqual(nextCycle.map(card=>card.difficulty).sort((x,y)=>x-y),cycle.map(card=>card.difficulty+1).sort((x,y)=>x-y),'All variants must continue escalating every six rounds');
 }
 assert.deepEqual(kmWeekRiskOddsV1(1,2),{performanceGap:1,requiredRoll:2,successfulFaces:5,chancePercent:83},'A one-point performance gap must still carry risk and require 2+ on d6');
 assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successfulFaces:2,chancePercent:33},'Risk odds must worsen as the remaining performance gap grows');
@@ -602,6 +608,21 @@ assert.ok((company.kmWeek?.score.total||0)>0);
  st.challenges[2].difficulty=8;
  co.round=6;
  assert.deepEqual(kmWeekAARCandidatesV1(co),[],'The original AAR unlock timing must be preserved');
+}
+// Store actual past failures, so a player sees the review when it unlocks,
+// even if the immediate round did not contain another big loss.
+{
+ const co=createInitialCompanyV2('Previous failure','kmw-previous-failure',config);
+ const sampleSession={...session,id:'KMW-PRIOR-FAILURE',companies:[co],activeEvents:{}} as GameSessionV2;
+ initialiseKMWeekSessionV1(sampleSession);
+ const focus=co.kmWeek!.pressureDomain!;
+ const prior={id:'EARLY-HARD',title:'High-pressure incident',story:'Learning opportunity',siteId:'perth',domain:focus,difficulty:8,impact:120,status:'open' as const};
+ co.kmWeek!.stage='free';co.kmWeek!.phase='challenge';co.kmWeek!.freeRound=2;co.round=5;co.kmWeek!.challenges=[prior];
+ const failure=applyKMWeekActionV1(sampleSession,co.id,{type:'KM_WEEK_RESOLVE',challengeId:prior.id,method:'local'});
+ assert.equal(failure.success,true,failure.message);
+ assert.equal(co.kmWeek!.lastPressureFailure?.id,prior.id,'The resolved failure must be saved for review');
+ co.kmWeek!.freeRound=4;co.round=7;co.kmWeek!.phase='invest';co.kmWeek!.challenges=[];
+ assert.deepEqual(kmWeekAARCandidatesV1(co).map(challenge=>challenge.id),[prior.id],'The previous failure must become reviewable at the original unlock');
 }
 // Other investments must be able to strengthen expertise beyond difficulty ten.
 {
