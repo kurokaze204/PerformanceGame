@@ -61,7 +61,7 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
   'local-heroes': {
     id:'local-heroes',
     title:'Local Heroes',
-    description:'Solve at least 2 free-play Challenges using local team capability only.',
+    description:'Solve at least 5 free-play Challenges using local team capability only.',
     points:5,
   },
   'deep-bench': {
@@ -585,7 +585,7 @@ function expertisePoints(company:CompanyV2){
 function goalAchieved(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek!;
   const goal=session.kmWeekGoalId||hashGoal(session.id);
-  if(goal==='local-heroes')return state.localSuccesses>=2;
+  if(goal==='local-heroes')return state.localSuccesses>=5;
   if(goal==='deep-bench')return activeExperts(company).every(expert=>(expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0)>=KM_WEEK_DEEP_BENCH_TARGET);
   if(goal==='broad-base')return localCapabilityPoints(company)>=4;
   const totals=activeSites(company).map(site=>KM_WEEK_DOMAINS.reduce((sum,domain)=>sum+(site.teamCapability[domain]||0),0));
