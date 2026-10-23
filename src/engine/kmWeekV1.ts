@@ -228,7 +228,9 @@ function hireRetiredExpertReplacement(company:CompanyV2){
   const skill=expert.domains.find(item=>item.domain===retirement.domain);
   if(!skill)return;
   const siteScores=activeSites(company).map(site=>site.teamCapability[retirement.domain]||0);
-  const replacementScore=Math.max(3,...siteScores);
+  // AAR lessons recorded while this specialist was retired are handed to the
+  // replacement, rather than lost when the vacancy is filled.
+  const replacementScore=Math.max(3,...siteScores)+(retirement.pendingAARUplift||0);
   expert.name=retirement.replacementName;
   skill.score=replacementScore;
   expert.isVacant=false;
@@ -817,9 +819,15 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     const event=kmWeekAARCandidatesV1(company).find(item=>item.id===payload?.challengeId);
     if(!event)return{success:false,message:'Choose an eligible completed Challenge (knowledge requirement of 5 or more).'};
     const site=company.sites.find(item=>item.id===event.siteId&&!item.isClosed);
-    const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===event.domain));
+    const retirement=state.expertRetirement;
+    // When the domain expert has just retired, the local team may still carry
+    // out its AAR. Captured lessons are handed to the incoming specialist.
+    const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===event.domain))
+      ||(retirement?.status==='retired'&&retirement.domain===event.domain
+        ?company.experts.find(item=>item.id===retirement.expertId&&item.isVacant)
+        :undefined);
     const skill=expert?.domains.find(item=>item.domain===event.domain);
-    if(!site||!expert||!skill)return{success:false,message:'A local site and a company expert in the Challenge domain are required for the review.'};
+    if(!site||!expert||!skill)return{success:false,message:'The relevant domain expert is unavailable for this review. Choose another investment or review after their replacement arrives.'};
     cost=KM_WEEK_AAR_COST;
     if(!spend(company,cost))return{success:false,message:'Not enough turnover for the $50k After Action Review.'};
     const uplift=event.status==='failure'?2:1;
@@ -828,7 +836,9 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     after=before+uplift;
     expertBefore=skill.score;expertAfter=expertBefore+uplift;
     site.teamCapability[event.domain]=after;
-    skill.score=expertAfter;
+    if(expert.isVacant&&retirement?.status==='retired'&&retirement.expertId===expert.id){
+      retirement.pendingAARUplift=(retirement.pendingAARUplift||0)+uplift;
+    }else skill.score=expertAfter;
   }else if(type==='TRAIN_EXPERT'){
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const skill=expert?.domains.find(item=>item.domain===domain);
@@ -866,7 +876,9 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
   });
   state.turnoverHistory.push({label:state.stage==='guided'?`G${state.guidedTurn} I`:`R${state.freeRound} I`,turnover:company.turnover});
   state.lastMessage=type==='AFTER_ACTION_REVIEW'
-    ?`After Action Review complete: site ${before} → ${after}, expert ${expertBefore} → ${expertAfter}. Cost ${cost}k.`
+    ?state.expertRetirement?.status==='retired'&&state.expertRetirement.expertId===expertId
+      ?`After Action Review complete: site ${before} → ${after}; +${after-before} knowledge captured for the incoming expert. Cost ${cost}k.`
+      :`After Action Review complete: site ${before} → ${after}, expert ${expertBefore} → ${expertAfter}. Cost ${cost}k.`
     :`${investmentLabel(type)} complete: ${before} → ${after}. Cost ${cost}k.`;
 
   advanceAfterKMWeekInvestment(session,company);
