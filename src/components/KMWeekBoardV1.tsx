@@ -1103,7 +1103,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const source=company.sites.find(site=>site.id===sourceSiteId);
  const target=company.sites.find(site=>site.id===targetSiteId);
  const investmentPreview=investment==='AFTER_ACTION_REVIEW'
-   ?aarChallenge&&aarSite&&aarExpert?`${aarChallenge.status==='success'?'SUCCESS':'FAILURE'}: ${aarSite.name} ${domainLabel(aarChallenge.domain)} ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.isVacant?'Incoming expert receives +'+aarExpertDelta+' when appointed':aarExpert.name.split(' ')[0]+' '+aarExpertBefore+' → '+(aarExpertBefore+aarExpertDelta)} · $50k`:'Choose a qualifying Challenge'
+   ?aarChallenge&&aarSite&&aarExpert?`${aarChallenge.status==='success'?'SUCCESS':'FAILURE'}: ${aarSite.name} ${domainLabel(aarChallenge.domain)} ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.isVacant?'Incoming expert receives +'+aarExpertDelta+' when appointed':aarExpert.name.split(' ')[0]+' '+aarExpertBefore+' → '+(aarExpertBefore+aarExpertDelta)} · $50k`:(aarChallenge?'Domain expert unavailable — check the review details':'Choose a qualifying Challenge')
    :investment==='TRAIN_EXPERT'
    ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${(specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
    :investment==='LOCAL_TRAINING'
@@ -1148,7 +1148,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    :scoreGhost==='resilience'?{kind:'threshold',value:KM_WEEK_SHOCK_CUTOFF,label:`AUDIT TARGET · ${KM_WEEK_SHOCK_CUTOFF}`}
    :undefined;
  const infoPreviewText=infoInvestment==='AFTER_ACTION_REVIEW'
-  ?aarChallenge&&aarSite&&aarExpert?`${aarSite.name}: ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]}: ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} (${aarChallenge.status==='failure'?'learning from failure':'learning from success'})`:'No eligible event in this round.'
+  ?!aarChallenge?'Choose a completed difficult Challenge to review.'
+   :!aarSite?'The site involved in the selected Challenge is unavailable.'
+   :!aarExpert?'This Challenge qualifies, but its domain specialist is unavailable. Try another investment or review when a replacement arrives.'
+   :aarExpert.isVacant
+    ?`${aarSite.name} ${domainLabel(aarChallenge.domain)}: ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; +${aarExpertDelta} knowledge saved for the incoming specialist when appointed.`
+    :`${aarSite.name} ${domainLabel(aarChallenge.domain)}: ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]}: ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} (${aarChallenge.status==='failure'?'learning from failure':'learning from success'})`
   :infoInvestment==='TRAIN_EXPERT'
    ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${(specialistScore(company,specialistDomain)+1)} (${domainLabel(specialistDomain)})`:'Choose an expert to preview.'
    :infoInvestment==='LOCAL_TRAINING'
@@ -1615,7 +1620,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          <h3 className="flex-1 text-sm font-black text-white">{KM_WEEK_INTERVENTION_HELP[infoInvestment].title}</h3>
          <button type="button" onClick={()=>setInfoInvestment(null)} aria-label="Close investment information" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-500 text-slate-300 hover:bg-slate-800"><X className="h-4 w-4"/></button>
         </div>
-        <p className="mt-2 text-[12px] leading-relaxed text-slate-100">{infoInvestment==='AFTER_ACTION_REVIEW'&&state.pressureDomain?'An After Action Review brings the team and company expert together to ask: What was planned? What happened? Why? What should change? Following a difficult failed Challenge (requirement 5 or more), a $50k review lifts both the site and expert by +2. This creates NEW knowledge, even beyond previous River peaks. An earlier setback can be reviewed when this option becomes available.':KM_WEEK_INTERVENTION_HELP[infoInvestment].description}</p>
+        <p className="mt-2 text-[12px] leading-relaxed text-slate-100">{infoInvestment==='AFTER_ACTION_REVIEW'&&state.pressureDomain?'An After Action Review asks: What was planned? What happened? Why? What should change? After a difficult failed Challenge (requirement 5 or more), a $50k review lifts the affected site by +2 and develops +2 expert knowledge beyond previous River peaks. If that expert has just retired, the lessons are passed to their replacement when appointed. An earlier setback can also be reviewed.':KM_WEEK_INTERVENTION_HELP[infoInvestment].description}</p>
         <div className="mt-2 rounded-lg border border-sky-700/70 bg-sky-950/45 px-2.5 py-2 text-[11px] leading-relaxed text-sky-100">
          <span className="font-black text-sky-300">River preview: </span>{infoPreviewText}
          {!scoreGhostPreview&&<span className="mt-1 block font-semibold text-amber-200">No further knowledge gain with these settings. Choose a different expert, site or domain to see an uplift.</span>}
