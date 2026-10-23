@@ -94,7 +94,7 @@ const scoreMath=(item:ScoreItem,company:CompanyV2,session:GameSessionV2):string=
   case'goal':{
    const goal=kmWeekGoalV1(session);
    let progress='';
-   if(goal.id==='local-heroes')progress='Local-only free-play Challenge wins: '+(state?.localSuccesses||0)+'; need at least 2.';
+   if(goal.id==='local-heroes')progress='Local-only free-play Challenge wins: '+(state?.localSuccesses||0)+'; need at least 5.';
    else if(goal.id==='deep-bench')progress='Each of the three active specialists must have knowledge level 6 or higher.';
    else if(goal.id==='broad-base')progress='Current scoring checks Local capability ≥ 4 (at least 8 combined local knowledge levels); current combined levels: '+localLevels+'.';
    else{
