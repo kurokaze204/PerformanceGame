@@ -19,6 +19,7 @@ import {
   freeChallengesForRound,
   kmWeekRiskOddsV1,
   kmWeekAARCandidatesV1,
+  kmWeekAvailableInvestmentExpertV1,
   KM_WEEK_AAR_COST,
   KM_WEEK_AAR_UNLOCK_ROUND,
 } from '../src/engine/kmWeekV1.ts';
@@ -270,6 +271,8 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.equal(retireState.expertRetirement?.retiredName,ops.name,'The highest-scoring expert must retire after free Round 5 Challenges');
   assert.equal(retireState.expertRetirement?.retiredScore,6);
   assert.equal(ops.isVacant,true,'The retired expert must disappear from the active expert pool');
+  assert.equal(kmWeekAvailableInvestmentExpertV1(retireCompany,ops.id,'operations')?.id,hr.id,
+   'Invest must switch away from a retired expert instead of retaining a stale selection and silently ignoring Commit');
 
   const retiredName=retireState.expertRetirement!.retiredName;
   retirementResult=applyKMWeekActionV1(retireSession,retireCompany.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:hr.id,domain:'hr'});
@@ -729,6 +732,27 @@ assert.ok((company.kmWeek?.score.total||0)>0);
  assert.equal(after.success,true,after.message);
  assert.equal(bankrupt.kmWeek!.stage,'complete','The previously bankrupt player must be able to reach the final AAR');
 }
+
+{
+ // During the final three-minute cutoff, a previously selected expert may
+ // already be retired. The normal final Commit must still reach Site Audits.
+ const finalCo=createInitialCompanyV2('Final Invest After Retirement','kmw-final-invest-retired',config);
+ const finalSession={...session,id:'KMW-FINAL-RETIRE',companies:[finalCo],timerEndsAt:null,timerPausedSecondsRemaining:0} as GameSessionV2;
+ initialiseKMWeekSessionV1(finalSession);
+ const finalState=finalCo.kmWeek!;
+ finalState.stage='free';finalState.phase='invest';finalState.freeRound=5;finalCo.round=8;
+ const retired=finalCo.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
+ retired.isVacant=true;
+ const replacement=kmWeekAvailableInvestmentExpertV1(finalCo,retired.id,'operations');
+ assert.ok(replacement&&!replacement.isVacant&&replacement.id!==retired.id,'Retired selection must fall back to a working specialist');
+ const initialTurnover=finalCo.turnover;
+ const committed=applyKMWeekActionV1(finalSession,finalCo.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:replacement.id,domain:replacement.domains[0].domain});
+ assert.equal(committed.success,true,'Final Commit must accept the available expert: '+committed.message);
+ assert.equal(finalState.stage,'shock','A valid final investment must enter Site Audits without the emergency button');
+ assert.equal(finalCo.turnover,initialTurnover-15,'The final investment must be charged once, not silently skipped');
+ assert.equal(finalState.investmentHistory.at(-1)?.expertId,replacement.id,'The actual available expert must receive the final investment');
+}
+
 {
  const co=createInitialCompanyV2('Deadline Escape','kmw-deadline',config);
  initialiseKMWeekCompanyV1(co,'KMW-CUTOFF');
