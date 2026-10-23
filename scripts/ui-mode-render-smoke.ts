@@ -94,6 +94,19 @@ assert.ok(marketingTarget.includes('data-kmw-challenge-target="marketing:3" tran
 assert.notEqual(operationTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],marketingTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],'A different Challenge must move the bullseye');
 const noTarget=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations'}));
 const compactRiver=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations',compact:true}));
+// The sole reveal is one unlabelled asterisk on the final AAR River:
+// no earlier River, including its opening-side AAR comparison, may expose it.
+for(const boosted of ['operations','hr','marketing'] as const){
+ const finalRiver=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations',compact:true,finalAarBoostedDomain:boosted}));
+ const label=boosted==='operations'?'Operations':boosted==='hr'?'Human Resources':'Marketing';
+ const domainLabels=['Operations','Human Resources','Marketing'];
+ assert.equal((finalRiver.match(/<text[^>]*>[^<]*\*<\/text>/g)||[]).length,1,'Exactly one domain label on the final AAR River must carry an asterisk');
+ assert.ok(finalRiver.includes(label+'*'),'The selected domain alone must gain its trailing asterisk');
+ for(const other of domainLabels.filter(item=>item!==label))assert.equal(finalRiver.includes(other+'*'),false,'Unboosted domains must retain plain labels');
+ const gameplayRiver=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations',finalAarBoostedDomain:boosted}));
+ assert.equal(gameplayRiver.includes(label+'*'),false,'Even if passed accidentally, the full gameplay River must never reveal the boosted domain');
+}
+assert.equal(compactRiver.includes('Operations*')||compactRiver.includes('Marketing*')||compactRiver.includes('Human Resources*'),false,'Starting compact River has no asterisk');
 const tickMarkup=(markup:string)=>[...markup.matchAll(/<text[^>]*data-kmw-river-axis-tick="[^"]+"[^>]*>/g)].map(match=>match[0]);
 const compactTicks=tickMarkup(compactRiver),fullTicks=tickMarkup(noTarget);
 assert.ok(compactTicks.length>=3,'Compact AAR River must retain labelled numeric vertical ticks');
@@ -146,11 +159,16 @@ assert.ok(riverSource.includes('const ghostScore=ghostPreview?.kind')&&riverSour
 assert.equal(kmWeekBoardSource.includes('KM_WEEK_MAX_EXPERT_KNOWLEDGE'),false,'KM Week board must not retain the obsolete expert-level cap');
 
 assert.ok(kmWeekBoardSource.includes("item.status==='success'?'SUCCESS: ':'FAILURE: '")&&kmWeekBoardSource.includes('data-kmw-aar-select'),'AAR dropdown labels successful and failed Challenges');
+assert.equal(kmWeekBoardSource.includes('No eligible event in this round.'),false,'AAR help must never mislabel a selected qualifying event as ineligible when its expert has retired');
+assert.ok(kmWeekBoardSource.includes('knowledge saved for the incoming specialist when appointed')&&kmWeekBoardSource.includes('If that expert has just retired, the lessons are passed to their replacement'),'The AAR preview and help must explain replacement learning during the vacancy');
 assert.ok(kmWeekBoardSource.includes('data-kmw-aar-intro')&&kmWeekBoardSource.includes('kmw-aar-arrow')&&kmWeekBoardSource.includes('dismissAARIntro'),'AAR opens a one-time briefing pointing at its button');
 assert.ok(kmWeekBoardSource.includes("kind:'aar',domain:aarChallenge.domain")&&riverSource.includes("ghostPreview.kind==='aar'&&ghostPreview.siteDelta>0")&&riverSource.includes("ghostPreview.kind==='aar'&&ghostPreview.expertDelta>0"),'AAR previews both site and expert knowledge gains');
 assert.ok(kmWeekBoardSource.includes("targetKey=`expert:${aarExpert.id}:${aarChallenge.domain}`")&&kmWeekBoardSource.includes("if(investment==='AFTER_ACTION_REVIEW'){\n   const site=optimisticCompany.sites"),'AAR orb lands on the expert before both River knowledge gains animate');
 assert.ok(kmWeekBoardSource.includes('Training site')&&kmWeekBoardSource.includes("' · +$2k travel'"),'KM Week Local Training must let the player choose another site and show the fixed travel fee');
 assert.ok(kmWeekBoardSource.includes('Travel $2k · total $12k')&&kmWeekBoardSource.includes('No travel · total $10k'),'KM Week Local Training preview must make travel and total cost explicit');
+assert.ok(kmWeekBoardSource.includes('kmWeekAvailableInvestmentExpertV1(company,expertId,selectedDomain)')&&kmWeekBoardSource.includes('data-kmw-investment-expert-reassigned'),'An expert retiring between Challenges and Invest must trigger a visible, valid replacement instead of a silent Commit');
+assert.ok(kmWeekBoardSource.includes('No company expert is available to train.')&&kmWeekBoardSource.includes('No company expert is available for Local Training.')&&kmWeekBoardSource.includes('data-kmw-invest-commit'),'The final Commit must show a clear error if no expert is available, and retain a clickable action');
+assert.ok(kmWeekBoardSource.includes('To finish without this investment, use GO TO SITE AUDITS NOW above.')&&kmWeekBoardSource.includes("data-kmw-go-audits"),'An invalid final investment must clearly direct the player to the existing Site Audit escape route');
 assert.ok(kmWeekBoardSource.includes('Site Audits · final three minutes')&&kmWeekBoardSource.includes('Can your sites prove compliance?'),'KM Week must introduce the five local-only compliance audits');
 assert.equal(eventV4Source.includes('2-domain lesson'),false,'Newbie and Expert Challenge cards must not label business events as lessons');
 assert.equal(eventV4Source.includes('Diagnostic complete'),false,'Newbie and Expert Challenge cards must not describe business events as diagnostics');
@@ -495,6 +513,8 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  const rival=createInitialCompanyV2('Rival Company','rival',DEFAULT_CONFIG);
  initialiseKMWeekCompanyV1(apex);
  initialiseKMWeekCompanyV1(rival);
+ apex.kmWeek!.pressureDomain='marketing';
+ rival.kmWeek!.pressureDomain='marketing';
  apex.kmWeek!.stage='complete';
  rival.kmWeek!.stage='complete';
  apex.kmWeek!.knowledgeTransfers=4;
@@ -522,6 +542,11 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  const html=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
  const axes=[...html.matchAll(/data-kmw-river-scale-max="(\d+)"/g)].map(match=>Number(match[1]));
  assert.equal(axes.length,4,'Two companies must each have a before and an after River');
+ assert.equal((html.match(/<text[^>]*>Marketing\*<\/text>/g)||[]).length,2,'Final AAR must mark Marketing exactly once per company, on the end-of-game River only');
+ assert.equal((html.match(/<text[^>]*>(Operations|Human Resources)\*<\/text>/g)||[]).length,0,'No other domain may be marked on the AAR River');
+ const firstBeforeRiver=html.split('At start of game')[1]?.split('At end of game')[0]||'';
+ assert.equal(firstBeforeRiver.includes('Marketing*'),false,'The initial comparison River must never reveal the workshop constraint');
+ assert.ok(kmWeekDebriefSource.includes('finalAarBoostedDomain={item.kmWeek?.pressureDomain}'),'Only the final AAR comparison passes the hidden pressure domain to the compact River');
 const finalTicks=tickMarkup(html);
 assert.ok(finalTicks.length>=12&&finalTicks.every(tick=>tick.includes('font-size="39"')),'All before/after Rivers in the final comparison must use the enlarged knowledge-level numbers');
  assert.ok(axes.every(value=>value===axes[0])&&axes[0]>=sharedMax,'All before/after Rivers across all companies must share a vertical axis that fits the highest knowledge score');

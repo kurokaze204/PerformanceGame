@@ -4,7 +4,7 @@ import type{KnowledgeDomain,Participant}from'../types/game.ts';
 import{DOMAIN_INFO}from'../types/game.ts';
 import type{CompanyV2,GameSessionV2}from'../types/gameV2.ts';
 import type{KMWeekChallenge,KMWeekInvestment}from'../types/kmWeek.ts';
-import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekGuidedTrainingSiteV1,kmWeekGuidedTransferV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
+import{KM_WEEK_AAR_COST,KM_WEEK_AAR_UNLOCK_ROUND,KM_WEEK_DOMAINS,KM_WEEK_GOALS,KM_WEEK_SHOCK_CUTOFF,KM_WEEK_SHOCK_GAP_COST,KM_WEEK_SHOCK_SPECS,KM_WEEK_SHOCK_WINDOW_SECONDS,KM_WEEK_SITE_IDS,kmWeekAARCandidatesV1,kmWeekAvailableInvestmentExpertV1,kmWeekGuidedTrainingSiteV1,kmWeekGuidedTransferV1,kmWeekRiskOddsV1}from'../engine/kmWeekV1.ts';
 import{toggleKMWeekSourceV1}from'../engine/kmWeekSelectionV1.ts';
 import{kmWeekCoachV1}from'../engine/kmWeekCoachV1.ts';
 import{InvestmentRiverView}from'./InvestmentRiverView.tsx';
@@ -254,13 +254,17 @@ function currentGuidedCopy(company:CompanyV2){
  const turn=company.kmWeek?.guidedTurn||1;
  const challenge=company.kmWeek?.challenges[0];
  const challengeSite=challenge?siteName(company,challenge.siteId):'your local site';
- if(turn===1)return{title:'1. Solve the business problem',text:`${challengeSite} needs Operations 4. Select Priya for depth, then the Local Team to see how its knowledge can contribute breadth.`,invest:'After the Challenge, deepen Priya’s expertise.'};
+ const focus=company.kmWeek?.pressureDomain||'operations';
+ const firstExpert=specialistFor(company,focus)?.name.split(' ')[0]||'your expert';
+ const currentDomain=challenge?.domain||'operations';
+ const currentExpert=specialistFor(company,currentDomain)?.name.split(' ')[0]||'the specialist';
+ if(turn===1)return{title:'1. Solve the business problem',text:`${challengeSite} needs ${domainLabel(currentDomain)} ${challenge?.difficulty||4}. Select ${firstExpert} for depth, then the Local Team to see how its knowledge can contribute breadth.`,invest:`After the Challenge, deepen ${firstExpert}’s expertise.`};
  if(turn===2){
   const site=siteName(company,kmWeekGuidedTrainingSiteV1(company));
-  return{title:'2. Who should handle this one?',text:`${challengeSite} needs Human Resources 1. The local team already knows how to solve it; Marcus is available if needed.`,invest:`Now use Local Training. Priya can strengthen the Operations team at ${site}. Travel to teach adds $2k.`};
+  return{title:'2. Who should handle this one?',text:`${challengeSite} needs ${domainLabel(currentDomain)} 1. The local team already knows how to solve it; ${currentExpert} is available if needed.`,invest:`Now use Local Training. ${firstExpert} can strengthen the ${domainLabel(focus)} team at ${site}. Travel to teach adds $2k.`};
  }
  const transfer=kmWeekGuidedTransferV1(company);
- return{title:'3. Another problem, another expert',text:`Priya is busy training staff, but Marketing specialist Mary is available for the ${challengeSite} distributor problem.`,invest:`Try Knowledge Transfer. The suggested example is ${siteName(company,transfer.sourceSiteId)} HR → ${siteName(company,transfer.targetSiteId)}, where a more capable team can help a weaker one. You can choose any valid transfer.`};
+ return{title:'3. Another problem, another expert',text:`${firstExpert} is busy training staff, but ${domainLabel(currentDomain)} specialist ${currentExpert} is available for the ${challengeSite} problem.`,invest:`Try Knowledge Transfer. The suggested example is ${siteName(company,transfer.sourceSiteId)} ${domainLabel(transfer.domain)} → ${siteName(company,transfer.targetSiteId)}, where a more capable team can help a weaker one. You can choose any valid transfer.`};
 }
 
 const ToolTip:React.FC<{text:React.ReactNode;onHoverChange?:(active:boolean)=>void;large?:boolean}>=({text,onHoverChange,large=false})=><span role="button" aria-label="More information" className={`group relative inline-grid shrink-0 cursor-help place-items-center ${large?'h-7 w-7 rounded-full border border-slate-700 bg-slate-900 text-slate-400':'inline-flex text-slate-500'}`} onMouseEnter={()=>onHoverChange?.(true)} onMouseLeave={()=>onHoverChange?.(false)} onFocus={()=>onHoverChange?.(true)} onBlur={()=>onHoverChange?.(false)} tabIndex={0}><Info className={large?'h-3.5 w-3.5':'h-3.5 w-3.5'}/><span role="tooltip" className="pointer-events-none absolute right-0 top-full z-[300] mt-2 hidden w-64 rounded-xl border border-slate-600 bg-slate-950 p-3 text-[11px] font-semibold normal-case leading-relaxed text-slate-200 shadow-2xl group-hover:block group-focus-within:block">{text}</span></span>;
@@ -446,16 +450,21 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const coaching=kmWeekCoachV1(company);
  const sites=KM_WEEK_SITE_IDS.map(id=>company.sites.find(site=>site.id===id)).filter((site):site is CompanyV2['sites'][number]=>Boolean(site));
  const experts=company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
- const specialist=expertId?experts.find(item=>item.id===expertId):specialistFor(company,selectedDomain);
+ const staleExpertSelection=Boolean(expertId&&!experts.some(item=>item.id===expertId));
+ const specialist=kmWeekAvailableInvestmentExpertV1(company,expertId,selectedDomain);
  const specialistDomain=specialist?.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
  const localTrainingSite=company.sites.find(site=>site.id===trainingSiteId&&!site.isClosed);
  const aarCandidates=kmWeekAARCandidatesV1(company);
  const aarChallenge=aarCandidates.find(challenge=>challenge.id===aarChallengeId)||aarCandidates[0];
  const aarSite=aarChallenge?company.sites.find(site=>site.id===aarChallenge.siteId):undefined;
- const aarExpert=aarChallenge?specialistFor(company,aarChallenge.domain):undefined;
+ const aarExpert=aarChallenge
+  ?specialistFor(company,aarChallenge.domain)
+    ||(state?.expertRetirement?.status==='retired'&&state.expertRetirement.domain===aarChallenge.domain
+       ?company.experts.find(item=>item.id===state.expertRetirement?.expertId):undefined)
+  :undefined;
  const aarUplift=aarChallenge?.status==='failure'?2:1;
  const aarSiteBefore=aarSite&&aarChallenge?aarSite.teamCapability[aarChallenge.domain]||0:0;
- const aarExpertBefore=aarExpert&&aarChallenge?specialistScore(company,aarChallenge.domain):0;
+ const aarExpertBefore=aarExpert&&aarChallenge?aarExpert.domains.find(skill=>skill.domain===aarChallenge.domain)?.score||0:0;
  const aarSiteDelta=aarChallenge?aarUplift:0;
  const aarExpertDelta=aarChallenge?aarUplift:0;
  const localTrainingTravelCost=specialist&&localTrainingSite&&specialist.location!==localTrainingSite.id?2:0;
@@ -498,8 +507,9 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  useEffect(()=>{
   if(!state)return;
   if(state.stage==='guided'&&state.phase==='invest'){
-    if(state.guidedTurn===1){setInvestment('TRAIN_EXPERT');setSelectedDomain('operations');setExpertId(specialistFor(company,'operations')?.id||'');}
-    else if(state.guidedTurn===2){const expert=specialistFor(company,'operations');setInvestment('LOCAL_TRAINING');setSelectedDomain('operations');setExpertId(expert?.id||'');setTrainingSiteId(kmWeekGuidedTrainingSiteV1(company));}
+    const guidedDomain=state.pressureDomain||'operations';
+    if(state.guidedTurn===1){setInvestment('TRAIN_EXPERT');setSelectedDomain(guidedDomain);setExpertId(specialistFor(company,guidedDomain)?.id||'');}
+    else if(state.guidedTurn===2){const expert=specialistFor(company,guidedDomain);setInvestment('LOCAL_TRAINING');setSelectedDomain(guidedDomain);setExpertId(expert?.id||'');setTrainingSiteId(kmWeekGuidedTrainingSiteV1(company));}
     else{const transfer=kmWeekGuidedTransferV1(company);setInvestment('KNOWLEDGE_TRANSFER');setSelectedDomain(transfer.domain);setSourceSiteId(transfer.sourceSiteId);setTargetSiteId(transfer.targetSiteId);}
   }else if(state.stage==='free'&&state.phase==='invest'){
     setInvestment('TRAIN_EXPERT');
@@ -1094,7 +1104,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const source=company.sites.find(site=>site.id===sourceSiteId);
  const target=company.sites.find(site=>site.id===targetSiteId);
  const investmentPreview=investment==='AFTER_ACTION_REVIEW'
-   ?aarChallenge&&aarSite&&aarExpert?`${aarChallenge.status==='success'?'SUCCESS':'FAILURE'}: ${aarSite.name} ${domainLabel(aarChallenge.domain)} ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]} ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} · $50k`:'Choose a qualifying Challenge'
+   ?aarChallenge&&aarSite&&aarExpert?`${aarChallenge.status==='success'?'SUCCESS':'FAILURE'}: ${aarSite.name} ${domainLabel(aarChallenge.domain)} ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.isVacant?'Incoming expert receives +'+aarExpertDelta+' when appointed':aarExpert.name.split(' ')[0]+' '+aarExpertBefore+' → '+(aarExpertBefore+aarExpertDelta)} · $50k`:(aarChallenge?'Domain expert unavailable — check the review details':'Choose a qualifying Challenge')
    :investment==='TRAIN_EXPERT'
    ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${(specialistScore(company,specialistDomain)+1)}`:'Choose a company expert'
    :investment==='LOCAL_TRAINING'
@@ -1122,6 +1132,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    return delta?{kind:'transfer',domain:selectedDomain,sourceSiteId:source.id,targetSiteId:target.id,delta}:undefined;
   }
   if(kind==='AFTER_ACTION_REVIEW'&&aarChallenge&&aarSite&&aarExpert){
+   if(aarExpert.isVacant)return{kind:'site',domain:aarChallenge.domain,siteId:aarSite.id,delta:aarSiteDelta};
    return{kind:'aar',domain:aarChallenge.domain,siteId:aarSite.id,expertId:aarExpert.id,siteDelta:aarSiteDelta,expertDelta:aarExpertDelta};
   }
   return undefined;
@@ -1138,7 +1149,12 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    :scoreGhost==='resilience'?{kind:'threshold',value:KM_WEEK_SHOCK_CUTOFF,label:`AUDIT TARGET · ${KM_WEEK_SHOCK_CUTOFF}`}
    :undefined;
  const infoPreviewText=infoInvestment==='AFTER_ACTION_REVIEW'
-  ?aarChallenge&&aarSite&&aarExpert?`${aarSite.name}: ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]}: ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} (${aarChallenge.status==='failure'?'learning from failure':'learning from success'})`:'No eligible event in this round.'
+  ?!aarChallenge?'Choose a completed difficult Challenge to review.'
+   :!aarSite?'The site involved in the selected Challenge is unavailable.'
+   :!aarExpert?'This Challenge qualifies, but its domain specialist is unavailable. Try another investment or review when a replacement arrives.'
+   :aarExpert.isVacant
+    ?`${aarSite.name} ${domainLabel(aarChallenge.domain)}: ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; +${aarExpertDelta} knowledge saved for the incoming specialist when appointed.`
+    :`${aarSite.name} ${domainLabel(aarChallenge.domain)}: ${aarSiteBefore} → ${aarSiteBefore+aarSiteDelta}; ${aarExpert.name.split(' ')[0]}: ${aarExpertBefore} → ${aarExpertBefore+aarExpertDelta} (${aarChallenge.status==='failure'?'learning from failure':'learning from success'})`
   :infoInvestment==='TRAIN_EXPERT'
    ?specialist?`${specialist.name}: ${specialistScore(company,specialistDomain)} → ${(specialistScore(company,specialistDomain)+1)} (${domainLabel(specialistDomain)})`:'Choose an expert to preview.'
    :infoInvestment==='LOCAL_TRAINING'
@@ -1151,16 +1167,28 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
  const invest=async(event:React.MouseEvent<HTMLButtonElement>)=>{
   let payload:any,targetKey='';
   if(investment==='AFTER_ACTION_REVIEW'){
-    if(!aarChallenge||!aarExpert)return;
+    if(!aarChallenge||!aarExpert){
+      const message='A review needs a qualifying Challenge and domain knowledge to capture. Choose another investment if this review is not available.';
+      setActionError(message);onToast(message);return;
+    }
     payload={type:'KM_WEEK_INVEST',investment,challengeId:aarChallenge.id};
     targetKey=`expert:${aarExpert.id}:${aarChallenge.domain}`;
+    if(aarExpert.isVacant)targetKey=`site:${aarChallenge.siteId}:${aarChallenge.domain}`;
   }else if(investment==='TRAIN_EXPERT'){
-    const expert=specialist||experts[0];if(!expert)return;
+    const expert=specialist;
+    if(!expert){
+      const message='No company expert is available to train. Choose Knowledge Transfer, or use GO TO SITE AUDITS NOW in the final three minutes.';
+      setActionError(message);onToast(message);return;
+    }
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
     payload={type:'KM_WEEK_INVEST',investment,expertId:expert.id,domain};
     targetKey=`expert:${expert.id}:${domain}`;
   }else if(investment==='LOCAL_TRAINING'){
-    const expert=specialist||experts[0];if(!expert||!localTrainingSite)return;
+    const expert=specialist;
+    if(!expert||!localTrainingSite){
+      const message=!expert?'No company expert is available for Local Training. Choose another intervention or go to Site Audits.':'The selected training site is unavailable. Choose another site before committing.';
+      setActionError(message);onToast(message);return;
+    }
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
     payload={type:'KM_WEEK_INVEST',investment,expertId:expert.id,siteId:localTrainingSite.id,domain};
     targetKey=`site:${localTrainingSite.id}:${domain}`;
@@ -1180,7 +1208,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    const skill=expert?.domains.find(item=>item.domain===aarChallenge?.domain);
    if(site&&skill&&aarChallenge){
     site.teamCapability[aarChallenge.domain]=(site.teamCapability[aarChallenge.domain]||0)+aarUplift;
-    skill.score+=aarUplift;
+    if(!expert?.isVacant)skill.score+=aarUplift;
    }
   }else if(investment==='TRAIN_EXPERT'){
    const expert=optimisticCompany.experts.find(item=>item.id===payload.expertId);
@@ -1370,7 +1398,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
    <section data-kmw-aar-intro role="dialog" aria-modal="true" aria-label="After Action Review introduction" className="fixed left-[30%] top-[26%] z-[165] w-[min(420px,calc(100vw-24px))] max-h-[calc(100dvh-100px)] -translate-x-1/2 overflow-y-auto rounded-[22px] border-2 border-amber-300 bg-[linear-gradient(145deg,#30210b,#101827)] p-5 text-left shadow-[0_25px_65px_rgba(0,0,0,.8)] max-[699px]:left-1/2 max-[699px]:top-[10%]">
     <div className="text-[10px] font-black uppercase tracking-[.16em] text-amber-300">A new investment choice</div>
     <h3 className="mt-2 text-xl font-black text-white">Learn from a tough Challenge</h3>
-    <p className="mt-3 text-sm leading-relaxed text-slate-200">A tough Challenge is a chance to learn. An After Action Review costs <b className="text-amber-200">$50k</b> and grows knowledge for both the expert and the local site: <b className="text-amber-200">+1 after success or +2 after failure</b>. It creates knowledge <b>above the current River levels</b>, not merely redistributes what the company already knows. Tap the <b>i</b> icon for the four questions and full details.</p>
+    <p className="mt-3 text-sm leading-relaxed text-slate-200">A tough Challenge is a chance to learn. An After Action Review costs <b className="text-amber-200">$50k</b> and grows knowledge for both the expert and the local site: <b className="text-amber-200">{state.pressureDomain?'+2 after a serious setback':'+1 after success or +2 after failure'}</b>. It creates knowledge <b>above the current River levels</b>, not merely redistributes what the company already knows. Tap the <b>i</b> icon for the four questions and full details.</p>
     <button type="button" onClick={dismissAARIntro} className="mt-4 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950">GOT IT — SHOW ME THE REVIEW <ArrowRight className="ml-1 inline h-4 w-4"/></button>
    </section>
   </>}
@@ -1601,7 +1629,7 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
          <h3 className="flex-1 text-sm font-black text-white">{KM_WEEK_INTERVENTION_HELP[infoInvestment].title}</h3>
          <button type="button" onClick={()=>setInfoInvestment(null)} aria-label="Close investment information" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-500 text-slate-300 hover:bg-slate-800"><X className="h-4 w-4"/></button>
         </div>
-        <p className="mt-2 text-[12px] leading-relaxed text-slate-100">{KM_WEEK_INTERVENTION_HELP[infoInvestment].description}</p>
+        <p className="mt-2 text-[12px] leading-relaxed text-slate-100">{infoInvestment==='AFTER_ACTION_REVIEW'&&state.pressureDomain?'An After Action Review asks: What was planned? What happened? Why? What should change? After a difficult failed Challenge (requirement 5 or more), a $50k review lifts the affected site by +2 and develops +2 expert knowledge beyond previous River peaks. If that expert has just retired, the lessons are passed to their replacement when appointed. An earlier setback can also be reviewed.':KM_WEEK_INTERVENTION_HELP[infoInvestment].description}</p>
         <div className="mt-2 rounded-lg border border-sky-700/70 bg-sky-950/45 px-2.5 py-2 text-[11px] leading-relaxed text-sky-100">
          <span className="font-black text-sky-300">River preview: </span>{infoPreviewText}
          {!scoreGhostPreview&&<span className="mt-1 block font-semibold text-amber-200">No further knowledge gain with these settings. Choose a different expert, site or domain to see an uplift.</span>}
@@ -1612,12 +1640,13 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
           <select data-kmw-aar-select value={aarChallenge?.id||''} onChange={event=>{const chosen=aarCandidates.find(item=>item.id===event.target.value);setAARChallengeId(event.target.value);if(chosen)setSelectedDomain(chosen.domain)}} className="mt-1 block w-full rounded-lg border border-amber-700 bg-[#071019] px-2 py-2.5 text-xs font-bold normal-case text-white">
            {aarCandidates.map(item=><option key={item.id} value={item.id}>{item.status==='success'?'SUCCESS: ':'FAILURE: '}{siteName(company,item.siteId)} — {item.title} · {domainLabel(item.domain)} {item.difficulty}</option>)}
           </select>
-          <span className="mt-2 block text-xs normal-case font-semibold text-slate-300">Facilitator: <b className="text-amber-200">{aarExpert?.name||'Company expert'}</b> · Site: <b className="text-white">{aarSite?.name||'—'}</b> · Both gain +{aarUplift}</span>
+          <span className="mt-2 block text-xs normal-case font-semibold text-slate-300">Facilitator: <b className="text-amber-200">{aarExpert?.isVacant?'Local team (lessons saved for replacement)':aarExpert?.name||'Company expert'}</b> · Site: <b className="text-white">{aarSite?.name||'—'}</b> · {aarExpert?.isVacant?`Site gains +${aarUplift}; incoming expert gains +${aarUplift} when appointed`:`Both gain +${aarUplift}`}</span>
          </label>:investment!=='KNOWLEDGE_TRANSFER'?<div className="grid grid-cols-2 items-start gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Company expert<select value={specialist?.id||''} onChange={event=>{const next=experts.find(item=>item.id===event.target.value);setExpertId(event.target.value);if(next)setSelectedDomain(next.domains[0].domain)}} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{experts.map(expert=><option key={expert.id} value={expert.id}>{expert.name} ({SITE_ABBR[expert.location]||expert.location}) · {domainLabel(expert.domains[0].domain)} {expert.domains[0].score}</option>)}</select></label><div>{investment==='LOCAL_TRAINING'?<label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Training site<select value={trainingSiteId} onChange={event=>setTrainingSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · Team {site.teamCapability[specialistDomain]||0}{specialist?.location===site.id?' · expert here':' · +$2k travel'}</option>)}</select></label>:<div><div className="text-[9px] font-black uppercase text-slate-500">Knowledge domain</div><div className="mt-1 rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs font-black text-white">{domainLabel(specialistDomain)}</div></div>}</div></div>:<div className="grid grid-cols-3 gap-2"><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">Domain<select value={selectedDomain} onChange={event=>setSelectedDomain(event.target.value as KnowledgeDomain)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{KM_WEEK_DOMAINS.map(domain=><option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">From<select value={sourceSiteId} onChange={event=>setSourceSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label><label className="block min-w-0 text-[9px] font-black uppercase text-slate-500">To<select value={targetSiteId} onChange={event=>setTargetSiteId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#071019] px-2 py-2 text-xs normal-case text-white">{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.teamCapability[selectedDomain]||0}</option>)}</select></label></div>}
+        {staleExpertSelection&&(investment==='TRAIN_EXPERT'||investment==='LOCAL_TRAINING')&&<p role="status" data-kmw-investment-expert-reassigned className="mt-2 rounded-lg border border-amber-700/70 bg-amber-950/25 px-2 py-1.5 text-[10px] font-bold text-amber-200">Your previously selected expert is no longer available. {specialist?`${specialist.name} (${domainLabel(specialistDomain)}) is selected instead.`:'Please choose another intervention.'}</p>}
         <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/15 px-2 py-1.5 text-[10px]"><span className="font-black text-amber-300">Preview:</span> <span className="text-slate-200">{investmentPreview}</span>{investment==='LOCAL_TRAINING'&&<div className="mt-1 font-bold text-red-300">Training commitment — unavailable next round</div>}</div>
-        {actionError&&<div className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}</div>}
+        {actionError&&<div role="alert" className="mt-2 rounded-lg border border-rose-700 bg-rose-950/30 px-2 py-2 text-[10px] font-black text-rose-200">{actionError}{finalShockWindow&&<p className="mt-1 font-semibold text-rose-100">To finish without this investment, use GO TO SITE AUDITS NOW above.</p>}</div>}
         {!guided&&<button type="button" data-kmw-skip-invest disabled={busy||readOnly} onClick={()=>{if(window.confirm(finalShockWindow?'Skip this investment and start Site Audits?':'Skip investing this round and proceed to the next Challenges?'))void post({type:'KM_WEEK_SKIP_INVEST'})}} className="mb-2 w-full rounded-lg border border-slate-500 bg-slate-900 px-3 py-2.5 text-xs font-bold text-slate-100 disabled:opacity-40">{company.turnover<8?'NO FUNDS — ':''}SKIP INVESTMENT {finalShockWindow?'& START SITE AUDITS':'& CONTINUE'}</button>}
-        <button onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':finalShockWindow?'COMMIT FINAL INVESTMENT & FACE SITE AUDITS':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
+        <button type="button" data-kmw-invest-commit onClick={event=>void invest(event)} disabled={busy||readOnly} className="mt-2 h-11 w-full rounded-xl border-2 border-amber-200 bg-amber-400 text-sm font-black text-slate-950 shadow-lg disabled:bg-slate-800 disabled:text-slate-600">{busy?'COMMITTING…':guided?'COMMIT GUIDED INVESTMENT':finalShockWindow?'COMMIT FINAL INVESTMENT & FACE SITE AUDITS':'COMMIT INVESTMENT & START NEXT ROUND'} <ArrowRight className="ml-1 inline h-4 w-4"/></button>
        </div>
       </>}
 

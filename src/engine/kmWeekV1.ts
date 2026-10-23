@@ -23,7 +23,11 @@ export function kmWeekAARCandidatesV1(company:CompanyV2):KMWeekChallenge[]{
  const state=company.kmWeek;
  if(!state||state.stage!=='free'||state.phase!=='invest'||company.round<KM_WEEK_AAR_UNLOCK_ROUND)return [];
  const reviewed=new Set(state.investmentHistory.filter(item=>item.type==='AFTER_ACTION_REVIEW').map(item=>item.challengeId));
- return state.challenges.filter(item=>item.difficulty>=5&&item.status!=='open'&&!reviewed.has(item.id));
+ const opportunities=state.pressureDomain&&state.lastPressureFailure
+  ?[...state.challenges,state.lastPressureFailure]:state.challenges;
+ return opportunities.filter((item,index)=>item.difficulty>=5
+  &&(state.pressureDomain?item.domain===state.pressureDomain&&item.status==='failure':item.status!=='open')
+  &&!reviewed.has(item.id)&&opportunities.findIndex(other=>other.id===item.id)===index);
 }
 
 export const KM_WEEK_SHOCK_WINDOW_SECONDS = 180;
@@ -57,7 +61,7 @@ export const KM_WEEK_GOALS: Record<KMWeekGoalId, KMWeekGoal> = {
   'local-heroes': {
     id:'local-heroes',
     title:'Local Heroes',
-    description:'Solve at least 2 free-play Challenges using local team capability only.',
+    description:'Solve at least 5 free-play Challenges using local team capability only.',
     points:5,
   },
   'deep-bench': {
@@ -145,6 +149,14 @@ const FREE_EVENT_DESCRIPTIONS:Record<KMWeekFreeDomain,KMWeekEventDescription[]>=
   ],
 };
 
+// Chosen once per random workshop ID, stable across reloads and company joins.
+function kmWeekPressureDomainV1(sessionSeed:string):KMWeekFreeDomain{
+ return KM_WEEK_DOMAINS[seededHash(sessionSeed+'|kmw3-pressure')%KM_WEEK_DOMAINS.length] as KMWeekFreeDomain;
+}
+function guidedDomainRotation(domain:KnowledgeDomain):[KnowledgeDomain,KnowledgeDomain,KnowledgeDomain]{
+ const start=KM_WEEK_DOMAINS.indexOf(domain);
+ return [0,1,2].map(offset=>KM_WEEK_DOMAINS[(start+offset)%3]) as [KnowledgeDomain,KnowledgeDomain,KnowledgeDomain];
+}
 function seededHash(text:string){
   let hash=2166136261;
   for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}
@@ -216,7 +228,9 @@ function hireRetiredExpertReplacement(company:CompanyV2){
   const skill=expert.domains.find(item=>item.domain===retirement.domain);
   if(!skill)return;
   const siteScores=activeSites(company).map(site=>site.teamCapability[retirement.domain]||0);
-  const replacementScore=Math.max(3,...siteScores);
+  // AAR lessons recorded while this specialist was retired are handed to the
+  // replacement, rather than lost when the vacancy is filled.
+  const replacementScore=Math.max(3,...siteScores)+(retirement.pendingAARUplift||0);
   expert.name=retirement.replacementName;
   skill.score=replacementScore;
   expert.isVacant=false;
@@ -227,41 +241,56 @@ function hireRetiredExpertReplacement(company:CompanyV2){
   retirement.status='replaced';
 }
 
-/** Keep guided lessons winnable and meaningful for every shuffled River.
- *  Guided 1 requires an Operations team with breadth > 0, Guided 2 a
- *  genuinely capable HR team, and Guided 3 a weaker Marketing team.
+/** Preserve expert deployment, local solving/training, and knowledge transfer
+ * irrespective of which domain is the workshop's recurring constraint.
  */
-function guidedChallenge(company:CompanyV2,turn:number):KMWeekChallenge{
+function guidedChallenge(company:CompanyV2,turn:number,pressure=company.kmWeek?.pressureDomain||'operations'):KMWeekChallenge{
  const sites=activeSites(company);
+ const [focus,second,third]=guidedDomainRotation(pressure);
  const choose=(domain:KnowledgeDomain,filter:(score:number,site:CompanyV2['sites'][number])=>boolean,preferred:string)=>{
   const candidates=sites.filter(site=>filter(site.teamCapability[domain]||0,site));
-  const site=candidates.find(site=>site.id===preferred)||candidates[0]||sites[0];
-  return site;
+  return candidates.find(site=>site.id===preferred)||candidates[0]||sites[0];
+ };
+ const example=(domain:KnowledgeDomain,index:number,site:CompanyV2['sites'][number])=>{
+  const description=FREE_EVENT_DESCRIPTIONS[domain as KMWeekFreeDomain][index];
+  return {title:description.title,story:description.story.split('{site}').join(site.name)};
  };
  if(turn===1){
-  const site=choose('operations',(score,site)=>score>0&&site.id!=='melbourne','brisbane');
-  return {id:'G1',title:'Packaging line shutdown',story:`A conveyor-control fault has stopped ${site.name}’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.`,siteId:site.id,domain:'operations',difficulty:4,impact:30,status:'open',guided:true};
+  const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===focus));
+  const site=choose(focus,(score,item)=>score>0&&item.id!==expert?.location,'brisbane');
+  const narrative=focus==='operations'
+   ?{title:'Packaging line shutdown',story:`A conveyor-control fault has stopped ${site.name}’s packaging line during a customer production run. Dispatch will miss today’s cut-off unless the line is restarted quickly.`}
+   :example(focus,focus==='hr'?0:1,site);
+  return {id:'G1',...narrative,siteId:site.id,domain:focus,difficulty:4,impact:30,status:'open',guided:true};
  }
  if(turn===2){
-  const site=choose('hr',score=>score>=1,'melbourne');
-  return {id:'G2',title:'Roster coverage dispute',story:`A last-minute ${site.name} staffing change raises concerns about shift coverage and fatigue limits. The local team needs to put a compliant roster in place before work begins.`,siteId:site.id,domain:'hr',difficulty:1,impact:30,status:'open',guided:true};
+  const site=choose(second,score=>score>=1,'melbourne');
+  const narrative=second==='hr'
+   ?{title:'Roster coverage dispute',story:`A last-minute ${site.name} staffing change raises concerns about shift coverage and fatigue limits. The local team needs to put a compliant roster in place before work begins.`}
+   :example(second,5,site);
+  return {id:'G2',...narrative,siteId:site.id,domain:second,difficulty:1,impact:30,status:'open',guided:true};
  }
- const site=choose('marketing',score=>score<=1,'perth');
- return {id:'G3',title:'Distributor escalation',story:`A distributor in ${site.name} threatens to suspend urgent customer deliveries after receiving conflicting product and service advice. The team needs a clear, consistent response today.`,siteId:site.id,domain:'marketing',difficulty:4,impact:35,status:'open',guided:true};
+ const site=choose(third,score=>score<=1,'perth');
+ const narrative=third==='marketing'
+  ?{title:'Distributor escalation',story:`A distributor in ${site.name} threatens to suspend urgent customer deliveries after receiving conflicting product and service advice. The team needs a clear, consistent response today.`}
+  :example(third,third==='operations'?0:3,site);
+ return {id:'G3',...narrative,siteId:site.id,domain:third,difficulty:4,impact:35,status:'open',guided:true};
 }
 
 /** Guided-investment recommendations follow the knowledge each team actually has. */
 export function kmWeekGuidedTrainingSiteV1(company:CompanyV2):string{
- const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain==='operations'));
+ const focus=company.kmWeek?.pressureDomain||'operations';
+ const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===focus));
  const sites=activeSites(company).filter(site=>site.id!==expert?.location);
- return [...sites].sort((a,b)=>(a.teamCapability.operations||0)-(b.teamCapability.operations||0)||a.id.localeCompare(b.id))[0]?.id||activeSites(company)[0]?.id||'brisbane';
+ return [...sites].sort((a,b)=>(a.teamCapability[focus]||0)-(b.teamCapability[focus]||0)||a.id.localeCompare(b.id))[0]?.id||activeSites(company)[0]?.id||'brisbane';
 }
 export function kmWeekGuidedTransferV1(company:CompanyV2):{domain:KnowledgeDomain;sourceSiteId:string;targetSiteId:string}{
- // HR is independent of the Operations training lesson and always starts 2/1/0.
+ // Transfer uses the second lesson's domain, independent of the expert-training lesson.
+ const domain=guidedDomainRotation(company.kmWeek?.pressureDomain||'operations')[1];
  const sites=[...activeSites(company)].sort((a,b)=>a.id.localeCompare(b.id));
- const source=[...sites].sort((a,b)=>(b.teamCapability.hr||0)-(a.teamCapability.hr||0))[0];
- const target=[...sites].sort((a,b)=>(a.teamCapability.hr||0)-(b.teamCapability.hr||0))[0];
- return {domain:'hr',sourceSiteId:source?.id||'melbourne',targetSiteId:target?.id||'perth'};
+ const source=[...sites].sort((a,b)=>(b.teamCapability[domain]||0)-(a.teamCapability[domain]||0))[0];
+ const target=[...sites].sort((a,b)=>(a.teamCapability[domain]||0)-(b.teamCapability[domain]||0))[0];
+ return {domain,sourceSiteId:source?.id||'melbourne',targetSiteId:target?.id||'perth'};
 }
 
 function cloneChallenges(items:KMWeekChallenge[]):KMWeekChallenge[]{
@@ -275,7 +304,18 @@ export function freeChallengesForRound(session:GameSessionV2,company:CompanyV2,r
   const seedBase=`${session.id}|${company.id}|cycle:${cycle}`;
   // Keep the first full-play round approachable. Shuffle the five tougher
   // pairs independently for every company and six-round cycle.
-  const shuffledProfiles=[FREE_ROUND_VALUES[0],...seededShuffle(FREE_ROUND_VALUES.slice(1),`${seedBase}|profiles`)];
+  const pressure=company.kmWeek?.pressureDomain;
+  // Place the five highest original requirements and one paired 4 in a
+  // recurring domain; preserve two same-domain rounds and all cash impacts.
+  // In-progress legacy games retain their existing profiles.
+  const alternatives=KM_WEEK_DOMAINS.filter(domain=>domain!==pressure);
+  const profiles=pressure?FREE_ROUND_VALUES.map(pair=>pair.map(value=>({
+    ...value,
+    domain:(value.difficulty>=5||value.id==='OPS4A'
+      ?pressure
+      :value.domain==='marketing'?alternatives[1]:alternatives[0]) as KMWeekFreeDomain,
+  }))):FREE_ROUND_VALUES;
+  const shuffledProfiles=[profiles[0],...seededShuffle(profiles.slice(1),`${seedBase}|profiles`)];
   const profile=shuffledProfiles[position];
 
   const descriptionPools={
@@ -358,6 +398,16 @@ function activeExperts(company:CompanyV2){
   return company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
 }
 
+// An investment selection may outlive an expert: Retirement happens as the
+// final Challenge is resolved, before Invest is displayed. Never leave the
+// client pointing at a vacant specialist or silently ignore the Commit button.
+export function kmWeekAvailableInvestmentExpertV1(company:CompanyV2,preferredId:string,domain:KnowledgeDomain):ExpertV2|undefined{
+  const available=activeExperts(company);
+  return available.find(expert=>expert.id===preferredId)
+    ||available.find(expert=>expert.domains.some(skill=>skill.domain===domain))
+    ||available[0];
+}
+
 function applyStartingBoard(company:CompanyV2,sessionSeed:string){
   for(const site of company.sites){
     site.isClosed=!KM_WEEK_SITE_IDS.includes(site.id as any);
@@ -402,6 +452,7 @@ function applyStartingBoard(company:CompanyV2,sessionSeed:string){
 }
 
 export function initialiseKMWeekCompanyV1(company:CompanyV2,sessionSeed='KM_WEEK_DEFAULT'){
+  const pressureDomain=kmWeekPressureDomainV1(sessionSeed);
   applyStartingBoard(company,sessionSeed);
   company.round=1;
   company.roundPhase='events';
@@ -410,7 +461,8 @@ export function initialiseKMWeekCompanyV1(company:CompanyV2,sessionSeed='KM_WEEK
     phase:'challenge',
     guidedTurn:1,
     freeRound:0,
-    challenges:[guidedChallenge(company,1)],
+    pressureDomain,
+    challenges:[guidedChallenge(company,1,pressureDomain)],
     usedExpertIds:[],
     freeSuccesses:0,
     businessDifficultySolved:0,
@@ -473,7 +525,7 @@ function kmWeekMatchesSessionOpening(company:CompanyV2,sessionId:string):boolean
   return Boolean(actual&&!actual.isVacant&&actual.location===expected.location
    &&expected.domains.every(skill=>actual.domains.some(item=>item.domain===skill.domain&&item.score===skill.score)));
  })&&experts.length===reference.experts.length;
- const guided=guidedChallenge(reference,1);
+ const guided=guidedChallenge(reference,1,company.kmWeek?.pressureDomain||'operations');
  return matchesSites(company.sites)&&matchesExperts(company.experts)
   &&Boolean(company.initialRiverSnapshot
    &&matchesSites(company.initialRiverSnapshot.sites)
@@ -545,7 +597,7 @@ function expertisePoints(company:CompanyV2){
 function goalAchieved(session:GameSessionV2,company:CompanyV2){
   const state=company.kmWeek!;
   const goal=session.kmWeekGoalId||hashGoal(session.id);
-  if(goal==='local-heroes')return state.localSuccesses>=2;
+  if(goal==='local-heroes')return state.localSuccesses>=5;
   if(goal==='deep-bench')return activeExperts(company).every(expert=>(expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.score||0)>=KM_WEEK_DEEP_BENCH_TARGET);
   if(goal==='broad-base')return localCapabilityPoints(company)>=4;
   const totals=activeSites(company).map(site=>KM_WEEK_DOMAINS.reduce((sum,domain)=>sum+(site.teamCapability[domain]||0),0));
@@ -641,7 +693,7 @@ export function resolveKMWeekChallengeV1(
   if(!site)return{success:false,message:'Challenge site not found.'};
 
   if(state.stage==='guided'&&state.guidedTurn===1&&method!=='expert'){
-    return{success:false,message:'This guided move is teaching expert deployment. Send the Operations expert.'};
+    return{success:false,message:`This guided move is teaching expert deployment. Send the ${challenge.domain==='hr'?'Human Resources':challenge.domain==='marketing'?'Marketing':'Operations'} expert.`};
   }
 
   if(expertId&&(method==='expert'||includeExpertBreadth||useExpertRisk)&&state.trainingCommitments?.[expertId]===company.round)return{success:false,message:'Busy training staff'};
@@ -719,6 +771,10 @@ export function resolveKMWeekChallengeV1(
   const turnoverChange=businessChange-travelCost;
   challenge.travelCost=travelCost||undefined;
   challenge.turnoverChange=turnoverChange;
+  if(state.stage==='free'&&!won&&state.pressureDomain===challenge.domain&&challenge.difficulty>=5){
+    // Hold onto the most recent significant setback until AAR becomes available.
+    state.lastPressureFailure={...challenge};
+  }
   applyTurnover(company,turnoverChange);
   const challengeIndex=state.challenges.findIndex(item=>item.id===challenge.id)+1;
   const challengeLabel=state.stage==='guided'?`G${state.guidedTurn} C`:`R${state.freeRound} C${challengeIndex}`;
@@ -771,11 +827,17 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
 
   if(type==='AFTER_ACTION_REVIEW'){
     const event=kmWeekAARCandidatesV1(company).find(item=>item.id===payload?.challengeId);
-    if(!event)return{success:false,message:'Choose an eligible completed Challenge (knowledge requirement of 5 or more) from this round.'};
+    if(!event)return{success:false,message:'Choose an eligible completed Challenge (knowledge requirement of 5 or more).'};
     const site=company.sites.find(item=>item.id===event.siteId&&!item.isClosed);
-    const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===event.domain));
+    const retirement=state.expertRetirement;
+    // When the domain expert has just retired, the local team may still carry
+    // out its AAR. Captured lessons are handed to the incoming specialist.
+    const expert=activeExperts(company).find(item=>item.domains.some(skill=>skill.domain===event.domain))
+      ||(retirement?.status==='retired'&&retirement.domain===event.domain
+        ?company.experts.find(item=>item.id===retirement.expertId&&item.isVacant)
+        :undefined);
     const skill=expert?.domains.find(item=>item.domain===event.domain);
-    if(!site||!expert||!skill)return{success:false,message:'A local site and a company expert in the Challenge domain are required for the review.'};
+    if(!site||!expert||!skill)return{success:false,message:'The relevant domain expert is unavailable for this review. Choose another investment or review after their replacement arrives.'};
     cost=KM_WEEK_AAR_COST;
     if(!spend(company,cost))return{success:false,message:'Not enough turnover for the $50k After Action Review.'};
     const uplift=event.status==='failure'?2:1;
@@ -784,7 +846,9 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
     after=before+uplift;
     expertBefore=skill.score;expertAfter=expertBefore+uplift;
     site.teamCapability[event.domain]=after;
-    skill.score=expertAfter;
+    if(expert.isVacant&&retirement?.status==='retired'&&retirement.expertId===expert.id){
+      retirement.pendingAARUplift=(retirement.pendingAARUplift||0)+uplift;
+    }else skill.score=expertAfter;
   }else if(type==='TRAIN_EXPERT'){
     const expert=company.experts.find(item=>item.id===payload?.expertId&&!item.isVacant);
     const skill=expert?.domains.find(item=>item.domain===domain);
@@ -822,7 +886,9 @@ export function investKMWeekV1(session:GameSessionV2,company:CompanyV2,payload:a
   });
   state.turnoverHistory.push({label:state.stage==='guided'?`G${state.guidedTurn} I`:`R${state.freeRound} I`,turnover:company.turnover});
   state.lastMessage=type==='AFTER_ACTION_REVIEW'
-    ?`After Action Review complete: site ${before} → ${after}, expert ${expertBefore} → ${expertAfter}. Cost ${cost}k.`
+    ?state.expertRetirement?.status==='retired'&&state.expertRetirement.expertId===expertId
+      ?`After Action Review complete: site ${before} → ${after}; +${after-before} knowledge captured for the incoming expert. Cost ${cost}k.`
+      :`After Action Review complete: site ${before} → ${after}, expert ${expertBefore} → ${expertAfter}. Cost ${cost}k.`
     :`${investmentLabel(type)} complete: ${before} → ${after}. Cost ${cost}k.`;
 
   advanceAfterKMWeekInvestment(session,company);

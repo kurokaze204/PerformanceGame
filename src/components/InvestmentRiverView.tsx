@@ -35,6 +35,8 @@ interface Props{
  challengeTarget?:{domain:KnowledgeDomain;level:number};
  /** Common vertical axis ceiling for before/after comparison charts. */
  maxKnowledgeLevel?:number;
+ /** Tiny unlabelled marker permitted only on the final compact KM Week AAR River. */
+ finalAarBoostedDomain?:KnowledgeDomain;
 }
 
 const KM_WEEK:KnowledgeDomain[]=['operations','hr','marketing'];
@@ -44,7 +46,7 @@ const ABBR:Record<string,string>={melbourne:'MEL',sydney:'SYD',brisbane:'BNE',ad
 const firstName=(name:string)=>name.trim().split(/\s+/)[0]||name;
 const abbrev=(value:string)=>ABBR[value]||value.slice(0,3).toUpperCase();
 
-export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,guidedSiteId,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview,challengeTarget,maxKnowledgeLevel})=>{
+export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,selectedSiteId,sourceSiteId,selectedExpertId,highlightHQ=false,highlightAllSites=false,highlightDomain=false,guidedSiteId,showSiteLabels=false,referenceSiteId,referenceHQ=false,previewSiteDelta=0,previewExpertDelta=0,previewHQDelta=0,thresholdLine,compact=false,ghostPreview,challengeTarget,maxKnowledgeLevel,finalAarBoostedDomain})=>{
  const[riverInfoOpen,setRiverInfoOpen]=useState(false);
  const domains=mode==='expert'?EXPERT:mode==='km_week'?KM_WEEK:NEWBIE;
  const sites=company.sites.filter(site=>!site.isClosed);
@@ -127,7 +129,7 @@ export const InvestmentRiverView:React.FC<Props>=({company,mode,selectedDomain,s
       <path d={transferGhost.path} fill="none" stroke="#38bdf8" strokeWidth="3" strokeDasharray="8 7" strokeLinecap="round" opacity=".9"/>
       <circle cx={transferGhost.targetPoint.px} cy={transferGhost.targetY} r="8" fill="#082f49" stroke="#7dd3fc" strokeWidth="2.5" strokeDasharray="4 3"/>
      </g>}
-     <text data-kmw-river-intro={mode==='km_week'&&!compact?'domain-'+item.domain:undefined} x={x(di)} y={H-12} textAnchor="middle" fill={domainSelected?'#fde047':'#cbd5e1'} fontSize="15" fontWeight={domainSelected?'900':'800'}>{DOMAIN_INFO[item.domain].label}</text>
+     <text data-kmw-river-intro={mode==='km_week'&&!compact?'domain-'+item.domain:undefined} x={x(di)} y={H-12} textAnchor="middle" fill={domainSelected?'#fde047':'#cbd5e1'} fontSize="15" fontWeight={domainSelected?'900':'800'}>{DOMAIN_INFO[item.domain].label}{compact&&mode==='km_week'&&finalAarBoostedDomain===item.domain?'*':''}</text>
      {item.scores.map(({site,score},si)=>{
        const {px,py}=sitePoints[si];
        const target=domainSelected&&(site.id===selectedSiteId||highlightAllSites);

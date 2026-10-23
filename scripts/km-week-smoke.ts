@@ -10,6 +10,7 @@ import {
   calculateKMWeekScoreV1,
   kmWeekFinalTurnoverPointsV1,
   KM_WEEK_DOMAINS,
+  KM_WEEK_GOALS,
   KM_WEEK_SITE_IDS,
   kmWeekGuidedTrainingSiteV1,
   kmWeekGuidedTransferV1,
@@ -18,6 +19,7 @@ import {
   freeChallengesForRound,
   kmWeekRiskOddsV1,
   kmWeekAARCandidatesV1,
+  kmWeekAvailableInvestmentExpertV1,
   KM_WEEK_AAR_COST,
   KM_WEEK_AAR_UNLOCK_ROUND,
 } from '../src/engine/kmWeekV1.ts';
@@ -150,30 +152,42 @@ for(let sample=0;sample<18;sample++){
  }
  assert.deepEqual(a.experts.map(expert=>expert.domains[0].score),b.experts.map(expert=>expert.domains[0].score),'Starting experts must be identical within the session');
  const specialist=(domain:string)=>a.experts.find(expert=>expert.domains.some(skill=>skill.domain===domain))!;
+ const focus=a.kmWeek!.pressureDomain!;
+ const focusPosition=KM_WEEK_DOMAINS.indexOf(focus);
+ const other=[KM_WEEK_DOMAINS[(focusPosition+1)%3],KM_WEEK_DOMAINS[(focusPosition+2)%3]];
+ assert.equal(b.kmWeek!.pressureDomain,focus,'Every company in the workshop must share the selected business pressure');
  const first=a.kmWeek!.challenges[0];
- assert.ok((a.sites.find(site=>site.id===first.siteId)!.teamCapability.operations||0)>0,'First guided problem needs real breadth');
- assert.notEqual(first.siteId,specialist('operations').location,'First guided problem should involve expert travel');
- let action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_RESOLVE',challengeId:first.id,method:'expert',expertId:specialist('operations').id,includeLocalBreadth:true});
+ assert.equal(first.domain,focus,'The first expert tutorial must follow the selected domain');
+ assert.ok((a.sites.find(site=>site.id===first.siteId)!.teamCapability[focus]||0)>0,'First guided problem needs real breadth');
+ assert.notEqual(first.siteId,specialist(focus).location,'First guided problem should involve expert travel');
+ let action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_RESOLVE',challengeId:first.id,method:'expert',expertId:specialist(focus).id,includeLocalBreadth:true});
  assert.ok(action.success,action.message);
- action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:specialist('operations').id,domain:'operations'});
+ action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:specialist(focus).id,domain:focus});
  assert.ok(action.success,action.message);
  const second=a.kmWeek!.challenges[0];
- assert.equal(second.domain,'hr');
- assert.ok((a.sites.find(site=>site.id===second.siteId)!.teamCapability.hr||0)>=second.difficulty,'Guided local HR challenge must be winnable');
+ assert.equal(second.domain,other[0],'Guided 2 must introduce another business domain');
+ assert.ok((a.sites.find(site=>site.id===second.siteId)!.teamCapability[other[0]]||0)>=second.difficulty,'Guided local challenge must remain winnable');
  action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_RESOLVE',challengeId:second.id,method:'local'});
  assert.ok(action.success,action.message);
  const trainingSiteId=kmWeekGuidedTrainingSiteV1(a);
- action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:specialist('operations').id,siteId:trainingSiteId,domain:'operations'});
+ action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'LOCAL_TRAINING',expertId:specialist(focus).id,siteId:trainingSiteId,domain:focus});
  assert.ok(action.success,action.message);
  const third=a.kmWeek!.challenges[0];
- assert.equal(third.domain,'marketing');
- assert.ok(third.story.includes(a.sites.find(site=>site.id===third.siteId)!.name),'Third guided story must match its chosen site');
- action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_RESOLVE',challengeId:third.id,method:'expert',expertId:specialist('marketing').id});
+ assert.equal(third.domain,other[1],'Guided 3 must introduce the remaining domain');
+ assert.ok(third.story.includes(a.sites.find(site=>site.id===third.siteId)!.name),'Guided story must match its actual site');
+ action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_RESOLVE',challengeId:third.id,method:'expert',expertId:specialist(other[1]).id});
  assert.ok(action.success,action.message);
  const transfer=kmWeekGuidedTransferV1(a);
+ assert.equal(transfer.domain,other[0],'Guided knowledge transfer must use an untrained domain');
  action=applyKMWeekActionV1(variantSession,a.id,{type:'KM_WEEK_INVEST',investment:'KNOWLEDGE_TRANSFER',...transfer});
  assert.ok(action.success,action.message);
  assert.equal(a.kmWeek!.stage,'free','All 3 guided lessons must complete for any starting allocation');
+ const cycle=Array.from({length:6},(_,index)=>freeChallengesForRound(variantSession,a,index+1)).flat();
+ assert.equal(cycle.filter(card=>card.domain===focus).length,6,'Every variant must have six related Challenges');
+ assert.ok(cycle.filter(card=>card.difficulty>=5).every(card=>card.domain===focus),'Every variant must focus all high requirements in its selected domain');
+ assert.equal(new Set(cycle.map(card=>card.title)).size,12,'A recurring domain must not cause story repetition');
+ const nextCycle=Array.from({length:6},(_,index)=>freeChallengesForRound(variantSession,a,index+7)).flat();
+ assert.deepEqual(nextCycle.map(card=>card.difficulty).sort((x,y)=>x-y),cycle.map(card=>card.difficulty+1).sort((x,y)=>x-y),'All variants must continue escalating every six rounds');
 }
 assert.deepEqual(kmWeekRiskOddsV1(1,2),{performanceGap:1,requiredRoll:2,successfulFaces:5,chancePercent:83},'A one-point performance gap must still carry risk and require 2+ on d6');
 assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successfulFaces:2,chancePercent:33},'Risk odds must worsen as the remaining performance gap grows');
@@ -181,17 +195,22 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
 {
   const rounds=Array.from({length:6},(_,index)=>freeChallengesForRound(session,company,index+1));
   const signatures=rounds.map(cards=>cards.map(card=>card.domain+':'+card.difficulty).sort().join('|')).sort();
+  const pressure=company.kmWeek!.pressureDomain!;
+  const [side1,side2]=KM_WEEK_DOMAINS.filter(domain=>domain!==pressure);
   const expected=[
-    'hr:2|marketing:3',
-    'hr:3|marketing:4',
-    'marketing:4|operations:8',
-    'operations:4|operations:6',
-    'marketing:5|operations:4',
-    'marketing:5|marketing:6',
-  ].sort();
+    [`${side1}:2`,`${side2}:3`],
+    [`${side1}:3`,`${side2}:4`],
+    [`${side2}:4`,`${pressure}:8`],
+    [`${pressure}:4`,`${pressure}:6`],
+    [`${side1}:4`,`${pressure}:5`],
+    [`${pressure}:5`,`${pressure}:6`],
+  ].map(items=>items.sort().join('|')).sort();
   assert.deepEqual(signatures,expected,'Each six-round cycle must contain the agreed six challenge-value profiles exactly once');
   assert.equal(rounds.filter(cards=>cards[0].domain===cards[1].domain&&cards.every(card=>card.difficulty>2)).length,2,'Each cycle must contain two later same-domain expert-bottleneck rounds');
-  assert.deepEqual(rounds[0].map(card=>card.domain+':'+card.difficulty).sort(),['hr:2','marketing:3'],'The first full round must remain approachable for new players');
+  assert.deepEqual(rounds[0].map(card=>card.domain+':'+card.difficulty).sort(),[`${side1}:2`,`${side2}:3`].sort(),'The first full round must remain approachable for new players');
+  assert.equal(rounds.flat().filter(card=>card.difficulty>=5).length,5,'There must be five high-pressure cards each cycle');
+  assert.ok(rounds.flat().filter(card=>card.difficulty>=5).every(card=>card.domain===pressure),'All five high-pressure Challenges must demand the same knowledge domain');
+  assert.equal(rounds.flat().filter(card=>card.domain===pressure).length,6,'The recurring constraint must appear in half the Challenges');
   assert.ok(rounds.flat().every(card=>card.impact===card.difficulty*15),'Free-play business impact must scale at $15k per required knowledge level');
   assert.ok(rounds.every(cards=>cards[0].siteId!==cards[1].siteId),'The two Challenges in a round must be assigned to different sites');
   assert.equal(new Set(rounds.flat().map(card=>card.title)).size,12,'Story descriptions must not repeat within a six-round cycle');
@@ -207,6 +226,19 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.ok(secondCycle.flat().every(card=>card.impact===(card.difficulty-1)*15),'A higher Challenge knowledge requirement must not silently change the existing financial impact');
   assert.ok(thirdCycle.flat().every(card=>card.impact===(card.difficulty-2)*15),'Monetary consequences should still be based on the original six profiles after two rotations');
   assert.deepEqual(freeChallengesForRound(session,company,7),secondCycle[0],'Escalated rounds must remain reproducible for a given game');
+}
+
+{
+  const localHero=createInitialCompanyV2('Local Heroes Threshold','kmw-local-heroes',config);
+  initialiseKMWeekCompanyV1(localHero);
+  const localGoalSession={...session,kmWeekGoalId:'local-heroes',companies:[localHero]} as GameSessionV2;
+  assert.match(KM_WEEK_GOALS['local-heroes'].description,/at least 5 free-play Challenges/,'The Local Heroes screen must describe the five-win target');
+  for(const wins of [0,2,4]){
+    localHero.kmWeek!.localSuccesses=wins;
+    assert.equal(calculateKMWeekScoreV1(localGoalSession,localHero).goal,0,`Local Heroes must not award points after ${wins} local-only wins`);
+  }
+  localHero.kmWeek!.localSuccesses=5;
+  assert.equal(calculateKMWeekScoreV1(localGoalSession,localHero).goal,5,'Five local-only wins must earn the Local Heroes award');
 }
 
 {
@@ -239,6 +271,8 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.equal(retireState.expertRetirement?.retiredName,ops.name,'The highest-scoring expert must retire after free Round 5 Challenges');
   assert.equal(retireState.expertRetirement?.retiredScore,6);
   assert.equal(ops.isVacant,true,'The retired expert must disappear from the active expert pool');
+  assert.equal(kmWeekAvailableInvestmentExpertV1(retireCompany,ops.id,'operations')?.id,hr.id,
+   'Invest must switch away from a retired expert instead of retaining a stale selection and silently ignoring Commit');
 
   const retiredName=retireState.expertRetirement!.retiredName;
   retirementResult=applyKMWeekActionV1(retireSession,retireCompany.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:hr.id,domain:'hr'});
@@ -254,6 +288,45 @@ assert.deepEqual(kmWeekRiskOddsV1(0,4),{performanceGap:4,requiredRoll:5,successf
   assert.equal(ops.isVacant,false);
   assert.notEqual(ops.name,retiredName,'The replacement expert must have a new name');
   assert.equal(ops.domains[0].score,4,'Replacement expertise must be Knowledge 3 or the strongest site score, whichever is higher');
+}
+
+
+{
+ // UAT regression: after Round 5 the highest specialist may retire just as
+ // a player first selects the AAR from an earlier serious setback. Commit must
+ // still do something and the company must retain the expert learning.
+ const co=createInitialCompanyV2('Retirement AAR Review','kmw-retirement-aar',config);
+ const run={...session,id:'KM-RETIRE-AAR',companies:[co],activeEvents:{},timerEndsAt:null,timerPausedSecondsRemaining:900} as GameSessionV2;
+ initialiseKMWeekSessionV1(run);
+ const st=co.kmWeek!;
+ st.pressureDomain='operations';
+ st.stage='free';st.phase='challenge';st.freeRound=5;co.round=8;
+ const retiring=co.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
+ retiring.domains[0].score=9;
+ st.challenges=[{id:'BIG-FAILURE',title:'Major process breakdown',story:'Round five',siteId:'brisbane',domain:'operations',difficulty:8,impact:120,status:'open'}];
+ const challenge=applyKMWeekActionV1(run,co.id,{type:'KM_WEEK_RESOLVE',challengeId:'BIG-FAILURE',method:'local'});
+ assert.equal(challenge.success,true,challenge.message);
+ assert.equal(st.phase,'invest');
+ assert.equal(st.lastPressureFailure?.id,'BIG-FAILURE');
+ assert.equal(st.expertRetirement?.expertId,retiring.id,'High-scoring domain expert must still retire after Round 5');
+ assert.equal(retiring.isVacant,true);
+ assert.deepEqual(kmWeekAARCandidatesV1(co).map(c=>c.id),['BIG-FAILURE']);
+ const brisbane=co.sites.find(site=>site.id==='brisbane')!;
+ const before=brisbane.teamCapability.operations||0;
+ const aar=applyKMWeekActionV1(run,co.id,{type:'KM_WEEK_INVEST',investment:'AFTER_ACTION_REVIEW',challengeId:'BIG-FAILURE'});
+ assert.equal(aar.success,true,'An AAR must commit even while the domain specialist is retired: '+aar.message);
+ assert.equal(brisbane.teamCapability.operations,before+2,'AAR must immediately strengthen the affected local team');
+ assert.equal(st.expertRetirement?.pendingAARUplift,2,'AAR knowledge must be preserved for the future specialist');
+ assert.equal(retiring.isVacant,true,'The retired expert must still be absent from the next Challenge round');
+ assert.equal(st.freeRound,6,'Successful AAR advances exactly one round');
+ const expectedBase=Math.max(3,...co.sites.filter(site=>KM_WEEK_SITE_IDS.includes(site.id as typeof KM_WEEK_SITE_IDS[number])).map(site=>site.teamCapability.operations||0));
+ st.challenges=[{id:'NEXT-ROUND',title:'Next round',story:'Replacement',siteId:'perth',domain:'marketing',difficulty:1,impact:15,status:'open'}];
+ const end=applyKMWeekActionV1(run,co.id,{type:'KM_WEEK_RESOLVE',challengeId:'NEXT-ROUND',method:'local'});
+ assert.equal(end.success,true,end.message);
+ assert.equal(st.expertRetirement?.status,'replaced');
+ assert.equal(retiring.isVacant,false,'The replacement must arrive normally in Round 6');
+ assert.equal(retiring.domains[0].score,expectedBase+2,'The replacement must inherit the AAR learning on top of its normal starting level');
+ assert.deepEqual(kmWeekAARCandidatesV1(co).map(c=>c.id),[],'One reviewed failure cannot produce another AAR');
 }
 
 {
@@ -527,6 +600,7 @@ assert.ok((company.kmWeek?.score.total||0)>0);
   const co=createInitialCompanyV2('Lessons Review '+status,'kmw-aar-'+status,config);
   initialiseKMWeekCompanyV1(co);
   const st=co.kmWeek!;
+  delete st.pressureDomain; // Legacy sessions still permit successful or failed reviews.
   st.stage='free';st.phase='invest';st.freeRound=3;co.round=6;
   const site=co.sites.find(site=>site.id==='perth')!;
   const expert=co.experts.find(expert=>expert.domains.some(skill=>skill.domain==='marketing'))!;
@@ -567,6 +641,44 @@ assert.ok((company.kmWeek?.score.total||0)>0);
  assert.equal(highSuccess.site.teamCapability.marketing,11,'Success AAR adds one beyond ten');
  assert.equal(highSuccess.skill.score,12,'Successful AAR also adds one to the expert beyond ten');
  assert.ok(calculateKMWeekScoreV1(session,high.co).expertise<=6,'Higher knowledge must not overflow the six-point Score Pad category');
+}
+// In KMWeek3 the first AAR opportunity follows a substantial failure in the
+// recurring problem domain, not a success or a failure elsewhere.
+{
+ const co=createInitialCompanyV2('Pressure Review','kmw-pressure-review',config);
+ initialiseKMWeekCompanyV1(co,'KMW-PRESSURE-REVIEW');
+ const st=co.kmWeek!,focus=st.pressureDomain!;
+ const other=KM_WEEK_DOMAINS.find(domain=>domain!==focus)!;
+ st.stage='free';st.phase='invest';st.freeRound=4;co.round=7;
+ const makeCard=(id:string,domain:typeof focus,status:'success'|'failure')=>({id,title:id,story:id,siteId:'perth',domain,difficulty:8,impact:120,status});
+ st.challenges=[makeCard('SUCCESS',focus,'success'),makeCard('OTHER',other,'failure')];
+ assert.deepEqual(kmWeekAARCandidatesV1(co),[],'The AAR must stay hidden without a failure in the recurring domain');
+ st.lastPressureFailure=makeCard('EARLIER',focus,'failure');
+ assert.deepEqual(kmWeekAARCandidatesV1(co).map(item=>item.id),['EARLIER'],'A substantial earlier-round failure should be reviewable when round seven begins');
+ st.lastPressureFailure=undefined;
+ st.challenges.push(makeCard('TARGET',focus,'failure'));
+ assert.deepEqual(kmWeekAARCandidatesV1(co).map(item=>item.id),['TARGET'],'Only a tough failure in the recurring domain may introduce the AAR');
+ assert.equal(investKMWeekV1({...session,companies:[co]} as GameSessionV2,co,{investment:'AFTER_ACTION_REVIEW',challengeId:'OTHER'}).success,false,'The server must enforce AAR domain eligibility');
+ st.challenges[2].difficulty=4;
+ assert.deepEqual(kmWeekAARCandidatesV1(co),[],'An easy failure must not introduce the AAR');
+ st.challenges[2].difficulty=8;
+ co.round=6;
+ assert.deepEqual(kmWeekAARCandidatesV1(co),[],'The original AAR unlock timing must be preserved');
+}
+// Store actual past failures, so a player sees the review when it unlocks,
+// even if the immediate round did not contain another big loss.
+{
+ const co=createInitialCompanyV2('Previous failure','kmw-previous-failure',config);
+ const sampleSession={...session,id:'KMW-PRIOR-FAILURE',companies:[co],activeEvents:{}} as GameSessionV2;
+ initialiseKMWeekSessionV1(sampleSession);
+ const focus=co.kmWeek!.pressureDomain!;
+ const prior={id:'EARLY-HARD',title:'High-pressure incident',story:'Learning opportunity',siteId:'perth',domain:focus,difficulty:8,impact:120,status:'open' as const};
+ co.kmWeek!.stage='free';co.kmWeek!.phase='challenge';co.kmWeek!.freeRound=2;co.round=5;co.kmWeek!.challenges=[prior];
+ const failure=applyKMWeekActionV1(sampleSession,co.id,{type:'KM_WEEK_RESOLVE',challengeId:prior.id,method:'local'});
+ assert.equal(failure.success,true,failure.message);
+ assert.equal(co.kmWeek!.lastPressureFailure?.id,prior.id,'The resolved failure must be saved for review');
+ co.kmWeek!.freeRound=4;co.round=7;co.kmWeek!.phase='invest';co.kmWeek!.challenges=[];
+ assert.deepEqual(kmWeekAARCandidatesV1(co).map(challenge=>challenge.id),[prior.id],'The previous failure must become reviewable at the original unlock');
 }
 // Other investments must be able to strengthen expertise beyond difficulty ten.
 {
@@ -620,6 +732,27 @@ assert.ok((company.kmWeek?.score.total||0)>0);
  assert.equal(after.success,true,after.message);
  assert.equal(bankrupt.kmWeek!.stage,'complete','The previously bankrupt player must be able to reach the final AAR');
 }
+
+{
+ // During the final three-minute cutoff, a previously selected expert may
+ // already be retired. The normal final Commit must still reach Site Audits.
+ const finalCo=createInitialCompanyV2('Final Invest After Retirement','kmw-final-invest-retired',config);
+ const finalSession={...session,id:'KMW-FINAL-RETIRE',companies:[finalCo],timerEndsAt:null,timerPausedSecondsRemaining:0} as GameSessionV2;
+ initialiseKMWeekSessionV1(finalSession);
+ const finalState=finalCo.kmWeek!;
+ finalState.stage='free';finalState.phase='invest';finalState.freeRound=5;finalCo.round=8;
+ const retired=finalCo.experts.find(expert=>expert.domains.some(skill=>skill.domain==='operations'))!;
+ retired.isVacant=true;
+ const replacement=kmWeekAvailableInvestmentExpertV1(finalCo,retired.id,'operations');
+ assert.ok(replacement&&!replacement.isVacant&&replacement.id!==retired.id,'Retired selection must fall back to a working specialist');
+ const initialTurnover=finalCo.turnover;
+ const committed=applyKMWeekActionV1(finalSession,finalCo.id,{type:'KM_WEEK_INVEST',investment:'TRAIN_EXPERT',expertId:replacement.id,domain:replacement.domains[0].domain});
+ assert.equal(committed.success,true,'Final Commit must accept the available expert: '+committed.message);
+ assert.equal(finalState.stage,'shock','A valid final investment must enter Site Audits without the emergency button');
+ assert.equal(finalCo.turnover,initialTurnover-15,'The final investment must be charged once, not silently skipped');
+ assert.equal(finalState.investmentHistory.at(-1)?.expertId,replacement.id,'The actual available expert must receive the final investment');
+}
+
 {
  const co=createInitialCompanyV2('Deadline Escape','kmw-deadline',config);
  initialiseKMWeekCompanyV1(co,'KMW-CUTOFF');
