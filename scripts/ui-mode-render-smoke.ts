@@ -94,6 +94,19 @@ assert.ok(marketingTarget.includes('data-kmw-challenge-target="marketing:3" tran
 assert.notEqual(operationTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],marketingTarget.match(/data-kmw-challenge-target="[^"]+" transform="([^"]+)"/)?.[1],'A different Challenge must move the bullseye');
 const noTarget=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations'}));
 const compactRiver=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations',compact:true}));
+// The sole reveal is one unlabelled asterisk on the final AAR River:
+// no earlier River, including its opening-side AAR comparison, may expose it.
+for(const boosted of ['operations','hr','marketing'] as const){
+ const finalRiver=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations',compact:true,finalAarBoostedDomain:boosted}));
+ const label=boosted==='operations'?'Operations':boosted==='hr'?'Human Resources':'Marketing';
+ const domainLabels=['Operations','Human Resources','Marketing'];
+ assert.equal((finalRiver.match(/<text[^>]*>[^<]*\*<\/text>/g)||[]).length,1,'Exactly one domain label on the final AAR River must carry an asterisk');
+ assert.ok(finalRiver.includes(label+'*'),'The selected domain alone must gain its trailing asterisk');
+ for(const other of domainLabels.filter(item=>item!==label))assert.equal(finalRiver.includes(other+'*'),false,'Unboosted domains must retain plain labels');
+ const gameplayRiver=renderToStaticMarkup(React.createElement(InvestmentRiverView,{company:targetCompany,mode:'km_week',selectedDomain:'operations',finalAarBoostedDomain:boosted}));
+ assert.equal(gameplayRiver.includes(label+'*'),false,'Even if passed accidentally, the full gameplay River must never reveal the boosted domain');
+}
+assert.equal(compactRiver.includes('Operations*')||compactRiver.includes('Marketing*')||compactRiver.includes('Human Resources*'),false,'Starting compact River has no asterisk');
 const tickMarkup=(markup:string)=>[...markup.matchAll(/<text[^>]*data-kmw-river-axis-tick="[^"]+"[^>]*>/g)].map(match=>match[0]);
 const compactTicks=tickMarkup(compactRiver),fullTicks=tickMarkup(noTarget);
 assert.ok(compactTicks.length>=3,'Compact AAR River must retain labelled numeric vertical ticks');
@@ -500,6 +513,8 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  const rival=createInitialCompanyV2('Rival Company','rival',DEFAULT_CONFIG);
  initialiseKMWeekCompanyV1(apex);
  initialiseKMWeekCompanyV1(rival);
+ apex.kmWeek!.pressureDomain='marketing';
+ rival.kmWeek!.pressureDomain='marketing';
  apex.kmWeek!.stage='complete';
  rival.kmWeek!.stage='complete';
  apex.kmWeek!.knowledgeTransfers=4;
@@ -527,6 +542,11 @@ assert.ok(appBoardEventSource.includes('const winnerId=String(d.winnerEventInsta
  const html=renderToStaticMarkup(React.createElement(KMWeekDebriefV1,{session:game,company:apex}));
  const axes=[...html.matchAll(/data-kmw-river-scale-max="(\d+)"/g)].map(match=>Number(match[1]));
  assert.equal(axes.length,4,'Two companies must each have a before and an after River');
+ assert.equal((html.match(/<text[^>]*>Marketing\*<\/text>/g)||[]).length,2,'Final AAR must mark Marketing exactly once per company, on the end-of-game River only');
+ assert.equal((html.match(/<text[^>]*>(Operations|Human Resources)\*<\/text>/g)||[]).length,0,'No other domain may be marked on the AAR River');
+ const firstBeforeRiver=html.split('At start of game')[1]?.split('At end of game')[0]||'';
+ assert.equal(firstBeforeRiver.includes('Marketing*'),false,'The initial comparison River must never reveal the workshop constraint');
+ assert.ok(kmWeekDebriefSource.includes('finalAarBoostedDomain={item.kmWeek?.pressureDomain}'),'Only the final AAR comparison passes the hidden pressure domain to the compact River');
 const finalTicks=tickMarkup(html);
 assert.ok(finalTicks.length>=12&&finalTicks.every(tick=>tick.includes('font-size="39"')),'All before/after Rivers in the final comparison must use the enlarged knowledge-level numbers');
  assert.ok(axes.every(value=>value===axes[0])&&axes[0]>=sharedMax,'All before/after Rivers across all companies must share a vertical axis that fits the highest knowledge score');
