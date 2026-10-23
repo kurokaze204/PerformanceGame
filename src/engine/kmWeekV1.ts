@@ -398,6 +398,16 @@ function activeExperts(company:CompanyV2){
   return company.experts.filter(expert=>!expert.isVacant&&expert.domains.some(skill=>KM_WEEK_DOMAINS.includes(skill.domain)));
 }
 
+// An investment selection may outlive an expert: Retirement happens as the
+// final Challenge is resolved, before Invest is displayed. Never leave the
+// client pointing at a vacant specialist or silently ignore the Commit button.
+export function kmWeekAvailableInvestmentExpertV1(company:CompanyV2,preferredId:string,domain:KnowledgeDomain):ExpertV2|undefined{
+  const available=activeExperts(company);
+  return available.find(expert=>expert.id===preferredId)
+    ||available.find(expert=>expert.domains.some(skill=>skill.domain===domain))
+    ||available[0];
+}
+
 function applyStartingBoard(company:CompanyV2,sessionSeed:string){
   for(const site of company.sites){
     site.isClosed=!KM_WEEK_SITE_IDS.includes(site.id as any);
