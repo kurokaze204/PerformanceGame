@@ -1166,7 +1166,8 @@ export const KMWeekBoardV1:React.FC<Props>=({session,company,participant,readOnl
       setActionError(message);onToast(message);return;
     }
     payload={type:'KM_WEEK_INVEST',investment,challengeId:aarChallenge.id};
-    targetKey=aarExpert.isVacant?`site:${aarChallenge.siteId}:${aarChallenge.domain}`:`expert:${aarExpert.id}:${aarChallenge.domain}`;
+    targetKey=`expert:${aarExpert.id}:${aarChallenge.domain}`;
+    if(aarExpert.isVacant)targetKey=`site:${aarChallenge.siteId}:${aarChallenge.domain}`;
   }else if(investment==='TRAIN_EXPERT'){
     const expert=specialist||experts[0];if(!expert)return;
     const domain=expert.domains.find(skill=>KM_WEEK_DOMAINS.includes(skill.domain))?.domain||selectedDomain;
