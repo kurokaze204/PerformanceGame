@@ -89,6 +89,8 @@ export interface KMWeekCompanyState {
   freeRound: number;
   /** Hidden, session-wide KMWeek3 business pressure; absent on existing games. */
   pressureDomain?: KnowledgeDomain;
+  /** Most recent substantial failure in that domain, retained for its AAR. */
+  lastPressureFailure?: KMWeekChallenge;
   challenges: KMWeekChallenge[];
   usedExpertIds: string[];
   trainingCommitments?: Record<string, number>;
